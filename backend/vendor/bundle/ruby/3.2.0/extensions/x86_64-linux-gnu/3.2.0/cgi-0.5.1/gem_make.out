@@ -1,18 +1,18 @@
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
 /usr/bin/ruby3.2 -I/usr/lib/ruby/vendor_ruby extconf.rb
 creating Makefile
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-zkgwsg sitelibdir\=./.gem.20260604-3956-zkgwsg clean
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-zkgwsg sitelibdir\=./.gem.20260604-3956-zkgwsg
 compiling escape.c
 linking shared-object cgi/escape.so
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-zkgwsg sitelibdir\=./.gem.20260604-3956-zkgwsg install
 /usr/bin/install -c -m 0755 escape.so ./.gem.20260604-3956-zkgwsg/cgi
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/cgi-0.5.1/ext/cgi/escape
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-zkgwsg sitelibdir\=./.gem.20260604-3956-zkgwsg clean

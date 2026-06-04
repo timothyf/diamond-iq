@@ -1,4 +1,4 @@
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
 /usr/bin/ruby3.2 -I/usr/lib/ruby/vendor_ruby extconf.rb
 checking for rb_enc_interned_str() in ruby.h... yes
 checking for rb_hash_new_capa() in ruby.h... yes
@@ -12,10 +12,10 @@ checking for whether -DHASH_ASET_DEDUPE=1 is accepted as CFLAGS... yes
 checking for whether -DSTR_UMINUS_DEDUPE_FROZEN=1 is accepted as CFLAGS... yes
 creating Makefile
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-byjkd5 sitelibdir\=./.gem.20260604-3956-byjkd5 clean
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-byjkd5 sitelibdir\=./.gem.20260604-3956-byjkd5
 compiling buffer.c
 compiling buffer_class.c
@@ -31,9 +31,9 @@ compiling unpacker_class.c
 compiling unpacker_ext_registry.c
 linking shared-object msgpack/msgpack.so
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-byjkd5 sitelibdir\=./.gem.20260604-3956-byjkd5 install
 /usr/bin/install -c -m 0755 msgpack.so ./.gem.20260604-3956-byjkd5/msgpack
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/msgpack-1.8.1/ext/msgpack
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-byjkd5 sitelibdir\=./.gem.20260604-3956-byjkd5 clean
