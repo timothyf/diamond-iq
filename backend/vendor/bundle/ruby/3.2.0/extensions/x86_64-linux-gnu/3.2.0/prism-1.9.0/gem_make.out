@@ -1,14 +1,14 @@
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
 /usr/bin/ruby3.2 -I/usr/lib/ruby/vendor_ruby extconf.rb
-checking for prism.h in /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/include... yes
-checking for prism/extension.h in /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext... yes
+checking for prism.h in /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/include... yes
+checking for prism/extension.h in /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext... yes
 checking for whether -fvisibility=hidden is accepted as CFLAGS... yes
 creating Makefile
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-vhtn58 sitelibdir\=./.gem.20260604-3956-vhtn58 clean
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-vhtn58 sitelibdir\=./.gem.20260604-3956-vhtn58
 compiling api_node.c
 compiling api_pack.c
@@ -36,9 +36,9 @@ compiling ./../../src/static_literals.c
 compiling ./../../src/token_type.c
 linking shared-object prism/prism.so
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-vhtn58 sitelibdir\=./.gem.20260604-3956-vhtn58 install
 /usr/bin/install -c -m 0755 prism.so ./.gem.20260604-3956-vhtn58/prism
 
-current directory: /tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
+current directory: /shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext/prism
 make DESTDIR\= sitearchdir\=./.gem.20260604-3956-vhtn58 sitelibdir\=./.gem.20260604-3956-vhtn58 clean
