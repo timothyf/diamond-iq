@@ -18,10 +18,10 @@ Gem::Specification.new do |s|
   s.homepage = "https://github.com/faye/websocket-driver-ruby".freeze
   s.licenses = ["Apache-2.0".freeze]
   s.rdoc_options = ["--main".freeze, "README.md".freeze, "--markup".freeze, "markdown".freeze]
-  s.rubygems_version = "3.4.20".freeze
+  s.rubygems_version = "3.4.19".freeze
   s.summary = "WebSocket protocol handler with pluggable I/O".freeze
 
-  s.installed_by_version = "3.4.20" if s.respond_to? :installed_by_version
+  s.installed_by_version = "3.4.19" if s.respond_to? :installed_by_version
 
   s.specification_version = 4
 
