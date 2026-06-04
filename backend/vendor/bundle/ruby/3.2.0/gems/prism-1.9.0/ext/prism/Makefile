@@ -86,7 +86,7 @@ warnflags = -Wall -Wextra -Wdeprecated-declarations -Wdiv-by-zero -Wduplicated-c
 cppflags = 
 CCDLFLAGS = -fPIC
 CFLAGS   = $(CCDLFLAGS) -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=BUILDDIR=. -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=BUILDDIR=/usr/src/ruby3.2-3.2.3-1ubuntu0.24.04.7 -fPIC -fvisibility=hidden $(ARCH_FLAG)
-INCFLAGS = -I. -I$(arch_hdrdir) -I$(hdrdir)/ruby/backward -I$(hdrdir) -I$(srcdir) -I/tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/include -I/tmp/workspace/timothyf/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext
+INCFLAGS = -I. -I$(arch_hdrdir) -I$(hdrdir)/ruby/backward -I$(hdrdir) -I$(srcdir) -I/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/include -I/shopify-prep-project/backend/vendor/bundle/ruby/3.2.0/gems/prism-1.9.0/ext
 DEFS     = 
 CPPFLAGS =  -Wdate-time -D_FORTIFY_SOURCE=3 $(DEFS) $(cppflags)
 CXXFLAGS = $(CCDLFLAGS) -g -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -ffile-prefix-map=BUILDDIR=. -fstack-protector-strong -fstack-clash-protection -Wformat -Werror=format-security -fcf-protection -fdebug-prefix-map=BUILDDIR=/usr/src/ruby3.2-3.2.3-1ubuntu0.24.04.7 $(ARCH_FLAG)
