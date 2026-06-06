@@ -12,22 +12,66 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
       team_code: "det",
       file_code: "det"
     )
+    @dodgers = create_team(
+      mlb_id: 119,
+      name: "Los Angeles Dodgers",
+      abbreviation: "LAD",
+      team_name: "Dodgers",
+      location_name: "Los Angeles",
+      short_name: "Los Angeles",
+      team_code: "lan",
+      file_code: "la"
+    )
     @player = create_player(team: @team, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
+    @shohei = create_player(team: @dodgers, attributes: { mlb_id: 660271, first_name: "Shohei", last_name: "Ohtani" })
     @stat_type = create_stat_type(name: "war", label: "WAR", category: "batting")
+    @ops = create_stat_type(name: "ops", label: "OPS", category: "batting")
+    @era = create_stat_type(name: "era", label: "ERA", category: "pitching")
     @player_season_stat = create_player_season_stat(
       player: @player,
       stat_type: @stat_type,
       attributes: { season: 2024, value: 3.2 }
     )
+    @ops_stat = create_player_season_stat(
+      player: @player,
+      stat_type: @ops,
+      attributes: { season: 2025, value: 0.95 }
+    )
+    @era_stat = create_player_season_stat(
+      player: @shohei,
+      stat_type: @era,
+      attributes: { season: 2024, value: 2.35 }
+    )
   end
 
-  it "lists player season stats" do
-    get api_player_season_stats_path, as: :json
+  it "lists player season stats with pagination metadata and nested associations" do
+    get api_player_season_stats_path,
+        params: { page: 1, per_page: 2, sort: "-value", filter: { team_name: "tig", category: "batting" } }
 
     expect(response).to have_http_status(:ok)
-    expect(json_body.fetch("data").length).to eq(1)
+    expect(json_body.dig("meta", "page")).to eq(1)
+    expect(json_body.dig("meta", "per_page")).to eq(2)
+    expect(json_body.dig("meta", "total_count")).to eq(2)
+    expect(json_body.dig("meta", "total_pages")).to eq(1)
+    expect(json_body.dig("meta", "sort")).to eq("-value")
+    expect(json_body.dig("meta", "filters")).to eq({ "team_name" => "tig", "category" => "batting" })
+    expect(json_body.fetch("data").length).to eq(2)
     expect(json_body.dig("data", 0, "id")).to eq(@player_season_stat.id)
+    expect(json_body.dig("data", 0, "player", "full_name")).to eq("Miguel Cabrera")
+    expect(json_body.dig("data", 0, "team", "abbreviation")).to eq("DET")
+    expect(json_body.dig("data", 0, "stat_type", "label")).to eq("WAR")
     expect(json_body.dig("data", 0, "value")).to eq("3.2")
+    expect(json_body.fetch("data").map { |row| row.dig("stat_type", "name") }).to eq(%w[war ops])
+  end
+
+  it "filters player season stats by player name, season, and stat type" do
+    get api_player_season_stats_path,
+        params: { filter: { player_name: "oht", season: 2024, stat_type_name: "era" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "total_count")).to eq(1)
+    expect(json_body.fetch("data").map { |row| row.dig("player", "last_name") }).to eq(["Ohtani"])
+    expect(json_body.dig("data", 0, "stat_type", "category")).to eq("pitching")
   end
 
   it "shows a player season stat" do
@@ -36,6 +80,8 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "id")).to eq(@player_season_stat.id)
     expect(json_body.dig("data", "season")).to eq(2024)
+    expect(json_body.dig("data", "player", "full_name")).to eq("Miguel Cabrera")
+    expect(json_body.dig("data", "stat_type", "label")).to eq("WAR")
   end
 
   it "creates a player season stat" do
