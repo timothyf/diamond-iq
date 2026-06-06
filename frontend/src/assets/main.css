@@ -14,6 +14,7 @@
 }
 
 .hero-panel,
+.import-station,
 .control-deck,
 .table-stage {
   width: min(1200px, 100%);
@@ -107,6 +108,7 @@
   font-size: 1.3rem;
 }
 
+.import-station,
 .control-deck,
 .table-stage {
   margin-top: 1rem;
@@ -124,6 +126,156 @@
   gap: 1rem;
   justify-content: space-between;
   align-items: flex-start;
+}
+
+.import-station {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+}
+
+.import-station__copy h2 {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', 'DIN Condensed', 'Trebuchet MS', sans-serif;
+  font-size: clamp(1.7rem, 2.3vw, 2.4rem);
+  text-transform: uppercase;
+}
+
+.import-station__copy p:last-child {
+  max-width: 38rem;
+  margin-top: 0.75rem;
+  color: #384857;
+}
+
+.import-station__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.import-dropzone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.45rem;
+  min-height: 180px;
+  padding: 1.25rem;
+  border: 1.5px dashed rgba(16, 38, 61, 0.22);
+  border-radius: 24px;
+  background:
+    linear-gradient(135deg, rgba(16, 38, 61, 0.04), rgba(143, 45, 36, 0.08)),
+    rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.import-dropzone:hover {
+  transform: translateY(-1px);
+  border-color: rgba(143, 45, 36, 0.38);
+  box-shadow: inset 0 0 0 1px rgba(143, 45, 36, 0.12);
+}
+
+.import-dropzone__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.import-dropzone__title {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', 'DIN Condensed', 'Trebuchet MS', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.import-dropzone__detail,
+.import-status {
+  color: #384857;
+}
+
+.import-station__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.import-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem 1.05rem;
+  border-radius: 18px;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.import-progress__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  color: #10263d;
+  font-size: 0.94rem;
+}
+
+.import-progress__header strong {
+  font-family: 'Avenir Next Condensed', 'DIN Condensed', 'Trebuchet MS', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.import-progress__track {
+  position: relative;
+  overflow: hidden;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: rgba(16, 38, 61, 0.08);
+}
+
+.import-progress__fill {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, rgba(143, 45, 36, 0.96), rgba(210, 182, 119, 0.95) 58%, rgba(37, 90, 131, 0.96));
+  box-shadow: 0 0 18px rgba(143, 45, 36, 0.18);
+  transition: width 220ms ease;
+}
+
+.import-progress__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 18%, rgba(255, 255, 255, 0.38) 50%, transparent 82%);
+  animation: import-sheen 1.3s linear infinite;
+}
+
+.import-progress__note {
+  color: #5a6977;
+  font-size: 0.9rem;
+}
+
+.import-error {
+  margin-top: 0;
+}
+
+.import-status {
+  margin-top: 1rem;
+  font-size: 0.95rem;
 }
 
 .filter-grid {
@@ -318,16 +470,31 @@
   color: #5e6d7b;
 }
 
+@keyframes import-sheen {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(100%);
+  }
+}
+
 @media (max-width: 860px) {
   .dashboard-shell {
     padding: 1rem 0.85rem 2.5rem;
   }
 
   .hero-panel,
+  .import-station,
   .control-deck,
   .table-stage {
     padding: 1.1rem;
     border-radius: 22px;
+  }
+
+  .import-station {
+    grid-template-columns: 1fr;
   }
 
   .control-deck__header,

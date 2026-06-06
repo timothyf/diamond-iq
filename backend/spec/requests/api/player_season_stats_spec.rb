@@ -1,4 +1,5 @@
 require "rails_helper"
+require "tempfile"
 
 RSpec.describe "Api::PlayerSeasonStats", type: :request do
   before do
@@ -117,6 +118,66 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("errors")).to include("Season can't be blank", "Value can't be blank")
+  end
+
+  it "imports player season stats from an uploaded csv" do
+    create_stat_type(name: "gamesPlayed", label: "G", category: "batting")
+
+    csv_file = Tempfile.new(["player-season-stats", ".csv"])
+    csv_file.write(<<~CSV)
+      source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed
+      2024,2024,batter,123456,Barry,Bonds,SFG,San Francisco Giants,Giants,137,99
+    CSV
+    csv_file.rewind
+
+    uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "player-season-stats.csv")
+
+    expect do
+      post import_api_player_season_stats_path,
+           params: {
+             file: uploaded_file,
+             required_stat_columns: ["gamesPlayed"]
+           }
+    end.to change(PlayerSeasonStat, :count).by(1)
+
+    expect(response).to have_http_status(:created)
+    expect(json_body["message"]).to eq("Imported 1 player season stats")
+    expect(json_body.dig("data", "imported_count")).to eq(1)
+    expect(json_body.dig("data", "created_player_count")).to eq(1)
+    expect(json_body.dig("data", "created_team_count")).to eq(1)
+    expect(Player.find_by!(mlb_id: 123456).last_name).to eq("Bonds")
+  ensure
+    csv_file.close!
+  end
+
+  it "returns an error when the upload request is missing a csv file" do
+    post import_api_player_season_stats_path,
+         params: { required_stat_columns: ["gamesPlayed"] }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body.fetch("errors")).to include("CSV file is required")
+  end
+
+  it "returns importer failures from the upload endpoint" do
+    csv_file = Tempfile.new(["player-season-stats-invalid", ".csv"])
+    csv_file.write(<<~CSV)
+      source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId
+      2024,2024,batter,123456,Barry,Bonds,SFG,San Francisco Giants,Giants,137
+    CSV
+    csv_file.rewind
+
+    uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "invalid-player-season-stats.csv")
+
+    post import_api_player_season_stats_path,
+         params: {
+           file: uploaded_file,
+           required_stat_columns: ["gamesPlayed"]
+         }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body["message"]).to include("Missing required stat columns: gamesPlayed")
+  ensure
+    csv_file.close!
   end
 
   it "updates a player season stat" do

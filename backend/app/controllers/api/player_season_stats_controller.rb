@@ -25,6 +25,27 @@ module Api
       end
     end
 
+    def import
+      uploaded_file = import_params[:file]
+
+      if uploaded_file.blank?
+        render json: { errors: ["CSV file is required"] }, status: :unprocessable_content
+        return
+      end
+
+      result = PlayerStatsImporter.call(
+        csv_data: uploaded_file.read,
+        source_name: uploaded_file.original_filename,
+        required_stat_columns: import_params[:required_stat_columns]
+      )
+
+      if result[:success]
+        render json: { message: result[:message], data: result[:data] }, status: :created
+      else
+        render json: { message: result[:message], errors: Array(result.dig(:data, :errors)) }, status: :unprocessable_content
+      end
+    end
+
     def update
       if @player_season_stat.update(player_season_stat_params)
         render json: { data: serialize_player_season_stat(@player_season_stat) }
@@ -55,6 +76,10 @@ module Api
 
     def player_season_stat_params
       params.require(:player_season_stat).permit(:player_id, :stat_type_id, :season, :value)
+    end
+
+    def import_params
+      params.permit(:file, required_stat_columns: [])
     end
 
     def serialize_player_season_stat(player_season_stat)
