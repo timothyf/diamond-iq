@@ -1,8 +1,10 @@
 <script setup>
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 
+import CsvImportPicker from './CsvImportPicker.vue'
 import PlayerSeasonStatsTable from './PlayerSeasonStatsTable.vue'
 import { usePlayerSeasonStats } from '../composables/usePlayerSeasonStats'
+import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 
 const filters = reactive({
   playerName: '',
@@ -21,6 +23,10 @@ const sort = reactive({
   value: '-value',
 })
 
+const selectedImportFile = ref(null)
+const importPickerKey = ref(0)
+const stagedImportMessage = ref('Choose a CSV file to import player season stats into the app.')
+
 const query = computed(() => ({
   page: pagination.page,
   perPage: pagination.perPage,
@@ -35,6 +41,7 @@ const query = computed(() => ({
 }))
 
 const { rows, meta, loading, error, refresh } = usePlayerSeasonStats(query)
+const { uploading, error: importError, summary: importSummary, importFile } = usePlayerSeasonStatsImport()
 
 watch(
   () => [filters.playerName, filters.teamName, filters.season, filters.category, filters.statTypeName, pagination.perPage, sort.value],
@@ -76,6 +83,22 @@ function resetFilters() {
   pagination.page = 1
   sort.value = '-value'
 }
+
+function handleFileSelected(file) {
+  selectedImportFile.value = file
+  stagedImportMessage.value = `${file.name} is selected and ready to import.`
+}
+
+async function handleImportRequest(file) {
+  selectedImportFile.value = file
+  const result = await importFile(file)
+  if (!result) return
+
+  await refresh()
+  selectedImportFile.value = null
+  stagedImportMessage.value = `Latest import file: ${file.name}.`
+  importPickerKey.value += 1
+}
 </script>
 
 <template>
@@ -104,6 +127,15 @@ function resetFilters() {
         </article>
       </div>
     </section>
+
+    <CsvImportPicker
+      :key="importPickerKey"
+      :busy="uploading"
+      :status-message="importSummary || stagedImportMessage"
+      :upload-error="importError"
+      @file-selected="handleFileSelected"
+      @import-request="handleImportRequest"
+    />
 
     <section class="control-deck">
       <div class="control-deck__header">

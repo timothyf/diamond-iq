@@ -1,7 +1,11 @@
 Rails.application.routes.draw do
   namespace :api do
     resources :players, only: [:index]
-    resources :player_season_stats
+    resources :player_season_stats do
+      collection do
+        post :import
+      end
+    end
   end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
