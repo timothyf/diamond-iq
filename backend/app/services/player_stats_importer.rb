@@ -1,32 +1,31 @@
+require "bigdecimal"
 require "csv"
 
 class PlayerStatsImporter
-  PLAYER_ID_FIELDS = %w[player_id playerid id].freeze
-  FIRST_NAME_FIELDS = %w[first_name firstname].freeze
-  LAST_NAME_FIELDS = %w[last_name lastname].freeze
-  FULL_NAME_FIELDS = %w[name full_name fullname].freeze
+  PLAYER_ID_FIELDS = %w[player_id playerid playerId id].freeze
+  FIRST_NAME_FIELDS = %w[first_name firstname playerfirstname playerFirstName].freeze
+  LAST_NAME_FIELDS = %w[last_name lastname playerlastname playerLastName].freeze
+  FULL_NAME_FIELDS = %w[name full_name fullname playerfullname playerFullName playername playerName].freeze
 
-  TEAM_NAME_FIELDS = %w[team_name teamname].freeze
-  LOCATION_NAME_FIELDS = %w[location_name locationname].freeze
-  TEAM_DISPLAY_NAME_FIELDS = %w[team_display_name team_display full_team_name].freeze
-  ABBREVIATION_FIELDS = %w[abbreviation abbrev].freeze
-  SHORT_NAME_FIELDS = %w[short_name shortname].freeze
-  TEAM_CODE_FIELDS = %w[team_code teamcode].freeze
-  FILE_CODE_FIELDS = %w[file_code filecode].freeze
+  TEAM_NAME_FIELDS = %w[teamname teamName].freeze
+  TEAM_ABBREVIATION_FIELDS = %w[teamabbrev teamAbbrev abbreviation abbrev].freeze
+  TEAM_SHORT_NAME_FIELDS = %w[teamshortname teamShortName short_name shortname].freeze
+  TEAM_ID_FIELDS = %w[teamid teamId].freeze
 
-  RESERVED_COLUMNS = (
-    PLAYER_ID_FIELDS +
-    FIRST_NAME_FIELDS +
-    LAST_NAME_FIELDS +
-    FULL_NAME_FIELDS +
-    TEAM_NAME_FIELDS +
-    LOCATION_NAME_FIELDS +
-    TEAM_DISPLAY_NAME_FIELDS +
-    ABBREVIATION_FIELDS +
-    SHORT_NAME_FIELDS +
-    TEAM_CODE_FIELDS +
-    FILE_CODE_FIELDS
-  ).freeze
+  SEASON_FIELDS = %w[season year source_season sourceSeason].freeze
+  STAT_GROUP_FIELDS = %w[stat_type statType].freeze
+
+  CATEGORY_MAP = {
+    "batter" => "batting",
+    "batting" => "batting",
+    "hitting" => "batting",
+    "pitcher" => "pitching",
+    "pitching" => "pitching",
+    "pitchstats" => "pitchStats",
+    "pitch_stats" => "pitchStats"
+  }.freeze
+
+  UPSERT_INDEX = %i[player_id stat_type_id season].freeze
 
   def self.call(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [])
     new(
@@ -56,11 +55,11 @@ class PlayerStatsImporter
     return failure("Missing required stat columns: #{missing_columns.join(', ')}") if missing_columns.any?
 
     import_rows = build_import_rows(csv)
-    return failure("No valid player stat rows found in CSV") if import_rows.empty?
+    return failure("No valid player season stat rows found in CSV") if import_rows.empty?
 
     persisted = persist_rows(import_rows)
     success(
-      "Imported #{persisted[:imported_count]} player stat rows",
+      "Imported #{persisted[:imported_count]} player season stats",
       persisted.merge(
         skipped_count: errors.length,
         duplicate_count: @duplicate_count || 0,
@@ -72,7 +71,7 @@ class PlayerStatsImporter
   rescue Errno::ENOENT => e
     failure("Failed to read CSV file: #{e.message}")
   rescue ActiveRecord::ActiveRecordError => e
-    failure("Failed to import player stats: #{e.message}")
+    failure("Failed to import player season stats: #{e.message}")
   end
 
   private
@@ -101,46 +100,49 @@ class PlayerStatsImporter
 
   def build_import_rows(csv)
     @duplicate_count = 0
-    rows_by_player_id = {}
+    rows_by_identity = {}
 
     csv.each_with_index do |row, index|
       source_row_number = index + 2
       import_row = build_import_row(row, source_row_number)
       next if import_row.nil?
 
-      if rows_by_player_id.key?(import_row[:player_id])
-        @duplicate_count += 1
-      end
-
-      rows_by_player_id[import_row[:player_id]] = import_row
+      row_key = [import_row[:player_mlb_id], import_row[:season], import_row[:category]]
+      @duplicate_count += 1 if rows_by_identity.key?(row_key)
+      rows_by_identity[row_key] = import_row
     end
 
-    rows_by_player_id.values
+    rows_by_identity.values
   end
 
   def build_import_row(row, source_row_number)
     normalized_row = normalize_row(row.to_h)
+    key_map = normalized_row.keys.index_by { |key| key.downcase }
 
-    player_id = fetch_value(normalized_row, PLAYER_ID_FIELDS)
-    first_name = fetch_value(normalized_row, FIRST_NAME_FIELDS)
-    last_name = fetch_value(normalized_row, LAST_NAME_FIELDS)
+    player_mlb_id = parse_integer(fetch_value(normalized_row, key_map, PLAYER_ID_FIELDS))
+    first_name = fetch_value(normalized_row, key_map, FIRST_NAME_FIELDS)
+    last_name = fetch_value(normalized_row, key_map, LAST_NAME_FIELDS)
 
     if first_name.blank? || last_name.blank?
-      derived_first_name, derived_last_name = split_name(fetch_value(normalized_row, FULL_NAME_FIELDS))
+      derived_first_name, derived_last_name = split_name(fetch_value(normalized_row, key_map, FULL_NAME_FIELDS))
       first_name ||= derived_first_name
       last_name ||= derived_last_name
     end
 
-    team_attributes = build_team_attributes(normalized_row)
-    stats_data = extract_stats_data(normalized_row)
+    season = parse_integer(fetch_value(normalized_row, key_map, SEASON_FIELDS))
+    category = normalize_category(fetch_value(normalized_row, key_map, STAT_GROUP_FIELDS))
+    team_attributes = build_team_attributes(normalized_row, key_map)
+    stat_entries = build_stat_entries(normalized_row, key_map, category)
 
     missing_identity_fields = []
-    missing_identity_fields << "player_id" if player_id.blank?
-    missing_identity_fields << "first_name" if first_name.blank?
-    missing_identity_fields << "last_name" if last_name.blank?
+    missing_identity_fields << "playerId" if player_mlb_id.nil?
+    missing_identity_fields << "playerFirstName" if first_name.blank?
+    missing_identity_fields << "playerLastName" if last_name.blank?
+    missing_identity_fields << "season" if season.nil?
+    missing_identity_fields << "stat_type" if category.blank?
 
     if missing_identity_fields.any?
-      errors << row_error(source_row_number, "Missing required player fields: #{missing_identity_fields.join(', ')}")
+      errors << row_error(source_row_number, "Missing required player season fields: #{missing_identity_fields.join(', ')}")
       return nil
     end
 
@@ -150,96 +152,105 @@ class PlayerStatsImporter
       return nil
     end
 
-    if stats_data.blank?
-      errors << row_error(source_row_number, "Missing statistical columns for player #{player_id}")
+    if stat_entries.empty?
+      errors << row_error(source_row_number, "No importable #{category} stats found for player #{player_mlb_id}")
       return nil
     end
 
     {
-      player_id: player_id,
+      player_mlb_id: player_mlb_id,
       first_name: first_name,
       last_name: last_name,
-      row_number: source_row_number,
+      season: season,
+      category: category,
       team_attributes: team_attributes,
-      stats_data: stats_data
+      stat_entries: stat_entries
     }
   end
 
-  def build_team_attributes(normalized_row)
-    team_name = fetch_value(normalized_row, TEAM_NAME_FIELDS)
-    location_name = fetch_value(normalized_row, LOCATION_NAME_FIELDS)
-    abbreviation = fetch_value(normalized_row, ABBREVIATION_FIELDS)
-    short_name = fetch_value(normalized_row, SHORT_NAME_FIELDS) || team_name
-    team_code = fetch_value(normalized_row, TEAM_CODE_FIELDS) || abbreviation&.downcase
-    file_code = fetch_value(normalized_row, FILE_CODE_FIELDS) || team_code
-    display_name = fetch_value(normalized_row, TEAM_DISPLAY_NAME_FIELDS)
+  def build_team_attributes(normalized_row, key_map)
+    team_abbreviation = fetch_value(normalized_row, key_map, TEAM_ABBREVIATION_FIELDS)
+    full_team_name = fetch_value(normalized_row, key_map, TEAM_NAME_FIELDS)
+    short_name = fetch_value(normalized_row, key_map, TEAM_SHORT_NAME_FIELDS).presence || full_team_name
+    team_mlb_id = parse_integer(fetch_value(normalized_row, key_map, TEAM_ID_FIELDS))
 
-    derived_name = if display_name.present? && display_name != team_name
-      display_name
-    elsif location_name.present? && team_name.present?
-      "#{location_name} #{team_name}"
+    derived_location_name = if full_team_name.present? && short_name.present? && full_team_name.end_with?(short_name) && full_team_name != short_name
+      full_team_name.delete_suffix(short_name).strip.presence || full_team_name
     else
-      team_name
+      full_team_name
     end
+
+    derived_team_name = short_name.presence || full_team_name
+    derived_team_code = team_mlb_id.presence || team_abbreviation.to_s.downcase.presence
 
     {
-      name: derived_name,
-      abbreviation: abbreviation,
-      team_name: team_name,
-      location_name: location_name,
+      mlb_id: team_mlb_id,
+      name: full_team_name.presence || derived_team_name,
+      abbreviation: team_abbreviation,
+      team_name: derived_team_name,
+      location_name: derived_location_name,
       short_name: short_name,
-      team_code: team_code,
-      file_code: file_code
+      team_code: derived_team_code,
+      file_code: derived_team_code
     }
   end
 
-  def extract_stats_data(normalized_row)
-    normalized_row.each_with_object({}) do |(key, value), stats|
-      next if reserved_column?(key)
-      next if value.blank?
+  def build_stat_entries(normalized_row, key_map, category)
+    return [] if category.blank?
 
-      stats[key] = value
+    stat_types_for_category(category).filter_map do |stat_type|
+      raw_value = fetch_value(normalized_row, key_map, [stat_type.name])
+      numeric_value = parse_numeric_value(raw_value)
+      next if numeric_value.nil?
+
+      { stat_type: stat_type, value: numeric_value }
     end
+  end
+
+  def stat_types_for_category(category)
+    @stat_types_for_category ||= StatType.all.group_by(&:category)
+    @stat_types_for_category.fetch(category, [])
   end
 
   def persist_rows(import_rows)
     timestamp = Time.current
-    stat_records = []
+    season_stat_records = []
     created_player_count = 0
     created_team_count = 0
 
-    PlayerStat.transaction do
-      PlayerStat.where(source_url: resolved_source_name).delete_all
-
+    PlayerSeasonStat.transaction do
       import_rows.each do |import_row|
-        team = Team.find_or_initialize_by(team_code: import_row[:team_attributes][:team_code])
+        team = Team.find_or_initialize_by(mlb_id: import_row[:team_attributes][:mlb_id])
         created_team_count += 1 if team.new_record?
         team.assign_attributes(import_row[:team_attributes])
         team.save!
 
-        player = Player.find_or_initialize_by(
+        player = Player.find_or_initialize_by(mlb_id: import_row[:player_mlb_id])
+        created_player_count += 1 if player.new_record?
+        player.assign_attributes(
           first_name: import_row[:first_name],
           last_name: import_row[:last_name],
           team: team
         )
-        created_player_count += 1 if player.new_record?
         player.save!
 
-        stat_records << {
-          player_id: import_row[:player_id],
-          source_url: resolved_source_name,
-          row_number: import_row[:row_number],
-          stats_data: import_row[:stats_data],
-          created_at: timestamp,
-          updated_at: timestamp
-        }
+        import_row[:stat_entries].each do |stat_entry|
+          season_stat_records << {
+            player_id: player.id,
+            stat_type_id: stat_entry[:stat_type].id,
+            season: import_row[:season],
+            value: stat_entry[:value],
+            created_at: timestamp,
+            updated_at: timestamp
+          }
+        end
       end
 
-      PlayerStat.insert_all!(stat_records)
+      PlayerSeasonStat.upsert_all(season_stat_records, unique_by: UPSERT_INDEX) if season_stat_records.any?
     end
 
     {
-      imported_count: stat_records.length,
+      imported_count: season_stat_records.length,
       created_player_count: created_player_count,
       created_team_count: created_team_count
     }
@@ -256,9 +267,9 @@ class PlayerStatsImporter
     end
   end
 
-  def fetch_value(normalized_row, aliases)
+  def fetch_value(normalized_row, key_map, aliases)
     aliases.each do |field_name|
-      matched_key = normalized_row.keys.find { |key| key.casecmp?(field_name) }
+      matched_key = key_map[field_name.to_s.downcase]
       return normalized_row[matched_key] if matched_key
     end
 
@@ -274,8 +285,26 @@ class PlayerStatsImporter
     [parts[0..-2].join(" "), parts.last]
   end
 
-  def reserved_column?(column_name)
-    RESERVED_COLUMNS.any? { |reserved| reserved.casecmp?(column_name) }
+  def normalize_category(raw_category)
+    CATEGORY_MAP[raw_category.to_s.strip.downcase]
+  end
+
+  def parse_integer(value)
+    return nil if value.blank?
+
+    Integer(value.to_s, exception: false)
+  end
+
+  def parse_numeric_value(value)
+    return nil if value.blank?
+
+    normalized_value = value.to_s.strip
+    return nil if normalized_value.blank?
+    return nil if normalized_value.match?(/\A-?\.-{2,}\z|\A\.---\z|\A-\.\-\-\z|\A\.--+\z|\A-\z/)
+
+    BigDecimal(normalized_value)
+  rescue ArgumentError
+    nil
   end
 
   def row_error(source_row_number, message)

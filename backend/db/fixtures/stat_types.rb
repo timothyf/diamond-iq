@@ -1,4 +1,4 @@
-StatType.seed([:category, :name],
+StatType.seed(:category, :name,
   { category: "pitching", name: "W", label: "W" },
   { category: "pitching", name: "L", label: "L" },
   { category: "pitching", name: "SV", label: "SV" },

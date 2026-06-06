@@ -1,5 +1,5 @@
 namespace :player_stats do
-  desc "Import player stats from CSV. Usage: bin/rails 'player_stats:seed[path/to/file.csv]' REQUIRED_STAT_COLUMNS=AVG,OPS"
+  desc "Import player season stats from CSV. Usage: bin/rails 'player_stats:seed[path/to/file.csv]' REQUIRED_STAT_COLUMNS=gamesPlayed,ops"
   task :seed, [:file_path] => :environment do |_task, args|
     file_path = args[:file_path].presence || ENV["PLAYER_STATS_CSV"]
 
@@ -22,7 +22,7 @@ namespace :player_stats do
 
     if result[:success]
       data = result[:data] || {}
-      puts "Imported rows: #{data[:imported_count]}"
+      puts "Imported season stat records: #{data[:imported_count]}"
       puts "Created teams: #{data[:created_team_count]}"
       puts "Created players: #{data[:created_player_count]}"
       puts "Skipped rows: #{data[:skipped_count]}"
@@ -36,7 +36,7 @@ namespace :player_stats do
         puts "Row #{error[:row_number]}: #{error[:error]}"
       end
 
-      abort "Player stats import failed"
+      abort "Player season stats import failed"
     end
   end
 end
