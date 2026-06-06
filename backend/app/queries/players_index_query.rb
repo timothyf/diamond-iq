@@ -76,7 +76,7 @@ class PlayersIndexQuery
 
   def raw_filters
     filters = params.fetch("filter", params.fetch(:filter, {}))
-    filters.respond_to?(:to_h) ? filters.to_h : {}
+    filters.respond_to?(:to_h) ? filters.to_h.deep_stringify_keys : {}
   end
 
   def page

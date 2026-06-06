@@ -3,6 +3,7 @@ require "test_helper"
 class ApiPlayersIndexTest < ActionDispatch::IntegrationTest
   setup do
     @tigers = create_team(
+      mlb_id: 116,
       name: "Detroit Tigers",
       abbreviation: "DET",
       team_name: "Tigers",
@@ -12,6 +13,7 @@ class ApiPlayersIndexTest < ActionDispatch::IntegrationTest
       file_code: "det"
     )
     @dodgers = create_team(
+      mlb_id: 119,
       name: "Los Angeles Dodgers",
       abbreviation: "LAD",
       team_name: "Dodgers",
@@ -21,6 +23,7 @@ class ApiPlayersIndexTest < ActionDispatch::IntegrationTest
       file_code: "la"
     )
     @angels = create_team(
+      mlb_id: 108,
       name: "Los Angeles Angels",
       abbreviation: "LAA",
       team_name: "Angels",
@@ -30,9 +33,9 @@ class ApiPlayersIndexTest < ActionDispatch::IntegrationTest
       file_code: "ana"
     )
 
-    @miguel = Player.create!(first_name: "Miguel", last_name: "Cabrera", team: @tigers)
-    @shohei = Player.create!(first_name: "Shohei", last_name: "Ohtani", team: @dodgers)
-    @mike = Player.create!(first_name: "Mike", last_name: "Trout", team: @angels)
+    @miguel = Player.create!(mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera", team: @tigers)
+    @shohei = Player.create!(mlb_id: 660271, first_name: "Shohei", last_name: "Ohtani", team: @dodgers)
+    @mike = Player.create!(mlb_id: 545361, first_name: "Mike", last_name: "Trout", team: @angels)
   end
 
   test "returns paginated players with metadata" do

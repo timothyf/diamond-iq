@@ -8,6 +8,6 @@ class CreateStatTypes < ActiveRecord::Migration[7.1]
       t.timestamps
     end
 
-    add_index :stat_types, :name, unique: true
+    add_index :stat_types, [:name, :category], unique: true
   end
 end
