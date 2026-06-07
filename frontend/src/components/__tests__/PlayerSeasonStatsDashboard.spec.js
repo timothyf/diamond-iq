@@ -43,6 +43,25 @@ vi.mock('../../composables/usePlayerSeasonStats', () => ({
   })),
 }))
 
+vi.mock('../../composables/usePlayerSuggestions', () => ({
+  usePlayerSuggestions: vi.fn(() => ({
+    suggestions: computed(() => [
+      {
+        id: 42,
+        fullName: 'Miguel Cabrera',
+        team: { abbreviation: 'DET' },
+      },
+      {
+        id: 43,
+        fullName: 'Mike Trout',
+        team: { abbreviation: 'LAA' },
+      },
+    ]),
+    loading: computed(() => false),
+    error: computed(() => ''),
+  })),
+}))
+
 vi.mock('../../composables/usePlayerSeasonStatsImport', () => ({
   usePlayerSeasonStatsImport: vi.fn(() => ({
     uploading: computed(() => false),
@@ -66,11 +85,31 @@ describe('PlayerSeasonStatsDashboard', () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
 
     expect(wrapper.text()).toContain('Player Season Stat Board')
-    expect(wrapper.text()).toContain('Stage A Player Season Stats Import')
-    expect(wrapper.text()).toContain('Players In View')
-    expect(wrapper.text()).toContain('Matching Players')
-    expect(wrapper.text()).toContain('14')
+    expect(wrapper.text()).toContain('Data import')
+    expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
+  })
+
+  it('updates the leaderboard title when the category changes', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Stats'))
+
+    expect(wrapper.text()).toContain('Batting Leaderboard')
+
+    await categorySelect.setValue('pitching')
+
+    expect(wrapper.text()).toContain('Pitching Leaderboard')
+    expect(wrapper.text()).not.toContain('Batting Leaderboard')
+  })
+
+  it('opens the import drawer from the table header action', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+
+    const importButton = wrapper.find('[data-test="open-import-panel"]')
+    await importButton.trigger('click')
+
+    expect(wrapper.text()).toContain('Refresh Player Season Stats')
+    expect(wrapper.text()).toContain('Player Season Stats Import')
   })
 
   it('updates and resets the filter summary', async () => {
@@ -94,6 +133,24 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(teamSelect.element.value).toBe('')
     expect(seasonSelect.element.value).toBe('')
     expect(wrapper.text()).toContain('Category: batting')
+  })
+
+  it('shows player suggestions and applies a selected suggestion', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const playerInput = wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]')
+
+    await playerInput.setValue('Mig')
+    await playerInput.trigger('focus')
+
+    expect(wrapper.text()).toContain('Miguel Cabrera')
+    expect(wrapper.text()).toContain('Mike Trout')
+
+    const suggestionButton = wrapper.findAll('.typeahead-option').find((button) => button.text().includes('Miguel Cabrera'))
+    await suggestionButton.trigger('mousedown')
+    await nextTick()
+
+    expect(playerInput.element.value).toBe('Miguel Cabrera')
+    expect(wrapper.findAll('.typeahead-option')).toHaveLength(0)
   })
 
   it('renders season options from available data years', () => {
@@ -126,6 +183,9 @@ describe('PlayerSeasonStatsDashboard', () => {
 
   it('updates the import status when a csv file is selected', async () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
+    const openImportButton = wrapper.find('[data-test="open-import-panel"]')
+    await openImportButton.trigger('click')
+
     const file = new File(['season,player'], 'season-stats.csv', { type: 'text/csv' })
     const input = wrapper.find('input[type="file"]')
 
@@ -142,6 +202,9 @@ describe('PlayerSeasonStatsDashboard', () => {
 
   it('uploads the selected csv and refreshes the board', async () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
+    const openImportButton = wrapper.find('[data-test="open-import-panel"]')
+    await openImportButton.trigger('click')
+
     const file = new File(['season,player'], 'season-stats.csv', { type: 'text/csv' })
     const input = wrapper.find('input[type="file"]')
 
@@ -153,11 +216,12 @@ describe('PlayerSeasonStatsDashboard', () => {
     await input.trigger('change')
     await nextTick()
 
-    const importButton = wrapper.findAll('button.ghost-button').find((button) => button.text().includes('Import CSV'))
+    const importButton = wrapper.find('[data-test="execute-import"]')
     await importButton.trigger('click')
     await nextTick()
 
     expect(importFileSpy).toHaveBeenCalledWith(file)
     expect(refreshSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).not.toContain('Refresh Player Season Stats')
   })
 })

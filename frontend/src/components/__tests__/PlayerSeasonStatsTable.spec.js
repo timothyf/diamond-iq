@@ -66,6 +66,29 @@ describe('PlayerSeasonStatsTable', () => {
     expect(wrapper.emitted('sort-change')).toEqual([['-homeRuns']])
   })
 
+  it('defaults a newly selected column sort to descending', async () => {
+    const wrapper = mount(PlayerSeasonStatsTable, {
+      props: buildProps({ sort: '-homeRuns' }),
+    })
+
+    const valueHeader = wrapper.findAll('th button').find((button) => button.text().includes('OPS'))
+    await valueHeader.trigger('click')
+
+    expect(wrapper.emitted('sort-change')).toEqual([['-ops']])
+  })
+
+  it('adds an active class to the currently sorted column header', () => {
+    const wrapper = mount(PlayerSeasonStatsTable, {
+      props: buildProps({ sort: '-homeRuns' }),
+    })
+
+    const sortedHeader = wrapper.findAll('th button').find((button) => button.text().includes('HR'))
+    const unsortedHeader = wrapper.findAll('th button').find((button) => button.text().includes('OPS'))
+
+    expect(sortedHeader.classes()).toContain('sort-button--active')
+    expect(unsortedHeader.classes()).not.toContain('sort-button--active')
+  })
+
   it('emits page-change when navigating pagination', async () => {
     const wrapper = mount(PlayerSeasonStatsTable, {
       props: buildProps(),
@@ -169,7 +192,9 @@ describe('PlayerSeasonStatsTable', () => {
               homeRuns: '8.0',
               strikeOuts: '70.0',
               avg: '0.205',
-              ops: '0.702',
+              obp: '0.31',
+              slg: '.39',
+              ops: '0.75',
             },
           },
         ],
@@ -184,18 +209,24 @@ describe('PlayerSeasonStatsTable', () => {
             { key: 'homeRuns', label: 'HR', align: 'numeric' },
             { key: 'strikeOuts', label: 'SO', align: 'numeric' },
             { key: 'avg', label: 'AVG', align: 'numeric' },
+            { key: 'obp', label: 'OBP', align: 'numeric' },
+            { key: 'slg', label: 'SLG', align: 'numeric' },
             { key: 'ops', label: 'OPS', align: 'numeric' },
           ],
         },
       }),
     })
 
+    const valueCells = wrapper.findAll('tbody td.value-cell')
+
     expect(wrapper.text()).toContain('56')
     expect(wrapper.text()).toContain('185')
     expect(wrapper.text()).toContain('8')
     expect(wrapper.text()).toContain('70')
-    expect(wrapper.text()).toContain('0.205')
-    expect(wrapper.text()).toContain('0.702')
+    expect(valueCells[4].text()).toBe('.205')
+    expect(valueCells[5].text()).toBe('.310')
+    expect(valueCells[6].text()).toBe('.390')
+    expect(valueCells[7].text()).toBe('.750')
     expect(wrapper.text()).not.toContain('56.0')
     expect(wrapper.text()).not.toContain('185.0')
     expect(wrapper.text()).not.toContain('8.0')

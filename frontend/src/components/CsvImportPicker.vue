@@ -6,6 +6,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  variant: {
+    type: String,
+    default: 'full',
+  },
   statusMessage: {
     type: String,
     default: '',
@@ -121,12 +125,16 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="import-station">
+  <section :class="['import-station', { 'import-station--drawer': variant === 'drawer' }]">
     <div class="import-station__copy">
       <p class="eyebrow">CSV Intake</p>
-      <h2>Stage A Player Season Stats Import</h2>
+      <h2>{{ variant === 'drawer' ? 'Player Season Stats Import' : 'Stage A Player Season Stats Import' }}</h2>
       <p>
-        Select a CSV export from your workstation so we can hand it to the import flow once the upload endpoint is connected.
+        {{
+          variant === 'drawer'
+            ? 'Select a CSV export from your workstation to refresh the player season stats dataset.'
+            : 'Select a CSV export from your workstation so we can hand it to the import flow once the upload endpoint is connected.'
+        }}
       </p>
     </div>
 
@@ -146,10 +154,22 @@ onBeforeUnmount(() => {
       </label>
 
       <div class="import-station__actions">
-        <button class="ghost-button" type="button" :disabled="!selectedFile || busy" @click="requestImport">
+        <button
+          class="ghost-button"
+          type="button"
+          data-test="execute-import"
+          :disabled="!selectedFile || busy"
+          @click="requestImport"
+        >
           {{ busy ? 'Importing…' : 'Import CSV' }}
         </button>
-        <button class="ghost-button" type="button" :disabled="!selectedFile || busy" @click="clearSelection">
+        <button
+          class="ghost-button"
+          type="button"
+          data-test="clear-import-selection"
+          :disabled="!selectedFile || busy"
+          @click="clearSelection"
+        >
           Clear Selection
         </button>
       </div>

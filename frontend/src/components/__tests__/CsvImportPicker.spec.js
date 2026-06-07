@@ -47,7 +47,7 @@ describe('CsvImportPicker', () => {
 
     await selectFile(wrapper, file)
 
-    const prepareButton = wrapper.findAll('button').find((button) => button.text().includes('Import CSV'))
+    const prepareButton = wrapper.find('[data-test="execute-import"]')
     await prepareButton.trigger('click')
 
     expect(wrapper.emitted('import-request')).toHaveLength(1)

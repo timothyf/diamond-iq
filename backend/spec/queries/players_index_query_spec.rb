@@ -28,5 +28,15 @@ RSpec.describe PlayersIndexQuery, type: :model do
       expect(query.metadata[:per_page]).to eq(100)
       expect(query.metadata[:sort]).to eq("last_name")
     end
+
+    it "filters by a combined player name query across first and last name" do
+      team = create_team
+      create_player(team: team, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
+      create_player(team: team, attributes: { mlb_id: 545361, first_name: "Mike", last_name: "Trout" })
+
+      expect(described_class.new(params: { filter: { name: "mig" } }).results.map(&:first_name)).to eq(["Miguel"])
+      expect(described_class.new(params: { filter: { name: "out" } }).results.map(&:last_name)).to eq(["Trout"])
+      expect(described_class.new(params: { filter: { name: "Miguel Cabrera" } }).results.map(&:last_name)).to eq(["Cabrera"])
+    end
   end
 end
