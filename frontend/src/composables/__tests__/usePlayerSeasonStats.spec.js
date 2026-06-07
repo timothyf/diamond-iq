@@ -19,8 +19,12 @@ describe('usePlayerSeasonStats', () => {
           per_page: 12,
           total_count: 45,
           total_pages: 4,
-          sort: '-value',
+          sort: '-homeRuns',
           filters: { category: 'batting' },
+          category: 'batting',
+          available_seasons: [2026, 2025, 2024],
+          available_teams: [{ id: 1, abbreviation: 'DET', short_name: 'Tigers' }],
+          columns: [{ key: 'homeRuns', label: 'HR', align: 'numeric' }],
         },
       }),
     })
@@ -28,9 +32,10 @@ describe('usePlayerSeasonStats', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const query = computed(() => ({
+      view: 'leaderboard',
       page: 2,
       perPage: 12,
-      sort: '-value',
+      sort: '-homeRuns',
       filters: {
         category: 'batting',
         player_name: 'miguel',
@@ -42,7 +47,7 @@ describe('usePlayerSeasonStats', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/player_season_stats?page=2&per_page=12&sort=-value&filter%5Bcategory%5D=batting&filter%5Bplayer_name%5D=miguel',
+      '/api/player_season_stats?view=leaderboard&page=2&per_page=12&sort=-homeRuns&filter%5Bcategory%5D=batting&filter%5Bplayer_name%5D=miguel',
       {
         headers: {
           Accept: 'application/json',
@@ -55,8 +60,12 @@ describe('usePlayerSeasonStats', () => {
       perPage: 12,
       totalCount: 45,
       totalPages: 4,
-      sort: '-value',
+      sort: '-homeRuns',
       filters: { category: 'batting' },
+      category: 'batting',
+      availableSeasons: [2026, 2025, 2024],
+      availableTeams: [{ id: 1, abbreviation: 'DET', short_name: 'Tigers' }],
+      columns: [{ key: 'homeRuns', label: 'HR', align: 'numeric' }],
     })
     expect(loading.value).toBe(false)
     expect(error.value).toBe('')
@@ -71,6 +80,7 @@ describe('usePlayerSeasonStats', () => {
       }),
     )
     const query = computed(() => ({
+      view: 'leaderboard',
       page: 1,
       perPage: 12,
       sort: 'season',

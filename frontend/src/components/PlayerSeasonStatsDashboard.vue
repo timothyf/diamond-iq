@@ -6,21 +6,26 @@ import PlayerSeasonStatsTable from './PlayerSeasonStatsTable.vue'
 import { usePlayerSeasonStats } from '../composables/usePlayerSeasonStats'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 
+const DEFAULT_SORT_BY_CATEGORY = {
+  batting: '-homeRuns',
+  pitching: '-strikeOuts',
+  pitchStats: '-pitch_usage',
+}
+
 const filters = reactive({
   playerName: '',
-  teamName: '',
+  teamId: '',
   season: '',
-  category: '',
-  statTypeName: '',
+  category: 'batting',
 })
 
 const pagination = reactive({
   page: 1,
-  perPage: 12,
+  perPage: 15,
 })
 
 const sort = reactive({
-  value: '-value',
+  value: DEFAULT_SORT_BY_CATEGORY.batting,
 })
 
 const selectedImportFile = ref(null)
@@ -28,15 +33,15 @@ const importPickerKey = ref(0)
 const stagedImportMessage = ref('Choose a CSV file to import player season stats into the app.')
 
 const query = computed(() => ({
+  view: 'leaderboard',
   page: pagination.page,
   perPage: pagination.perPage,
   sort: sort.value,
   filters: {
     player_name: filters.playerName,
-    team_name: filters.teamName,
+    team_id: filters.teamId,
     season: filters.season,
     category: filters.category,
-    stat_type_name: filters.statTypeName,
   },
 }))
 
@@ -44,22 +49,46 @@ const { rows, meta, loading, error, refresh } = usePlayerSeasonStats(query)
 const { uploading, error: importError, summary: importSummary, importFile } = usePlayerSeasonStatsImport()
 
 watch(
-  () => [filters.playerName, filters.teamName, filters.season, filters.category, filters.statTypeName, pagination.perPage, sort.value],
+  () => [filters.playerName, filters.teamId, filters.season, filters.category, pagination.perPage, sort.value],
   () => {
     pagination.page = 1
   },
 )
 
+watch(
+  () => filters.category,
+  (category) => {
+    sort.value = DEFAULT_SORT_BY_CATEGORY[category] || DEFAULT_SORT_BY_CATEGORY.batting
+  },
+)
+
+watch(
+  () => meta.value.availableTeams,
+  (availableTeams) => {
+    if (!filters.teamId) return
+
+    const teamStillAvailable = availableTeams.some((team) => String(team.id) === String(filters.teamId))
+    if (!teamStillAvailable) {
+      filters.teamId = ''
+    }
+  },
+  { deep: true },
+)
+
+const selectedTeam = computed(() =>
+  meta.value.availableTeams.find((team) => String(team.id) === String(filters.teamId)) || null,
+)
+
 const filterSummary = computed(() => {
   const activeFilters = [
     filters.playerName && `Player: ${filters.playerName}`,
-    filters.teamName && `Team: ${filters.teamName}`,
+    selectedTeam.value &&
+      `Team: ${selectedTeam.value.abbreviation || selectedTeam.value.short_name || selectedTeam.value.team_name || selectedTeam.value.name}`,
     filters.season && `Season: ${filters.season}`,
     filters.category && `Category: ${filters.category}`,
-    filters.statTypeName && `Stat: ${filters.statTypeName}`,
   ].filter(Boolean)
 
-  return activeFilters.length ? activeFilters.join(' · ') : 'Showing the full player season stat board.'
+  return activeFilters.length ? activeFilters.join(' · ') : 'Showing the full player season leaderboard.'
 })
 
 function updateSort(nextSort) {
@@ -76,12 +105,11 @@ function updatePerPage(event) {
 
 function resetFilters() {
   filters.playerName = ''
-  filters.teamName = ''
+  filters.teamId = ''
   filters.season = ''
-  filters.category = ''
-  filters.statTypeName = ''
+  filters.category = 'batting'
   pagination.page = 1
-  sort.value = '-value'
+  sort.value = DEFAULT_SORT_BY_CATEGORY.batting
 }
 
 function handleFileSelected(file) {
@@ -114,11 +142,11 @@ async function handleImportRequest(file) {
 
       <div class="hero-metrics">
         <article class="metric-card">
-          <span class="metric-label">Rows In View</span>
+          <span class="metric-label">Players In View</span>
           <strong class="metric-value">{{ rows.length }}</strong>
         </article>
         <article class="metric-card">
-          <span class="metric-label">Total Matches</span>
+          <span class="metric-label">Matching Players</span>
           <strong class="metric-value">{{ meta.totalCount }}</strong>
         </article>
         <article class="metric-card">
@@ -154,18 +182,27 @@ async function handleImportRequest(file) {
 
         <label class="field">
           <span>Team</span>
-          <input v-model="filters.teamName" type="text" placeholder="Dodgers, Tigers..." />
+          <select v-model="filters.teamId" data-test="team-filter">
+            <option value="">All teams</option>
+            <option v-for="teamOption in meta.availableTeams" :key="teamOption.id" :value="String(teamOption.id)">
+              {{ teamOption.abbreviation }} · {{ teamOption.short_name || teamOption.team_name || teamOption.name }}
+            </option>
+          </select>
         </label>
 
         <label class="field">
           <span>Season</span>
-          <input v-model="filters.season" type="number" min="1800" max="2100" placeholder="2024" />
+          <select v-model="filters.season" data-test="season-filter">
+            <option value="">All seasons</option>
+            <option v-for="seasonOption in meta.availableSeasons" :key="seasonOption" :value="seasonOption">
+              {{ seasonOption }}
+            </option>
+          </select>
         </label>
 
         <label class="field">
           <span>Category</span>
           <select v-model="filters.category">
-            <option value="">All categories</option>
             <option value="batting">Batting</option>
             <option value="pitching">Pitching</option>
             <option value="pitchStats">Pitch Stats</option>
@@ -173,15 +210,10 @@ async function handleImportRequest(file) {
         </label>
 
         <label class="field">
-          <span>Stat Type</span>
-          <input v-model="filters.statTypeName" type="text" placeholder="OPS, WAR, ERA..." />
-        </label>
-
-        <label class="field">
           <span>Rows per page</span>
           <select :value="pagination.perPage" @change="updatePerPage">
-            <option :value="12">12</option>
-            <option :value="24">24</option>
+            <option :value="15">15</option>
+            <option :value="30">30</option>
             <option :value="50">50</option>
             <option :value="100">100</option>
           </select>
@@ -192,8 +224,8 @@ async function handleImportRequest(file) {
     <section class="table-stage">
       <header class="table-stage__header">
         <div>
-          <h2>Season Stats</h2>
-          <p>Built for rapid slicing by player, club, season, and stat family.</p>
+          <h2>Season Leaderboard</h2>
+          <p>Traditional player rows with the selected stat line running straight across the board.</p>
         </div>
 
         <div class="table-actions">

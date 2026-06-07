@@ -19,3 +19,5 @@ if player_stats_csv.present?
 
   puts result[:message]
 end
+
+puts "Tip: use `bin/rails player_stats:reimport` to reseed stat types and reimport the latest local CSV in one command." if player_stats_csv.blank?

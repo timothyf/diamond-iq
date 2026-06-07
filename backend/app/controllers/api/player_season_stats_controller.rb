@@ -3,6 +3,16 @@ module Api
     before_action :set_player_season_stat, only: [:show, :update, :destroy]
 
     def index
+      if params[:view] == "leaderboard"
+        query = PlayerSeasonStatsLeaderboardQuery.new(params: index_params)
+
+        render json: {
+          data: query.results,
+          meta: query.metadata
+        }
+        return
+      end
+
       query = PlayerSeasonStatsIndexQuery.new(params: index_params)
 
       render json: {
@@ -67,6 +77,7 @@ module Api
 
     def index_params
       params.permit(
+        :view,
         :page,
         :per_page,
         :sort,

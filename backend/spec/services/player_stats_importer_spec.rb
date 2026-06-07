@@ -80,4 +80,46 @@ RSpec.describe PlayerStatsImporter, type: :service do
     expect(result[:message]).to include("Failed to parse CSV")
     expect(PlayerSeasonStat.count).to eq(0)
   end
+
+  it "imports pitching stats from verbose csv headers into abbreviated stat types" do
+    create_stat_type(name: "W", label: "W", category: "pitching")
+    create_stat_type(name: "L", label: "L", category: "pitching")
+    create_stat_type(name: "GS", label: "GS", category: "pitching")
+    create_stat_type(name: "CG", label: "CG", category: "pitching")
+    create_stat_type(name: "ShO", label: "SHO", category: "pitching")
+    create_stat_type(name: "SV", label: "SV", category: "pitching")
+    create_stat_type(name: "SVO", label: "SVO", category: "pitching")
+    create_stat_type(name: "ER", label: "ER", category: "pitching")
+
+    csv_data = <<~CSV
+      source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId,wins,losses,gamesStarted,completeGames,shutouts,saves,saveOpportunities,earnedRuns
+      2026,2026,pitcher,694973,Jacob,Misiorowski,MIL,Milwaukee Brewers,Brewers,158,5,1,11,0,0,0,1,13
+    CSV
+
+    result = described_class.call(csv_data: csv_data, source_name: "spec/imports/pitching_player_season_stats.csv")
+
+    expect(result[:success]).to be(true)
+
+    pitcher = Player.find_by!(mlb_id: 694973)
+    expect(PlayerSeasonStat.find_by!(player: pitcher, stat_type: StatType.find_by!(name: "W", category: "pitching"), season: 2026).value).to eq(BigDecimal("5"))
+    expect(PlayerSeasonStat.find_by!(player: pitcher, stat_type: StatType.find_by!(name: "L", category: "pitching"), season: 2026).value).to eq(BigDecimal("1"))
+    expect(PlayerSeasonStat.find_by!(player: pitcher, stat_type: StatType.find_by!(name: "GS", category: "pitching"), season: 2026).value).to eq(BigDecimal("11"))
+    expect(PlayerSeasonStat.find_by!(player: pitcher, stat_type: StatType.find_by!(name: "SVO", category: "pitching"), season: 2026).value).to eq(BigDecimal("1"))
+    expect(PlayerSeasonStat.find_by!(player: pitcher, stat_type: StatType.find_by!(name: "ER", category: "pitching"), season: 2026).value).to eq(BigDecimal("13"))
+  end
+
+  it "prefers playerUseName over playerFirstName for display names" do
+    csv_data = <<~CSV
+      source_season,season,stat_type,playerId,playerName,playerFirstName,playerFullName,playerLastName,playerUseName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed,homeRuns,avg,ops
+      2012,2012,batter,408234,Miguel Cabrera,Jose,Miguel Cabrera,Cabrera,Miguel,DET,Detroit Tigers,Tigers,116,161,44,.330,.999
+    CSV
+
+    result = described_class.call(csv_data: csv_data, source_name: "spec/imports/player_use_name_player_season_stats.csv")
+
+    expect(result[:success]).to be(true)
+
+    miguel = Player.find_by!(mlb_id: 408234)
+    expect(miguel.first_name).to eq("Miguel")
+    expect(miguel.last_name).to eq("Cabrera")
+  end
 end

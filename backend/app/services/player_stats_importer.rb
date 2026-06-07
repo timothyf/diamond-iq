@@ -3,6 +3,7 @@ require "csv"
 
 class PlayerStatsImporter
   PLAYER_ID_FIELDS = %w[player_id playerid playerId id].freeze
+  USE_NAME_FIELDS = %w[use_name usename playerusename playerUseName].freeze
   FIRST_NAME_FIELDS = %w[first_name firstname playerfirstname playerFirstName].freeze
   LAST_NAME_FIELDS = %w[last_name lastname playerlastname playerLastName].freeze
   FULL_NAME_FIELDS = %w[name full_name fullname playerfullname playerFullName playername playerName].freeze
@@ -23,6 +24,39 @@ class PlayerStatsImporter
     "pitching" => "pitching",
     "pitchstats" => "pitchStats",
     "pitch_stats" => "pitchStats"
+  }.freeze
+
+  STAT_IMPORT_ALIASES = {
+    "pitching" => {
+      "W" => %w[W wins],
+      "L" => %w[L losses],
+      "ERA" => %w[ERA era],
+      "G" => %w[G gamesPitched gamesPlayed],
+      "GS" => %w[GS gamesStarted],
+      "CG" => %w[CG completeGames],
+      "ShO" => %w[ShO shutouts shutout],
+      "SV" => %w[SV saves],
+      "SVO" => %w[SVO saveOpportunities],
+      "IP" => %w[IP inningsPitched],
+      "inningsPitched" => %w[inningsPitched IP],
+      "H" => %w[H hits],
+      "hits" => %w[hits H],
+      "R" => %w[R runs],
+      "runs" => %w[runs R],
+      "ER" => %w[ER earnedRuns],
+      "HR" => %w[HR homeRuns],
+      "homeRuns" => %w[homeRuns HR],
+      "HBP" => %w[HBP hitByPitch hitBatsmen],
+      "hitByPitch" => %w[hitByPitch hitBatsmen HBP],
+      "BB" => %w[BB baseOnBalls walks],
+      "baseOnBalls" => %w[baseOnBalls BB walks],
+      "SO" => %w[SO strikeOuts strikeouts],
+      "strikeOuts" => %w[strikeOuts strikeouts SO],
+      "WHIP" => %w[WHIP whip],
+      "whip" => %w[whip WHIP],
+      "AVG" => %w[AVG avg],
+      "avg" => %w[avg AVG]
+    }
   }.freeze
 
   UPSERT_INDEX = %i[player_id stat_type_id season].freeze
@@ -120,7 +154,7 @@ class PlayerStatsImporter
     key_map = normalized_row.keys.index_by { |key| key.downcase }
 
     player_mlb_id = parse_integer(fetch_value(normalized_row, key_map, PLAYER_ID_FIELDS))
-    first_name = fetch_value(normalized_row, key_map, FIRST_NAME_FIELDS)
+    first_name = fetch_value(normalized_row, key_map, USE_NAME_FIELDS).presence || fetch_value(normalized_row, key_map, FIRST_NAME_FIELDS)
     last_name = fetch_value(normalized_row, key_map, LAST_NAME_FIELDS)
 
     if first_name.blank? || last_name.blank?
@@ -199,12 +233,19 @@ class PlayerStatsImporter
     return [] if category.blank?
 
     stat_types_for_category(category).filter_map do |stat_type|
-      raw_value = fetch_value(normalized_row, key_map, [stat_type.name])
+      raw_value = fetch_value(normalized_row, key_map, stat_lookup_names(stat_type, category))
       numeric_value = parse_numeric_value(raw_value)
       next if numeric_value.nil?
 
       { stat_type: stat_type, value: numeric_value }
     end
+  end
+
+  def stat_lookup_names(stat_type, category)
+    category_aliases = STAT_IMPORT_ALIASES.fetch(category, {})
+    aliases = category_aliases.fetch(stat_type.name, [stat_type.name])
+
+    ([stat_type.name, stat_type.label] + aliases).compact.uniq
   end
 
   def stat_types_for_category(category)

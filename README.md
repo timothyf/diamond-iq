@@ -18,6 +18,27 @@ bin/rails db:prepare
 bin/rails server
 ```
 
+### Reimport Player Stats In One Command
+
+From `backend/`:
+
+```bash
+bin/rails player_stats:reimport
+```
+
+That command will:
+
+- reseed `stat_types` via SeedFu
+- prefer the MLB downloader output directory at `~/Projects/mlb-stats-downloader/otuput`
+- auto-pick the canonical batter and pitcher `-present.csv` files there when available
+- rerun the importer against those files in one pass
+
+If auto-detection misses your file, point to it directly:
+
+```bash
+PLAYER_STATS_CSV=/absolute/path/to/player_season_stats.csv bin/rails player_stats:reimport
+```
+
 ### Frontend (Vue)
 
 ```bash

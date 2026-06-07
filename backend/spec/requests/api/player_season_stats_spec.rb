@@ -75,6 +75,101 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", 0, "stat_type", "category")).to eq("pitching")
   end
 
+  it "lists leaderboard rows grouped by player with stats across columns" do
+    %w[gamesPlayed atBats runs hits doubles triples homeRuns rbi baseOnBalls strikeOuts stolenBases caughtStealing avg obp slg ops].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+    end
+
+    {
+      "gamesPlayed" => "150",
+      "atBats" => "540",
+      "runs" => "88",
+      "hits" => "162",
+      "doubles" => "30",
+      "triples" => "2",
+      "homeRuns" => "24",
+      "rbi" => "91",
+      "baseOnBalls" => "60",
+      "strikeOuts" => "102",
+      "stolenBases" => "4",
+      "caughtStealing" => "1",
+      "avg" => ".300",
+      "obp" => ".372",
+      "slg" => ".515",
+      "ops" => ".887"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: @player,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    {
+      "gamesPlayed" => "155",
+      "atBats" => "560",
+      "runs" => "102",
+      "hits" => "171",
+      "doubles" => "28",
+      "triples" => "4",
+      "homeRuns" => "41",
+      "rbi" => "99",
+      "baseOnBalls" => "88",
+      "strikeOuts" => "118",
+      "stolenBases" => "18",
+      "caughtStealing" => "3",
+      "avg" => ".305",
+      "obp" => ".401",
+      "slg" => ".612",
+      "ops" => "1.013"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: @shohei,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    get api_player_season_stats_path,
+        params: {
+          view: "leaderboard",
+          sort: "-homeRuns",
+          filter: { category: "batting", season: 2024 }
+        }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "category")).to eq("batting")
+    expect(json_body.dig("meta", "sort")).to eq("-homeRuns")
+    expect(json_body.dig("meta", "total_count")).to eq(2)
+    expect(json_body.dig("meta", "available_seasons")).to eq([2025, 2024])
+    expect(json_body.dig("meta", "available_teams")).to eq(
+      [
+        {
+          "id" => @team.id,
+          "mlb_id" => 116,
+          "abbreviation" => "DET",
+          "name" => "Detroit Tigers",
+          "team_name" => "Tigers",
+          "location_name" => "Detroit",
+          "short_name" => "Detroit"
+        },
+        {
+          "id" => @dodgers.id,
+          "mlb_id" => 119,
+          "abbreviation" => "LAD",
+          "name" => "Los Angeles Dodgers",
+          "team_name" => "Dodgers",
+          "location_name" => "Los Angeles",
+          "short_name" => "Los Angeles"
+        }
+      ]
+    )
+    expect(json_body.dig("meta", "columns").map { |column| column.fetch("key") }).to include("homeRuns", "ops")
+    expect(json_body.dig("data", 0, "player", "full_name")).to eq("Shohei Ohtani")
+    expect(json_body.dig("data", 0, "stats", "homeRuns")).to eq("41.0")
+    expect(json_body.dig("data", 0, "stats", "ops")).to eq("1.013")
+  end
+
   it "shows a player season stat" do
     get api_player_season_stat_path(@player_season_stat), as: :json
 
