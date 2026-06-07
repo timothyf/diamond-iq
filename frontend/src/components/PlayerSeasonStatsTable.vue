@@ -35,6 +35,7 @@ const BATTING_INTEGER_STAT_KEYS = new Set([
   'stolenBases',
   'caughtStealing',
 ])
+const BATTING_SLASH_STAT_KEYS = new Set(['avg', 'obp', 'slg', 'ops'])
 const PITCHING_INTEGER_STAT_KEYS = new Set(['W', 'L', 'G', 'GS', 'CG', 'ShO', 'SV', 'SVO', 'hits', 'runs', 'ER', 'homeRuns', 'hitByPitch', 'baseOnBalls', 'strikeOuts'])
 
 const fixedColumns = [
@@ -62,7 +63,7 @@ function toggleSort(columnKey) {
     return
   }
 
-  emit('sort-change', columnKey)
+  emit('sort-change', `-${columnKey}`)
 }
 
 function sortIndicator(columnKey) {
@@ -70,6 +71,12 @@ function sortIndicator(columnKey) {
   if (props.sort === columnKey) return '↑'
   if (props.sort === `-${columnKey}`) return '↓'
   return ''
+}
+
+function isSortedColumn(columnKey) {
+  if (columnKey === 'rank') return false
+
+  return props.sort === columnKey || props.sort === `-${columnKey}`
 }
 
 function goToPreviousPage() {
@@ -96,6 +103,14 @@ function formatStatValue(columnKey, value) {
     return Number.isFinite(numericValue) ? String(Math.trunc(numericValue)) : value
   }
 
+  if (props.meta.category === 'batting' && BATTING_SLASH_STAT_KEYS.has(columnKey) && typeof value === 'string') {
+    const numericValue = Number(value)
+    if (!Number.isFinite(numericValue)) return value
+
+    const formattedValue = numericValue.toFixed(3)
+    return formattedValue.replace(/\b0\./, '.')
+  }
+
   return value
 }
 </script>
@@ -119,7 +134,10 @@ function formatStatValue(columnKey, value) {
               <button
                 type="button"
                 class="sort-button"
-                :class="{ 'sort-button--static': column.sortable === false }"
+                :class="{
+                  'sort-button--static': column.sortable === false,
+                  'sort-button--active': isSortedColumn(column.key),
+                }"
                 @click="toggleSort(column.key)"
               >
                 <span>{{ column.label }}</span>

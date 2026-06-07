@@ -73,6 +73,19 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.fetch("data").map { |player| player.fetch("last_name") }).to eq(["Trout"])
   end
 
+  it "filters players by a combined name query across first and last name" do
+    get api_players_path, params: { filter: { name: "mig" }, per_page: 10 }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "filters")).to eq({ "name" => "mig" })
+    expect(json_body.fetch("data").map { |player| player.values_at("first_name", "last_name") }).to eq([["Miguel", "Cabrera"]])
+
+    get api_players_path, params: { filter: { name: "out" }, per_page: 10 }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").map { |player| player.values_at("first_name", "last_name") }).to eq([["Mike", "Trout"]])
+  end
+
   it "sorts players by team name descending" do
     get api_players_path, params: { sort: "-team_name" }
 

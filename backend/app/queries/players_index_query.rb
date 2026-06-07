@@ -46,6 +46,14 @@ class PlayersIndexQuery
     @filtered_relation ||= begin
       scope = base_relation
 
+      if normalized_filters[:name].present?
+        pattern = like_pattern(normalized_filters[:name])
+        scope = scope.where(
+          "concat_ws(' ', players.first_name, players.last_name) ILIKE :pattern OR players.first_name ILIKE :pattern OR players.last_name ILIKE :pattern",
+          pattern: pattern
+        )
+      end
+
       if normalized_filters[:first_name].present?
         scope = scope.where("players.first_name ILIKE ?", like_pattern(normalized_filters[:first_name]))
       end
@@ -68,7 +76,7 @@ class PlayersIndexQuery
 
   def normalized_filters
     @normalized_filters ||= raw_filters
-      .slice("first_name", "last_name", "team_id", "team_name")
+      .slice("name", "first_name", "last_name", "team_id", "team_name")
       .transform_values { |value| value.is_a?(String) ? value.strip : value }
       .compact_blank
       .symbolize_keys

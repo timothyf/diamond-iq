@@ -12,7 +12,7 @@ module Api
     private
 
     def index_params
-      params.permit(:page, :per_page, :sort, filter: [:first_name, :last_name, :team_id, :team_name]).to_h
+      params.permit(:page, :per_page, :sort, filter: [:name, :first_name, :last_name, :team_id, :team_name]).to_h
     end
 
     def serialize_player(player)
