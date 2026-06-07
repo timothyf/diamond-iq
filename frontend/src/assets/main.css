@@ -17,7 +17,7 @@
 .import-station,
 .control-deck,
 .table-stage {
-  width: min(1200px, 100%);
+  width: min(1680px, calc(100vw - 2.5rem));
   margin: 0 auto;
 }
 
@@ -370,45 +370,57 @@
 }
 
 .data-grid {
-  overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid rgba(16, 38, 61, 0.11);
-  background: rgba(255, 255, 255, 0.9);
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(9, 12, 18, 0.98), rgba(5, 7, 12, 0.98)),
+    #06080d;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(210, 182, 119, 0.6) rgba(255, 255, 255, 0.08);
 }
 
 .data-grid table {
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
 }
 
 .data-grid th,
 .data-grid td {
-  padding: 0.95rem 1rem;
-  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
-  text-align: left;
+  padding: 0.82rem 0.78rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: right;
   vertical-align: middle;
+  font-size: 0.84rem;
 }
 
 .data-grid th {
-  background: #10263d;
-  color: #f7f1e3;
-  font-size: 0.84rem;
-  letter-spacing: 0.07em;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(245, 241, 229, 0.74);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-align: center;
   text-transform: uppercase;
 }
 
 .data-grid tbody tr {
-  transition: background-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    transform 120ms ease;
 }
 
 .data-grid tbody tr:hover {
-  background: rgba(234, 221, 191, 0.26);
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .sort-button {
+  position: relative;
   display: inline-flex;
   width: 100%;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   gap: 0.5rem;
   padding: 0;
@@ -420,7 +432,13 @@
   text-transform: inherit;
 }
 
+.sort-button--static {
+  cursor: default;
+}
+
 .sort-indicator {
+  position: absolute;
+  right: 0;
   min-width: 1ch;
   color: #d2b677;
 }
@@ -428,16 +446,18 @@
 .primary-cell {
   display: flex;
   flex-direction: column;
-  gap: 0.12rem;
+  gap: 0.18rem;
 }
 
 .primary-cell strong {
-  color: #10263d;
+  color: #f9f5e8;
   font-weight: 700;
+  font-size: 0.88rem;
 }
 
 .primary-cell span {
-  font-size: 0.84rem;
+  color: rgba(245, 241, 229, 0.58);
+  font-size: 0.7rem;
 }
 
 .pill {
@@ -459,15 +479,46 @@
 }
 
 .value-cell {
-  color: #10263d;
+  color: #f9f5e8;
   font-family: 'SFMono-Regular', 'Menlo', 'Monaco', monospace;
   font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.row-rank {
+  width: 52px;
+  color: rgba(245, 241, 229, 0.62);
+  font-family: 'SFMono-Regular', 'Menlo', 'Monaco', monospace;
+}
+
+.player-cell {
+  min-width: 212px;
+  text-align: left !important;
+}
+
+.team-cell {
+  min-width: 104px;
+  width: 104px;
+  text-align: left !important;
+}
+
+.player-cell strong,
+.team-cell strong {
+  font-size: 0.92rem;
+}
+
+.team-cell .primary-cell span {
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-state {
   padding: 2rem !important;
   text-align: center !important;
-  color: #5e6d7b;
+  color: rgba(245, 241, 229, 0.62);
 }
 
 @keyframes import-sheen {

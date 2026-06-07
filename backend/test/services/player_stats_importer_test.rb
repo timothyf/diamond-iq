@@ -81,4 +81,22 @@ class PlayerStatsImporterTest < ActiveSupport::TestCase
     assert_match "Failed to parse CSV", result[:message]
     assert_equal 0, PlayerSeasonStat.count
   end
+
+  test "prefers playerUseName over playerFirstName for display names" do
+    csv_data = <<~CSV
+      source_season,season,stat_type,playerId,playerName,playerFirstName,playerFullName,playerLastName,playerUseName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed,homeRuns,avg,ops
+      2012,2012,batter,408234,Miguel Cabrera,Jose,Miguel Cabrera,Cabrera,Miguel,DET,Detroit Tigers,Tigers,116,161,44,.330,.999
+    CSV
+
+    result = PlayerStatsImporter.call(
+      csv_data: csv_data,
+      source_name: "spec/imports/player_use_name_player_season_stats.csv"
+    )
+
+    assert result[:success]
+
+    miguel = Player.find_by!(mlb_id: 408234)
+    assert_equal "Miguel", miguel.first_name
+    assert_equal "Cabrera", miguel.last_name
+  end
 end

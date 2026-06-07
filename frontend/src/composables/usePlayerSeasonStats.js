@@ -5,6 +5,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 function buildSearchParams(query) {
   const searchParams = new URLSearchParams()
 
+  if (query.view) searchParams.set('view', String(query.view))
   if (query.page) searchParams.set('page', String(query.page))
   if (query.perPage) searchParams.set('per_page', String(query.perPage))
   if (query.sort) searchParams.set('sort', query.sort)
@@ -23,8 +24,12 @@ function normalizeMeta(meta = {}) {
     perPage: meta.per_page || 25,
     totalCount: meta.total_count || 0,
     totalPages: meta.total_pages || 0,
-    sort: meta.sort || 'season',
+    sort: meta.sort || 'player_name',
     filters: meta.filters || {},
+    category: meta.category || 'batting',
+    availableSeasons: meta.available_seasons || [],
+    availableTeams: meta.available_teams || [],
+    columns: meta.columns || [],
   }
 }
 
