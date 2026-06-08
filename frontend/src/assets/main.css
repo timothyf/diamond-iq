@@ -414,40 +414,41 @@
 
 .import-utility {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.5rem;
   justify-content: flex-end;
   align-items: center;
+  padding: 0.4rem;
+  border: 1px solid rgba(16, 38, 61, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 24px rgba(18, 24, 31, 0.06);
+}
+
+.import-utility--live {
+  border-color: rgba(37, 90, 131, 0.22);
+  background: rgba(228, 240, 248, 0.92);
+}
+
+.import-utility--error {
+  border-color: rgba(143, 45, 36, 0.22);
+  background: rgba(143, 45, 36, 0.08);
+}
+
+.import-utility--success {
+  border-color: rgba(66, 109, 61, 0.2);
+  background: rgba(233, 244, 225, 0.94);
+}
+
+.import-utility--staged {
+  border-color: rgba(210, 182, 119, 0.28);
+  background: rgba(250, 241, 220, 0.96);
 }
 
 .import-chip {
   display: grid;
   gap: 0.1rem;
-  min-width: min(26rem, 60vw);
-  padding: 0.65rem 0.9rem;
-  border: 1px solid rgba(16, 38, 61, 0.12);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.76);
-}
-
-.import-chip--live {
-  border-color: rgba(37, 90, 131, 0.22);
-  background: rgba(228, 240, 248, 0.92);
-}
-
-.import-chip--error {
-  border-color: rgba(143, 45, 36, 0.22);
-  background: rgba(143, 45, 36, 0.08);
-}
-
-.import-chip--success {
-  border-color: rgba(66, 109, 61, 0.2);
-  background: rgba(233, 244, 225, 0.94);
-}
-
-.import-chip--staged {
-  border-color: rgba(210, 182, 119, 0.28);
-  background: rgba(250, 241, 220, 0.96);
+  min-width: min(25rem, 56vw);
+  padding: 0.45rem 0.8rem 0.45rem 0.9rem;
 }
 
 .import-chip__label {
@@ -465,6 +466,14 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.import-utility__button {
+  flex: 0 0 auto;
+  min-height: 100%;
+  padding-inline: 1.2rem;
+  border-color: rgba(16, 38, 61, 0.12);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .import-drawer-backdrop {
