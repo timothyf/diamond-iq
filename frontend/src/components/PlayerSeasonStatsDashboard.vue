@@ -317,12 +317,12 @@ async function handleImportRequest(file) {
         </div>
 
         <div class="table-actions">
-          <div class="import-utility">
-            <div :class="['import-chip', `import-chip--${importStatusTone}`]">
+          <div :class="['import-utility', `import-utility--${importStatusTone}`]">
+            <div class="import-chip">
               <span class="import-chip__label">{{ importStatusLabel }}</span>
               <span class="import-chip__detail">{{ importStatusDetail }}</span>
             </div>
-            <button class="ghost-button" type="button" data-test="open-import-panel" :disabled="uploading" @click="openImportPanel">
+            <button class="ghost-button import-utility__button" type="button" data-test="open-import-panel" :disabled="uploading" @click="openImportPanel">
               {{ uploading ? 'Importing…' : 'Import CSV' }}
             </button>
           </div>
