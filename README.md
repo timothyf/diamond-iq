@@ -1,24 +1,94 @@
 # shopify-prep-project
 
-This project uses:
+Player season stats explorer built with a Ruby on Rails API and a Vue 3 dashboard.
 
-- **Ruby on Rails** backend in `/shopify-prep-project/backend`
-- **PostgreSQL** for the Rails database (`backend/config/database.yml`)
-- **Vue.js** frontend in `/shopify-prep-project/frontend`
-- **RuboCop** linter for backend code (`bundle exec rubocop`)
+## Overview
 
-## Quick start
+The application imports player season stats from CSV files, stores the parsed data in PostgreSQL, and lets you browse the resulting leaderboard in the frontend.
 
-### Backend (Rails + PostgreSQL)
+The dashboard is designed for scouting-style workflows:
+
+- search for players with typeahead suggestions
+- filter by team, season, and category
+- switch between batting, pitching, and pitch stats views
+- sort and paginate leaderboard rows
+- import CSV files into the app and refresh the table immediately after upload
+
+## Architecture
+
+```mermaid
+flowchart LR
+	CSV[CSV file] --> FE[Vue dashboard]
+	FE --> API[Rails API]
+	API --> DB[(PostgreSQL)]
+	API --> P[Player and team lookup]
+	API --> S[Season stats import and leaderboard queries]
+	P --> DB
+	S --> DB
+```
+
+## Technical Changes
+
+Recent work in the codebase added or updated the following:
+
+- Rails models and migrations for `Team`, `Player`, and `StatType`
+- a `PlayerStat` persistence model for imported CSV rows
+- CSV parsing and database writes in the player stats downloader service
+- API routes for player lookup and season stats import/query flows
+- frontend composables and dashboard UI for searching, filtering, sorting, and importing stats
+- Ruby environment pinning with backend `.ruby-version` and `.ruby-gemset`
+- `.gitignore` updates to keep `backend/vendor/bundle` out of source control
+
+## Backend
+
+Rails provides the API and persistence layer.
+
+Notable endpoints:
+
+- `GET /api/players` for player suggestions and lookup
+- `GET /api/player_season_stats` for leaderboard data
+- `POST /api/player_season_stats/import` for CSV imports
+
+The backend currently includes these domain models:
+
+- `Player`
+- `Team`
+- `StatType`
+- `PlayerStat`
+- `PlayerSeasonStat`
+
+## Frontend
+
+The Vue app centers around the player season stats dashboard.
+
+Main user-facing features:
+
+- player typeahead search
+- team and season selectors
+- category switching between batting, pitching, and pitch stats
+- leaderboard table with sorting and pagination
+- CSV import panel with upload status and summary messaging
+
+## Setup
+
+### Backend
 
 ```bash
-cd /shopify-prep-project/backend
+cd backend
 bundle install
 bin/rails db:prepare
 bin/rails server
 ```
 
-### Reimport Player Stats In One Command
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Reimport Player Stats
 
 From `backend/`:
 
@@ -26,104 +96,18 @@ From `backend/`:
 bin/rails player_stats:reimport
 ```
 
-That command will:
-
-- reseed `stat_types` via SeedFu
-- prefer the MLB downloader output directory at `~/Projects/mlb-stats-downloader/otuput`
-- auto-pick the canonical batter and pitcher `-present.csv` files there when available
-- rerun the importer against those files in one pass
-
-If auto-detection misses your file, point to it directly:
+That task reseeds stat types and reruns the player stats import flow. If needed, point it at a specific CSV file:
 
 ```bash
 PLAYER_STATS_CSV=/absolute/path/to/player_season_stats.csv bin/rails player_stats:reimport
 ```
 
-### Frontend (Vue)
+## Project Structure
 
-```bash
-cd /shopify-prep-project/frontend
-npm install
-npm run dev
-```
+- `backend/` Rails API, models, services, migrations, and database configuration
+- `frontend/` Vue 3 app, dashboard components, and composables
 
+## Notes
 
-
-### Stats
-
-Batting Stats
-
-playerId
-teamAbbrev
-teamName
-positionAbbrev
-gamesPlayed
-plateAppearances
-atBats
-runs
-hits
-doubles
-triples
-homeRuns
-rbi
-baseOnBalls
-intentionalWalks
-strikeOuts
-stolenBases
-caughtStealing
-avg
-obp
-slg
-ops
-totalBases
-hitByPitch
-sacBunts
-sacFlies
-groundIntoDoublePlay
-groundOuts
-airOuts
-leftOnBase
-atBatsPerHomeRun
-babip
-source_url
-age
-ballsInPlay
-catchersInterference
-caughtStealingPercentage
-extraBaseHits
-flyHits
-flyOuts
-gidp
-gidpOpp
-groundHits
-groundOutsToAirouts
-homeRunsPerPlateAppearance
-iso
-leagueId
-leagueName
-lineHits
-lineOuts
-numberOfPitches
-pitchesPerPlateAppearance
-playerFirstName
-playerFullName
-playerInitLastName
-playerLastName
-playerUseName
-popHits
-popOuts
-position
-primaryPositionAbbrev
-rank
-reachedOnError
-stolenBasePercentage
-strikeoutsPerPlateAppearance
-swingAndMisses
-teamId
-teamShortName
-totalSwings
-type
-walkOffs
-walksPerPlateAppearance
-walksPerStrikeout
-year
+- Use the backend `.ruby-version` and `.ruby-gemset` files to match the expected Ruby environment.
+- Do not commit `backend/vendor/bundle`; it is ignored by `.gitignore` and should be regenerated locally.
