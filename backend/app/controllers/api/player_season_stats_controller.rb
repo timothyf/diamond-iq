@@ -46,7 +46,8 @@ module Api
       result = PlayerStatsImporter.call(
         csv_data: uploaded_file.read,
         source_name: uploaded_file.original_filename,
-        required_stat_columns: import_params[:required_stat_columns]
+        required_stat_columns: import_params[:required_stat_columns],
+        replace_season: import_params[:replace_season]
       )
 
       if result[:success]
@@ -81,7 +82,7 @@ module Api
         :page,
         :per_page,
         :sort,
-        filter: [:season, :team_id, :player_id, :team_name, :player_name, :stat_type_name, :category, :min_value, :max_value]
+        filter: [:season, :season_start, :season_end, :team_id, :player_id, :team_name, :player_name, :stat_type_name, :category, :min_value, :max_value]
       ).to_h
     end
 
@@ -90,7 +91,7 @@ module Api
     end
 
     def import_params
-      params.permit(:file, required_stat_columns: [])
+      params.permit(:file, :replace_season, required_stat_columns: [])
     end
 
     def serialize_player_season_stat(player_season_stat)

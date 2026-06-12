@@ -122,4 +122,44 @@ RSpec.describe PlayerStatsImporter, type: :service do
     expect(miguel.first_name).to eq("Miguel")
     expect(miguel.last_name).to eq("Cabrera")
   end
+
+  it "replaces existing rows for imported season/category when replace_season is enabled" do
+    create_stat_type(name: "W", label: "W", category: "pitching")
+
+    team = Team.create!(
+      mlb_id: 142,
+      name: "Minnesota Twins",
+      abbreviation: "MIN",
+      team_name: "Twins",
+      location_name: "Minnesota",
+      short_name: "Twins",
+      team_code: "142",
+      file_code: "142"
+    )
+
+    old_player = Player.create!(mlb_id: 1, first_name: "Old", last_name: "Player", team: team)
+    old_batting_type = StatType.find_by!(name: "homeRuns", category: "batting")
+    old_pitching_type = StatType.find_by!(name: "W", category: "pitching")
+
+    PlayerSeasonStat.create!(player: old_player, stat_type: old_batting_type, season: 2026, value: BigDecimal("30"))
+    PlayerSeasonStat.create!(player: old_player, stat_type: old_pitching_type, season: 2026, value: BigDecimal("8"))
+
+    csv_data = <<~CSV
+      source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed,homeRuns,avg,ops
+      2026,2026,batter,115636,Hal,Haydel,MIN,Minnesota Twins,Twins,142,4,1,.667,2.667
+    CSV
+
+    result = described_class.call(
+      csv_data: csv_data,
+      source_name: "spec/imports/replace_season_player_season_stats.csv",
+      replace_season: true
+    )
+
+    expect(result[:success]).to be(true)
+    expect(result.dig(:data, :replace_season)).to be(true)
+    expect(result.dig(:data, :replaced_rows_count)).to eq(1)
+
+    expect(PlayerSeasonStat.where(player: old_player, stat_type: old_batting_type, season: 2026)).to be_empty
+    expect(PlayerSeasonStat.where(player: old_player, stat_type: old_pitching_type, season: 2026).count).to eq(1)
+  end
 end

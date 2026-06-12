@@ -20,6 +20,7 @@ describe('usePlayerSuggestions', () => {
         data: [
           {
             id: 42,
+            mlb_id: 545361,
             first_name: 'Miguel',
             last_name: 'Cabrera',
             team: { abbreviation: 'DET' },
@@ -52,6 +53,7 @@ describe('usePlayerSuggestions', () => {
     expect(suggestions.value).toEqual([
       {
         id: 42,
+        mlbId: 545361,
         firstName: 'Miguel',
         lastName: 'Cabrera',
         fullName: 'Miguel Cabrera',

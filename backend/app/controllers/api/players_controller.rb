@@ -18,6 +18,7 @@ module Api
     def serialize_player(player)
       {
         id: player.id,
+        mlb_id: player.mlb_id,
         first_name: player.first_name,
         last_name: player.last_name,
         team: serialize_team(player.team),

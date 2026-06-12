@@ -6,6 +6,11 @@ Rails.application.routes.draw do
         post :import
       end
     end
+    resources :pitch_data, only: [:index] do
+      collection do
+        post :import
+      end
+    end
   end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
