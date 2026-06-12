@@ -19,10 +19,23 @@ function buildSearchParams(query) {
   return searchParams
 }
 
+function formatInningHalf(inningTopbot) {
+  const normalized = String(inningTopbot || '').trim().toLowerCase()
+  if (normalized === 'top') return 'Top'
+  if (normalized === 'bot' || normalized === 'bottom') return 'Bot'
+  return ''
+}
+
 function normalizeRow(row = {}, index = 0, query = {}) {
   const page = Number.isFinite(Number(query.page)) ? Number(query.page) : 1
   const perPage = Number.isFinite(Number(query.perPage || query.limit)) ? Number(query.perPage || query.limit) : 50
   const rankOffset = Math.max(page - 1, 0) * perPage
+  const ballsValue = row.balls
+  const strikesValue = row.strikes
+  const hasCount = ballsValue !== null && ballsValue !== undefined && strikesValue !== null && strikesValue !== undefined
+  const inningValue = row.inning ?? '—'
+  const inningTopbot = row.inning_topbot || row.inningTopbot || ''
+  const inningHalfLabel = formatInningHalf(inningTopbot)
 
   return {
     id: row.id,
@@ -42,8 +55,13 @@ function normalizeRow(row = {}, index = 0, query = {}) {
     launchSpeed: row.launch_speed ?? row.launchSpeed ?? '—',
     launchAngle: row.launch_angle ?? row.launchAngle ?? '—',
     hitDistanceSc: row.hit_distance_sc ?? row.hitDistanceSc ?? '—',
+    balls: ballsValue ?? '—',
+    strikes: strikesValue ?? '—',
+    count: hasCount ? `${ballsValue}-${strikesValue}` : '—',
     zone: row.zone ?? '—',
-    inning: row.inning ?? '—',
+    inning: inningValue,
+    inningTopbot,
+    inningDisplay: inningHalfLabel && inningValue !== '—' ? `${inningHalfLabel} ${inningValue}` : inningValue,
     description: row.description || '—',
     events: row.events || '—',
     pitchName: row.pitch_name || row.pitchName || '—',
