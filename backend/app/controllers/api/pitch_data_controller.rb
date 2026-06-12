@@ -1,7 +1,7 @@
 module Api
   class PitchDataController < ApplicationController
     def index
-      rows = PitchDatum.order(game_date: :desc, game_pk: :desc, at_bat_number: :desc, pitch_number: :desc)
+      rows = PitchDatum.order(game_date: :desc, game_pk: :desc, inning: :asc, at_bat_number: :asc, pitch_number: :asc)
       rows = apply_filters(rows)
       total_count = rows.count
       rows = rows.offset((page_param - 1) * per_page_param).limit(per_page_param)
@@ -154,13 +154,14 @@ module Api
         launch_speed: row.launch_speed,
         launch_angle: row.launch_angle,
         hit_distance_sc: row.hit_distance_sc,
+        balls: row.balls,
+        strikes: row.strikes,
         zone: row.zone,
         inning: row.inning,
+        inning_topbot: row.inning_topbot,
         description: row.description,
         events: row.events,
         pitch_name: row.pitch_name,
-        description: row.description,
-        events: row.events,
         raw_data: row.raw_data,
         created_at: row.created_at,
         updated_at: row.updated_at

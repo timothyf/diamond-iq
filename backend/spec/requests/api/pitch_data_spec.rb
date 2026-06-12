@@ -154,6 +154,42 @@ RSpec.describe "Api::PitchData", type: :request do
     expect(json_body.fetch("data").map { |row| row.fetch("id") }).to eq([matching_row.id])
   end
 
+  it "sorts rows within a game by inning ascending" do
+    seventh_inning = PitchDatum.create!(
+      game_pk: 777,
+      at_bat_number: 1,
+      pitch_number: 1,
+      inning: 7,
+      inning_topbot: "top",
+      game_date: Date.new(2026, 4, 30),
+      raw_data: { "game_pk" => "777", "at_bat_number" => "1", "pitch_number" => "1", "inning" => "7" }
+    )
+    first_inning = PitchDatum.create!(
+      game_pk: 777,
+      at_bat_number: 2,
+      pitch_number: 1,
+      inning: 1,
+      inning_topbot: "top",
+      game_date: Date.new(2026, 4, 30),
+      raw_data: { "game_pk" => "777", "at_bat_number" => "2", "pitch_number" => "1", "inning" => "1" }
+    )
+    third_inning = PitchDatum.create!(
+      game_pk: 777,
+      at_bat_number: 3,
+      pitch_number: 1,
+      inning: 3,
+      inning_topbot: "bot",
+      game_date: Date.new(2026, 4, 30),
+      raw_data: { "game_pk" => "777", "at_bat_number" => "3", "pitch_number" => "1", "inning" => "3" }
+    )
+
+    get api_pitch_data_path, params: { game_pk: "777" }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").map { |row| row.fetch("id") }).to eq([first_inning.id, third_inning.id, seventh_inning.id])
+    expect(json_body.fetch("data").map { |row| row.fetch("inning") }).to eq([1, 3, 7])
+  end
+
   it "filters pitch data rows by an inclusive game date range" do
     first_in_range = PitchDatum.create!(
       game_pk: 501,
