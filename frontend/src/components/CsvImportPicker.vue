@@ -18,12 +18,41 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  defaultReplaceSeason: {
+    type: Boolean,
+    default: false,
+  },
+  headline: {
+    type: String,
+    default: 'CSV Import',
+  },
+  description: {
+    type: String,
+    default: '',
+  },
+  statusNoun: {
+    type: String,
+    default: 'data',
+  },
+  showReplaceSeasonToggle: {
+    type: Boolean,
+    default: true,
+  },
+  replaceSeasonLabel: {
+    type: String,
+    default: 'Replace existing rows for seasons/categories in this file',
+  },
+  fileInputId: {
+    type: String,
+    default: 'player-season-stats-csv',
+  },
 })
 
 const emit = defineEmits(['file-selected', 'import-request'])
 
 const selectedFile = ref(null)
 const validationMessage = ref('')
+const replaceSeason = ref(props.defaultReplaceSeason)
 const fileInput = ref(null)
 const progressValue = ref(0)
 let progressTimer = null
@@ -41,6 +70,22 @@ const progressLabel = computed(() => {
   return selectedFile.value
     ? `Importing ${selectedFile.value.name} into the Rails datastore…`
     : 'Importing CSV into the Rails datastore…'
+})
+
+const effectiveDescription = computed(() => {
+  if (props.description) return props.description
+
+  return props.variant === 'drawer'
+    ? 'Select a CSV export from your workstation to import data into the app.'
+    : 'Select a CSV export from your workstation so we can hand it to the import flow once the upload endpoint is connected.'
+})
+
+const progressNote = computed(() => {
+  if (props.statusNoun === 'pitch data') {
+    return 'Large files can take a little time while the API parses rows and upserts pitch-by-pitch data.'
+  }
+
+  return 'Large historical files can take a little time while the API parses rows and upserts data.'
 })
 
 function startProgressTimer() {
@@ -100,7 +145,10 @@ function handleFileSelection(event) {
 function requestImport() {
   if (!selectedFile.value || validationMessage.value || props.busy) return
 
-  emit('import-request', selectedFile.value)
+  emit('import-request', {
+    file: selectedFile.value,
+    replaceSeason: replaceSeason.value,
+  })
 }
 
 watch(
@@ -128,20 +176,14 @@ onBeforeUnmount(() => {
   <section :class="['import-station', { 'import-station--drawer': variant === 'drawer' }]">
     <div class="import-station__copy">
       <p class="eyebrow">CSV Intake</p>
-      <h2>{{ variant === 'drawer' ? 'Player Season Stats Import' : 'Stage A Player Season Stats Import' }}</h2>
-      <p>
-        {{
-          variant === 'drawer'
-            ? 'Select a CSV export from your workstation to refresh the player season stats dataset.'
-            : 'Select a CSV export from your workstation so we can hand it to the import flow once the upload endpoint is connected.'
-        }}
-      </p>
+      <h2>{{ variant === 'drawer' ? headline : `Stage A ${headline}` }}</h2>
+      <p>{{ effectiveDescription }}</p>
     </div>
 
     <div class="import-station__controls">
-      <label class="import-dropzone" for="player-season-stats-csv">
+      <label class="import-dropzone" :for="fileInputId">
         <input
-          id="player-season-stats-csv"
+          :id="fileInputId"
           ref="fileInput"
           class="import-dropzone__input"
           type="file"
@@ -154,6 +196,11 @@ onBeforeUnmount(() => {
       </label>
 
       <div class="import-station__actions">
+        <label v-if="showReplaceSeasonToggle" class="import-toggle">
+          <input v-model="replaceSeason" type="checkbox" :disabled="busy" />
+          <span>{{ replaceSeasonLabel }}</span>
+        </label>
+
         <button
           class="ghost-button"
           type="button"
@@ -196,7 +243,7 @@ onBeforeUnmount(() => {
           <span class="import-progress__fill" :style="{ width: `${progressValue}%` }" />
         </div>
         <p class="import-progress__note">
-          Large historical files can take a little time while the API parses rows and upserts season stats.
+          {{ progressNote }}
         </p>
       </div>
 

@@ -53,6 +53,14 @@ class PlayerSeasonStatsIndexQuery
 
       if normalized_filters[:season].present?
         scope = scope.where(season: normalized_filters[:season])
+      else
+        if normalized_filters[:season_start].present?
+          scope = scope.where("player_season_stats.season >= ?", normalized_filters[:season_start])
+        end
+
+        if normalized_filters[:season_end].present?
+          scope = scope.where("player_season_stats.season <= ?", normalized_filters[:season_end])
+        end
       end
 
       if normalized_filters[:team_id].present?
@@ -102,6 +110,8 @@ class PlayerSeasonStatsIndexQuery
       filters = raw_filters
         .slice(
           "season",
+          "season_start",
+          "season_end",
           "team_id",
           "player_id",
           "team_name",
@@ -115,10 +125,14 @@ class PlayerSeasonStatsIndexQuery
         .compact_blank
 
       integer_filter!(filters, "season")
+      integer_filter!(filters, "season_start")
+      integer_filter!(filters, "season_end")
       integer_filter!(filters, "team_id")
       integer_filter!(filters, "player_id")
       decimal_filter!(filters, "min_value")
       decimal_filter!(filters, "max_value")
+
+      normalize_season_bounds!(filters)
 
       filters.symbolize_keys
     end
@@ -196,5 +210,12 @@ class PlayerSeasonStatsIndexQuery
 
   def like_pattern(value)
     "%#{ActiveRecord::Base.sanitize_sql_like(value)}%"
+  end
+
+  def normalize_season_bounds!(filters)
+    return unless filters["season_start"].present? && filters["season_end"].present?
+    return unless filters["season_start"] > filters["season_end"]
+
+    filters["season_start"], filters["season_end"] = filters["season_end"], filters["season_start"]
   end
 end

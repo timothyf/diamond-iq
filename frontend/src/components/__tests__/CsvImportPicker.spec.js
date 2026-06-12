@@ -41,7 +41,7 @@ describe('CsvImportPicker', () => {
     expect(wrapper.text()).toContain('Please choose a file with a .csv extension.')
   })
 
-  it('emits an import-request for the selected file', async () => {
+  it('emits an import-request payload for the selected file', async () => {
     const wrapper = mount(CsvImportPicker)
     const file = buildFile('batting.csv')
 
@@ -51,7 +51,29 @@ describe('CsvImportPicker', () => {
     await prepareButton.trigger('click')
 
     expect(wrapper.emitted('import-request')).toHaveLength(1)
-    expect(wrapper.emitted('import-request')[0][0]).toBe(file)
+    expect(wrapper.emitted('import-request')[0][0]).toEqual({
+      file,
+      replaceSeason: false,
+    })
+  })
+
+  it('includes replaceSeason=true when the checkbox is checked', async () => {
+    const wrapper = mount(CsvImportPicker)
+    const file = buildFile('batting.csv')
+
+    await selectFile(wrapper, file)
+
+    const checkbox = wrapper.find('input[type="checkbox"]')
+    await checkbox.setValue(true)
+
+    const prepareButton = wrapper.find('[data-test="execute-import"]')
+    await prepareButton.trigger('click')
+
+    expect(wrapper.emitted('import-request')).toHaveLength(1)
+    expect(wrapper.emitted('import-request')[0][0]).toEqual({
+      file,
+      replaceSeason: true,
+    })
   })
 
   it('renders a progress indicator while an import is in flight', async () => {

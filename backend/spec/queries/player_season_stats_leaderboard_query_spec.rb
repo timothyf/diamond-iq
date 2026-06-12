@@ -137,6 +137,98 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     expect(query.metadata[:columns].map { |column| column[:label] }).to include("HR", "OPS")
   end
 
+  it "sorts batting leaderboard rows by strikeOuts numerically" do
+    tigers = create_team(
+      mlb_id: 116,
+      name: "Detroit Tigers",
+      abbreviation: "DET",
+      team_name: "Tigers",
+      location_name: "Detroit",
+      short_name: "Detroit",
+      team_code: "det",
+      file_code: "det"
+    )
+    dodgers = create_team(
+      mlb_id: 119,
+      name: "Los Angeles Dodgers",
+      abbreviation: "LAD",
+      team_name: "Dodgers",
+      location_name: "Los Angeles",
+      short_name: "Los Angeles",
+      team_code: "lan",
+      file_code: "la"
+    )
+    miguel = create_player(team: tigers, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
+    shohei = create_player(team: dodgers, attributes: { mlb_id: 660271, first_name: "Shohei", last_name: "Ohtani" })
+
+    %w[gamesPlayed atBats runs hits doubles triples homeRuns rbi baseOnBalls strikeOuts stolenBases caughtStealing avg obp slg ops].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+    end
+
+    {
+      "gamesPlayed" => "150",
+      "atBats" => "540",
+      "runs" => "88",
+      "hits" => "162",
+      "doubles" => "30",
+      "triples" => "2",
+      "homeRuns" => "24",
+      "rbi" => "91",
+      "baseOnBalls" => "60",
+      "strikeOuts" => "12",
+      "stolenBases" => "4",
+      "caughtStealing" => "1",
+      "avg" => ".300",
+      "obp" => ".372",
+      "slg" => ".515",
+      "ops" => ".887"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: miguel,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    {
+      "gamesPlayed" => "155",
+      "atBats" => "560",
+      "runs" => "102",
+      "hits" => "171",
+      "doubles" => "28",
+      "triples" => "4",
+      "homeRuns" => "41",
+      "rbi" => "99",
+      "baseOnBalls" => "88",
+      "strikeOuts" => "2",
+      "stolenBases" => "18",
+      "caughtStealing" => "3",
+      "avg" => ".305",
+      "obp" => ".401",
+      "slg" => ".612",
+      "ops" => "1.013"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: shohei,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    query = described_class.new(
+      params: {
+        view: "leaderboard",
+        sort: "-strikeOuts",
+        filter: { category: "batting", season: 2024 }
+      }
+    )
+
+    expect(query.results.map { |row| [row.dig(:player, :full_name), row.dig(:stats, "strikeOuts")] }).to eq([
+      ["Miguel Cabrera", "12.0"],
+      ["Shohei Ohtani", "2.0"]
+    ])
+  end
+
   it "uses the MLB-style pitching column order and labels" do
     query = described_class.new(
       params: {

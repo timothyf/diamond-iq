@@ -49,6 +49,7 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("meta", "sort")).to eq("last_name")
     expect(json_body.fetch("data").map { |player| player.fetch("last_name") }).to eq(["Ohtani"])
     expect(json_body.dig("data", 0, "first_name")).to eq("Shohei")
+    expect(json_body.dig("data", 0, "mlb_id")).to eq(660271)
     expect(json_body.dig("data", 0, "team", "name")).to eq("Los Angeles Dodgers")
     expect(json_body.dig("data", 0, "team", "abbreviation")).to eq("LAD")
     expect(json_body.dig("data", 0, "team", "team_name")).to eq("Dodgers")

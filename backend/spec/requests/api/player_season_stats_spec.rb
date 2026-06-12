@@ -75,6 +75,15 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", 0, "stat_type", "category")).to eq("pitching")
   end
 
+  it "filters player season stats by inclusive season range" do
+    get api_player_season_stats_path,
+        params: { filter: { season_start: 2025, season_end: 2026 } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "filters")).to include({ "season_start" => 2025, "season_end" => 2026 })
+    expect(json_body.fetch("data").map { |row| row.fetch("season") }).to eq([2025])
+  end
+
   it "lists leaderboard rows grouped by player with stats across columns" do
     %w[gamesPlayed atBats runs hits doubles triples homeRuns rbi baseOnBalls strikeOuts stolenBases caughtStealing avg obp slg ops].each do |name|
       create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
@@ -168,6 +177,88 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", 0, "player", "full_name")).to eq("Shohei Ohtani")
     expect(json_body.dig("data", 0, "stats", "homeRuns")).to eq("41.0")
     expect(json_body.dig("data", 0, "stats", "ops")).to eq("1.013")
+  end
+
+  it "filters leaderboard rows by an inclusive season range" do
+    get api_player_season_stats_path,
+        params: {
+          view: "leaderboard",
+          sort: "-ops",
+          filter: { category: "batting", season_start: 2025, season_end: 2026 }
+        }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "filters")).to include({ "season_start" => 2025, "season_end" => 2026, "category" => "batting" })
+    expect(json_body.fetch("data").map { |row| row.fetch("season") }).to eq([2025])
+  end
+
+  it "sorts batting leaderboard rows by strikeOuts through the API" do
+    %w[gamesPlayed atBats runs hits doubles triples homeRuns rbi baseOnBalls strikeOuts stolenBases caughtStealing avg obp slg ops].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+    end
+
+    {
+      "gamesPlayed" => "150",
+      "atBats" => "540",
+      "runs" => "88",
+      "hits" => "162",
+      "doubles" => "30",
+      "triples" => "2",
+      "homeRuns" => "24",
+      "rbi" => "91",
+      "baseOnBalls" => "60",
+      "strikeOuts" => "12",
+      "stolenBases" => "4",
+      "caughtStealing" => "1",
+      "avg" => ".300",
+      "obp" => ".372",
+      "slg" => ".515",
+      "ops" => ".887"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: @player,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    {
+      "gamesPlayed" => "155",
+      "atBats" => "560",
+      "runs" => "102",
+      "hits" => "171",
+      "doubles" => "28",
+      "triples" => "4",
+      "homeRuns" => "41",
+      "rbi" => "99",
+      "baseOnBalls" => "88",
+      "strikeOuts" => "2",
+      "stolenBases" => "18",
+      "caughtStealing" => "3",
+      "avg" => ".305",
+      "obp" => ".401",
+      "slg" => ".612",
+      "ops" => "1.013"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: @shohei,
+        stat_type: StatType.find_by!(name: name, category: "batting"),
+        attributes: { season: 2024, value: value }
+      )
+    end
+
+    get api_player_season_stats_path,
+        params: {
+          view: "leaderboard",
+          sort: "-strikeOuts",
+          filter: { category: "batting", season: 2024 }
+        }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "sort")).to eq("-strikeOuts")
+    expect(json_body.fetch("data").map { |row| row.dig("player", "full_name") }).to eq(["Miguel Cabrera", "Shohei Ohtani"])
+    expect(json_body.dig("data", 0, "stats", "strikeOuts")).to eq("12.0")
+    expect(json_body.dig("data", 1, "stats", "strikeOuts")).to eq("2.0")
   end
 
   it "shows a player season stat" do

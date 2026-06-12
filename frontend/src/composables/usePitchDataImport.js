@@ -2,36 +2,32 @@ import { computed, ref } from 'vue'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
-function buildSuccessMessage(payload) {
-  const data = payload.data || {}
-  const messageParts = [payload.message].filter(Boolean)
-
-  if (typeof data.created_player_count === 'number' && typeof data.created_team_count === 'number') {
-    messageParts.push(`Created ${data.created_player_count} players and ${data.created_team_count} teams.`)
-  }
-
-  if (typeof data.skipped_count === 'number' && data.skipped_count > 0) {
-    messageParts.push(`Skipped ${data.skipped_count} rows.`)
-  }
-
-  if (data.replace_season && typeof data.replaced_rows_count === 'number') {
-    messageParts.push(`Replaced ${data.replaced_rows_count} existing season rows before import.`)
-  }
-
-  return messageParts.join(' ')
-}
-
 function buildErrorMessage(payload, status) {
   if (payload?.message) return payload.message
   return `Import failed with status ${status}.`
 }
 
-export function usePlayerSeasonStatsImport() {
+function buildSuccessMessage(payload) {
+  const data = payload.data || {}
+  const messageParts = [payload.message].filter(Boolean)
+
+  if (typeof data.duplicate_count === 'number' && data.duplicate_count > 0) {
+    messageParts.push(`Collapsed ${data.duplicate_count} duplicate pitch rows.`)
+  }
+
+  if (typeof data.skipped_count === 'number' && data.skipped_count > 0) {
+    messageParts.push(`Skipped ${data.skipped_count} invalid rows.`)
+  }
+
+  return messageParts.join(' ')
+}
+
+export function usePitchDataImport() {
   const uploading = ref(false)
   const error = ref('')
   const summary = ref('')
 
-  async function importFile(file, options = {}) {
+  async function importFile(file) {
     if (!file) {
       error.value = 'Choose a CSV file before starting the import.'
       summary.value = ''
@@ -44,9 +40,8 @@ export function usePlayerSeasonStatsImport() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('replace_season', options.replaceSeason ? '1' : '0')
 
-      const response = await fetch(`${API_BASE_URL}/api/player_season_stats/import`, {
+      const response = await fetch(`${API_BASE_URL}/api/pitch_data/import`, {
         method: 'POST',
         headers: {
           Accept: 'application/json',

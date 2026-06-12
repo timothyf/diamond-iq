@@ -23,6 +23,7 @@ function buildSearchParams(query) {
 function normalizePlayers(players = []) {
   return players.map((player) => ({
     id: player.id,
+    mlbId: player.mlb_id,
     firstName: player.first_name,
     lastName: player.last_name,
     fullName: [player.first_name, player.last_name].filter(Boolean).join(' '),

@@ -198,6 +198,12 @@ class PlayerSeasonStatsLeaderboardQuery
     @column_definitions ||= COLUMN_DEFINITIONS_BY_CATEGORY.fetch(category, COLUMN_DEFINITIONS_BY_CATEGORY.fetch(DEFAULT_CATEGORY))
   end
 
+  def column_definition_for(column_key)
+    column_definitions.find { |column_definition| column_definition.fetch(:key) == column_key } ||
+      column_definitions.find { |column_definition| Array(column_definition.fetch(:aliases)).include?(column_key) } ||
+      column_definitions.first
+  end
+
   def total_count
     @total_count ||= begin
       sql = <<~SQL.squish
@@ -269,7 +275,7 @@ class PlayerSeasonStatsLeaderboardQuery
   def sort_expression
     return FIXED_SORT_FIELDS.fetch(sort_field) if FIXED_SORT_FIELDS.key?(sort_field)
 
-    stat_alias(sort_field)
+    "CAST(#{aggregate_expression(column_definition_for(sort_field))} AS NUMERIC)"
   end
 
   def sort_direction
@@ -296,13 +302,16 @@ class PlayerSeasonStatsLeaderboardQuery
   def normalized_filters
     @normalized_filters ||= begin
       filters = raw_filters
-        .slice("season", "team_id", "player_id", "team_name", "player_name", "category")
+        .slice("season", "season_start", "season_end", "team_id", "player_id", "team_name", "player_name", "category")
         .transform_values { |value| value.is_a?(String) ? value.strip : value }
         .compact_blank
 
       integer_filter!(filters, "season")
+      integer_filter!(filters, "season_start")
+      integer_filter!(filters, "season_end")
       integer_filter!(filters, "team_id")
       integer_filter!(filters, "player_id")
+      normalize_season_bounds!(filters)
       filters["category"] = normalize_category(filters["category"])
       filters["category"] ||= DEFAULT_CATEGORY
 
@@ -340,11 +349,26 @@ class PlayerSeasonStatsLeaderboardQuery
     "%#{ActiveRecord::Base.sanitize_sql_like(value)}%"
   end
 
+  def normalize_season_bounds!(filters)
+    return unless filters["season_start"].present? && filters["season_end"].present?
+    return unless filters["season_start"] > filters["season_end"]
+
+    filters["season_start"], filters["season_end"] = filters["season_end"], filters["season_start"]
+  end
+
   def apply_filters(scope, include_season:, include_team:)
     filtered_scope = scope.where(stat_types: { category: category, name: available_alias_names })
 
     if include_season && normalized_filters[:season].present?
       filtered_scope = filtered_scope.where(player_season_stats: { season: normalized_filters[:season] })
+    elsif include_season
+      if normalized_filters[:season_start].present?
+        filtered_scope = filtered_scope.where("player_season_stats.season >= ?", normalized_filters[:season_start])
+      end
+
+      if normalized_filters[:season_end].present?
+        filtered_scope = filtered_scope.where("player_season_stats.season <= ?", normalized_filters[:season_end])
+      end
     end
 
     if include_team && normalized_filters[:team_id].present?

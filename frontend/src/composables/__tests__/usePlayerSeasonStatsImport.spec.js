@@ -12,6 +12,8 @@ describe('usePlayerSeasonStatsImport', () => {
           created_player_count: 3,
           created_team_count: 2,
           skipped_count: 0,
+          replace_season: true,
+          replaced_rows_count: 22,
         },
       }),
     })
@@ -21,7 +23,7 @@ describe('usePlayerSeasonStatsImport', () => {
     const { importFile, uploading, error, summary } = usePlayerSeasonStatsImport()
     const file = new File(['season,player'], 'season-stats.csv', { type: 'text/csv' })
 
-    const payload = await importFile(file)
+    const payload = await importFile(file, { replaceSeason: true })
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -31,10 +33,11 @@ describe('usePlayerSeasonStatsImport', () => {
       headers: { Accept: 'application/json' },
     })
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData)
+    expect(fetchMock.mock.calls[0][1].body.get('replace_season')).toBe('1')
     expect(payload.message).toBe('Imported 10 player season stats')
     expect(uploading.value).toBe(false)
     expect(error.value).toBe('')
-    expect(summary.value).toBe('Imported 10 player season stats Created 3 players and 2 teams.')
+    expect(summary.value).toBe('Imported 10 player season stats Created 3 players and 2 teams. Replaced 22 existing season rows before import.')
   })
 
   it('surfaces an import error when the request fails', async () => {

@@ -61,20 +61,22 @@ class PlayerStatsImporter
 
   UPSERT_INDEX = %i[player_id stat_type_id season].freeze
 
-  def self.call(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [])
+  def self.call(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [], replace_season: false)
     new(
       csv_data: csv_data,
       file_path: file_path,
       source_name: source_name,
-      required_stat_columns: required_stat_columns
+      required_stat_columns: required_stat_columns,
+      replace_season: replace_season
     ).call
   end
 
-  def initialize(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [])
+  def initialize(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [], replace_season: false)
     @csv_data = csv_data
     @file_path = file_path
     @source_name = source_name
     @required_stat_columns = Array(required_stat_columns).map { |column| column.to_s.strip }.reject(&:blank?)
+    @replace_season = cast_boolean(replace_season)
     @errors = []
   end
 
@@ -97,6 +99,7 @@ class PlayerStatsImporter
       persisted.merge(
         skipped_count: errors.length,
         duplicate_count: @duplicate_count || 0,
+        replace_season: replace_season?,
         errors: errors
       )
     )
@@ -111,6 +114,10 @@ class PlayerStatsImporter
   private
 
   attr_reader :csv_data, :file_path, :source_name, :required_stat_columns, :errors
+
+  def replace_season?
+    @replace_season
+  end
 
   def csv_source
     @csv_source ||= if csv_data.present?
@@ -258,8 +265,11 @@ class PlayerStatsImporter
     season_stat_records = []
     created_player_count = 0
     created_team_count = 0
+    replaced_rows_count = 0
 
     PlayerSeasonStat.transaction do
+      replaced_rows_count = replace_existing_season_rows(import_rows) if replace_season?
+
       import_rows.each do |import_row|
         team = Team.find_or_initialize_by(mlb_id: import_row[:team_attributes][:mlb_id])
         created_team_count += 1 if team.new_record?
@@ -293,8 +303,20 @@ class PlayerStatsImporter
     {
       imported_count: season_stat_records.length,
       created_player_count: created_player_count,
-      created_team_count: created_team_count
+      created_team_count: created_team_count,
+      replaced_rows_count: replaced_rows_count
     }
+  end
+
+  def replace_existing_season_rows(import_rows)
+    scopes = import_rows.map { |row| [row[:season], row[:category]] }.uniq
+
+    scopes.sum do |season, category|
+      stat_type_ids = stat_types_for_category(category).map(&:id)
+      next 0 if stat_type_ids.empty?
+
+      PlayerSeasonStat.where(season: season, stat_type_id: stat_type_ids).delete_all
+    end
   end
 
   def normalize_row(row_hash)
@@ -346,6 +368,12 @@ class PlayerStatsImporter
     BigDecimal(normalized_value)
   rescue ArgumentError
     nil
+  end
+
+  def cast_boolean(value)
+    return value if value == true || value == false
+
+    %w[1 true t yes y on].include?(value.to_s.strip.downcase)
   end
 
   def row_error(source_row_number, message)
