@@ -150,6 +150,7 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("meta", "category")).to eq("batting")
     expect(json_body.dig("meta", "sort")).to eq("-homeRuns")
     expect(json_body.dig("meta", "total_count")).to eq(2)
+    expect(json_body.dig("meta", "data_range")).to eq({ "type" => "season", "start" => 2024, "end" => 2025 })
     expect(json_body.dig("meta", "available_seasons")).to eq([2025, 2024])
     expect(json_body.dig("meta", "available_teams")).to eq(
       [
@@ -364,6 +365,60 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body["message"]).to include("Missing required stat columns: gamesPlayed")
   ensure
     csv_file.close!
+  end
+
+  it "downloads MLB stats and imports them through the API" do
+    create_stat_type(name: "gamesPlayed", label: "G", category: "batting") unless StatType.exists?(name: "gamesPlayed", category: "batting")
+    create_stat_type(name: "homeRuns", label: "HR", category: "batting") unless StatType.exists?(name: "homeRuns", category: "batting")
+
+    csv_data = <<~CSV
+      source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed,homeRuns
+      2026,2026,batter,123456,Barry,Bonds,SFG,San Francisco Giants,Giants,137,99,73
+    CSV
+
+    allow(PlayerStatsDownloader).to receive(:call).and_return(
+      {
+        success: true,
+        message: "Downloaded 1 batting player season rows from MLB",
+        data: {
+          csv_data: csv_data,
+          row_count: 1,
+          category: "batting",
+          seasons: [2026]
+        }
+      }
+    )
+
+    expect do
+      post download_api_player_season_stats_path,
+           params: {
+             category: "batting",
+             start_year: 2026,
+             end_year: 2026,
+             replace_season: "1"
+           },
+           as: :json
+    end.to change(PlayerSeasonStat, :count).by(2)
+
+    expect(response).to have_http_status(:created)
+    expect(PlayerStatsDownloader).to have_received(:call).with(category: "batting", start_year: 2026, end_year: 2026)
+    expect(json_body.dig("data", "downloaded_count")).to eq(1)
+    expect(json_body.dig("data", "downloaded_category")).to eq("batting")
+    expect(json_body.dig("data", "downloaded_seasons")).to eq([2026])
+    expect(Player.find_by!(mlb_id: 123456).last_name).to eq("Bonds")
+  end
+
+  it "returns downloader failures from the MLB download endpoint" do
+    allow(PlayerStatsDownloader).to receive(:call).and_return(
+      { success: false, message: "No batting rows returned from MLB", data: {} }
+    )
+
+    post download_api_player_season_stats_path,
+         params: { category: "batting", start_year: 2026, end_year: 2026 },
+         as: :json
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body["message"]).to eq("No batting rows returned from MLB")
   end
 
   it "updates a player season stat" do

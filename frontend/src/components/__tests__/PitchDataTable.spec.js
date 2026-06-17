@@ -30,6 +30,7 @@ function buildProps(overrides = {}) {
     meta: {
       count: 1,
       limit: 50,
+      dataRange: { type: 'game_date', start: '2026-04-01', end: '2026-04-30' },
     },
     loading: false,
     ...overrides,
@@ -44,6 +45,7 @@ describe('PitchDataTable', () => {
 
     expect(wrapper.text()).toContain('Showing 1 of 1 pitch rows')
     expect(wrapper.text()).toContain('Page 1 of 1')
+    expect(wrapper.text()).toContain('Data range: 2026-04-01 to 2026-04-30')
     expect(wrapper.find('th').text()).toContain('Game')
     expect(wrapper.find('.game-cell .game-pk').text()).toBe('888')
     expect(wrapper.find('.game-cell .game-date').text()).toBe('2026-04-30')

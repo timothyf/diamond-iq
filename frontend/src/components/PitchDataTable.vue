@@ -20,6 +20,13 @@ const props = defineProps({
 
 const currentPage = computed(() => Number(props.meta.page || 1))
 const totalPages = computed(() => Number(props.meta.totalPages || 1))
+const dataRangeLabel = computed(() => {
+  const range = props.meta.dataRange || {}
+  if (!range.start || !range.end) return 'Data range unavailable'
+  if (range.start === range.end) return `Data range: ${range.start}`
+
+  return `Data range: ${range.start} to ${range.end}`
+})
 const outerZones = [11, 12, 13, 14]
 const innerZones = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
@@ -63,6 +70,7 @@ function goToLastPage() {
     <div class="table-meta">
       <span>Showing {{ meta.count || 0 }} of {{ meta.totalCount || meta.count || 0 }} pitch rows</span>
       <span>Page {{ meta.page || 1 }} of {{ meta.totalPages || 1 }} · {{ meta.perPage || meta.limit || 50 }} per page</span>
+      <span>{{ dataRangeLabel }}</span>
     </div>
 
     <div class="table-meta">

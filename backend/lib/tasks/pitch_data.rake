@@ -45,4 +45,50 @@ namespace :pitch_data do
     puts "Using pitch CSV source: #{file_path}"
     import_pitch_data_from!(file_path)
   end
+
+  desc "Download Baseball Savant pitch data and import it. Usage: bin/rails 'pitch_data:download[2026-04-01,2026-04-07]' GAME_TYPES=R CHUNK_DAYS=7"
+  task :download, [:start_date, :end_date] => :environment do |_task, args|
+    start_date = args[:start_date].presence || ENV["START_DATE"].presence
+    end_date = args[:end_date].presence || ENV["END_DATE"].presence || start_date
+    game_types = ENV["GAME_TYPES"].presence || "R"
+    chunk_days = ENV["CHUNK_DAYS"].presence || PitchDataDownloader::DEFAULT_CHUNK_DAYS
+
+    if start_date.blank? || end_date.blank?
+      abort "Usage: bin/rails 'pitch_data:download[2026-04-01,2026-04-07]' or START_DATE=2026-04-01 END_DATE=2026-04-07 bin/rails pitch_data:download"
+    end
+
+    puts "Downloading pitch data from Baseball Savant for #{start_date}-#{end_date}..."
+    download_result = PitchDataDownloader.call(
+      start_date: start_date,
+      end_date: end_date,
+      game_types: game_types,
+      chunk_days: chunk_days
+    )
+
+    unless download_result[:success]
+      abort download_result[:message]
+    end
+
+    puts download_result[:message]
+    result = PitchDataImporter.call(
+      csv_data: download_result.dig(:data, :csv_data),
+      source_name: "Baseball Savant pitch data #{download_result.dig(:data, :start_date)}-#{download_result.dig(:data, :end_date)}"
+    )
+
+    puts result[:message]
+
+    unless result[:success]
+      Array(result.dig(:data, :errors)).each do |error|
+        puts "Row #{error[:row_number]}: #{error[:error]}"
+      end
+
+      abort "Pitch data download import failed"
+    end
+
+    data = result[:data] || {}
+    puts "Downloaded pitch rows: #{download_result.dig(:data, :row_count)}"
+    puts "Imported pitch rows: #{data[:imported_count]}"
+    puts "Skipped rows: #{data[:skipped_count]}"
+    puts "Duplicate rows collapsed: #{data[:duplicate_count]}"
+  end
 end

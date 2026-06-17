@@ -84,6 +84,7 @@ function normalizeMeta(meta = {}, requestedPerPage = 50) {
     totalPages: safeTotalPages,
     totalCount: safeTotalCount,
     count: safeCount,
+    dataRange: meta.data_range || null,
     availableEvents,
     availablePitchTypes,
   }

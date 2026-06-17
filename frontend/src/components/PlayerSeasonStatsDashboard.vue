@@ -6,7 +6,9 @@ import PitchDataTable from './PitchDataTable.vue'
 import PlayerSeasonStatsTable from './PlayerSeasonStatsTable.vue'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import { usePitchData } from '../composables/usePitchData'
+import { usePitchDataDownload } from '../composables/usePitchDataDownload'
 import { usePlayerSeasonStats } from '../composables/usePlayerSeasonStats'
+import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 import { usePitchDataImport } from '../composables/usePitchDataImport'
 
@@ -42,6 +44,19 @@ const pitchDataFilters = reactive({
   batter: '',
   pitchType: '',
   events: '',
+})
+
+const currentSeason = new Date().getFullYear()
+const currentDateIso = new Date().toISOString().slice(0, 10)
+const mlbDownloadOptions = reactive({
+  category: 'batting',
+  startYear: String(currentSeason),
+  endYear: String(currentSeason),
+  startDate: currentDateIso,
+  endDate: currentDateIso,
+  gameTypes: 'R',
+  chunkDays: 7,
+  replaceSeason: true,
 })
 
 const sort = reactive({
@@ -123,6 +138,18 @@ const { suggestions: pitcherSuggestions, loading: pitcherSuggestionsLoading } = 
 const { suggestions: batterSuggestions, loading: batterSuggestionsLoading } = usePlayerSuggestions(batterSuggestionQuery)
 const { uploading, error: importError, summary: importSummary, importFile } = usePlayerSeasonStatsImport()
 const {
+  downloading: mlbDownloading,
+  error: mlbDownloadError,
+  summary: mlbDownloadSummary,
+  downloadStats: downloadMlbStats,
+} = usePlayerSeasonStatsDownload()
+const {
+  downloading: pitchDataDownloading,
+  error: pitchDataDownloadError,
+  summary: pitchDataDownloadSummary,
+  downloadPitchData,
+} = usePitchDataDownload()
+const {
   uploading: pitchUploading,
   error: pitchImportError,
   summary: pitchImportSummary,
@@ -144,6 +171,20 @@ watch(
     if (startYear && endYear && startYear > endYear) {
       filters.seasonEnd = filters.seasonStart
     }
+  },
+)
+
+watch(
+  () => [mlbDownloadOptions.startYear, mlbDownloadOptions.endYear],
+  () => {
+    normalizeDownloadYearRange()
+  },
+)
+
+watch(
+  () => [mlbDownloadOptions.startDate, mlbDownloadOptions.endDate],
+  () => {
+    normalizePitchDownloadDateRange()
   },
 )
 
@@ -251,30 +292,36 @@ const showBatterSuggestions = computed(
 )
 
 const importBusy = computed(() => uploading.value || pitchUploading.value)
+const dataActionBusy = computed(() => importBusy.value || mlbDownloading.value || pitchDataDownloading.value)
 
 const importStatusTone = computed(() => {
-  if (importBusy.value) return 'live'
-  if (importError.value || pitchImportError.value) return 'error'
+  if (dataActionBusy.value) return 'live'
+  if (importError.value || pitchImportError.value || mlbDownloadError.value || pitchDataDownloadError.value) return 'error'
   if (selectedImportFile.value || selectedPitchImportFile.value) return 'staged'
-  if (importSummary.value || pitchImportSummary.value) return 'success'
+  if (importSummary.value || pitchImportSummary.value || mlbDownloadSummary.value || pitchDataDownloadSummary.value) return 'success'
   return 'idle'
 })
 
 const importStatusLabel = computed(() => {
+  if (pitchDataDownloading.value) return 'Pitch data download in progress'
+  if (mlbDownloading.value) return 'MLB download in progress'
   if (importBusy.value) return 'Import in progress'
-  if (importError.value || pitchImportError.value) return 'Import issue'
+  if (importError.value || pitchImportError.value || mlbDownloadError.value || pitchDataDownloadError.value) return 'Data issue'
   if (selectedImportFile.value || selectedPitchImportFile.value) return 'File staged'
-  if (importSummary.value || pitchImportSummary.value) return 'Latest import'
+  if (importSummary.value || pitchImportSummary.value || mlbDownloadSummary.value || pitchDataDownloadSummary.value) return 'Latest data action'
   return 'Data imports'
 })
 
 const importStatusDetail = computed(() => {
-  if (importError.value || pitchImportError.value) {
-    return importError.value || pitchImportError.value
+  if (importError.value || pitchImportError.value || mlbDownloadError.value || pitchDataDownloadError.value) {
+    return importError.value || pitchImportError.value || mlbDownloadError.value || pitchDataDownloadError.value
   }
 
   if (selectedImportFile.value) return stagedImportMessage.value
   if (selectedPitchImportFile.value) return stagedPitchImportMessage.value
+
+  if (pitchDataDownloadSummary.value) return pitchDataDownloadSummary.value
+  if (mlbDownloadSummary.value) return mlbDownloadSummary.value
 
   if (importSummary.value && pitchImportSummary.value) {
     return `Season: ${importSummary.value} | Pitch: ${pitchImportSummary.value}`
@@ -359,6 +406,25 @@ function updatePitchPerPage(event) {
 
 function updatePitchPage(nextPage) {
   pitchDataOptions.page = nextPage
+}
+
+function normalizeDownloadYearRange() {
+  if (mlbDownloadOptions.category === 'pitchData') return
+
+  const startYear = Number(mlbDownloadOptions.startYear)
+  const endYear = Number(mlbDownloadOptions.endYear)
+
+  if (startYear && endYear && startYear > endYear) {
+    mlbDownloadOptions.endYear = mlbDownloadOptions.startYear
+  }
+}
+
+function normalizePitchDownloadDateRange() {
+  if (mlbDownloadOptions.category !== 'pitchData') return
+
+  if (mlbDownloadOptions.startDate && mlbDownloadOptions.endDate && mlbDownloadOptions.startDate > mlbDownloadOptions.endDate) {
+    mlbDownloadOptions.endDate = mlbDownloadOptions.startDate
+  }
 }
 
 function handlePlayerInputFocus() {
@@ -468,6 +534,45 @@ function closeImportPanel() {
   if (importBusy.value) return
 
   importPanelOpen.value = false
+}
+
+async function handleMlbDownload() {
+  if (mlbDownloadOptions.category === 'pitchData') {
+    normalizePitchDownloadDateRange()
+
+    const result = await downloadPitchData({
+      startDate: mlbDownloadOptions.startDate,
+      endDate: mlbDownloadOptions.endDate,
+      gameTypes: mlbDownloadOptions.gameTypes,
+      chunkDays: mlbDownloadOptions.chunkDays,
+    })
+
+    if (!result) return
+
+    filters.category = 'pitchData'
+    pitchDataFilters.gameDateStart = mlbDownloadOptions.startDate
+    pitchDataFilters.gameDateEnd = mlbDownloadOptions.endDate
+    pitchDataOptions.page = 1
+    await refreshPitchData()
+    return
+  }
+
+  normalizeDownloadYearRange()
+
+  const result = await downloadMlbStats({
+    category: mlbDownloadOptions.category,
+    startYear: mlbDownloadOptions.startYear,
+    endYear: mlbDownloadOptions.endYear,
+    replaceSeason: mlbDownloadOptions.replaceSeason,
+  })
+
+  if (!result) return
+
+  filters.category = mlbDownloadOptions.category
+  filters.seasonStart = mlbDownloadOptions.startYear
+  filters.seasonEnd = mlbDownloadOptions.endYear
+  sort.value = DEFAULT_SORT_BY_CATEGORY[filters.category] || DEFAULT_SORT_BY_CATEGORY.batting
+  await refresh()
 }
 
 function resetFilters() {
@@ -616,7 +721,7 @@ function normalizeHeaderKey(value) {
         <p class="eyebrow">Front Office Dashboard</p>
         <h1>Player Season Stat Board</h1>
         <p class="lede">
-          A single scouting-style command center for searching, sorting, and comparing imported player season stats.
+          Command center for searching, sorting, and comparing imported player season stats.
         </p>
       </div>
     </section>
@@ -833,6 +938,100 @@ function normalizeHeaderKey(value) {
           </select>
         </label>
       </div>
+
+      <form class="mlb-download-panel" data-test="mlb-download-panel" @submit.prevent="handleMlbDownload">
+        <div>
+          <p class="eyebrow">MLB Direct</p>
+          <h3>{{ mlbDownloadOptions.category === 'pitchData' ? 'Download Pitch Data' : 'Download Season Stats' }}</h3>
+        </div>
+
+        <label class="field">
+          <span>Stat Set</span>
+          <select v-model="mlbDownloadOptions.category" data-test="mlb-download-category">
+            <option value="batting">Batting</option>
+            <option value="pitching">Pitching</option>
+            <option value="pitchData">Pitch Data</option>
+          </select>
+        </label>
+
+        <label v-if="mlbDownloadOptions.category !== 'pitchData'" class="field">
+          <span>Start Year</span>
+          <input
+            v-model="mlbDownloadOptions.startYear"
+            type="number"
+            min="1876"
+            :max="currentSeason"
+            required
+            data-test="mlb-download-start-year"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category !== 'pitchData'" class="field">
+          <span>End Year</span>
+          <input
+            v-model="mlbDownloadOptions.endYear"
+            type="number"
+            min="1876"
+            :max="currentSeason"
+            required
+            data-test="mlb-download-end-year"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category === 'pitchData'" class="field">
+          <span>Start Date</span>
+          <input
+            v-model="mlbDownloadOptions.startDate"
+            type="date"
+            min="2008-01-01"
+            required
+            data-test="mlb-download-start-date"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category === 'pitchData'" class="field">
+          <span>End Date</span>
+          <input
+            v-model="mlbDownloadOptions.endDate"
+            type="date"
+            min="2008-01-01"
+            required
+            data-test="mlb-download-end-date"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category === 'pitchData'" class="field">
+          <span>Game Types</span>
+          <input
+            v-model="mlbDownloadOptions.gameTypes"
+            type="text"
+            inputmode="text"
+            required
+            data-test="mlb-download-game-types"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category === 'pitchData'" class="field">
+          <span>Chunk Days</span>
+          <input
+            v-model.number="mlbDownloadOptions.chunkDays"
+            type="number"
+            min="1"
+            max="14"
+            required
+            data-test="mlb-download-chunk-days"
+          />
+        </label>
+
+        <label v-if="mlbDownloadOptions.category !== 'pitchData'" class="import-toggle mlb-download-panel__toggle">
+          <input v-model="mlbDownloadOptions.replaceSeason" type="checkbox" :disabled="dataActionBusy" />
+          <span>Replace matching season rows</span>
+        </label>
+
+        <button class="ghost-button" type="submit" :disabled="dataActionBusy" data-test="execute-mlb-download">
+          {{ dataActionBusy && (mlbDownloading || pitchDataDownloading) ? 'Downloading...' : 'Download MLB Data' }}
+        </button>
+      </form>
     </section>
 
     <section class="table-stage">
@@ -848,7 +1047,7 @@ function normalizeHeaderKey(value) {
               <span class="import-chip__label">{{ importStatusLabel }}</span>
               <span class="import-chip__detail">{{ importStatusDetail }}</span>
             </div>
-            <button class="ghost-button import-utility__button" type="button" data-test="open-import-panel" :disabled="importBusy" @click="openImportPanel(filters.category === 'pitchData' ? 'pitch' : 'season')">
+            <button class="ghost-button import-utility__button" type="button" data-test="open-import-panel" :disabled="dataActionBusy" @click="openImportPanel(filters.category === 'pitchData' ? 'pitch' : 'season')">
               {{ importBusy ? 'Importing…' : 'Import CSV' }}
             </button>
           </div>

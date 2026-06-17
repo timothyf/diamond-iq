@@ -111,6 +111,7 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     expect(query.metadata[:total_count]).to eq(2)
     expect(query.metadata[:sort]).to eq("-homeRuns")
     expect(query.metadata[:category]).to eq("batting")
+    expect(query.metadata[:data_range]).to eq(type: "season", start: 2024, end: 2024)
     expect(query.metadata[:available_seasons]).to eq([2024])
     expect(query.metadata[:available_teams]).to eq(
       [

@@ -9,6 +9,8 @@ const refreshSpy = vi.fn()
 const refreshPitchDataSpy = vi.fn()
 const importFileSpy = vi.fn()
 const importPitchDataFileSpy = vi.fn()
+const downloadStatsSpy = vi.fn()
+const downloadPitchDataSpy = vi.fn()
 
 vi.mock('../../composables/usePlayerSeasonStats', () => ({
   usePlayerSeasonStats: vi.fn(() => ({
@@ -29,6 +31,7 @@ vi.mock('../../composables/usePlayerSeasonStats', () => ({
       sort: '-homeRuns',
       filters: {},
       category: 'batting',
+      dataRange: { type: 'season', start: 1970, end: 2026 },
       availableSeasons: [2026, 2025, 2024],
       availableTeams: [
         { id: 1, abbreviation: 'DET', short_name: 'Tigers', name: 'Detroit Tigers' },
@@ -100,6 +103,7 @@ vi.mock('../../composables/usePitchData', () => ({
       page: 1,
       totalPages: 1,
       totalCount: 1,
+      dataRange: { type: 'game_date', start: '2026-04-01', end: '2026-04-30' },
       availableEvents: ['double', 'strikeout', 'walk'],
       availablePitchTypes: ['FF', 'SL'],
     })),
@@ -118,6 +122,24 @@ vi.mock('../../composables/usePlayerSeasonStatsImport', () => ({
   })),
 }))
 
+vi.mock('../../composables/usePitchDataDownload', () => ({
+  usePitchDataDownload: vi.fn(() => ({
+    downloading: computed(() => false),
+    error: computed(() => ''),
+    summary: computed(() => ''),
+    downloadPitchData: downloadPitchDataSpy,
+  })),
+}))
+
+vi.mock('../../composables/usePlayerSeasonStatsDownload', () => ({
+  usePlayerSeasonStatsDownload: vi.fn(() => ({
+    downloading: computed(() => false),
+    error: computed(() => ''),
+    summary: computed(() => ''),
+    downloadStats: downloadStatsSpy,
+  })),
+}))
+
 vi.mock('../../composables/usePitchDataImport', () => ({
   usePitchDataImport: vi.fn(() => ({
     uploading: computed(() => false),
@@ -133,6 +155,8 @@ describe('PlayerSeasonStatsDashboard', () => {
     refreshPitchDataSpy.mockClear()
     importFileSpy.mockReset()
     importPitchDataFileSpy.mockReset()
+    downloadStatsSpy.mockReset()
+    downloadPitchDataSpy.mockReset()
     importFileSpy.mockResolvedValue({
       message: 'Imported 1 player season stats',
       data: { imported_count: 1 },
@@ -140,6 +164,14 @@ describe('PlayerSeasonStatsDashboard', () => {
     importPitchDataFileSpy.mockResolvedValue({
       message: 'Imported 1 pitch data rows',
       data: { imported_count: 1 },
+    })
+    downloadStatsSpy.mockResolvedValue({
+      message: 'Imported 2 player season stats',
+      data: { imported_count: 2, downloaded_count: 1 },
+    })
+    downloadPitchDataSpy.mockResolvedValue({
+      message: 'Imported 1 pitch data rows',
+      data: { imported_count: 1, downloaded_count: 1 },
     })
   })
 
@@ -150,6 +182,7 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(wrapper.text()).toContain('Data import')
     expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
+    expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
   })
 
   it('updates the leaderboard title when the category changes', async () => {
@@ -364,6 +397,55 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(refreshSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('downloads MLB stats and refreshes the leaderboard', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+
+    await wrapper.find('[data-test="mlb-download-category"]').setValue('pitching')
+    await wrapper.find('[data-test="mlb-download-start-year"]').setValue('2025')
+    await wrapper.find('[data-test="mlb-download-end-year"]').setValue('2026')
+    await wrapper.find('[data-test="mlb-download-panel"]').trigger('submit')
+    await flushPromises()
+    await nextTick()
+
+    expect(downloadStatsSpy).toHaveBeenCalledWith({
+      category: 'pitching',
+      startYear: 2025,
+      endYear: 2026,
+      replaceSeason: true,
+    })
+    expect(refreshSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Pitching Leaderboard')
+  })
+
+  it('downloads pitch data and refreshes the pitch feed', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+
+    await wrapper.find('[data-test="mlb-download-category"]').setValue('pitchData')
+    await nextTick()
+
+    expect(wrapper.text()).toContain('Download Pitch Data')
+    expect(wrapper.find('[data-test="mlb-download-start-date"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="mlb-download-start-year"]').exists()).toBe(false)
+
+    await wrapper.find('[data-test="mlb-download-start-date"]').setValue('2026-04-01')
+    await wrapper.find('[data-test="mlb-download-end-date"]').setValue('2026-04-02')
+    await wrapper.find('[data-test="mlb-download-game-types"]').setValue('R,F')
+    await wrapper.find('[data-test="mlb-download-chunk-days"]').setValue(3)
+    await wrapper.find('[data-test="mlb-download-panel"]').trigger('submit')
+    await flushPromises()
+    await nextTick()
+
+    expect(downloadPitchDataSpy).toHaveBeenCalledWith({
+      startDate: '2026-04-01',
+      endDate: '2026-04-02',
+      gameTypes: 'R,F',
+      chunkDays: 3,
+    })
+    expect(refreshPitchDataSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Pitch Data Feed')
+    expect(wrapper.text()).toContain('Game Dates: 2026-04-01 to 2026-04-02')
+  })
+
   it('updates the import status when a csv file is selected', async () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
     const openImportButton = wrapper.find('[data-test="open-import-panel"]')
@@ -446,6 +528,7 @@ describe('PlayerSeasonStatsDashboard', () => {
     await categorySelect.setValue('pitchData')
 
     expect(wrapper.text()).toContain('Showing latest imported pitch rows (50 per page).')
+    expect(wrapper.text()).toContain('Data range: 2026-04-01 to 2026-04-30')
     expect(wrapper.text()).toContain('Showing 1 of 1 pitch rows')
     expect(wrapper.text()).toContain('FF')
     expect(wrapper.text()).toContain('97.8')

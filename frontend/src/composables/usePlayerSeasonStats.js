@@ -27,6 +27,7 @@ function normalizeMeta(meta = {}) {
     sort: meta.sort || 'player_name',
     filters: meta.filters || {},
     category: meta.category || 'batting',
+    dataRange: meta.data_range || null,
     availableSeasons: meta.available_seasons || [],
     availableTeams: meta.available_teams || [],
     columns: meta.columns || [],

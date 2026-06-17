@@ -67,6 +67,50 @@ namespace :player_stats do
     import_player_stats_from!(file_path)
   end
 
+  desc "Download MLB player season stats and import them. Usage: bin/rails 'player_stats:download[batting,2025,2026]' REPLACE_SEASON=1"
+  task :download, [:category, :start_year, :end_year] => :environment do |_task, args|
+    category = args[:category].presence || ENV["CATEGORY"].presence || "batting"
+    start_year = args[:start_year].presence || ENV["START_YEAR"].presence
+    end_year = args[:end_year].presence || ENV["END_YEAR"].presence || start_year
+
+    if start_year.blank?
+      abort "Usage: bin/rails 'player_stats:download[batting,2025,2026]' or START_YEAR=2025 CATEGORY=pitching bin/rails player_stats:download"
+    end
+
+    puts "Downloading #{category} stats from MLB for #{start_year}-#{end_year}..."
+    download_result = PlayerStatsDownloader.call(category: category, start_year: start_year, end_year: end_year)
+
+    unless download_result[:success]
+      abort download_result[:message]
+    end
+
+    puts download_result[:message]
+    import_result = PlayerStatsImporter.call(
+      csv_data: download_result.dig(:data, :csv_data),
+      source_name: "MLB #{download_result.dig(:data, :category)} #{download_result.dig(:data, :seasons).join('-')}",
+      replace_season: %w[1 true t yes y on].include?(ENV["REPLACE_SEASON"].to_s.strip.downcase)
+    )
+
+    puts import_result[:message]
+
+    unless import_result[:success]
+      Array(import_result.dig(:data, :errors)).each do |error|
+        puts "Row #{error[:row_number]}: #{error[:error]}"
+      end
+
+      abort "Player season stats download import failed"
+    end
+
+    data = import_result[:data] || {}
+    puts "Downloaded MLB rows: #{download_result.dig(:data, :row_count)}"
+    puts "Imported season stat records: #{data[:imported_count]}"
+    puts "Created teams: #{data[:created_team_count]}"
+    puts "Created players: #{data[:created_player_count]}"
+    puts "Skipped rows: #{data[:skipped_count]}"
+    puts "Duplicate rows collapsed: #{data[:duplicate_count]}"
+    puts "Replaced rows: #{data[:replaced_rows_count]}" if data[:replace_season]
+  end
+
   desc "Seed stat_types and reimport player season stats from the preferred local CSV source. Usage: bin/rails player_stats:reimport or PLAYER_STATS_CSV=/path/file.csv bin/rails player_stats:reimport"
   task :reimport, [:file_path] => :environment do |_task, args|
     file_paths = resolve_import_paths(args[:file_path])

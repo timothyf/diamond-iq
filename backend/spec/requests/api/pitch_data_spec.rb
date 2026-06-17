@@ -39,6 +39,7 @@ RSpec.describe "Api::PitchData", type: :request do
     expect(json_body.dig("meta", "total_pages")).to eq(1)
     expect(json_body.dig("meta", "total_count")).to eq(2)
     expect(json_body.dig("meta", "count")).to eq(2)
+    expect(json_body.dig("meta", "data_range")).to eq({ "type" => "game_date", "start" => "2026-04-01", "end" => "2026-04-02" })
     expect(json_body.fetch("data").map { |row| row.fetch("id") }).to eq([latest.id, earlier.id])
   end
 
@@ -268,5 +269,63 @@ RSpec.describe "Api::PitchData", type: :request do
     expect(json_body.fetch("message")).to include("Missing required columns")
   ensure
     csv_file.close!
+  end
+
+  it "downloads Baseball Savant pitch data and imports it through the API" do
+    csv_data = <<~CSV
+      source_start_date,source_end_date,fetched_at_utc,game_date,game_pk,game_type,at_bat_number,pitch_number,pitcher,player_name,batter,pitch_type,description
+      2026-04-01,2026-04-01,2026-04-02T00:00:00Z,2026-04-01,777,R,1,1,9001,Pitcher One,8001,FF,called_strike
+    CSV
+
+    allow(PitchDataDownloader).to receive(:call).and_return(
+      {
+        success: true,
+        message: "Downloaded 1 pitch data rows from Baseball Savant",
+        data: {
+          csv_data: csv_data,
+          row_count: 1,
+          start_date: "2026-04-01",
+          end_date: "2026-04-01",
+          game_types: ["R"],
+          chunk_days: 7
+        }
+      }
+    )
+
+    expect do
+      post download_api_pitch_data_path,
+           params: {
+             start_date: "2026-04-01",
+             end_date: "2026-04-01",
+             game_types: "R",
+             chunk_days: 7
+           },
+           as: :json
+    end.to change(PitchDatum, :count).by(1)
+
+    expect(response).to have_http_status(:created)
+    expect(PitchDataDownloader).to have_received(:call).with(
+      start_date: "2026-04-01",
+      end_date: "2026-04-01",
+      game_types: "R",
+      chunk_days: 7
+    )
+    expect(json_body.dig("data", "downloaded_count")).to eq(1)
+    expect(json_body.dig("data", "downloaded_start_date")).to eq("2026-04-01")
+    expect(json_body.dig("data", "downloaded_game_types")).to eq(["R"])
+    expect(PitchDatum.last.pitch_type).to eq("FF")
+  end
+
+  it "returns downloader failures from the pitch data download endpoint" do
+    allow(PitchDataDownloader).to receive(:call).and_return(
+      { success: false, message: "No pitch data rows returned from Baseball Savant", data: {} }
+    )
+
+    post download_api_pitch_data_path,
+         params: { start_date: "2026-04-01", end_date: "2026-04-01" },
+         as: :json
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body["message"]).to eq("No pitch data rows returned from Baseball Savant")
   end
 end
