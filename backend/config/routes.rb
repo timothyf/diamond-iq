@@ -4,11 +4,13 @@ Rails.application.routes.draw do
     resources :player_season_stats do
       collection do
         post :import
+        post :download
       end
     end
     resources :pitch_data, only: [:index] do
       collection do
         post :import
+        post :download
       end
     end
   end

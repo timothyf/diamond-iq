@@ -30,7 +30,7 @@ class PlayerStatsImporter
     "pitching" => {
       "W" => %w[W wins],
       "L" => %w[L losses],
-      "ERA" => %w[ERA era],
+      "ERA" => %w[ERA era earnedRunAverage],
       "G" => %w[G gamesPitched gamesPlayed],
       "GS" => %w[GS gamesStarted],
       "CG" => %w[CG completeGames],
@@ -55,7 +55,14 @@ class PlayerStatsImporter
       "WHIP" => %w[WHIP whip],
       "whip" => %w[whip WHIP],
       "AVG" => %w[AVG avg],
-      "avg" => %w[avg AVG]
+      "avg" => %w[avg AVG],
+      "TBF" => %w[TBF battersFaced],
+      "battersFaced" => %w[battersFaced TBF],
+      "K/9" => %w[K/9 strikeoutsPer9Inn],
+      "BB/9" => %w[BB/9 walksPer9Inn],
+      "K/BB" => %w[K/BB strikeoutWalkRatio],
+      "HR/9" => %w[HR/9 homeRunsPer9],
+      "H/9" => %w[H/9 hitsPer9Inn]
     }
   }.freeze
 

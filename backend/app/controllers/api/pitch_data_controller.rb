@@ -21,6 +21,7 @@ module Api
           total_count: total_count,
           available_events: available_events,
           available_pitch_types: available_pitch_types,
+          data_range: data_range,
           filters: active_filters
         }
       }
@@ -46,10 +47,48 @@ module Api
       end
     end
 
+    def download
+      download_result = PitchDataDownloader.call(
+        start_date: download_params[:start_date],
+        end_date: download_params[:end_date],
+        game_types: download_params[:game_types],
+        chunk_days: download_params[:chunk_days]
+      )
+
+      unless download_result[:success]
+        render json: { message: download_result[:message] }, status: :unprocessable_content
+        return
+      end
+
+      import_result = PitchDataImporter.call(
+        csv_data: download_result.dig(:data, :csv_data),
+        source_name: "Baseball Savant pitch data #{download_result.dig(:data, :start_date)}-#{download_result.dig(:data, :end_date)}"
+      )
+
+      if import_result[:success]
+        render json: {
+          message: import_result[:message],
+          data: import_result[:data].merge(
+            downloaded_count: download_result.dig(:data, :row_count),
+            downloaded_start_date: download_result.dig(:data, :start_date),
+            downloaded_end_date: download_result.dig(:data, :end_date),
+            downloaded_game_types: download_result.dig(:data, :game_types),
+            downloaded_chunk_days: download_result.dig(:data, :chunk_days)
+          )
+        }, status: :created
+      else
+        render json: { message: import_result[:message], errors: Array(import_result.dig(:data, :errors)) }, status: :unprocessable_content
+      end
+    end
+
     private
 
     def import_params
       params.permit(:file)
+    end
+
+    def download_params
+      params.permit(:start_date, :end_date, :game_types, :chunk_days)
     end
 
     def page_param
@@ -126,6 +165,14 @@ module Api
 
     def available_pitch_types
       @available_pitch_types ||= PitchDatum.where.not(pitch_type: [nil, ""]).distinct.order(:pitch_type).pluck(:pitch_type)
+    end
+
+    def data_range
+      @data_range ||= {
+        type: "game_date",
+        start: PitchDatum.minimum(:game_date)&.iso8601,
+        end: PitchDatum.maximum(:game_date)&.iso8601
+      }
     end
 
     def parse_iso_date(value)

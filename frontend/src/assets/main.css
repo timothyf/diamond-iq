@@ -277,6 +277,32 @@
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 }
 
+.mlb-download-panel {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.1fr) repeat(3, minmax(140px, 0.8fr)) minmax(180px, 0.9fr) auto;
+  gap: 1rem;
+  align-items: end;
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.mlb-download-panel h3 {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', 'DIN Condensed', 'Trebuchet MS', sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mlb-download-panel .eyebrow {
+  margin-bottom: 0.2rem;
+}
+
+.mlb-download-panel__toggle {
+  align-self: center;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -717,6 +743,7 @@
   .table-stage__header,
   .table-actions,
   .import-utility,
+  .mlb-download-panel,
   .import-drawer__header,
   .table-meta,
   .pagination-bar {

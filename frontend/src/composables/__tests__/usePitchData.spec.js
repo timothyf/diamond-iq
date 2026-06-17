@@ -43,6 +43,7 @@ describe('usePitchData', () => {
           per_page: 100,
           total_pages: 3,
           total_count: 250,
+          data_range: { type: 'game_date', start: '2026-04-01', end: '2026-04-30' },
         },
       }),
     })
@@ -97,6 +98,7 @@ describe('usePitchData', () => {
       page: 2,
       totalPages: 3,
       totalCount: 250,
+      dataRange: { type: 'game_date', start: '2026-04-01', end: '2026-04-30' },
       availableEvents: [],
       availablePitchTypes: [],
     })

@@ -28,6 +28,7 @@ function buildProps(overrides = {}) {
       page: 2,
       totalPages: 3,
       totalCount: 25,
+      dataRange: { type: 'season', start: 1970, end: 2026 },
       columns: [
         { key: 'gamesPlayed', label: 'G', align: 'numeric' },
         { key: 'homeRuns', label: 'HR', align: 'numeric' },
@@ -48,6 +49,7 @@ describe('PlayerSeasonStatsTable', () => {
 
     expect(wrapper.text()).toContain('Page 2 of 3')
     expect(wrapper.text()).toContain('25 total matching players')
+    expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
     expect(wrapper.text()).toContain('Miguel Cabrera')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('150')

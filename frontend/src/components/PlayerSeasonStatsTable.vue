@@ -49,6 +49,13 @@ const columns = computed(() => [...fixedColumns, ...(props.meta.columns || [])])
 const totalPages = computed(() => props.meta.totalPages || 0)
 const canGoBackward = computed(() => (props.meta.page || 1) > 1)
 const canGoForward = computed(() => (props.meta.page || 1) < totalPages.value)
+const dataRangeLabel = computed(() => {
+  const range = props.meta.dataRange || {}
+  if (!range.start || !range.end) return 'Data range unavailable'
+  if (range.start === range.end) return `Data range: ${range.start} season`
+
+  return `Data range: ${range.start}-${range.end} seasons`
+})
 
 function toggleSort(columnKey) {
   if (columnKey === 'rank') return
@@ -120,6 +127,7 @@ function formatStatValue(columnKey, value) {
     <div class="table-meta">
       <span>Page {{ meta.page || 1 }} of {{ totalPages || 1 }}</span>
       <span>{{ meta.totalCount || 0 }} total matching players</span>
+      <span>{{ dataRangeLabel }}</span>
     </div>
 
     <div class="data-grid">

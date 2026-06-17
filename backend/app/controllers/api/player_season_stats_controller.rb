@@ -57,6 +57,38 @@ module Api
       end
     end
 
+    def download
+      download_result = PlayerStatsDownloader.call(
+        category: download_params[:category],
+        start_year: download_params[:start_year],
+        end_year: download_params[:end_year]
+      )
+
+      unless download_result[:success]
+        render json: { message: download_result[:message] }, status: :unprocessable_content
+        return
+      end
+
+      import_result = PlayerStatsImporter.call(
+        csv_data: download_result.dig(:data, :csv_data),
+        source_name: "MLB #{download_result.dig(:data, :category)} #{download_result.dig(:data, :seasons).join('-')}",
+        replace_season: download_params[:replace_season]
+      )
+
+      if import_result[:success]
+        render json: {
+          message: import_result[:message],
+          data: import_result[:data].merge(
+            downloaded_count: download_result.dig(:data, :row_count),
+            downloaded_category: download_result.dig(:data, :category),
+            downloaded_seasons: download_result.dig(:data, :seasons)
+          )
+        }, status: :created
+      else
+        render json: { message: import_result[:message], errors: Array(import_result.dig(:data, :errors)) }, status: :unprocessable_content
+      end
+    end
+
     def update
       if @player_season_stat.update(player_season_stat_params)
         render json: { data: serialize_player_season_stat(@player_season_stat) }
@@ -92,6 +124,10 @@ module Api
 
     def import_params
       params.permit(:file, :replace_season, required_stat_columns: [])
+    end
+
+    def download_params
+      params.permit(:category, :start_year, :end_year, :replace_season)
     end
 
     def serialize_player_season_stat(player_season_stat)

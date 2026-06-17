@@ -90,6 +90,7 @@ class PlayerSeasonStatsLeaderboardQuery
       sort: normalized_sort,
       filters: normalized_filters,
       category: category,
+      data_range: data_range,
       available_seasons: available_seasons,
       available_teams: available_teams,
       columns: visible_column_definitions.map do |column_definition|
@@ -232,6 +233,20 @@ class PlayerSeasonStatsLeaderboardQuery
       .distinct
       .order("player_season_stats.season DESC")
       .pluck("player_season_stats.season")
+  end
+
+  def data_range
+    @data_range ||= begin
+      scope = relation.joins(:stat_type).where(stat_types: { category: category })
+      min_season = scope.minimum(:season)
+      max_season = scope.maximum(:season)
+
+      {
+        type: "season",
+        start: min_season,
+        end: max_season
+      }
+    end
   end
 
   def available_teams
