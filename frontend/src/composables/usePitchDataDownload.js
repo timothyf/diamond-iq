@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { adminRequestHeaders } from './apiAuth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -38,10 +39,10 @@ export function usePitchDataDownload() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/pitch_data/download`, {
         method: 'POST',
-        headers: {
+        headers: adminRequestHeaders({
           Accept: 'application/json',
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           start_date: options.startDate,
           end_date: options.endDate,

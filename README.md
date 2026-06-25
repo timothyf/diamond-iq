@@ -52,6 +52,8 @@ Notable endpoints:
 - `GET /api/pitch_data` for recently imported pitch rows
 - `POST /api/pitch_data/import` for pitch CSV imports
 
+Unsafe API requests are protected with an admin token when `ADMIN_API_TOKEN` is set. In production, unsafe requests fail closed unless this token is configured. Send the token as `Authorization: Bearer <token>` or `X-Admin-Token: <token>`. For the Vue dashboard, expose the same value as `VITE_ADMIN_API_TOKEN` at build/runtime.
+
 The backend currently includes these domain models:
 
 - `Player`

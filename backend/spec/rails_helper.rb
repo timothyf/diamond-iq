@@ -65,4 +65,13 @@ RSpec.configure do |config|
   # config.filter_gems_from_backtrace("gem name")
 
   config.include TestDataHelper
+
+  config.around do |example|
+    previous_admin_api_token = ENV["ADMIN_API_TOKEN"]
+    ENV.delete("ADMIN_API_TOKEN")
+
+    example.run
+  ensure
+    previous_admin_api_token.present? ? ENV["ADMIN_API_TOKEN"] = previous_admin_api_token : ENV.delete("ADMIN_API_TOKEN")
+  end
 end

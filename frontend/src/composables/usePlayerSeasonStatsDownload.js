@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { adminRequestHeaders } from './apiAuth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -38,10 +39,10 @@ export function usePlayerSeasonStatsDownload() {
     try {
       const response = await fetch(`${API_BASE_URL}/api/player_season_stats/download`, {
         method: 'POST',
-        headers: {
+        headers: adminRequestHeaders({
           Accept: 'application/json',
           'Content-Type': 'application/json',
-        },
+        }),
         body: JSON.stringify({
           category: options.category,
           start_year: options.startYear,

@@ -3,6 +3,19 @@ module TestDataHelper
     JSON.parse(response.body)
   end
 
+  def with_admin_api_token(token)
+    previous_token = ENV["ADMIN_API_TOKEN"]
+    token.present? ? ENV["ADMIN_API_TOKEN"] = token : ENV.delete("ADMIN_API_TOKEN")
+
+    yield
+  ensure
+    previous_token.present? ? ENV["ADMIN_API_TOKEN"] = previous_token : ENV.delete("ADMIN_API_TOKEN")
+  end
+
+  def admin_headers(token = "test-admin-token")
+    { "Authorization" => "Bearer #{token}" }
+  end
+
   def create_team(attributes = {})
     index = Team.count + 1
 

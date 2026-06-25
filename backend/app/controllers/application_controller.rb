@@ -1,2 +1,35 @@
 class ApplicationController < ActionController::API
+  before_action :authenticate_unsafe_api_request
+
+  private
+
+  def authenticate_unsafe_api_request
+    return if safe_api_request?
+
+    expected_token = ENV["ADMIN_API_TOKEN"].to_s
+    return if expected_token.blank? && !Rails.env.production?
+
+    unless expected_token.present? && admin_token_matches?(expected_token)
+      render json: { message: "Admin API token is required" }, status: :unauthorized
+    end
+  end
+
+  def safe_api_request?
+    request.get? || request.head? || request.request_method == "OPTIONS"
+  end
+
+  def admin_token_matches?(expected_token)
+    submitted_token = request_admin_token
+    return false if submitted_token.blank?
+
+    ActiveSupport::SecurityUtils.secure_compare(
+      Digest::SHA256.hexdigest(submitted_token),
+      Digest::SHA256.hexdigest(expected_token)
+    )
+  end
+
+  def request_admin_token
+    bearer_token = request.authorization.to_s[/\ABearer\s+(.+)\z/i, 1]
+    bearer_token.presence || request.headers["X-Admin-Token"].to_s
+  end
 end

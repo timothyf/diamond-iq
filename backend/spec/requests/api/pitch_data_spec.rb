@@ -246,6 +246,55 @@ RSpec.describe "Api::PitchData", type: :request do
     csv_file.close!
   end
 
+  it "rejects pitch data imports when an admin token is configured but missing" do
+    csv_file = Tempfile.new(["pitch-data", ".csv"])
+    csv_file.write(<<~CSV)
+      game_pk,at_bat_number,pitch_number,game_date,pitch_type,description
+      777,1,1,2026-04-01,FF,Called Strike
+    CSV
+    csv_file.rewind
+
+    uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "pitch-data.csv")
+
+    expect do
+      with_admin_api_token("test-admin-token") do
+        post import_api_pitch_data_path, params: { file: uploaded_file }
+      end
+    end.not_to change(PitchDatum, :count)
+
+    expect(response).to have_http_status(:unauthorized)
+    expect(json_body["message"]).to eq("Admin API token is required")
+  ensure
+    csv_file.close!
+  end
+
+  it "accepts pitch data downloads with a valid x-admin-token header" do
+    allow(PitchDataDownloader).to receive(:call).and_return(
+      {
+        success: true,
+        message: "Downloaded 0 pitch data rows from Baseball Savant",
+        data: {
+          csv_data: "game_pk,at_bat_number,pitch_number,game_date\n",
+          row_count: 0,
+          start_date: "2026-04-01",
+          end_date: "2026-04-01",
+          game_types: ["R"],
+          chunk_days: 7
+        }
+      }
+    )
+
+    with_admin_api_token("test-admin-token") do
+      post download_api_pitch_data_path,
+           params: { start_date: "2026-04-01", end_date: "2026-04-01" },
+           headers: { "X-Admin-Token" => "test-admin-token" },
+           as: :json
+    end
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(response).not_to have_http_status(:unauthorized)
+  end
+
   it "returns an error when import is missing a file" do
     post import_api_pitch_data_path
 

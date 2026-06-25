@@ -272,6 +272,53 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", "stat_type", "label")).to eq("WAR")
   end
 
+  it "keeps read requests public when an admin token is configured" do
+    with_admin_api_token("test-admin-token") do
+      get api_player_season_stat_path(@player_season_stat), as: :json
+    end
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "id")).to eq(@player_season_stat.id)
+  end
+
+  it "rejects unsafe requests when an admin token is configured but missing" do
+    expect do
+      with_admin_api_token("test-admin-token") do
+        post api_player_season_stats_path,
+             params: {
+               player_season_stat: {
+                 player_id: @player.id,
+                 stat_type_id: @stat_type.id,
+                 season: 2025,
+                 value: "4.7"
+               }
+             },
+             as: :json
+      end
+    end.not_to change(PlayerSeasonStat, :count)
+
+    expect(response).to have_http_status(:unauthorized)
+    expect(json_body["message"]).to eq("Admin API token is required")
+  end
+
+  it "rejects unsafe production requests when no admin token is configured" do
+    allow(Rails.env).to receive(:production?).and_return(true)
+
+    post api_player_season_stats_path,
+         params: {
+           player_season_stat: {
+             player_id: @player.id,
+             stat_type_id: @stat_type.id,
+             season: 2025,
+             value: "4.7"
+           }
+         },
+         as: :json
+
+    expect(response).to have_http_status(:unauthorized)
+    expect(json_body["message"]).to eq("Admin API token is required")
+  end
+
   it "creates a player season stat" do
     expect do
       post api_player_season_stats_path,
@@ -289,6 +336,27 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(response).to have_http_status(:created)
     expect(json_body.dig("data", "season")).to eq(2025)
     expect(json_body.dig("data", "value")).to eq("4.7")
+  end
+
+  it "accepts unsafe requests with a valid bearer admin token" do
+    expect do
+      with_admin_api_token("test-admin-token") do
+        post api_player_season_stats_path,
+             params: {
+               player_season_stat: {
+                 player_id: @player.id,
+                 stat_type_id: @stat_type.id,
+                 season: 2025,
+                 value: "4.7"
+               }
+             },
+             headers: admin_headers,
+             as: :json
+      end
+    end.to change(PlayerSeasonStat, :count).by(1)
+
+    expect(response).to have_http_status(:created)
+    expect(json_body.dig("data", "season")).to eq(2025)
   end
 
   it "returns validation errors for invalid create input" do
