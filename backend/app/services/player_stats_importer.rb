@@ -295,6 +295,7 @@ class PlayerStatsImporter
         import_row[:stat_entries].each do |stat_entry|
           season_stat_records << {
             player_id: player.id,
+            team_id: team.id,
             stat_type_id: stat_entry[:stat_type].id,
             season: import_row[:season],
             value: stat_entry[:value],

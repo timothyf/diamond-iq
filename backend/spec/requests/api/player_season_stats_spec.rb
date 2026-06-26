@@ -272,6 +272,54 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", "stat_type", "label")).to eq("WAR")
   end
 
+  it "uses the season team when serializing a player season stat" do
+    historical_team = create_team(
+      mlb_id: 117,
+      name: "Detroit Tigers",
+      abbreviation: "DET",
+      team_name: "Tigers",
+      location_name: "Detroit",
+      short_name: "Detroit",
+      team_code: "det",
+      file_code: "det"
+    )
+    current_team = create_team(
+      mlb_id: 136,
+      name: "Seattle Mariners",
+      abbreviation: "SEA",
+      team_name: "Mariners",
+      location_name: "Seattle",
+      short_name: "Seattle",
+      team_code: "sea",
+      file_code: "sea"
+    )
+    batter = create_player(team: current_team, attributes: { mlb_id: 123456, first_name: "Alex", last_name: "Mason" })
+    pitcher = create_player(team: current_team, attributes: { mlb_id: 684517, first_name: "Milt", last_name: "Wilcox" })
+    batting_stat = create_stat_type(name: "homeRuns", label: "HR", category: "batting")
+    pitching_stat = @era
+
+    batting_row = create_player_season_stat(
+      player: batter,
+      stat_type: batting_stat,
+      attributes: { team: historical_team, season: 2024, value: 31 }
+    )
+    pitching_row = create_player_season_stat(
+      player: pitcher,
+      stat_type: pitching_stat,
+      attributes: { team: historical_team, season: 1976, value: 3.58 }
+    )
+
+    get api_player_season_stat_path(batting_row), as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "team", "abbreviation")).to eq("DET")
+
+    get api_player_season_stat_path(pitching_row), as: :json
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "team", "abbreviation")).to eq("DET")
+  end
+
   it "keeps read requests public when an admin token is configured" do
     with_admin_api_token("test-admin-token") do
       get api_player_season_stat_path(@player_season_stat), as: :json

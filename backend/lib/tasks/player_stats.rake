@@ -132,4 +132,22 @@ namespace :player_stats do
       import_player_stats_from!(file_path)
     end
   end
+
+  desc "Backfill missing player_season_stats.team_id values from each stat's player team. Usage: bin/rails player_stats:backfill_team_ids DRY_RUN=1"
+  task backfill_team_ids: :environment do
+    dry_run = %w[1 true t yes y on].include?(ENV["DRY_RUN"].to_s.strip.downcase)
+    batch_size = ENV.fetch("BATCH_SIZE", PlayerSeasonStatsTeamBackfill::DEFAULT_BATCH_SIZE)
+    result = PlayerSeasonStatsTeamBackfill.call(dry_run: dry_run, batch_size: batch_size)
+
+    puts "Player season stat team_id backfill"
+    puts "Missing team_id rows: #{result[:missing_count]}"
+    puts "Eligible rows: #{result[:eligible_count]}"
+    puts "Skipped rows without player team: #{result[:skipped_count]}"
+
+    if result[:dry_run]
+      puts "Dry run only. Rerun without DRY_RUN=1 to update eligible rows."
+    else
+      puts "Updated rows: #{result[:updated_count]}"
+    end
+  end
 end

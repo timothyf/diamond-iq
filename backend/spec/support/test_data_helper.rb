@@ -66,6 +66,7 @@ module TestDataHelper
     PlayerSeasonStat.create!(
       {
         player: player,
+        team: player.team,
         stat_type: stat_type,
         season: 2024,
         value: 1.5

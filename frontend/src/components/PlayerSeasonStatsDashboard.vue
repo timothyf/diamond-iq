@@ -17,6 +17,7 @@ const DEFAULT_SORT_BY_CATEGORY = {
   pitching: '-strikeOuts',
   pitchStats: '-pitch_usage',
 }
+const FILTER_URL_CATEGORIES = new Set(['batting', 'pitching', 'pitchData'])
 
 const filters = reactive({
   playerName: '',
@@ -82,6 +83,8 @@ let batterSuggestionBlurTimer = null
 
 const PITCH_REQUIRED_HEADERS = ['game_pk', 'at_bat_number', 'pitch_number']
 const SEASON_REQUIRED_HEADERS = ['season', 'stat_type', 'playerid']
+
+applyUrlState()
 
 const query = computed(() => ({
   view: 'leaderboard',
@@ -157,6 +160,34 @@ const {
 } = usePitchDataImport()
 
 watch(
+  () => [
+    filters.category,
+    filters.playerName,
+    filters.teamId,
+    filters.seasonStart,
+    filters.seasonEnd,
+    pagination.page,
+    pagination.perPage,
+    sort.value,
+    pitchDataOptions.page,
+    pitchDataOptions.perPage,
+    pitchDataFilters.gameDateStart,
+    pitchDataFilters.gameDateEnd,
+    pitchDataFilters.gamePk,
+    pitchDataFilters.pitcher,
+    pitchDataFilters.batter,
+    pitcherNameInput.value,
+    batterNameInput.value,
+    pitchDataFilters.pitchType,
+    pitchDataFilters.events,
+  ],
+  () => {
+    syncUrlState()
+  },
+  { immediate: true },
+)
+
+watch(
   () => [filters.playerName, filters.teamId, filters.seasonStart, filters.seasonEnd, filters.category, pagination.perPage, sort.value],
   () => {
     pagination.page = 1
@@ -217,6 +248,9 @@ watch(
   () => filters.category,
   (category) => {
     sort.value = DEFAULT_SORT_BY_CATEGORY[category] || DEFAULT_SORT_BY_CATEGORY.batting
+    filters.seasonStart = ''
+    filters.seasonEnd = ''
+    pagination.page = 1
     if (category === 'pitchData') {
       pitchDataOptions.page = 1
     }
@@ -387,6 +421,90 @@ const filterSummary = computed(() => {
 
   return activeFilters.length ? activeFilters.join(' · ') : 'Showing the full player season leaderboard.'
 })
+
+function applyUrlState() {
+  if (typeof window === 'undefined') return
+
+  const searchParams = new URLSearchParams(window.location.search)
+  const category = searchParams.get('category')
+
+  if (FILTER_URL_CATEGORIES.has(category)) {
+    filters.category = category
+  }
+
+  const sortParam = searchParams.get('sort')
+  sort.value = sortParam || DEFAULT_SORT_BY_CATEGORY[filters.category] || DEFAULT_SORT_BY_CATEGORY.batting
+
+  pagination.page = positiveInteger(searchParams.get('page'), pagination.page)
+  pagination.perPage = positiveInteger(searchParams.get('per_page'), pagination.perPage)
+  pitchDataOptions.page = positiveInteger(searchParams.get('pitch_page'), pitchDataOptions.page)
+  pitchDataOptions.perPage = positiveInteger(searchParams.get('pitch_per_page'), pitchDataOptions.perPage)
+
+  filters.playerName = searchParams.get('player') || filters.playerName
+  filters.teamId = searchParams.get('team') || filters.teamId
+  filters.seasonStart = searchParams.get('season_start') || filters.seasonStart
+  filters.seasonEnd = searchParams.get('season_end') || filters.seasonEnd
+
+  pitchDataFilters.gameDateStart = searchParams.get('game_date_start') || pitchDataFilters.gameDateStart
+  pitchDataFilters.gameDateEnd = searchParams.get('game_date_end') || pitchDataFilters.gameDateEnd
+  pitchDataFilters.gamePk = searchParams.get('game_pk') || pitchDataFilters.gamePk
+  pitchDataFilters.pitcher = searchParams.get('pitcher') || pitchDataFilters.pitcher
+  pitchDataFilters.batter = searchParams.get('batter') || pitchDataFilters.batter
+  pitcherNameInput.value = searchParams.get('pitcher_name') || pitcherNameInput.value
+  batterNameInput.value = searchParams.get('batter_name') || batterNameInput.value
+  pitchDataFilters.pitchType = searchParams.get('pitch_type') || pitchDataFilters.pitchType
+  pitchDataFilters.events = searchParams.get('events') || pitchDataFilters.events
+}
+
+function syncUrlState() {
+  if (typeof window === 'undefined') return
+
+  const searchParams = new URLSearchParams()
+  const defaultSort = DEFAULT_SORT_BY_CATEGORY[filters.category] || DEFAULT_SORT_BY_CATEGORY.batting
+
+  setSearchParam(searchParams, 'category', filters.category === 'batting' ? '' : filters.category)
+
+  if (filters.category === 'pitchData') {
+    setSearchParam(searchParams, 'pitch_page', pitchDataOptions.page === 1 ? '' : pitchDataOptions.page)
+    setSearchParam(searchParams, 'pitch_per_page', pitchDataOptions.perPage === 50 ? '' : pitchDataOptions.perPage)
+    setSearchParam(searchParams, 'game_date_start', pitchDataFilters.gameDateStart)
+    setSearchParam(searchParams, 'game_date_end', pitchDataFilters.gameDateEnd)
+    setSearchParam(searchParams, 'game_pk', pitchDataFilters.gamePk)
+    setSearchParam(searchParams, 'pitcher', pitchDataFilters.pitcher)
+    setSearchParam(searchParams, 'pitcher_name', pitcherNameInput.value)
+    setSearchParam(searchParams, 'batter', pitchDataFilters.batter)
+    setSearchParam(searchParams, 'batter_name', batterNameInput.value)
+    setSearchParam(searchParams, 'pitch_type', pitchDataFilters.pitchType)
+    setSearchParam(searchParams, 'events', pitchDataFilters.events)
+  } else {
+    setSearchParam(searchParams, 'player', filters.playerName)
+    setSearchParam(searchParams, 'team', filters.teamId)
+    setSearchParam(searchParams, 'season_start', filters.seasonStart)
+    setSearchParam(searchParams, 'season_end', filters.seasonEnd)
+    setSearchParam(searchParams, 'page', pagination.page === 1 ? '' : pagination.page)
+    setSearchParam(searchParams, 'per_page', pagination.perPage === 15 ? '' : pagination.perPage)
+    setSearchParam(searchParams, 'sort', sort.value === defaultSort ? '' : sort.value)
+  }
+
+  const nextQuery = searchParams.toString()
+  const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ''}${window.location.hash}`
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`
+
+  if (nextUrl !== currentUrl) {
+    window.history.replaceState(window.history.state, '', nextUrl)
+  }
+}
+
+function setSearchParam(searchParams, key, value) {
+  if (value === '' || value === null || value === undefined) return
+
+  searchParams.set(key, String(value))
+}
+
+function positiveInteger(value, fallback) {
+  const integer = Number(value)
+  return Number.isInteger(integer) && integer > 0 ? integer : fallback
+}
 
 function updateSort(nextSort) {
   sort.value = nextSort

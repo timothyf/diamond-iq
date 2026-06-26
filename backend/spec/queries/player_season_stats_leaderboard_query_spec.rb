@@ -230,6 +230,60 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     ])
   end
 
+  it "orders single-player filtered leaderboard rows by season ascending" do
+    tigers = create_team(
+      mlb_id: 116,
+      name: "Detroit Tigers",
+      abbreviation: "DET",
+      team_name: "Tigers",
+      location_name: "Detroit",
+      short_name: "Detroit",
+      team_code: "det",
+      file_code: "det"
+    )
+    al = create_player(team: tigers, attributes: { mlb_id: 116822, first_name: "Al", last_name: "Kaline" })
+
+    %w[gamesPlayed homeRuns ops].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+    end
+
+    [
+      [1967, 25, 0.952],
+      [1965, 18, 0.859],
+      [1966, 29, 0.926]
+    ].each do |season, home_runs, ops|
+      create_player_season_stat(
+        player: al,
+        stat_type: StatType.find_by!(name: "gamesPlayed", category: "batting"),
+        attributes: { season: season, value: 125 }
+      )
+      create_player_season_stat(
+        player: al,
+        stat_type: StatType.find_by!(name: "homeRuns", category: "batting"),
+        attributes: { season: season, value: home_runs }
+      )
+      create_player_season_stat(
+        player: al,
+        stat_type: StatType.find_by!(name: "ops", category: "batting"),
+        attributes: { season: season, value: ops }
+      )
+    end
+
+    query = described_class.new(
+      params: {
+        view: "leaderboard",
+        sort: "-homeRuns",
+        filter: { category: "batting", player_name: "Al Kaline" }
+      }
+    )
+
+    expect(query.results.map { |row| [row[:season], row.dig(:stats, "homeRuns")] }).to eq([
+      [1965, "18.0"],
+      [1966, "29.0"],
+      [1967, "25.0"]
+    ])
+  end
+
   it "uses the MLB-style pitching column order and labels" do
     query = described_class.new(
       params: {
@@ -328,5 +382,78 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     expect(query.metadata[:columns].map { |column| column[:key] }).to eq(
       %w[ERA G inningsPitched hits runs ER homeRuns hitByPitch baseOnBalls strikeOuts whip avg]
     )
+  end
+
+  it "shows the season team instead of the player's current team" do
+    current_team = create_team(
+      mlb_id: 136,
+      name: "Seattle Mariners",
+      abbreviation: "SEA",
+      team_name: "Mariners",
+      location_name: "Seattle",
+      short_name: "Seattle",
+      team_code: "sea",
+      file_code: "sea"
+    )
+    historical_team = create_team(
+      mlb_id: 116,
+      name: "Detroit Tigers",
+      abbreviation: "DET",
+      team_name: "Tigers",
+      location_name: "Detroit",
+      short_name: "Detroit",
+      team_code: "det",
+      file_code: "det"
+    )
+    batting_player = create_player(team: current_team, attributes: { mlb_id: 123456, first_name: "Alex", last_name: "Mason" })
+    pitching_player = create_player(team: current_team, attributes: { mlb_id: 684517, first_name: "Milt", last_name: "Wilcox" })
+
+    %w[homeRuns ops W ERA inningsPitched strikeOuts].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+      create_stat_type(name: name, label: name, category: "pitching") unless StatType.exists?(name: name, category: "pitching")
+    end
+
+    create_player_season_stat(
+      player: batting_player,
+      stat_type: StatType.find_by!(name: "homeRuns", category: "batting"),
+      attributes: { team: historical_team, season: 2024, value: 31 }
+    )
+    create_player_season_stat(
+      player: batting_player,
+      stat_type: StatType.find_by!(name: "ops", category: "batting"),
+      attributes: { team: historical_team, season: 2024, value: 0.912 }
+    )
+
+    {
+      "W" => "17",
+      "ERA" => "3.58",
+      "inningsPitched" => "196.2",
+      "strikeOuts" => "115"
+    }.each do |name, value|
+      create_player_season_stat(
+        player: pitching_player,
+        stat_type: StatType.find_by!(name: name, category: "pitching"),
+        attributes: { team: historical_team, season: 1976, value: value }
+      )
+    end
+
+    batting_query = described_class.new(
+      params: {
+        view: "leaderboard",
+        filter: { category: "batting", player_name: "Alex Mason", season: 2024 }
+      }
+    )
+
+    pitching_query = described_class.new(
+      params: {
+        view: "leaderboard",
+        filter: { category: "pitching", player_name: "Milt Wilcox", season: 1976 }
+      }
+    )
+
+    expect(batting_query.results.first.dig(:team, :abbreviation)).to eq("DET")
+    expect(batting_query.results.first.dig(:team, :team_name)).to eq("Tigers")
+    expect(pitching_query.results.first.dig(:team, :abbreviation)).to eq("DET")
+    expect(pitching_query.results.first.dig(:team, :team_name)).to eq("Tigers")
   end
 end

@@ -138,7 +138,7 @@ module Api
         season: player_season_stat.season,
         value: player_season_stat.value.to_s("F"),
         player: serialize_player(player_season_stat.player),
-        team: serialize_team(player_season_stat.player.team),
+        team: serialize_team(player_season_stat.team || player_season_stat.player.team),
         stat_type: serialize_stat_type(player_season_stat.stat_type),
         created_at: player_season_stat.created_at,
         updated_at: player_season_stat.updated_at

@@ -1,9 +1,25 @@
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 
 import { usePlayerSeasonStats } from '../usePlayerSeasonStats'
 
 describe('usePlayerSeasonStats', () => {
+  function deferredResponse(payload) {
+    let resolve
+    const promise = new Promise((promiseResolve) => {
+      resolve = promiseResolve
+    })
+
+    return {
+      promise,
+      resolve: () =>
+        resolve({
+          ok: true,
+          json: async () => payload,
+        }),
+    }
+  }
+
   it('fetches rows and normalizes metadata from the API', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -71,6 +87,72 @@ describe('usePlayerSeasonStats', () => {
     })
     expect(loading.value).toBe(false)
     expect(error.value).toBe('')
+  })
+
+  it('ignores stale responses when the player filter changes quickly', async () => {
+    const broadSearch = deferredResponse({
+      data: [
+        {
+          id: 1,
+          player: { full_name: 'Kal Daniels' },
+        },
+      ],
+      meta: {
+        page: 1,
+        per_page: 15,
+        total_count: 1,
+        total_pages: 1,
+        filters: { player_name: 'Al' },
+      },
+    })
+    const preciseSearch = deferredResponse({
+      data: [
+        {
+          id: 2,
+          player: { full_name: 'Al Kaline' },
+        },
+      ],
+      meta: {
+        page: 1,
+        per_page: 15,
+        total_count: 1,
+        total_pages: 1,
+        filters: { player_name: 'Al Kaline' },
+      },
+    })
+    const fetchMock = vi.fn().mockReturnValueOnce(broadSearch.promise).mockReturnValueOnce(preciseSearch.promise)
+    vi.stubGlobal('fetch', fetchMock)
+
+    const playerName = ref('Al')
+    const query = computed(() => ({
+      view: 'leaderboard',
+      page: 1,
+      perPage: 15,
+      sort: '-homeRuns',
+      filters: {
+        category: 'batting',
+        player_name: playerName.value,
+      },
+    }))
+
+    const { rows, meta, loading, error } = usePlayerSeasonStats(query)
+    playerName.value = 'Al Kaline'
+    await nextTick()
+
+    preciseSearch.resolve()
+    await flushPromises()
+
+    expect(rows.value).toEqual([{ id: 2, player: { full_name: 'Al Kaline' } }])
+    expect(meta.value.filters).toEqual({ player_name: 'Al Kaline' })
+    expect(loading.value).toBe(false)
+    expect(error.value).toBe('')
+
+    broadSearch.resolve()
+    await flushPromises()
+
+    expect(rows.value).toEqual([{ id: 2, player: { full_name: 'Al Kaline' } }])
+    expect(meta.value.filters).toEqual({ player_name: 'Al Kaline' })
+    expect(loading.value).toBe(false)
   })
 
   it('exposes a friendly error when the request fails', async () => {

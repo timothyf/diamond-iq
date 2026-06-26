@@ -43,8 +43,8 @@ class PlayerSeasonStatsIndexQuery
 
   def base_relation
     @base_relation ||= relation
-      .includes(:stat_type, player: :team)
-      .joins(:stat_type, player: :team)
+      .includes(:stat_type, :team, player: :team)
+      .joins(:stat_type, :team, :player)
   end
 
   def filtered_relation

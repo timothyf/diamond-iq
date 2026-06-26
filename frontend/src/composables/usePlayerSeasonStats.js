@@ -39,8 +39,11 @@ export function usePlayerSeasonStats(queryRef) {
   const meta = ref(normalizeMeta())
   const loading = ref(false)
   const error = ref('')
+  let requestCounter = 0
 
   async function load() {
+    const requestId = requestCounter + 1
+    requestCounter = requestId
     loading.value = true
     error.value = ''
 
@@ -57,15 +60,21 @@ export function usePlayerSeasonStats(queryRef) {
       }
 
       const payload = await response.json()
+      if (requestId !== requestCounter) return
+
       rows.value = payload.data || []
       meta.value = normalizeMeta(payload.meta)
     } catch (fetchError) {
+      if (requestId !== requestCounter) return
+
       rows.value = []
       meta.value = normalizeMeta()
       error.value = 'Unable to load player season stats. Confirm the Rails API is running and reachable from the frontend.'
       console.error(fetchError)
     } finally {
-      loading.value = false
+      if (requestId === requestCounter) {
+        loading.value = false
+      }
     }
   }
 

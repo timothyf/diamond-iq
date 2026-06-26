@@ -151,6 +151,7 @@ vi.mock('../../composables/usePitchDataImport', () => ({
 
 describe('PlayerSeasonStatsDashboard', () => {
   beforeEach(() => {
+    window.history.replaceState({}, '', '/')
     refreshSpy.mockClear()
     refreshPitchDataSpy.mockClear()
     importFileSpy.mockReset()
@@ -183,6 +184,64 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
     expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
+  })
+
+  it('hydrates leaderboard filters from the URL query string', () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?category=pitching&player=Al+Kaline&team=2&season_start=2025&season_end=2026&per_page=30&sort=season',
+    )
+
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const playerInput = wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]')
+    const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
+
+    expect(categorySelect.element.value).toBe('pitching')
+    expect(playerInput.element.value).toBe('Al Kaline')
+    expect(wrapper.find('[data-test="team-filter"]').element.value).toBe('2')
+    expect(wrapper.find('[data-test="season-start-filter"]').element.value).toBe('2025')
+    expect(wrapper.find('[data-test="season-end-filter"]').element.value).toBe('2026')
+    expect(wrapper.text()).toContain('Player: Al Kaline · Team: LAD · Seasons: 2025-2026 · Category: pitching')
+  })
+
+  it('writes selected leaderboard filters to the URL query string', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+
+    await wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]').setValue('Al Kaline')
+    await wrapper.find('[data-test="team-filter"]').setValue('2')
+    await wrapper.find('[data-test="season-start-filter"]').setValue('2025')
+    await wrapper.find('[data-test="season-end-filter"]').setValue('2026')
+    await wrapper.findAll('select').find((select) => select.text().includes('100')).setValue('30')
+    await nextTick()
+
+    const searchParams = new URLSearchParams(window.location.search)
+    expect(searchParams.get('player')).toBe('Al Kaline')
+    expect(searchParams.get('team')).toBe('2')
+    expect(searchParams.get('season_start')).toBe('2025')
+    expect(searchParams.get('season_end')).toBe('2026')
+    expect(searchParams.get('per_page')).toBe('30')
+  })
+
+  it('writes selected pitch data filters to the URL query string', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
+
+    await categorySelect.setValue('pitchData')
+    await wrapper.find('[data-test="pitch-game-date-start-filter"]').setValue('2026-04-29')
+    await wrapper.find('[data-test="pitch-game-date-end-filter"]').setValue('2026-04-30')
+    await wrapper.find('[data-test="pitch-game-pk-filter"]').setValue('777')
+    await wrapper.find('[data-test="pitch-type-filter"]').setValue('FF')
+    await wrapper.find('[data-test="pitch-events-filter"]').setValue('strikeout')
+    await nextTick()
+
+    const searchParams = new URLSearchParams(window.location.search)
+    expect(searchParams.get('category')).toBe('pitchData')
+    expect(searchParams.get('game_date_start')).toBe('2026-04-29')
+    expect(searchParams.get('game_date_end')).toBe('2026-04-30')
+    expect(searchParams.get('game_pk')).toBe('777')
+    expect(searchParams.get('pitch_type')).toBe('FF')
+    expect(searchParams.get('events')).toBe('strikeout')
   })
 
   it('updates the leaderboard title when the category changes', async () => {

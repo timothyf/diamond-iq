@@ -112,7 +112,7 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def base_relation
-    @base_relation ||= relation.joins(:stat_type, player: :team)
+    @base_relation ||= relation.joins(:stat_type, :team, :player)
   end
 
   def filtered_relation
@@ -135,9 +135,15 @@ class PlayerSeasonStatsLeaderboardQuery
 
   def paginated_relation
     grouped_relation
-      .order(Arel.sql("#{sort_expression} #{sort_direction} NULLS LAST, players.last_name ASC, players.first_name ASC, player_season_stats.season DESC"))
+      .order(Arel.sql(order_expression))
       .offset((page - 1) * per_page)
       .limit(per_page)
+  end
+
+  def order_expression
+    return "player_season_stats.season ASC" if single_player_results?
+
+    "#{sort_expression} #{sort_direction} NULLS LAST, players.last_name ASC, players.first_name ASC, player_season_stats.season DESC"
   end
 
   def group_select_fields
@@ -220,6 +226,14 @@ class PlayerSeasonStatsLeaderboardQuery
     filtered_relation
       .select("players.id", "player_season_stats.season")
       .group("players.id", "player_season_stats.season")
+  end
+
+  def single_player_results?
+    @single_player_results ||= player_filter_present? && filtered_relation.distinct.count("players.id") == 1
+  end
+
+  def player_filter_present?
+    normalized_filters[:player_id].present? || normalized_filters[:player_name].present?
   end
 
   def total_pages
