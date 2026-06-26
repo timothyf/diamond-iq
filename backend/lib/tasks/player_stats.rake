@@ -133,21 +133,46 @@ namespace :player_stats do
     end
   end
 
-  desc "Backfill missing player_season_stats.team_id values from each stat's player team. Usage: bin/rails player_stats:backfill_team_ids DRY_RUN=1"
-  task backfill_team_ids: :environment do
-    dry_run = %w[1 true t yes y on].include?(ENV["DRY_RUN"].to_s.strip.downcase)
-    batch_size = ENV.fetch("BATCH_SIZE", PlayerSeasonStatsTeamBackfill::DEFAULT_BATCH_SIZE)
-    result = PlayerSeasonStatsTeamBackfill.call(dry_run: dry_run, batch_size: batch_size)
+  desc "Verify player_season_stats.team_id values against MLB source data. Usage: bin/rails 'player_stats:verify_team_ids[pitching,1968,1968]' FIX=1"
+  task :verify_team_ids, [:category, :start_year, :end_year] => :environment do |_task, args|
+    category = args[:category].presence || ENV["CATEGORY"].presence || "pitching"
+    start_year = args[:start_year].presence || ENV["START_YEAR"].presence
+    end_year = args[:end_year].presence || ENV["END_YEAR"].presence || start_year
 
-    puts "Player season stat team_id backfill"
-    puts "Missing team_id rows: #{result[:missing_count]}"
-    puts "Eligible rows: #{result[:eligible_count]}"
-    puts "Skipped rows without player team: #{result[:skipped_count]}"
-
-    if result[:dry_run]
-      puts "Dry run only. Rerun without DRY_RUN=1 to update eligible rows."
-    else
-      puts "Updated rows: #{result[:updated_count]}"
+    if start_year.blank?
+      abort "Usage: bin/rails 'player_stats:verify_team_ids[pitching,1968,1968]' or START_YEAR=1968 CATEGORY=pitching bin/rails player_stats:verify_team_ids"
     end
+
+    fix = %w[1 true t yes y on].include?(ENV["FIX"].to_s.strip.downcase)
+    puts "#{fix ? 'Repairing' : 'Verifying'} #{category} team ids from MLB for #{start_year}-#{end_year}..."
+
+    result = PlayerSeasonStatsTeamVerifier.call(
+      category: category,
+      start_year: start_year,
+      end_year: end_year,
+      fix: fix
+    )
+
+    abort result[:message] unless result[:success]
+
+    data = result[:data] || {}
+    puts result[:message]
+    puts "Checked player-season groups: #{data[:checked_groups]}"
+    puts "Missing players: #{data[:missing_player_groups]}"
+    puts "Missing stat groups: #{data[:missing_stat_groups]}"
+    puts "Mismatched groups: #{data[:mismatched_groups]}"
+    puts "Mismatched stat rows: #{data[:mismatched_rows]}"
+    puts "Updated rows: #{data[:updated_rows]}" if fix
+
+    Array(data[:samples]).each do |sample|
+      puts [
+        "#{sample[:player]} #{sample[:season]}",
+        "expected #{sample[:expected_team]} (#{sample[:expected_team_mlb_id]})",
+        "stored team mlb ids #{sample[:stored_team_mlb_ids].inspect}",
+        "#{sample[:row_count]} rows"
+      ].join(" - ")
+    end
+
+    puts "Dry run only. Rerun with FIX=1 to update mismatched rows." unless fix
   end
 end
