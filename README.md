@@ -1,84 +1,52 @@
 # shopify-prep-project
 
-Player season stats explorer built with a Ruby on Rails API and a Vue 3 dashboard.
+A baseball stats explorer built with a Ruby on Rails API, PostgreSQL, and a Vue 3 dashboard.
 
-## Overview
+The app imports MLB player season stats and pitch-by-pitch Statcast data, stores it locally, and exposes a filterable dashboard for leaderboards, player season history, and pitch data review.
 
-The application imports player season stats and pitch-level tracking data from CSV files, stores the parsed data in PostgreSQL, and lets you browse the season leaderboard in the frontend.
+## Current Features
 
-The dashboard is designed for scouting-style workflows:
-
-- search for players with typeahead suggestions
-- filter by team, season, and category
-- switch between batting, pitching, and pitch data views
-- sort and paginate leaderboard rows
-- import CSV files into the app and refresh the table immediately after upload
-- import pitch-by-pitch CSV files through a dedicated pitch-data intake workflow
+- Batting and pitching leaderboards with team, player, season range, category, sorting, and pagination filters.
+- Player typeahead search for leaderboard, pitcher, and batter filters.
+- Shareable dashboard URLs: selected filters are written to the query string and restored on reload.
+- Single-player leaderboard results sort seasons from oldest to newest.
+- CSV import workflows for player season stats and pitch data.
+- Direct MLB season-stat downloads for batting and pitching data.
+- Direct Baseball Savant downloads for pitch-by-pitch Statcast data.
+- Source-based team verification and repair for historical `player_season_stats.team_id` values.
+- Admin-token protection for unsafe API requests.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-	CSV[CSV file] --> FE[Vue dashboard]
-	FE --> API[Rails API]
-	API --> DB[(PostgreSQL)]
-	API --> P[Player and team lookup]
-	API --> S[Season stats import and leaderboard queries]
-	P --> DB
-	S --> DB
+  CSV[CSV import] --> FE[Vue dashboard]
+  MLB[MLB stats API] --> API[Rails API]
+  SAVANT[Baseball Savant Statcast] --> API
+  FE --> API
+  API --> DB[(PostgreSQL)]
+  API --> PLAYERS[Players and teams]
+  API --> SEASONS[Season stats]
+  API --> PITCHES[Pitch data]
+  PLAYERS --> DB
+  SEASONS --> DB
+  PITCHES --> DB
 ```
 
-## Technical Changes
+## Tech Stack
 
-Recent work in the codebase added or updated the following:
+- Backend: Rails 7.1, Ruby 3.2.3, PostgreSQL, RSpec, SeedFu
+- Frontend: Vue 3, Vite, Vitest
+- Data sources:
+  - MLB.com stats endpoints for season-level batting and pitching totals
+  - Baseball Savant Statcast CSV for pitch-level data
 
-- Rails models and migrations for `Team`, `Player`, `StatType`, and `PitchDatum`
-- a `PlayerStat` persistence model for imported CSV rows
-- CSV parsing and database writes in dedicated importer services
-- API routes for player lookup, season stats import/query flows, and pitch data import/query flows
-- frontend composables and dashboard UI for searching, filtering, sorting, and importing stats
-- Ruby environment pinning with backend `.ruby-version` and `.ruby-gemset`
-- `.gitignore` updates to keep `backend/vendor/bundle` out of source control
+## Project Structure
 
-## Backend
+- `backend/` Rails API, models, services, queries, rake tasks, migrations, and specs
+- `frontend/` Vue dashboard, components, composables, Vite config, and tests
 
-Rails provides the API and persistence layer.
-
-Notable endpoints:
-
-- `GET /api/players` for player suggestions and lookup
-- `GET /api/player_season_stats` for leaderboard data
-- `POST /api/player_season_stats/import` for CSV imports
-- `GET /api/pitch_data` for recently imported pitch rows
-- `POST /api/pitch_data/import` for pitch CSV imports
-
-Unsafe API requests are protected with an admin token when `ADMIN_API_TOKEN` is set. In production, unsafe requests fail closed unless this token is configured. Send the token as `Authorization: Bearer <token>` or `X-Admin-Token: <token>`. For the Vue dashboard, expose the same value as `VITE_ADMIN_API_TOKEN` at build/runtime.
-
-The backend currently includes these domain models:
-
-- `Player`
-- `Team`
-- `StatType`
-- `PlayerStat`
-- `PlayerSeasonStat`
-- `PitchDatum`
-
-## Frontend
-
-The Vue app centers around the player season stats dashboard.
-
-Main user-facing features:
-
-- player typeahead search
-- team and season selectors
-- category switching between batting, pitching, and pitch data
-- leaderboard table with sorting and pagination
-- CSV import panel with upload status and summary messaging
-- pitch data import drawer with upload status and summary messaging
-
-## Setup
-
-### Backend
+## Backend Setup
 
 ```bash
 cd backend
@@ -87,7 +55,9 @@ bin/rails db:prepare
 bin/rails server
 ```
 
-### Frontend
+The Rails API runs on `http://127.0.0.1:3000` by default.
+
+## Frontend Setup
 
 ```bash
 cd frontend
@@ -95,46 +65,144 @@ npm install
 npm run dev
 ```
 
-## Reimport Player Stats
+The Vite dev server proxies `/api` requests to `http://127.0.0.1:3000`.
 
-From `backend/`:
+If the API is hosted somewhere else, set:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:3000 npm run dev
+```
+
+## Admin API Token
+
+Unsafe API requests are protected when `ADMIN_API_TOKEN` is set. In production, unsafe requests fail closed unless this token is configured.
+
+Accepted request headers:
+
+```text
+Authorization: Bearer <token>
+X-Admin-Token: <token>
+```
+
+For the Vue dashboard, expose the matching value as `VITE_ADMIN_API_TOKEN` so import and download actions can send the token.
+
+## API Endpoints
+
+- `GET /api/players`
+- `GET /api/player_season_stats`
+- `POST /api/player_season_stats/import`
+- `POST /api/player_season_stats/download`
+- `GET /api/pitch_data`
+- `POST /api/pitch_data/import`
+- `POST /api/pitch_data/download`
+
+## Player Season Stats
+
+Import a specific season-stat CSV:
+
+```bash
+cd backend
+bin/rails 'player_stats:seed[/absolute/path/to/player_season_stats.csv]'
+```
+
+Or use an environment variable:
+
+```bash
+PLAYER_STATS_CSV=/absolute/path/to/player_season_stats.csv bin/rails player_stats:seed
+```
+
+Reseed stat types and reimport from the preferred local CSV source:
 
 ```bash
 bin/rails player_stats:reimport
 ```
 
-That task reseeds stat types and reruns the player stats import flow. If needed, point it at a specific CSV file:
+Download and import directly from MLB:
 
 ```bash
-PLAYER_STATS_CSV=/absolute/path/to/player_season_stats.csv bin/rails player_stats:reimport
+bin/rails 'player_stats:download[batting,2025,2026]'
+bin/rails 'player_stats:download[pitching,1968,1968]'
 ```
 
-## Import Pitch Data
-
-From `backend/`:
+Use `REPLACE_SEASON=1` when you want the import to delete existing rows for the downloaded season/category before inserting fresh data:
 
 ```bash
-bin/rails pitch_data:import
+REPLACE_SEASON=1 bin/rails 'player_stats:download[pitching,1968,1968]'
 ```
 
-The task looks for these paths by default:
+Season-stat imports require player, team, season, category, and at least one importable stat column. The importer stores `team_id` from the source row, so historical seasons can be associated with the team the player was on for that season instead of the player record's latest team.
 
-- `../data/mlb_pitch_data_april_2026.csv`
-- `backend/data/mlb_pitch_data_april_2026.csv`
+## Team ID Verification
 
-You can also provide an explicit source:
+Verify stored season-team assignments against MLB source data:
 
 ```bash
-bin/rails 'pitch_data:import[/absolute/path/to/mlb_pitch_data_april_2026.csv]'
-PITCH_DATA_CSV=/absolute/path/to/mlb_pitch_data_april_2026.csv bin/rails pitch_data:import
+cd backend
+bin/rails 'player_stats:verify_team_ids[pitching,1968,1968]'
 ```
 
-## Project Structure
+Repair mismatched rows:
 
-- `backend/` Rails API, models, services, migrations, and database configuration
-- `frontend/` Vue 3 app, dashboard components, and composables
+```bash
+FIX=1 bin/rails 'player_stats:verify_team_ids[pitching,1968,1968]'
+```
+
+Use this source-based verifier for historical team corrections. Avoid using `player_stats:backfill_team_ids` for historical repairs, because that task fills missing values from the current `players.team_id`, which can be wrong for players who changed teams.
+
+## Pitch Data
+
+Import a pitch-data CSV:
+
+```bash
+cd backend
+bin/rails 'pitch_data:import[/absolute/path/to/mlb_pitch_data.csv]'
+```
+
+Or use an environment variable:
+
+```bash
+PITCH_DATA_CSV=/absolute/path/to/mlb_pitch_data.csv bin/rails pitch_data:import
+```
+
+Download and import directly from Baseball Savant:
+
+```bash
+bin/rails 'pitch_data:download[2026-04-01,2026-04-07]'
+```
+
+Optional download controls:
+
+```bash
+GAME_TYPES=R CHUNK_DAYS=7 bin/rails 'pitch_data:download[2026-04-01,2026-04-30]'
+```
+
+Statcast pitch data is available from 2008 onward. The downloader chunks larger date ranges to keep requests manageable.
+
+## Tests
+
+Backend:
+
+```bash
+cd backend
+bundle exec rspec
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm run test:run
+```
+
+Frontend production build:
+
+```bash
+cd frontend
+npm run build
+```
 
 ## Notes
 
-- Use the backend `.ruby-version` and `.ruby-gemset` files to match the expected Ruby environment.
-- Do not commit `backend/vendor/bundle`; it is ignored by `.gitignore` and should be regenerated locally.
+- Use `backend/.ruby-version` to match the expected Ruby version.
+- Do not commit local editor settings or dependency installs such as `backend/vendor/bundle`.
+- Root `.gitignore` ignores `.vscode/` so local VS Code settings stay out of the repository.
