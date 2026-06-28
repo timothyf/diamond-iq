@@ -127,6 +127,31 @@ describe('usePitchData', () => {
     expect(error.value).toContain('Unable to load pitch data')
   })
 
+  it('defaults pitch data pagination to 20 rows per page', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [],
+        meta: { count: 0 },
+      }),
+    })
+
+    vi.stubGlobal('fetch', fetchMock)
+
+    const query = computed(() => ({ page: 1 }))
+    const { meta } = usePitchData(query)
+
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/pitch_data?page=1', {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    expect(meta.value.perPage).toBe(20)
+    expect(meta.value.limit).toBe(20)
+  })
+
   it('serializes pitch filter params into the request URL', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

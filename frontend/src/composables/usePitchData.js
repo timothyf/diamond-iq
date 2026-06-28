@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const DEFAULT_PER_PAGE = 20
 
 function buildSearchParams(query) {
   const searchParams = new URLSearchParams()
@@ -28,7 +29,7 @@ function formatInningHalf(inningTopbot) {
 
 function normalizeRow(row = {}, index = 0, query = {}) {
   const page = Number.isFinite(Number(query.page)) ? Number(query.page) : 1
-  const perPage = Number.isFinite(Number(query.perPage || query.limit)) ? Number(query.perPage || query.limit) : 50
+  const perPage = Number.isFinite(Number(query.perPage || query.limit)) ? Number(query.perPage || query.limit) : DEFAULT_PER_PAGE
   const rankOffset = Math.max(page - 1, 0) * perPage
   const ballsValue = row.balls
   const strikesValue = row.strikes
@@ -68,7 +69,7 @@ function normalizeRow(row = {}, index = 0, query = {}) {
   }
 }
 
-function normalizeMeta(meta = {}, requestedPerPage = 50) {
+function normalizeMeta(meta = {}, requestedPerPage = DEFAULT_PER_PAGE) {
   const safePerPage = Number.isFinite(Number(meta.per_page || meta.limit)) ? Number(meta.per_page || meta.limit) : requestedPerPage
   const safeCount = Number.isFinite(Number(meta.count)) ? Number(meta.count) : 0
   const safePage = Number.isFinite(Number(meta.page)) ? Number(meta.page) : 1
@@ -117,10 +118,10 @@ export function usePitchData(queryRef) {
       const normalizedRows = sourceRows.map((row, index) => normalizeRow(row, index, queryRef.value || {}))
 
       rows.value = normalizedRows
-      meta.value = normalizeMeta(payload.meta, queryRef.value?.perPage || queryRef.value?.limit || 50)
+      meta.value = normalizeMeta(payload.meta, queryRef.value?.perPage || queryRef.value?.limit || DEFAULT_PER_PAGE)
     } catch (fetchError) {
       rows.value = []
-      meta.value = normalizeMeta({}, queryRef.value?.perPage || queryRef.value?.limit || 50)
+      meta.value = normalizeMeta({}, queryRef.value?.perPage || queryRef.value?.limit || DEFAULT_PER_PAGE)
       error.value = 'Unable to load pitch data. Confirm the Rails API is running and reachable from the frontend.'
       console.error(fetchError)
     } finally {

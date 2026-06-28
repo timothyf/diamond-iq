@@ -98,8 +98,8 @@ vi.mock('../../composables/usePitchData', () => ({
     ]),
     meta: computed(() => ({
       count: 1,
-      limit: 50,
-      perPage: 50,
+      limit: 20,
+      perPage: 20,
       page: 1,
       totalPages: 1,
       totalCount: 1,
@@ -402,7 +402,7 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(wrapper.find('[data-test="pitch-game-date-start-filter"]').element.value).toBe('')
     expect(wrapper.find('[data-test="pitch-pitcher-filter"]').element.value).toBe('')
     expect(categorySelect.element.value).toBe('pitchData')
-    expect(wrapper.text()).toContain('Showing latest imported pitch rows (50 per page).')
+    expect(wrapper.text()).toContain('Showing latest imported pitch rows (20 per page).')
   })
 
   it('shows player suggestions and applies a selected suggestion', async () => {
@@ -586,7 +586,7 @@ describe('PlayerSeasonStatsDashboard', () => {
 
     await categorySelect.setValue('pitchData')
 
-    expect(wrapper.text()).toContain('Showing latest imported pitch rows (50 per page).')
+    expect(wrapper.text()).toContain('Showing latest imported pitch rows (20 per page).')
     expect(wrapper.text()).toContain('Data range: 2026-04-01 to 2026-04-30')
     expect(wrapper.text()).toContain('Showing 1 of 1 pitch rows')
     expect(wrapper.text()).toContain('FF')

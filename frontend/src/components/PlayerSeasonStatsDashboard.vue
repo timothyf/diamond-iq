@@ -17,6 +17,7 @@ const DEFAULT_SORT_BY_CATEGORY = {
   pitching: '-strikeOuts',
   pitchStats: '-pitch_usage',
 }
+const DEFAULT_PITCH_DATA_PER_PAGE = 20
 const FILTER_URL_CATEGORIES = new Set(['batting', 'pitching', 'pitchData'])
 
 const filters = reactive({
@@ -34,7 +35,7 @@ const pagination = reactive({
 
 const pitchDataOptions = reactive({
   page: 1,
-  perPage: 50,
+  perPage: DEFAULT_PITCH_DATA_PER_PAGE,
 })
 
 const pitchDataFilters = reactive({
@@ -466,7 +467,7 @@ function syncUrlState() {
 
   if (filters.category === 'pitchData') {
     setSearchParam(searchParams, 'pitch_page', pitchDataOptions.page === 1 ? '' : pitchDataOptions.page)
-    setSearchParam(searchParams, 'pitch_per_page', pitchDataOptions.perPage === 50 ? '' : pitchDataOptions.perPage)
+    setSearchParam(searchParams, 'pitch_per_page', pitchDataOptions.perPage === DEFAULT_PITCH_DATA_PER_PAGE ? '' : pitchDataOptions.perPage)
     setSearchParam(searchParams, 'game_date_start', pitchDataFilters.gameDateStart)
     setSearchParam(searchParams, 'game_date_end', pitchDataFilters.gameDateEnd)
     setSearchParam(searchParams, 'game_pk', pitchDataFilters.gamePk)
@@ -702,7 +703,7 @@ function resetFilters() {
   filters.seasonEnd = ''
   pagination.page = 1
   pitchDataOptions.page = 1
-  pitchDataOptions.perPage = 50
+  pitchDataOptions.perPage = DEFAULT_PITCH_DATA_PER_PAGE
   pitchDataFilters.gameDateStart = ''
   pitchDataFilters.gameDateEnd = ''
   pitchDataFilters.gamePk = ''
@@ -941,6 +942,7 @@ function normalizeHeaderKey(value) {
         <label v-else class="field">
           <span>Pitch rows per page</span>
           <select :value="pitchDataOptions.perPage" @change="updatePitchPerPage">
+            <option :value="20">20</option>
             <option :value="25">25</option>
             <option :value="50">50</option>
             <option :value="100">100</option>

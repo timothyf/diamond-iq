@@ -1,5 +1,10 @@
 module Api
   class PitchDataController < ApplicationController
+    wrap_parameters false
+
+    DEFAULT_PER_PAGE = 20
+    MAX_PER_PAGE = 500
+
     def index
       rows = PitchDatum.order(game_date: :desc, game_pk: :desc, inning: :asc, at_bat_number: :asc, pitch_number: :asc)
       rows = apply_filters(rows)
@@ -48,11 +53,13 @@ module Api
     end
 
     def download
+      permitted_params = download_params
+
       download_result = PitchDataDownloader.call(
-        start_date: download_params[:start_date],
-        end_date: download_params[:end_date],
-        game_types: download_params[:game_types],
-        chunk_days: download_params[:chunk_days]
+        start_date: permitted_params[:start_date],
+        end_date: permitted_params[:end_date],
+        game_types: permitted_params[:game_types],
+        chunk_days: permitted_params[:chunk_days]
       )
 
       unless download_result[:success]
@@ -84,11 +91,11 @@ module Api
     private
 
     def import_params
-      params.permit(:file)
+      @import_params ||= params.permit(:file)
     end
 
     def download_params
-      params.permit(:start_date, :end_date, :game_types, :chunk_days)
+      @download_params ||= params.permit(:start_date, :end_date, :game_types, :chunk_days)
     end
 
     def page_param
@@ -100,9 +107,9 @@ module Api
 
     def per_page_param
       raw = Integer(params[:per_page] || params[:limit], exception: false)
-      return 50 if raw.nil?
+      return DEFAULT_PER_PAGE if raw.nil?
 
-      raw.clamp(1, 500)
+      raw.clamp(1, MAX_PER_PAGE)
     end
 
     def total_pages(total_count, per_page)

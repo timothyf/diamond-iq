@@ -43,6 +43,27 @@ RSpec.describe "Api::PitchData", type: :request do
     expect(json_body.fetch("data").map { |row| row.fetch("id") }).to eq([latest.id, earlier.id])
   end
 
+  it "defaults pitch data pagination to 20 rows per page" do
+    21.times do |index|
+      PitchDatum.create!(
+        game_pk: 1_000 + index,
+        at_bat_number: 1,
+        pitch_number: 1,
+        game_date: Date.new(2026, 4, 1),
+        raw_data: { "game_pk" => (1_000 + index).to_s, "at_bat_number" => "1", "pitch_number" => "1" }
+      )
+    end
+
+    get api_pitch_data_path
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "limit")).to eq(20)
+    expect(json_body.dig("meta", "per_page")).to eq(20)
+    expect(json_body.dig("meta", "count")).to eq(20)
+    expect(json_body.dig("meta", "total_count")).to eq(21)
+    expect(json_body.fetch("data").length).to eq(20)
+  end
+
   it "returns distinct pitch event and pitch type options in metadata" do
     PitchDatum.create!(
       game_pk: 301,
@@ -376,5 +397,35 @@ RSpec.describe "Api::PitchData", type: :request do
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body["message"]).to eq("No pitch data rows returned from Baseball Savant")
+  end
+
+  it "does not wrap pitch data download json params into an unpermitted pitch_datum key" do
+    previous_setting = ActionController::Parameters.action_on_unpermitted_parameters
+    ActionController::Parameters.action_on_unpermitted_parameters = :raise
+
+    allow(PitchDataDownloader).to receive(:call).and_return(
+      { success: false, message: "No pitch data rows returned from Baseball Savant", data: {} }
+    )
+
+    expect do
+      post download_api_pitch_data_path,
+           params: {
+             start_date: "2026-05-20",
+             end_date: "2026-05-31",
+             game_types: "R",
+             chunk_days: 7
+           },
+           as: :json
+    end.not_to raise_error
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(PitchDataDownloader).to have_received(:call).with(
+      start_date: "2026-05-20",
+      end_date: "2026-05-31",
+      game_types: "R",
+      chunk_days: 7
+    )
+  ensure
+    ActionController::Parameters.action_on_unpermitted_parameters = previous_setting
   end
 end
