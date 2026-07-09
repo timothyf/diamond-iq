@@ -1,4 +1,4 @@
-# shopify-prep-project
+# DiamondIQ
 
 A baseball stats explorer built with a Ruby on Rails API, PostgreSQL, and a Vue 3 dashboard.
 
