@@ -73,4 +73,41 @@ module TestDataHelper
       }.merge(attributes)
     )
   end
+
+  def create_schedule(attributes = {})
+    index = Schedule.count + 1
+
+    Schedule.create!(
+      {
+        season: 2026,
+        schedule_type: "regular",
+        start_date: Date.new(2026, 3, 25),
+        end_date: Date.new(2026, 9, 27),
+        source_name: "MLB Stats API",
+        source_key: "mlb:2026:regular:#{index}",
+        source_url: "https://statsapi.mlb.com/api/v1/schedule?sportId=1&season=2026",
+        last_synced_at: Time.current
+      }.merge(attributes)
+    )
+  end
+
+  def create_game(attributes = {})
+    index = Game.count + 1
+
+    Game.create!(
+      {
+        schedule: create_schedule,
+        mlb_id: 700_000 + index,
+        official_date: Date.current + index.days,
+        scheduled_at: Time.current + index.days,
+        game_type: "R",
+        status: "scheduled",
+        home_team: create_team,
+        away_team: create_team,
+        source_name: "MLB Stats API",
+        source_url: "https://statsapi.mlb.com/api/v1.1/game/#{700_000 + index}/feed/live",
+        last_synced_at: Time.current
+      }.merge(attributes)
+    )
+  end
 end

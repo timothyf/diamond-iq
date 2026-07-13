@@ -10,9 +10,46 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_06_25_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_12_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "games", force: :cascade do |t|
+    t.bigint "schedule_id", null: false
+    t.bigint "mlb_id", null: false
+    t.date "official_date", null: false
+    t.datetime "scheduled_at"
+    t.string "game_type", null: false
+    t.string "status", null: false
+    t.string "detailed_status"
+    t.bigint "home_team_id", null: false
+    t.bigint "away_team_id", null: false
+    t.bigint "home_probable_pitcher_id"
+    t.bigint "away_probable_pitcher_id"
+    t.string "venue_name"
+    t.integer "game_number"
+    t.string "doubleheader"
+    t.integer "home_score"
+    t.integer "away_score"
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["away_probable_pitcher_id"], name: "index_games_on_away_probable_pitcher_id"
+    t.index ["away_team_id", "official_date"], name: "index_games_on_away_team_id_and_official_date"
+    t.index ["away_team_id"], name: "index_games_on_away_team_id"
+    t.index ["home_probable_pitcher_id"], name: "index_games_on_home_probable_pitcher_id"
+    t.index ["home_team_id", "official_date"], name: "index_games_on_home_team_id_and_official_date"
+    t.index ["home_team_id"], name: "index_games_on_home_team_id"
+    t.index ["mlb_id"], name: "index_games_on_mlb_id", unique: true
+    t.index ["official_date", "status"], name: "index_games_on_official_date_and_status"
+    t.index ["schedule_id"], name: "index_games_on_schedule_id"
+    t.check_constraint "away_score IS NULL OR away_score >= 0", name: "games_nonnegative_away_score"
+    t.check_constraint "home_score IS NULL OR home_score >= 0", name: "games_nonnegative_home_score"
+    t.check_constraint "home_team_id <> away_team_id", name: "games_distinct_teams"
+  end
 
   create_table "pitch_data", force: :cascade do |t|
     t.date "source_start_date"
@@ -183,6 +220,23 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_25_000000) do
     t.index ["team_id"], name: "index_players_on_team_id"
   end
 
+  create_table "schedules", force: :cascade do |t|
+    t.integer "season", null: false
+    t.string "schedule_type", default: "regular", null: false
+    t.date "start_date", null: false
+    t.date "end_date", null: false
+    t.string "source_name", null: false
+    t.string "source_key", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["season", "schedule_type"], name: "index_schedules_on_season_and_schedule_type"
+    t.index ["source_key"], name: "index_schedules_on_source_key", unique: true
+    t.check_constraint "end_date >= start_date", name: "schedules_valid_date_range"
+  end
+
   create_table "stat_types", force: :cascade do |t|
     t.string "name", null: false
     t.string "label", null: false
@@ -206,6 +260,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_06_25_000000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  add_foreign_key "games", "players", column: "away_probable_pitcher_id"
+  add_foreign_key "games", "players", column: "home_probable_pitcher_id"
+  add_foreign_key "games", "schedules"
+  add_foreign_key "games", "teams", column: "away_team_id"
+  add_foreign_key "games", "teams", column: "home_team_id"
   add_foreign_key "player_season_stats", "players"
   add_foreign_key "player_season_stats", "stat_types"
   add_foreign_key "player_season_stats", "teams"
