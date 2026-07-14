@@ -10,7 +10,7 @@ RSpec.describe PlayerPosition, type: :model do
     position = create_position
 
     create_player_position(player: player, position: position, attributes: { season: nil })
-    seasonal = build_player_position = described_class.new(
+    seasonal = described_class.new(
       player: player,
       position: position,
       season: 2025,
@@ -18,7 +18,7 @@ RSpec.describe PlayerPosition, type: :model do
       last_synced_at: Time.current
     )
 
-    expect(build_player_position).to be_valid
+    expect(seasonal).to be_valid
     expect(seasonal.season).to eq(2025)
   end
 
