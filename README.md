@@ -178,6 +178,23 @@ GAME_TYPES=R CHUNK_DAYS=7 bin/rails 'pitch_data:download[2026-04-01,2026-04-30]'
 
 Statcast pitch data is available from 2008 onward. The downloader chunks larger date ranges to keep requests manageable.
 
+## Games and Schedules
+
+Download and idempotently synchronize canonical games from the MLB Stats API:
+
+```bash
+cd backend
+bin/rails 'mlb_schedule:sync[2026-04-01,2026-04-07]'
+```
+
+Optional controls:
+
+```bash
+GAME_TYPES=R SPORT_ID=1 bin/rails 'mlb_schedule:sync[2026-04-01,2026-04-30]'
+```
+
+The synchronization preserves the raw MLB schedule and game payloads, resolves teams and available probable pitchers, and updates existing games by MLB game id without creating duplicates.
+
 ## Tests
 
 Backend:
