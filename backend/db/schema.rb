@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_13_005000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_14_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -184,6 +184,29 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_13_005000) do
     t.index ["pitcher"], name: "index_pitch_data_on_pitcher"
   end
 
+  create_table "player_profiles", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.date "birth_date"
+    t.integer "height_inches"
+    t.integer "weight_pounds"
+    t.string "bats", limit: 1
+    t.string "throws", limit: 1
+    t.date "mlb_debut_date"
+    t.string "headshot_id"
+    t.string "headshot_url_override"
+    t.string "source_name", null: false
+    t.datetime "source_updated_at"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id"], name: "index_player_profiles_on_player_id", unique: true
+    t.check_constraint "bats IS NULL OR (bats::text = ANY (ARRAY['L'::character varying, 'R'::character varying, 'S'::character varying]::text[]))", name: "player_profiles_valid_bats"
+    t.check_constraint "height_inches IS NULL OR height_inches > 0", name: "player_profiles_positive_height"
+    t.check_constraint "throws IS NULL OR (throws::text = ANY (ARRAY['L'::character varying, 'R'::character varying]::text[]))", name: "player_profiles_valid_throws"
+    t.check_constraint "weight_pounds IS NULL OR weight_pounds > 0", name: "player_profiles_positive_weight"
+  end
+
   create_table "player_season_stats", force: :cascade do |t|
     t.bigint "player_id", null: false
     t.bigint "stat_type_id", null: false
@@ -308,6 +331,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_13_005000) do
   add_foreign_key "games", "schedules"
   add_foreign_key "games", "teams", column: "away_team_id"
   add_foreign_key "games", "teams", column: "home_team_id"
+  add_foreign_key "player_profiles", "players"
   add_foreign_key "player_season_stats", "players"
   add_foreign_key "player_season_stats", "stat_types"
   add_foreign_key "player_season_stats", "teams"
