@@ -13,8 +13,11 @@ class PlayerPosition < ApplicationRecord
   scope :primary_assignments, -> { where(is_primary: true) }
   scope :secondary_assignments, -> { where(is_primary: false) }
   scope :ordered, -> {
-    joins(:position)
-      .order(Arel.sql("player_positions.season DESC NULLS FIRST"), is_primary: :desc, "positions.sort_order ASC")
+    joins(:position).order(
+      Arel.sql("player_positions.season DESC NULLS FIRST"),
+      Arel.sql("player_positions.is_primary DESC"),
+      Arel.sql("positions.sort_order ASC")
+    )
   }
 
   private
