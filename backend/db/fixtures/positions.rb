@@ -8,5 +8,12 @@ Position.seed(:mlb_code,
   { mlb_code: "7", abbreviation: "LF", name: "Left Field", position_type: "outfielder", sort_order: 7 },
   { mlb_code: "8", abbreviation: "CF", name: "Center Field", position_type: "outfielder", sort_order: 8 },
   { mlb_code: "9", abbreviation: "RF", name: "Right Field", position_type: "outfielder", sort_order: 9 },
-  { mlb_code: "10", abbreviation: "DH", name: "Designated Hitter", position_type: "designated_hitter", sort_order: 10 }
+  { mlb_code: "10", abbreviation: "DH", name: "Designated Hitter", position_type: "designated_hitter", sort_order: 10 },
+  { mlb_code: "11", abbreviation: "PH", name: "Pinch Hitter", position_type: "other", sort_order: 11 },
+  { mlb_code: "12", abbreviation: "PR", name: "Pinch Runner", position_type: "other", sort_order: 12 },
+  { mlb_code: "I", abbreviation: "IF", name: "Infielder", position_type: "infielder", sort_order: 13 },
+  { mlb_code: "O", abbreviation: "OF", name: "Outfielder", position_type: "outfielder", sort_order: 14 },
+  { mlb_code: "S", abbreviation: "SP", name: "Starting Pitcher", position_type: "pitcher", sort_order: 15 },
+  { mlb_code: "R", abbreviation: "RP", name: "Relief Pitcher", position_type: "pitcher", sort_order: 16 },
+  { mlb_code: "Y", abbreviation: "TWP", name: "Two-Way Player", position_type: "two_way", sort_order: 17 }
 )
