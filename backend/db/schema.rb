@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_14_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_14_001000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -184,6 +184,24 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_000000) do
     t.index ["pitcher"], name: "index_pitch_data_on_pitcher"
   end
 
+  create_table "player_positions", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "position_id", null: false
+    t.boolean "is_primary", default: false, null: false
+    t.integer "season"
+    t.string "source_name", null: false
+    t.datetime "last_synced_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id", "position_id", "season"], name: "index_player_positions_unique_season", unique: true, where: "(season IS NOT NULL)"
+    t.index ["player_id", "position_id"], name: "index_player_positions_unique_current", unique: true, where: "(season IS NULL)"
+    t.index ["player_id", "season"], name: "index_player_positions_one_season_primary", unique: true, where: "((season IS NOT NULL) AND (is_primary = true))"
+    t.index ["player_id"], name: "index_player_positions_on_player_id"
+    t.index ["player_id"], name: "index_player_positions_one_current_primary", unique: true, where: "((season IS NULL) AND (is_primary = true))"
+    t.index ["position_id"], name: "index_player_positions_on_position_id"
+    t.check_constraint "season IS NULL OR season > 1800", name: "player_positions_valid_season"
+  end
+
   create_table "player_profiles", force: :cascade do |t|
     t.bigint "player_id", null: false
     t.date "birth_date"
@@ -244,6 +262,21 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_000000) do
     t.datetime "updated_at", null: false
     t.index ["mlb_id"], name: "index_players_on_mlb_id", unique: true
     t.index ["team_id"], name: "index_players_on_team_id"
+  end
+
+  create_table "positions", force: :cascade do |t|
+    t.string "mlb_code", null: false
+    t.string "abbreviation", null: false
+    t.string "name", null: false
+    t.string "position_type", null: false
+    t.integer "sort_order", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["abbreviation"], name: "index_positions_on_abbreviation", unique: true
+    t.index ["mlb_code"], name: "index_positions_on_mlb_code", unique: true
+    t.index ["sort_order"], name: "index_positions_on_sort_order"
+    t.check_constraint "position_type::text = ANY (ARRAY['pitcher'::character varying, 'catcher'::character varying, 'infielder'::character varying, 'outfielder'::character varying, 'designated_hitter'::character varying, 'two_way'::character varying, 'other'::character varying]::text[])", name: "positions_valid_position_type"
+    t.check_constraint "sort_order > 0", name: "positions_positive_sort_order"
   end
 
   create_table "roster_players", force: :cascade do |t|
@@ -331,6 +364,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_000000) do
   add_foreign_key "games", "schedules"
   add_foreign_key "games", "teams", column: "away_team_id"
   add_foreign_key "games", "teams", column: "home_team_id"
+  add_foreign_key "player_positions", "players"
+  add_foreign_key "player_positions", "positions"
   add_foreign_key "player_profiles", "players"
   add_foreign_key "player_season_stats", "players"
   add_foreign_key "player_season_stats", "stat_types"

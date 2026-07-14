@@ -63,3 +63,4 @@ build-iPhoneSimulator/
 /data/
 scratch.txt
 backend/config/master.key
+ingest_data_from_postgres*
