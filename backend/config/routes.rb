@@ -1,6 +1,13 @@
 Rails.application.routes.draw do
   namespace :api do
     resources :players, only: [:index]
+    resources :team_memberships, only: [] do
+      collection do
+        get :active_today
+        get :active_range
+        get :roster_status
+      end
+    end
     resources :player_season_stats do
       collection do
         post :import

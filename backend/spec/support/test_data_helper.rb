@@ -123,4 +123,24 @@ module TestDataHelper
       }.merge(attributes)
     )
   end
+
+  def create_team_membership(player: nil, team: nil, attributes: {}, **direct_attributes)
+    team ||= create_team
+    player ||= create_player(team: team)
+
+    TeamMembership.create!(
+      {
+        player: player,
+        team: team,
+        starts_on: Date.current,
+        ends_on: nil,
+        roster_status: "active",
+        primary_position: "1B",
+        secondary_positions: [],
+        jersey_number: "24",
+        source_name: "MLB Stats API",
+        last_synced_at: Time.current
+      }.merge(attributes).merge(direct_attributes)
+    )
+  end
 end

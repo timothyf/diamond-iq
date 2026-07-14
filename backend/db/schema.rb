@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_13_004000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_13_005000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -268,6 +268,27 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_13_004000) do
     t.index ["name", "category"], name: "index_stat_types_on_name_and_category", unique: true
   end
 
+  create_table "team_memberships", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id", null: false
+    t.date "starts_on", null: false
+    t.date "ends_on"
+    t.string "roster_status", null: false
+    t.string "primary_position"
+    t.jsonb "secondary_positions", default: [], null: false
+    t.string "jersey_number"
+    t.string "source_name", null: false
+    t.datetime "last_synced_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id", "team_id", "starts_on"], name: "index_team_memberships_on_player_team_start"
+    t.index ["player_id"], name: "index_team_memberships_on_player_id"
+    t.index ["roster_status"], name: "index_team_memberships_on_roster_status"
+    t.index ["team_id", "starts_on", "ends_on"], name: "index_team_memberships_on_team_date_window"
+    t.index ["team_id"], name: "index_team_memberships_on_team_id"
+    t.check_constraint "ends_on IS NULL OR ends_on >= starts_on", name: "team_memberships_valid_date_range"
+  end
+
   create_table "teams", force: :cascade do |t|
     t.integer "mlb_id", null: false
     t.string "name", null: false
@@ -294,4 +315,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_13_004000) do
   add_foreign_key "roster_players", "players"
   add_foreign_key "roster_players", "rosters"
   add_foreign_key "rosters", "teams"
+  add_foreign_key "team_memberships", "players"
+  add_foreign_key "team_memberships", "teams"
 end
