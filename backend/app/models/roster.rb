@@ -5,4 +5,5 @@ class Roster < ApplicationRecord
   has_many :players, through: :roster_players
 
   validates :season, presence: true, numericality: { only_integer: true }
+  validates :team_id, uniqueness: { scope: :season }
 end

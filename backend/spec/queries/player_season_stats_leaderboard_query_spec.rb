@@ -456,4 +456,81 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     expect(pitching_query.results.first.dig(:team, :abbreviation)).to eq("DET")
     expect(pitching_query.results.first.dig(:team, :team_name)).to eq("Tigers")
   end
+
+  it "filters by historical season team id instead of player's current team" do
+    current_team = create_team(
+      mlb_id: 136,
+      name: "Seattle Mariners",
+      abbreviation: "SEA",
+      team_name: "Mariners",
+      location_name: "Seattle",
+      short_name: "Seattle",
+      team_code: "sea",
+      file_code: "sea"
+    )
+    historical_team = create_team(
+      mlb_id: 116,
+      name: "Detroit Tigers",
+      abbreviation: "DET",
+      team_name: "Tigers",
+      location_name: "Detroit",
+      short_name: "Detroit",
+      team_code: "det",
+      file_code: "det"
+    )
+    player = create_player(team: current_team, attributes: { mlb_id: 555555, first_name: "Casey", last_name: "History" })
+
+    %w[homeRuns ops].each do |name|
+      create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
+    end
+
+    create_player_season_stat(
+      player: player,
+      stat_type: StatType.find_by!(name: "homeRuns", category: "batting"),
+      attributes: { team: historical_team, season: 2024, value: 29 }
+    )
+    create_player_season_stat(
+      player: player,
+      stat_type: StatType.find_by!(name: "ops", category: "batting"),
+      attributes: { team: historical_team, season: 2024, value: 0.901 }
+    )
+
+    query = described_class.new(
+      params: {
+        view: "leaderboard",
+        filter: { category: "batting", season: 2024, team_id: historical_team.id }
+      }
+    )
+
+    expect(query.results.map { |row| row.dig(:player, :full_name) }).to eq(["Casey History"])
+    expect(query.results.first.dig(:team, :abbreviation)).to eq("DET")
+  end
+
+  it "supports combined scope rows with scope filters" do
+    player = create_player(attributes: { mlb_id: 777888, first_name: "Taylor", last_name: "Scope" })
+    create_stat_type(name: "homeRuns", label: "HR", category: "batting") unless StatType.exists?(name: "homeRuns", category: "batting")
+    create_stat_type(name: "ops", label: "OPS", category: "batting") unless StatType.exists?(name: "ops", category: "batting")
+
+    create_player_season_stat(
+      player: player,
+      stat_type: StatType.find_by!(name: "homeRuns", category: "batting"),
+      attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 33 }
+    )
+    create_player_season_stat(
+      player: player,
+      stat_type: StatType.find_by!(name: "ops", category: "batting"),
+      attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 0.931 }
+    )
+
+    query = described_class.new(
+      params: {
+        filter: { category: "batting", season: 2024, scope_type: "combined", scope_key: "TOT" }
+      }
+    )
+
+    expect(query.results.map { |row| row.dig(:player, :full_name) }).to eq(["Taylor Scope"])
+    expect(query.results.first.dig(:scope, :type)).to eq("combined")
+    expect(query.results.first.dig(:scope, :key)).to eq("TOT")
+    expect(query.results.first.dig(:team, :abbreviation)).to eq("TOT")
+  end
 end

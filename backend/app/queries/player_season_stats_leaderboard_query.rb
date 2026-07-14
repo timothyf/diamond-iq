@@ -8,6 +8,7 @@ class PlayerSeasonStatsLeaderboardQuery
     "team_name" => "teams.team_name",
     "season" => "player_season_stats.season"
   }.freeze
+  SCOPE_TYPES = %w[team combined league].freeze
   COLUMN_DEFINITIONS_BY_CATEGORY = {
     "batting" => [
       { key: "gamesPlayed", label: "G", aliases: %w[gamesPlayed G] },
@@ -112,7 +113,7 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def base_relation
-    @base_relation ||= relation.joins(:stat_type, :team, :player)
+    @base_relation ||= relation.joins(:stat_type, :player).left_outer_joins(:team)
   end
 
   def filtered_relation
@@ -159,6 +160,8 @@ class PlayerSeasonStatsLeaderboardQuery
       "teams.team_name AS team_team_name",
       "teams.location_name AS team_location_name",
       "teams.short_name AS team_short_name",
+      "player_season_stats.scope_type AS scope_type",
+      "player_season_stats.scope_key AS scope_key",
       "player_season_stats.season AS season"
     ]
   end
@@ -197,6 +200,8 @@ class PlayerSeasonStatsLeaderboardQuery
       "teams.team_name",
       "teams.location_name",
       "teams.short_name",
+      "player_season_stats.scope_type",
+      "player_season_stats.scope_key",
       "player_season_stats.season"
     ]
   end
@@ -224,8 +229,8 @@ class PlayerSeasonStatsLeaderboardQuery
 
   def count_relation
     filtered_relation
-      .select("players.id", "player_season_stats.season")
-      .group("players.id", "player_season_stats.season")
+      .select("players.id", "player_season_stats.season", "player_season_stats.scope_type", "player_season_stats.scope_key")
+      .group("players.id", "player_season_stats.season", "player_season_stats.scope_type", "player_season_stats.scope_key")
   end
 
   def single_player_results?
@@ -331,7 +336,7 @@ class PlayerSeasonStatsLeaderboardQuery
   def normalized_filters
     @normalized_filters ||= begin
       filters = raw_filters
-        .slice("season", "season_start", "season_end", "team_id", "player_id", "team_name", "player_name", "category")
+        .slice("season", "season_start", "season_end", "team_id", "scope_type", "scope_key", "player_id", "team_name", "player_name", "category")
         .transform_values { |value| value.is_a?(String) ? value.strip : value }
         .compact_blank
 
@@ -340,6 +345,7 @@ class PlayerSeasonStatsLeaderboardQuery
       integer_filter!(filters, "season_end")
       integer_filter!(filters, "team_id")
       integer_filter!(filters, "player_id")
+      normalize_scope_type!(filters)
       normalize_season_bounds!(filters)
       filters["category"] = normalize_category(filters["category"])
       filters["category"] ||= DEFAULT_CATEGORY
@@ -401,7 +407,15 @@ class PlayerSeasonStatsLeaderboardQuery
     end
 
     if include_team && normalized_filters[:team_id].present?
-      filtered_scope = filtered_scope.where(players: { team_id: normalized_filters[:team_id] })
+      filtered_scope = filtered_scope.where(player_season_stats: { scope_type: "team", team_id: normalized_filters[:team_id] })
+    end
+
+    if normalized_filters[:scope_type].present?
+      filtered_scope = filtered_scope.where(player_season_stats: { scope_type: normalized_filters[:scope_type] })
+    end
+
+    if normalized_filters[:scope_key].present?
+      filtered_scope = filtered_scope.where("player_season_stats.scope_key ILIKE ?", like_pattern(normalized_filters[:scope_key]))
     end
 
     if normalized_filters[:player_id].present?
@@ -429,11 +443,19 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def serialize_row(row, index)
+    team_abbreviation = row["team_abbreviation"].presence || row["scope_key"]
+    team_name = row["team_name"].presence || row["scope_key"]
+    team_team_name = row["team_team_name"].presence || row["scope_key"]
+
     {
-      id: "#{row["player_id"]}-#{row["season"]}-#{category}",
+      id: "#{row["player_id"]}-#{row["season"]}-#{category}-#{row["scope_type"]}-#{row["scope_key"]}",
       rank: ((page - 1) * per_page) + index + 1,
       season: row["season"].to_i,
       category: category,
+      scope: {
+        type: row["scope_type"],
+        key: row["scope_key"]
+      },
       player: {
         id: row["player_id"].to_i,
         mlb_id: row["player_mlb_id"].to_i,
@@ -442,11 +464,11 @@ class PlayerSeasonStatsLeaderboardQuery
         full_name: [row["player_first_name"], row["player_last_name"]].compact.join(" ")
       },
       team: {
-        id: row["team_id"].to_i,
-        mlb_id: row["team_mlb_id"].to_i,
-        name: row["team_name"],
-        abbreviation: row["team_abbreviation"],
-        team_name: row["team_team_name"],
+        id: row["team_id"]&.to_i,
+        mlb_id: row["team_mlb_id"]&.to_i,
+        name: team_name,
+        abbreviation: team_abbreviation,
+        team_name: team_team_name,
         location_name: row["team_location_name"],
         short_name: row["team_short_name"]
       },
@@ -488,6 +510,13 @@ class PlayerSeasonStatsLeaderboardQuery
 
   def available_stat_names
     @available_stat_names ||= filtered_relation.distinct.pluck("stat_types.name")
+  end
+
+  def normalize_scope_type!(filters)
+    return unless filters["scope_type"].present?
+
+    scope_type = filters["scope_type"].to_s.downcase
+    SCOPE_TYPES.include?(scope_type) ? filters["scope_type"] = scope_type : filters.delete("scope_type")
   end
 
   def derived_earned_runs_expression

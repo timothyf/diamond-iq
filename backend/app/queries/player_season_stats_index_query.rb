@@ -44,7 +44,8 @@ class PlayerSeasonStatsIndexQuery
   def base_relation
     @base_relation ||= relation
       .includes(:stat_type, :team, player: :team)
-      .joins(:stat_type, :team, :player)
+      .joins(:stat_type, :player)
+      .left_outer_joins(:team)
   end
 
   def filtered_relation
@@ -64,7 +65,15 @@ class PlayerSeasonStatsIndexQuery
       end
 
       if normalized_filters[:team_id].present?
-        scope = scope.where(players: { team_id: normalized_filters[:team_id] })
+        scope = scope.where(player_season_stats: { scope_type: "team", team_id: normalized_filters[:team_id] })
+      end
+
+      if normalized_filters[:scope_type].present?
+        scope = scope.where(player_season_stats: { scope_type: normalized_filters[:scope_type] })
+      end
+
+      if normalized_filters[:scope_key].present?
+        scope = scope.where("player_season_stats.scope_key ILIKE ?", like_pattern(normalized_filters[:scope_key]))
       end
 
       if normalized_filters[:player_id].present?
@@ -113,6 +122,8 @@ class PlayerSeasonStatsIndexQuery
           "season_start",
           "season_end",
           "team_id",
+          "scope_type",
+          "scope_key",
           "player_id",
           "team_name",
           "player_name",
@@ -131,6 +142,7 @@ class PlayerSeasonStatsIndexQuery
       integer_filter!(filters, "player_id")
       decimal_filter!(filters, "min_value")
       decimal_filter!(filters, "max_value")
+      normalize_scope_type!(filters)
 
       normalize_season_bounds!(filters)
 
@@ -217,5 +229,12 @@ class PlayerSeasonStatsIndexQuery
     return unless filters["season_start"] > filters["season_end"]
 
     filters["season_start"], filters["season_end"] = filters["season_end"], filters["season_start"]
+  end
+
+  def normalize_scope_type!(filters)
+    return unless filters["scope_type"].present?
+
+    scope_type = filters["scope_type"].to_s.downcase
+    %w[team combined league].include?(scope_type) ? filters["scope_type"] = scope_type : filters.delete("scope_type")
   end
 end

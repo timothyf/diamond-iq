@@ -69,6 +69,8 @@ module TestDataHelper
         team: player.team,
         stat_type: stat_type,
         season: 2024,
+        scope_type: "team",
+        scope_key: player.team.abbreviation,
         value: 1.5
       }.merge(attributes)
     )
@@ -107,6 +109,17 @@ module TestDataHelper
         source_name: "MLB Stats API",
         source_url: "https://statsapi.mlb.com/api/v1.1/game/#{700_000 + index}/feed/live",
         last_synced_at: Time.current
+      }.merge(attributes)
+    )
+  end
+
+  def create_team_season_roster(team: nil, season: 2026, attributes: {})
+    team ||= create_team
+
+    Roster.create!(
+      {
+        team: team,
+        season: season
       }.merge(attributes)
     )
   end

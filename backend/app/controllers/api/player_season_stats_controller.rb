@@ -114,12 +114,12 @@ module Api
         :page,
         :per_page,
         :sort,
-        filter: [:season, :season_start, :season_end, :team_id, :player_id, :team_name, :player_name, :stat_type_name, :category, :min_value, :max_value]
+        filter: [:season, :season_start, :season_end, :team_id, :scope_type, :scope_key, :player_id, :team_name, :player_name, :stat_type_name, :category, :min_value, :max_value]
       ).to_h
     end
 
     def player_season_stat_params
-      params.require(:player_season_stat).permit(:player_id, :stat_type_id, :season, :value)
+      params.require(:player_season_stat).permit(:player_id, :team_id, :stat_type_id, :season, :scope_type, :scope_key, :value)
     end
 
     def import_params
@@ -136,9 +136,11 @@ module Api
         player_id: player_season_stat.player_id,
         stat_type_id: player_season_stat.stat_type_id,
         season: player_season_stat.season,
+        scope_type: player_season_stat.scope_type,
+        scope_key: player_season_stat.scope_key,
         value: player_season_stat.value.to_s("F"),
         player: serialize_player(player_season_stat.player),
-        team: serialize_team(player_season_stat.team || player_season_stat.player.team),
+        team: serialize_team(player_season_stat),
         stat_type: serialize_stat_type(player_season_stat.stat_type),
         created_at: player_season_stat.created_at,
         updated_at: player_season_stat.updated_at
@@ -155,7 +157,21 @@ module Api
       }
     end
 
-    def serialize_team(team)
+    def serialize_team(player_season_stat)
+      team = player_season_stat.team || player_season_stat.player.team
+
+      if player_season_stat.scope_type != "team"
+        return {
+          id: nil,
+          mlb_id: nil,
+          name: player_season_stat.scope_key,
+          abbreviation: player_season_stat.scope_key,
+          team_name: player_season_stat.scope_key,
+          location_name: nil,
+          short_name: player_season_stat.scope_key
+        }
+      end
+
       {
         id: team.id,
         mlb_id: team.mlb_id,

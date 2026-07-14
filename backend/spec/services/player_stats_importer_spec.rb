@@ -162,4 +162,30 @@ RSpec.describe PlayerStatsImporter, type: :service do
     expect(PlayerSeasonStat.where(player: old_player, stat_type: old_batting_type, season: 2026)).to be_empty
     expect(PlayerSeasonStat.where(player: old_player, stat_type: old_pitching_type, season: 2026).count).to eq(1)
   end
+
+  it "keeps separate rows for team splits and a TOT row in the same season" do
+    csv_data = <<~CSV
+      source_season,season,fetched_at_utc,stat_type,playerId,playerFullName,teamAbbrev,teamName,teamShortName,gamesPlayed,homeRuns,avg,ops,playerFirstName,playerLastName,source_url,teamId,year
+      2026,2026,2026-07-01T00:00:00+00:00,batter,123456,Alex Mason,DET,Detroit Tigers,Tigers,80,18,.295,.861,Alex,Mason,https://example.com/2026,116,2026
+      2026,2026,2026-07-01T00:00:00+00:00,batter,123456,Alex Mason,LAD,Los Angeles Dodgers,Dodgers,70,12,.282,.834,Alex,Mason,https://example.com/2026,119,2026
+      2026,2026,2026-07-01T00:00:00+00:00,batter,123456,Alex Mason,TOT,Total,Total,150,30,.289,.848,Alex,Mason,https://example.com/2026,0,2026
+    CSV
+
+    result = described_class.call(csv_data: csv_data, source_name: "spec/imports/player_season_stats_team_splits.csv")
+
+    expect(result[:success]).to be(true)
+    expect(result.dig(:data, :duplicate_count)).to eq(0)
+
+    player = Player.find_by!(mlb_id: 123456)
+    home_runs = StatType.find_by!(name: "homeRuns", category: "batting")
+    season_rows = PlayerSeasonStat.where(player: player, stat_type: home_runs, season: 2026)
+
+    expect(season_rows.count).to eq(3)
+    expect(season_rows.pluck(:scope_type, :scope_key)).to contain_exactly(
+      ["team", "DET"],
+      ["team", "LAD"],
+      ["combined", "TOT"]
+    )
+    expect(season_rows.where(scope_type: "combined").pluck(:team_id)).to eq([nil])
+  end
 end

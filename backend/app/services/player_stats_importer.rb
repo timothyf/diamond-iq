@@ -66,7 +66,8 @@ class PlayerStatsImporter
     }
   }.freeze
 
-  UPSERT_INDEX = %i[player_id stat_type_id season].freeze
+  UPSERT_SCOPE_INDEX = :idx_player_season_stats_unique_scope
+  LEAGUE_SCOPE_KEYS = %w[AL NL MLB].freeze
 
   def self.call(csv_data: nil, file_path: nil, source_name: nil, required_stat_columns: [], replace_season: false)
     new(
@@ -155,7 +156,7 @@ class PlayerStatsImporter
       import_row = build_import_row(row, source_row_number)
       next if import_row.nil?
 
-      row_key = [import_row[:player_mlb_id], import_row[:season], import_row[:category]]
+      row_key = [import_row[:player_mlb_id], import_row[:season], import_row[:category], import_row[:scope_type], import_row[:scope_key]]
       @duplicate_count += 1 if rows_by_identity.key?(row_key)
       rows_by_identity[row_key] = import_row
     end
@@ -212,8 +213,25 @@ class PlayerStatsImporter
       season: season,
       category: category,
       team_attributes: team_attributes,
+      scope_type: scope_type_for(team_attributes),
+      scope_key: scope_key_for(team_attributes),
       stat_entries: stat_entries
     }
+  end
+
+  def scope_type_for(team_attributes)
+    abbreviation = team_attributes[:abbreviation].to_s.upcase
+    return "combined" if abbreviation == "TOT"
+    return "league" if LEAGUE_SCOPE_KEYS.include?(abbreviation)
+
+    "team"
+  end
+
+  def scope_key_for(team_attributes)
+    abbreviation = team_attributes[:abbreviation].to_s.upcase
+    return abbreviation if abbreviation.present?
+
+    team_attributes[:mlb_id].to_s
   end
 
   def build_team_attributes(normalized_row, key_map)
@@ -295,9 +313,11 @@ class PlayerStatsImporter
         import_row[:stat_entries].each do |stat_entry|
           season_stat_records << {
             player_id: player.id,
-            team_id: team.id,
+            team_id: import_row[:scope_type] == "team" ? team.id : nil,
             stat_type_id: stat_entry[:stat_type].id,
             season: import_row[:season],
+            scope_type: import_row[:scope_type],
+            scope_key: import_row[:scope_key],
             value: stat_entry[:value],
             created_at: timestamp,
             updated_at: timestamp
@@ -305,7 +325,7 @@ class PlayerStatsImporter
         end
       end
 
-      PlayerSeasonStat.upsert_all(season_stat_records, unique_by: UPSERT_INDEX) if season_stat_records.any?
+      PlayerSeasonStat.upsert_all(season_stat_records, unique_by: UPSERT_SCOPE_INDEX) if season_stat_records.any?
     end
 
     {

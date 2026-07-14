@@ -84,6 +84,24 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.fetch("data").map { |row| row.fetch("season") }).to eq([2025])
   end
 
+  it "filters player season stats by scope type and scope key" do
+    create_player_season_stat(
+      player: @player,
+      stat_type: @ops,
+      attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 0.901 }
+    )
+
+    get api_player_season_stats_path,
+        params: { filter: { scope_type: "combined", scope_key: "TOT" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "filters")).to include({ "scope_type" => "combined", "scope_key" => "TOT" })
+    expect(json_body.fetch("data").length).to eq(1)
+    expect(json_body.dig("data", 0, "scope_type")).to eq("combined")
+    expect(json_body.dig("data", 0, "scope_key")).to eq("TOT")
+    expect(json_body.dig("data", 0, "team", "abbreviation")).to eq("TOT")
+  end
+
   it "lists leaderboard rows grouped by player with stats across columns" do
     %w[gamesPlayed atBats runs hits doubles triples homeRuns rbi baseOnBalls strikeOuts stolenBases caughtStealing avg obp slg ops].each do |name|
       create_stat_type(name: name, label: name, category: "batting") unless StatType.exists?(name: name, category: "batting")
@@ -191,6 +209,34 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("meta", "filters")).to include({ "season_start" => 2025, "season_end" => 2026, "category" => "batting" })
     expect(json_body.fetch("data").map { |row| row.fetch("season") }).to eq([2025])
+  end
+
+  it "filters leaderboard rows by combined scope" do
+    create_stat_type(name: "homeRuns", label: "HR", category: "batting") unless StatType.exists?(name: "homeRuns", category: "batting")
+
+    create_player_season_stat(
+      player: @player,
+      stat_type: StatType.find_by!(name: "homeRuns", category: "batting"),
+      attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 30 }
+    )
+    create_player_season_stat(
+      player: @player,
+      stat_type: @ops,
+      attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 0.915 }
+    )
+
+    get api_player_season_stats_path,
+        params: {
+          view: "leaderboard",
+          filter: { category: "batting", season: 2024, scope_type: "combined", scope_key: "TOT" }
+        }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").length).to eq(1)
+    expect(json_body.dig("data", 0, "scope", "type")).to eq("combined")
+    expect(json_body.dig("data", 0, "scope", "key")).to eq("TOT")
+    expect(json_body.dig("data", 0, "team", "abbreviation")).to eq("TOT")
+    expect(json_body.dig("meta", "filters")).to include({ "scope_type" => "combined", "scope_key" => "TOT" })
   end
 
   it "sorts batting leaderboard rows by strikeOuts through the API" do

@@ -60,5 +60,63 @@ RSpec.describe PlayerSeasonStatsIndexQuery, type: :model do
       expect(query.metadata[:per_page]).to eq(100)
       expect(query.metadata[:sort]).to eq("season")
     end
+
+    it "filters by historical season team id instead of player's current team" do
+      current_team = create_team(
+        mlb_id: 136,
+        name: "Seattle Mariners",
+        abbreviation: "SEA",
+        team_name: "Mariners",
+        location_name: "Seattle",
+        short_name: "Seattle",
+        team_code: "sea",
+        file_code: "sea"
+      )
+      historical_team = create_team(
+        mlb_id: 116,
+        name: "Detroit Tigers",
+        abbreviation: "DET",
+        team_name: "Tigers",
+        location_name: "Detroit",
+        short_name: "Detroit",
+        team_code: "det",
+        file_code: "det"
+      )
+      player = create_player(team: current_team, attributes: { mlb_id: 999123, first_name: "Jordan", last_name: "Legacy" })
+      war = create_stat_type(name: "war", label: "WAR", category: "batting")
+
+      create_player_season_stat(
+        player: player,
+        stat_type: war,
+        attributes: { season: 2024, team: historical_team, value: 4.2 }
+      )
+
+      query = described_class.new(
+        params: {
+          filter: { team_id: historical_team.id, season: 2024 }
+        }
+      )
+
+      expect(query.results.map(&:player_id)).to eq([player.id])
+      expect(query.results.map(&:team_id)).to eq([historical_team.id])
+    end
+
+    it "filters by scope type and key" do
+      player = create_player
+      stat_type = create_stat_type(name: "ops", label: "OPS", category: "batting")
+
+      create_player_season_stat(player: player, stat_type: stat_type, attributes: { season: 2024, value: 0.82 })
+      create_player_season_stat(
+        player: player,
+        stat_type: stat_type,
+        attributes: { season: 2024, team: nil, scope_type: "combined", scope_key: "TOT", value: 0.9 }
+      )
+
+      query = described_class.new(params: { filter: { scope_type: "combined", scope_key: "TOT" } })
+
+      expect(query.results.count).to eq(1)
+      expect(query.results.first.scope_type).to eq("combined")
+      expect(query.results.first.scope_key).to eq("TOT")
+    end
   end
 end

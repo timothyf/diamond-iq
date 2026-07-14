@@ -10,5 +10,3 @@ class CreateRosters < ActiveRecord::Migration[7.1]
     add_index :rosters, [:team_id, :season], unique: true
   end
 end
-  end
-end
