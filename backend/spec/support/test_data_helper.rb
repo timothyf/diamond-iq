@@ -47,6 +47,25 @@ module TestDataHelper
     )
   end
 
+  def create_player_profile(player: nil, attributes: {})
+    player ||= create_player
+
+    PlayerProfile.create!(
+      {
+        player: player,
+        birth_date: Date.new(1995, 5, 10),
+        height_inches: 74,
+        weight_pounds: 210,
+        bats: "R",
+        throws: "R",
+        mlb_debut_date: Date.new(2020, 7, 24),
+        headshot_id: player.mlb_id.to_s,
+        source_name: "MLB Stats API",
+        last_synced_at: Time.current
+      }.merge(attributes)
+    )
+  end
+
   def create_stat_type(attributes = {})
     index = StatType.count + 1
 
