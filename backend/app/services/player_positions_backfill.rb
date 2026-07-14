@@ -16,8 +16,10 @@ class PlayerPositionsBackfill
       unknown_position_codes: []
     }
 
-    latest_memberships.each do |membership|
-      sync_membership(membership, summary)
+    PlayerPosition.transaction do
+      latest_memberships.each do |membership|
+        sync_membership(membership, summary)
+      end
     end
 
     summary[:unknown_position_codes] = summary[:unknown_position_codes].uniq.sort
@@ -59,8 +61,13 @@ class PlayerPositionsBackfill
     unknown_codes = requested_codes - positions_by_code.keys
     summary[:unknown_position_codes].concat(unknown_codes)
 
-    if primary_code.present? && positions_by_code.key?(primary_code)
-      membership.player.player_positions.current.primary_assignments.update_all(is_primary: false, updated_at: Time.current)
+    primary_code_unknown = primary_code.present? && !positions_by_code.key?(primary_code)
+
+    unless primary_code_unknown
+      membership.player.player_positions.current.primary_assignments.update_all(
+        is_primary: false,
+        updated_at: Time.current
+      )
     end
 
     desired_position_ids = positions_by_code.values.map(&:id)
