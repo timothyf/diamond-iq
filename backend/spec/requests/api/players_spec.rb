@@ -33,7 +33,7 @@ RSpec.describe "Api::Players", type: :request do
       file_code: "ana"
     )
 
-    create_player(team: @tigers, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
+    @miguel = create_player(team: @tigers, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
     create_player(team: @dodgers, attributes: { mlb_id: 660271, first_name: "Shohei", last_name: "Ohtani" })
     create_player(team: @angels, attributes: { mlb_id: 545361, first_name: "Mike", last_name: "Trout" })
   end
@@ -53,6 +53,42 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", 0, "team", "name")).to eq("Los Angeles Dodgers")
     expect(json_body.dig("data", 0, "team", "abbreviation")).to eq("LAD")
     expect(json_body.dig("data", 0, "team", "team_name")).to eq("Dodgers")
+  end
+
+  it "returns a player with profile details" do
+    create_player_profile(
+      player: @miguel,
+      attributes: {
+        birth_date: Date.new(1983, 4, 18),
+        height_inches: 76,
+        weight_pounds: 267,
+        bats: "R",
+        throws: "R",
+        mlb_debut_date: Date.new(2003, 6, 20),
+        headshot_id: "408234",
+        headshot_url_override: "https://example.test/miguel-cabrera.png"
+      }
+    )
+
+    get api_player_path(@miguel)
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "full_name")).to eq("Miguel Cabrera")
+    expect(json_body.dig("data", "profile", "birth_date")).to eq("1983-04-18")
+    expect(json_body.dig("data", "profile", "height_inches")).to eq(76)
+    expect(json_body.dig("data", "profile", "formatted_height")).to eq("6' 4\"")
+    expect(json_body.dig("data", "profile", "weight_pounds")).to eq(267)
+    expect(json_body.dig("data", "profile", "bats")).to eq("R")
+    expect(json_body.dig("data", "profile", "throws")).to eq("R")
+    expect(json_body.dig("data", "profile", "mlb_debut_date")).to eq("2003-06-20")
+    expect(json_body.dig("data", "profile", "headshot_url")).to eq("https://example.test/miguel-cabrera.png")
+  end
+
+  it "returns a null profile when profile data has not been synchronized" do
+    get api_player_path(@miguel)
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "profile")).to be_nil
   end
 
   it "filters players by first name and team name" do
