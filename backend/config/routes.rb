@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   namespace :api do
     resources :players, only: [:index, :show]
+    resources :positions, only: [:index]
     resources :team_memberships, only: [] do
       collection do
         get :active_today
