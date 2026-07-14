@@ -10,9 +10,11 @@ module Api
     end
 
     def show
-      player = Player.includes(:profile, :team).find(params[:id])
+      player = Player.includes(:profile, :team, player_positions: :position).find(params[:id])
 
-      render json: { data: serialize_player(player, include_profile: true) }
+      render json: {
+        data: serialize_player(player, include_profile: true, include_positions: true)
+      }
     end
 
     private
@@ -21,7 +23,7 @@ module Api
       params.permit(:page, :per_page, :sort, filter: [:name, :first_name, :last_name, :team_id, :team_name]).to_h
     end
 
-    def serialize_player(player, include_profile: false)
+    def serialize_player(player, include_profile: false, include_positions: false)
       data = {
         id: player.id,
         mlb_id: player.mlb_id,
@@ -34,6 +36,7 @@ module Api
       }
 
       data[:profile] = serialize_profile(player.profile) if include_profile
+      data[:positions] = serialize_player_positions(player.player_positions) if include_positions
       data
     end
 
@@ -55,6 +58,49 @@ module Api
         source_name: profile.source_name,
         source_updated_at: profile.source_updated_at,
         last_synced_at: profile.last_synced_at
+      }
+    end
+
+    def serialize_player_positions(assignments)
+      serialized_assignments = assignments
+        .sort_by do |assignment|
+          [
+            assignment.season.nil? ? 0 : 1,
+            -(assignment.season || 0),
+            assignment.is_primary? ? 0 : 1,
+            assignment.position.sort_order
+          ]
+        end
+        .map do |assignment|
+          {
+            id: assignment.id,
+            season: assignment.season,
+            current: assignment.season.nil?,
+            primary: assignment.is_primary,
+            source_name: assignment.source_name,
+            last_synced_at: assignment.last_synced_at,
+            position: serialize_position(assignment.position)
+          }
+        end
+
+      current_assignments = serialized_assignments.select { |assignment| assignment[:current] }
+      primary_assignment = current_assignments.find { |assignment| assignment[:primary] }
+
+      {
+        primary: primary_assignment&.fetch(:position),
+        secondary: current_assignments.reject { |assignment| assignment[:primary] }.map { |assignment| assignment[:position] },
+        assignments: serialized_assignments
+      }
+    end
+
+    def serialize_position(position)
+      {
+        id: position.id,
+        mlb_code: position.mlb_code,
+        abbreviation: position.abbreviation,
+        name: position.name,
+        position_type: position.position_type,
+        sort_order: position.sort_order
       }
     end
 

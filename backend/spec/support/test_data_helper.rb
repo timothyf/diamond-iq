@@ -66,6 +66,36 @@ module TestDataHelper
     )
   end
 
+  def create_position(attributes = {})
+    index = Position.count + 1
+
+    Position.create!(
+      {
+        mlb_code: (100 + index).to_s,
+        abbreviation: "POS#{index}",
+        name: "Position #{index}",
+        position_type: "infielder",
+        sort_order: index
+      }.merge(attributes)
+    )
+  end
+
+  def create_player_position(player: nil, position: nil, attributes: {})
+    player ||= create_player
+    position ||= create_position
+
+    PlayerPosition.create!(
+      {
+        player: player,
+        position: position,
+        is_primary: false,
+        season: nil,
+        source_name: "MLB Stats API",
+        last_synced_at: Time.current
+      }.merge(attributes)
+    )
+  end
+
   def create_stat_type(attributes = {})
     index = StatType.count + 1
 
