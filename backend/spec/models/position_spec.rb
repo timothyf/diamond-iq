@@ -34,7 +34,7 @@ RSpec.describe Position, type: :model do
   end
 
   it "rejects unsupported position types" do
-    position = build_position = described_class.new(
+    position = described_class.new(
       mlb_code: "99",
       abbreviation: "X",
       name: "Unknown",
@@ -42,7 +42,7 @@ RSpec.describe Position, type: :model do
       sort_order: 99
     )
 
-    expect(build_position).not_to be_valid
+    expect(position).not_to be_valid
     expect(position.errors[:position_type]).to include("is not included in the list")
   end
 
