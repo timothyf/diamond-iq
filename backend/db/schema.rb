@@ -10,8 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_14_001000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_14_002000) do
   # These are extensions that must be enabled in order to support this database
+  enable_extension "btree_gist"
   enable_extension "plpgsql"
 
   create_table "games", force: :cascade do |t|
@@ -343,6 +344,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_001000) do
     t.index ["team_id", "starts_on", "ends_on"], name: "index_team_memberships_on_team_date_window"
     t.index ["team_id"], name: "index_team_memberships_on_team_id"
     t.check_constraint "ends_on IS NULL OR ends_on >= starts_on", name: "team_memberships_valid_date_range"
+    t.exclusion_constraint "player_id WITH =, team_id WITH =, lower((roster_status)::text) WITH =, daterange(starts_on, COALESCE((ends_on + 1), 'infinity'::date), '[)'::text) WITH &&", using: :gist, name: "team_memberships_no_overlap_same_status"
   end
 
   create_table "teams", force: :cascade do |t|

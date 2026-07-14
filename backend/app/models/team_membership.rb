@@ -7,6 +7,7 @@ class TeamMembership < ApplicationRecord
   validates :source_name, presence: true
   validates :last_synced_at, presence: true
   validate :ends_on_not_before_starts_on
+  validate :no_overlapping_window_for_same_status
 
   scope :active_on, ->(date) { where("starts_on <= ? AND (ends_on IS NULL OR ends_on >= ?)", date, date) }
   scope :current, -> { active_on(Date.current) }
@@ -17,5 +18,23 @@ class TeamMembership < ApplicationRecord
     return if ends_on.blank? || starts_on.blank? || ends_on >= starts_on
 
     errors.add(:ends_on, "must be on or after starts_on")
+  end
+
+  def no_overlapping_window_for_same_status
+    return if player_id.blank? || team_id.blank? || roster_status.blank? || starts_on.blank?
+
+    overlapping_scope = self.class
+      .where(player_id: player_id, team_id: team_id)
+      .where("LOWER(roster_status) = ?", roster_status.downcase)
+      .where("starts_on <= ? AND (ends_on IS NULL OR ends_on >= ?)", overlap_end_date, starts_on)
+    overlapping_scope = overlapping_scope.where.not(id: id) if persisted?
+
+    return unless overlapping_scope.exists?
+
+    errors.add(:starts_on, "overlaps another membership for this player/team/roster_status")
+  end
+
+  def overlap_end_date
+    ends_on || Date.new(9999, 12, 31)
   end
 end

@@ -75,7 +75,7 @@ class TeamMembershipsRosterStatusQuery
     nested_hash = nested_filters.respond_to?(:to_h) ? nested_filters.to_h.deep_stringify_keys : {}
 
     top_level_hash = params.to_h.deep_stringify_keys.slice("team_id", "player_id", "roster_status")
-    top_level_hash.merge(nested_hash)
+    nested_hash.merge(top_level_hash)
   end
 
   def integer_filter!(filters, key)

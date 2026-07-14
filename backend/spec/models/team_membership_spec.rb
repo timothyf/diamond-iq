@@ -44,4 +44,55 @@ RSpec.describe TeamMembership, type: :model do
     expect(described_class.active_on(Date.new(2026, 6, 15))).to include(current)
     expect(described_class.active_on(Date.new(2026, 6, 15)).count).to eq(1)
   end
+
+  it "prevents overlapping windows for the same player, team, and roster_status" do
+    player = create_player
+    team = player.team
+
+    create_team_membership(
+      player: player,
+      team: team,
+      starts_on: Date.new(2026, 6, 1),
+      ends_on: Date.new(2026, 6, 30),
+      roster_status: "active"
+    )
+
+    overlap = described_class.new(
+      player: player,
+      team: team,
+      starts_on: Date.new(2026, 6, 15),
+      ends_on: Date.new(2026, 7, 15),
+      roster_status: "active",
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+
+    expect(overlap).not_to be_valid
+    expect(overlap.errors[:starts_on]).to include("overlaps another membership for this player/team/roster_status")
+  end
+
+  it "allows overlapping windows for different roster statuses" do
+    player = create_player
+    team = player.team
+
+    create_team_membership(
+      player: player,
+      team: team,
+      starts_on: Date.new(2026, 6, 1),
+      ends_on: Date.new(2026, 6, 30),
+      roster_status: "active"
+    )
+
+    overlap_different_status = described_class.new(
+      player: player,
+      team: team,
+      starts_on: Date.new(2026, 6, 15),
+      ends_on: Date.new(2026, 7, 15),
+      roster_status: "40-man",
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+
+    expect(overlap_different_status).to be_valid
+  end
 end
