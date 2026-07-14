@@ -16,8 +16,9 @@ class PlayerProfile < ApplicationRecord
     return if birth_date.blank?
 
     years = on.year - birth_date.year
-    birthday_this_year = birth_date.change(year: on.year)
-    on < birthday_this_year ? years - 1 : years
+    birthday_has_occurred = on.month > birth_date.month || (on.month == birth_date.month && on.day >= birth_date.day)
+
+    birthday_has_occurred ? years : years - 1
   end
 
   def formatted_height
