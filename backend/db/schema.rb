@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_12_001000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_13_002000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -220,6 +220,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_12_001000) do
     t.index ["team_id"], name: "index_players_on_team_id"
   end
 
+  create_table "roster_players", force: :cascade do |t|
+    t.bigint "roster_id", null: false
+    t.bigint "player_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id"], name: "index_roster_players_on_player_id"
+    t.index ["roster_id", "player_id"], name: "index_roster_players_on_roster_id_and_player_id", unique: true
+    t.index ["roster_id"], name: "index_roster_players_on_roster_id"
+  end
+
+  create_table "rosters", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.integer "season", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id", "season"], name: "index_rosters_on_team_id_and_season", unique: true
+    t.index ["team_id"], name: "index_rosters_on_team_id"
+  end
+
   create_table "schedules", force: :cascade do |t|
     t.integer "season", null: false
     t.string "schedule_type", default: "regular", null: false
@@ -269,4 +288,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_12_001000) do
   add_foreign_key "player_season_stats", "stat_types"
   add_foreign_key "player_season_stats", "teams"
   add_foreign_key "players", "teams"
+  add_foreign_key "roster_players", "players"
+  add_foreign_key "roster_players", "rosters"
+  add_foreign_key "rosters", "teams"
 end

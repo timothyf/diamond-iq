@@ -1,6 +1,8 @@
 class Player < ApplicationRecord
   belongs_to :team
   has_many :player_season_stats, dependent: :destroy
+  has_many :roster_players, dependent: :destroy
+  has_many :rosters, through: :roster_players
   has_many :home_probable_pitcher_games, class_name: "Game", foreign_key: :home_probable_pitcher_id, dependent: :nullify
   has_many :away_probable_pitcher_games, class_name: "Game", foreign_key: :away_probable_pitcher_id, dependent: :nullify
 
