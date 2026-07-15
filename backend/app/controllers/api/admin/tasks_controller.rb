@@ -6,7 +6,9 @@ module Api
           data: AdminTaskRunner.catalog,
           meta: {
             schedule_import_range: schedule_import_range,
-            schedule_date_range: schedule_date_range
+            schedule_date_range: schedule_date_range,
+            mlb_teams: mlb_teams,
+            database: database_metrics
           }
         }
       end
@@ -33,6 +35,7 @@ module Api
           :batch_size,
           :limit,
           :mlb_ids,
+          :team_scope,
           :team_mlb_id,
           :season,
           :roster_type,
@@ -67,6 +70,34 @@ module Api
           earliest_import_date: earliest_date&.iso8601,
           latest_import_date: latest_date&.iso8601
         }
+      end
+
+      def mlb_teams
+        Team.where(mlb_id: MlbRosterBatchSync::ALL_TEAM_IDS).order(:name).map do |team|
+          {
+            id: team.id,
+            mlb_id: team.mlb_id,
+            name: team.name,
+            abbreviation: team.abbreviation,
+            league: MlbRosterBatchSync.league_for(team.mlb_id)
+          }
+        end
+      end
+
+      def database_metrics
+        connection = ActiveRecord::Base.connection
+
+        {
+          environment: Rails.env,
+          adapter: connection.adapter_name,
+          size_bytes: database_size_bytes(connection)
+        }
+      end
+
+      def database_size_bytes(connection)
+        return unless connection.adapter_name.downcase.include?("postgres")
+
+        connection.select_value("SELECT pg_database_size(current_database())").to_i
       end
     end
   end

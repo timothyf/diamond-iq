@@ -40,6 +40,7 @@ const profileOptions = reactive({
 })
 
 const rosterOptions = reactive({
+  teamScope: 'team',
   teamMlbId: '',
   season: currentSeason,
   rosterType: '40Man',
@@ -54,6 +55,8 @@ const {
   overviewError,
   scheduleImportRange,
   scheduleDateRange,
+  mlbTeams,
+  databaseMetrics,
   loadOverview,
   runTask,
 } = useAdminTask()
@@ -147,7 +150,8 @@ async function handleProfileSync() {
 
 async function handleRosterSync() {
   await runTask('mlb_roster_sync', {
-    team_mlb_id: rosterOptions.teamMlbId,
+    team_scope: rosterOptions.teamScope,
+    team_mlb_id: rosterOptions.teamScope === 'team' ? rosterOptions.teamMlbId : null,
     season: rosterOptions.season,
     roster_type: rosterOptions.rosterType,
     as_of: rosterOptions.asOf,
@@ -184,6 +188,21 @@ function formatDate(value) {
     year: 'numeric',
   }).format(new Date(`${value}T12:00:00`))
 }
+
+function formatBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return 'Unavailable'
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let amount = value
+  let unitIndex = 0
+  while (amount >= 1024 && unitIndex < units.length - 1) {
+    amount /= 1024
+    unitIndex += 1
+  }
+
+  const precision = unitIndex < 2 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2
+  return `${amount.toFixed(precision)} ${units[unitIndex]}`
+}
 </script>
 
 <template>
@@ -196,9 +215,16 @@ function formatDate(value) {
           Import local datasets, retrieve source data, and run MLB synchronization tasks from one operational workspace.
         </p>
       </div>
-      <div class="admin-hero__status" :class="{ 'admin-hero__status--busy': anyActionRunning }">
-        <span aria-hidden="true"></span>
-        {{ anyActionRunning ? 'Data operation in progress' : 'Admin tools ready' }}
+      <div class="admin-hero__aside">
+        <div class="database-footprint" data-test="database-size">
+          <span>{{ humanize(databaseMetrics.environment || 'current') }} database</span>
+          <strong>{{ overviewLoading ? 'Measuring…' : formatBytes(databaseMetrics.sizeBytes) }}</strong>
+          <small>{{ databaseMetrics.adapter || 'Database' }} footprint</small>
+        </div>
+        <div class="admin-hero__status" :class="{ 'admin-hero__status--busy': anyActionRunning }">
+          <span aria-hidden="true"></span>
+          {{ anyActionRunning ? 'Data operation in progress' : 'Admin tools ready' }}
+        </div>
       </div>
     </section>
 
@@ -412,7 +438,24 @@ function formatDate(value) {
             <code>mlb_roster:sync</code>
           </div>
           <div class="admin-fields admin-fields--four">
-            <label><span>Team MLB ID</span><input v-model="rosterOptions.teamMlbId" type="number" min="1" placeholder="116" required /></label>
+            <label>
+              <span>Team selection</span>
+              <select v-model="rosterOptions.teamScope" data-test="roster-team-scope">
+                <option value="all">All MLB teams</option>
+                <option value="american">American League</option>
+                <option value="national">National League</option>
+                <option value="team">Specific team</option>
+              </select>
+            </label>
+            <label v-if="rosterOptions.teamScope === 'team'" class="admin-field--wide">
+              <span>MLB team</span>
+              <select v-model="rosterOptions.teamMlbId" data-test="roster-team" required>
+                <option value="" disabled>Select a team</option>
+                <option v-for="team in mlbTeams" :key="team.mlbId" :value="String(team.mlbId)">
+                  {{ team.abbreviation }} · {{ team.name }} ({{ team.league === 'american' ? 'AL' : 'NL' }})
+                </option>
+              </select>
+            </label>
             <label><span>Season</span><input v-model.number="rosterOptions.season" type="number" min="1876" required /></label>
             <label>
               <span>Roster type</span>
@@ -511,6 +554,45 @@ function formatDate(value) {
   margin-top: 0.9rem;
   color: #4b5964;
   font-size: 1.04rem;
+}
+
+.admin-hero__aside {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.7rem;
+  align-items: flex-end;
+}
+
+.database-footprint {
+  display: grid;
+  min-width: 190px;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(16, 38, 61, 0.12);
+  border-radius: 16px;
+  background: rgba(231, 237, 241, 0.78);
+  text-align: right;
+}
+
+.database-footprint span,
+.database-footprint small {
+  color: #61707b;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.database-footprint strong {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.55rem;
+  line-height: 1.1;
+}
+
+.database-footprint small {
+  font-size: 0.58rem;
+  font-weight: 700;
 }
 
 .admin-hero__status {
@@ -885,6 +967,15 @@ function formatDate(value) {
   .admin-section__heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .admin-hero__aside {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .database-footprint {
+    text-align: left;
   }
 
   .admin-section__heading > p {

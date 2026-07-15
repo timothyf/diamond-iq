@@ -10,7 +10,7 @@ class AdminTaskRunner
     },
     "mlb_roster_sync" => {
       name: "MLB roster sync",
-      description: "Download one team's roster and update player profiles and historical memberships."
+      description: "Download one or more team rosters and update player profiles and historical memberships."
     },
     "player_positions_backfill" => {
       name: "Player position backfill",
@@ -71,8 +71,11 @@ class AdminTaskRunner
   end
 
   def mlb_roster_sync
-    MlbRosterSync.call(
-      team_mlb_id: positive_integer(:team_mlb_id, required: true),
+    scope = params[:team_scope].presence || "team"
+
+    MlbRosterBatchSync.call(
+      scope: scope,
+      team_mlb_id: optional_positive_integer(:team_mlb_id),
       season: positive_integer(:season, default: Date.current.year),
       roster_type: params[:roster_type].presence || MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
       as_of: optional_date(:as_of) || Date.current

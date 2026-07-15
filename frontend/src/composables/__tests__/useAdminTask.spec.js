@@ -20,11 +20,25 @@ describe('useAdminTask', () => {
               earliest_game_date: '2026-03-26',
               latest_game_date: '2026-09-22',
             },
+            mlb_teams: [
+              {
+                id: 1,
+                mlb_id: 116,
+                name: 'Detroit Tigers',
+                abbreviation: 'DET',
+                league: 'american',
+              },
+            ],
+            database: {
+              environment: 'development',
+              adapter: 'PostgreSQL',
+              size_bytes: 536870912,
+            },
           },
         }),
       }),
     )
-    const { loadOverview, scheduleImportRange, scheduleDateRange, overviewError } = useAdminTask()
+    const { loadOverview, scheduleImportRange, scheduleDateRange, mlbTeams, databaseMetrics, overviewError } = useAdminTask()
 
     await loadOverview()
 
@@ -35,6 +49,20 @@ describe('useAdminTask', () => {
     expect(scheduleDateRange.value).toEqual({
       earliestGameDate: '2026-03-26',
       latestGameDate: '2026-09-22',
+    })
+    expect(mlbTeams.value).toEqual([
+      {
+        id: 1,
+        mlbId: 116,
+        name: 'Detroit Tigers',
+        abbreviation: 'DET',
+        league: 'american',
+      },
+    ])
+    expect(databaseMetrics.value).toEqual({
+      environment: 'development',
+      adapter: 'PostgreSQL',
+      sizeBytes: 536870912,
     })
     expect(overviewError.value).toBe('')
   })

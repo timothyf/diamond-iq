@@ -44,6 +44,32 @@ RSpec.describe AdminTaskRunner do
     )
   end
 
+  it "runs roster synchronization for a selected league" do
+    allow(MlbRosterBatchSync).to receive(:call).and_return(
+      success: true,
+      message: "Synchronized 15 MLB team rosters",
+      data: { team_count: 15 }
+    )
+
+    described_class.call(
+      task_name: "mlb_roster_sync",
+      params: {
+        team_scope: "national",
+        season: "2026",
+        roster_type: "active",
+        as_of: "2026-07-15"
+      }
+    )
+
+    expect(MlbRosterBatchSync).to have_received(:call).with(
+      scope: "national",
+      team_mlb_id: nil,
+      season: 2026,
+      roster_type: "active",
+      as_of: Date.new(2026, 7, 15)
+    )
+  end
+
   it "rejects invalid or reversed schedule dates without calling the synchronizer" do
     allow(MlbScheduleSync).to receive(:call)
 

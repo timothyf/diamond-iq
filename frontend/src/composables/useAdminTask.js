@@ -12,6 +12,8 @@ export function useAdminTask() {
   const overviewError = ref('')
   const scheduleImportRange = ref({ earliestImportDate: null, latestImportDate: null })
   const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
+  const mlbTeams = ref([])
+  const databaseMetrics = ref({ environment: '', adapter: '', sizeBytes: null })
 
   async function loadOverview() {
     overviewLoading.value = true
@@ -36,6 +38,24 @@ export function useAdminTask() {
       scheduleDateRange.value = {
         earliestGameDate: range.earliest_game_date || null,
         latestGameDate: range.latest_game_date || null,
+      }
+      mlbTeams.value = (payload?.meta?.mlb_teams || []).map((team) => ({
+        id: team.id,
+        mlbId: team.mlb_id,
+        name: team.name,
+        abbreviation: team.abbreviation,
+        league: team.league,
+      }))
+      const database = payload?.meta?.database || {}
+      databaseMetrics.value = {
+        environment: database.environment || '',
+        adapter: database.adapter || '',
+        sizeBytes:
+          database.size_bytes !== null &&
+          database.size_bytes !== undefined &&
+          Number.isFinite(Number(database.size_bytes))
+            ? Number(database.size_bytes)
+            : null,
       }
       return payload
     } catch (overviewLoadError) {
@@ -86,6 +106,8 @@ export function useAdminTask() {
     overviewError: computed(() => overviewError.value),
     scheduleImportRange: computed(() => scheduleImportRange.value),
     scheduleDateRange: computed(() => scheduleDateRange.value),
+    mlbTeams: computed(() => mlbTeams.value),
+    databaseMetrics: computed(() => databaseMetrics.value),
     loadOverview,
     runTask,
   }

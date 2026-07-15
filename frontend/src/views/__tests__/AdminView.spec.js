@@ -26,6 +26,15 @@ vi.mock('../../composables/useAdminTask', () => ({
       earliestGameDate: '2026-03-26',
       latestGameDate: '2026-09-22',
     })),
+    mlbTeams: computed(() => [
+      { id: 1, mlbId: 116, name: 'Detroit Tigers', abbreviation: 'DET', league: 'american' },
+      { id: 2, mlbId: 119, name: 'Los Angeles Dodgers', abbreviation: 'LAD', league: 'national' },
+    ]),
+    databaseMetrics: computed(() => ({
+      environment: 'development',
+      adapter: 'PostgreSQL',
+      sizeBytes: 536870912,
+    })),
     loadOverview,
     runTask,
   }),
@@ -81,12 +90,19 @@ describe('AdminView', () => {
     const wrapper = mount(AdminView)
 
     expect(wrapper.text()).toContain('Data administration')
+    expect(wrapper.get('[data-test="database-size"]').text()).toContain('Development database')
+    expect(wrapper.get('[data-test="database-size"]').text()).toContain('512 MB')
+    expect(wrapper.get('[data-test="database-size"]').text()).toContain('PostgreSQL footprint')
     expect(wrapper.text()).toContain('Player season statistics')
     expect(wrapper.text()).toContain('Statcast pitch data')
     expect(wrapper.text()).toContain('Local file imports')
     expect(wrapper.text()).toContain('MLB schedule synchronization')
     expect(wrapper.text()).toContain('MLB profile synchronization')
     expect(wrapper.text()).toContain('MLB team roster synchronization')
+    expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('All MLB teams')
+    expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('American League')
+    expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('National League')
+    expect(wrapper.get('[data-test="roster-team"]').text()).toContain('DET · Detroit Tigers (AL)')
     expect(wrapper.text()).toContain('Rebuild current player positions')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
@@ -113,6 +129,13 @@ describe('AdminView', () => {
     expect(runTask).toHaveBeenCalledWith(
       'mlb_player_profiles_sync',
       expect.objectContaining({ only_missing: true, batch_size: 50 }),
+    )
+
+    await wrapper.get('[data-test="roster-team-scope"]').setValue('national')
+    await wrapper.get('[data-test="roster-sync-form"]').trigger('submit')
+    expect(runTask).toHaveBeenCalledWith(
+      'mlb_roster_sync',
+      expect.objectContaining({ team_scope: 'national', team_mlb_id: null }),
     )
   })
 })

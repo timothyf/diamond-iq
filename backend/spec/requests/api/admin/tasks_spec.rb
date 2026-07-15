@@ -6,6 +6,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     late_schedule = create_schedule(start_date: Date.new(2026, 5, 2), end_date: Date.new(2026, 5, 31))
     create_game(schedule: early_schedule, official_date: Date.new(2026, 3, 26))
     create_game(schedule: late_schedule, official_date: Date.new(2026, 9, 22))
+    tigers = create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
 
     get api_admin_tasks_path
 
@@ -24,6 +25,22 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "earliest_import_date" => "2026-03-26",
       "latest_import_date" => "2026-05-31"
     )
+    expect(json_body.dig("meta", "mlb_teams")).to eq(
+      [
+        {
+          "id" => tigers.id,
+          "mlb_id" => 116,
+          "name" => "Detroit Tigers",
+          "abbreviation" => "DET",
+          "league" => "american"
+        }
+      ]
+    )
+    expect(json_body.dig("meta", "database")).to include(
+      "environment" => "test",
+      "adapter" => "PostgreSQL"
+    )
+    expect(json_body.dig("meta", "database", "size_bytes")).to be_positive
   end
 
   it "returns an empty schedule date range when no games are stored" do
