@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 
@@ -12,6 +12,14 @@ const props = defineProps({
 
 const playerId = computed(() => props.playerId)
 const { player, loading, error, refresh } = usePlayerProfile(playerId)
+const headshotFailed = ref(false)
+
+watch(
+  () => player.value?.profile?.headshotUrl,
+  () => {
+    headshotFailed.value = false
+  },
+)
 
 const initials = computed(() =>
   [player.value?.firstName, player.value?.lastName]
@@ -98,8 +106,16 @@ function formatTimestamp(value) {
       <RouterLink class="profile-back" to="/">← Back to stat board</RouterLink>
 
       <section class="profile-hero">
-        <div class="profile-portrait">
-          <img v-if="player.profile?.headshotUrl" :src="player.profile.headshotUrl" :alt="player.fullName" />
+        <div
+          class="profile-portrait"
+          :class="{ 'profile-portrait--photo': player.profile?.headshotUrl && !headshotFailed }"
+        >
+          <img
+            v-if="player.profile?.headshotUrl && !headshotFailed"
+            :src="player.profile.headshotUrl"
+            :alt="`${player.fullName} headshot`"
+            @error="headshotFailed = true"
+          />
           <span v-else>{{ initials }}</span>
         </div>
 
@@ -272,6 +288,7 @@ function formatTimestamp(value) {
 }
 
 .profile-portrait {
+  position: relative;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -287,9 +304,16 @@ function formatTimestamp(value) {
 }
 
 .profile-portrait img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
+}
+
+.profile-portrait--photo {
+  background: #c9c9c9;
 }
 
 .profile-identity h1 {

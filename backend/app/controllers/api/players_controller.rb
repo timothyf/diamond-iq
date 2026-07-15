@@ -55,7 +55,7 @@ module Api
         throws: profile.throws,
         mlb_debut_date: profile.mlb_debut_date,
         headshot_id: profile.headshot_id,
-        headshot_url: profile.headshot_url_override,
+        headshot_url: profile.headshot_url,
         source_name: profile.source_name,
         source_updated_at: profile.source_updated_at,
         last_synced_at: profile.last_synced_at

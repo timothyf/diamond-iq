@@ -38,6 +38,27 @@ RSpec.describe PlayerProfile, type: :model do
     expect(build_profile(height_inches: 74).formatted_height).to eq("6' 2\"")
   end
 
+  it "builds an MLB headshot URL from the imported headshot id" do
+    profile = build_profile(headshot_id: "680776")
+
+    expect(profile.headshot_url).to eq(
+      "https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/680776/headshot/67/current"
+    )
+  end
+
+  it "prefers a manually configured headshot URL" do
+    profile = build_profile(
+      headshot_id: "680776",
+      headshot_url_override: "https://example.test/custom-headshot.png"
+    )
+
+    expect(profile.headshot_url).to eq("https://example.test/custom-headshot.png")
+  end
+
+  it "does not build a headshot URL from an invalid id" do
+    expect(build_profile(headshot_id: "invalid/id").headshot_url).to be_nil
+  end
+
   def build_profile(attributes = {})
     described_class.new(
       {

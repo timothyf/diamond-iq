@@ -1,6 +1,8 @@
 class PlayerProfile < ApplicationRecord
   BATTING_SIDES = %w[L R S].freeze
   THROWING_HANDS = %w[L R].freeze
+  MLB_HEADSHOT_URL_TEMPLATE =
+    "https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/%<id>s/headshot/67/current".freeze
 
   belongs_to :player
 
@@ -26,5 +28,12 @@ class PlayerProfile < ApplicationRecord
 
     feet, inches = height_inches.divmod(12)
     "#{feet}' #{inches}\""
+  end
+
+  def headshot_url
+    return headshot_url_override if headshot_url_override.present?
+    return unless headshot_id.to_s.match?(/\A\d+\z/)
+
+    format(MLB_HEADSHOT_URL_TEMPLATE, id: headshot_id)
   end
 end

@@ -20,6 +20,8 @@ function apiPayload() {
         bats: 'L',
         throws: 'L',
         mlb_debut_date: '2022-06-18',
+        headshot_url:
+          'https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/680776/headshot/67/current',
       },
       positions: {
         primary: { abbreviation: 'CF', name: 'Outfielder' },
@@ -106,6 +108,33 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')
     expect(wrapper.text()).toContain('Baseball Savant')
+    expect(wrapper.get('.profile-portrait img').attributes()).toMatchObject({
+      src: 'https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/680776/headshot/67/current',
+      alt: 'Riley Greene headshot',
+    })
+    expect(wrapper.get('.profile-portrait').classes()).toContain('profile-portrait--photo')
+  })
+
+  it('falls back to player initials when the headshot cannot load', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => apiPayload(),
+      }),
+    )
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('.profile-portrait img').trigger('error')
+
+    expect(wrapper.find('.profile-portrait img').exists()).toBe(false)
+    expect(wrapper.get('.profile-portrait').classes()).not.toContain('profile-portrait--photo')
+    expect(wrapper.get('.profile-portrait span').text()).toBe('RG')
   })
 
   it('renders a retry state when loading fails', async () => {

@@ -91,6 +91,16 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile")).to be_nil
   end
 
+  it "returns the canonical MLB headshot URL when an override is not configured" do
+    create_player_profile(player: @miguel, attributes: { headshot_id: "408234" })
+
+    get api_player_path(@miguel)
+
+    expect(json_body.dig("data", "profile", "headshot_url")).to eq(
+      "https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/408234/headshot/67/current"
+    )
+  end
+
   it "returns a unified current-season, roster-history, pitch, and source profile" do
     profile = create_player_profile(player: @miguel)
     position = create_position(mlb_code: "5", abbreviation: "3B", name: "Third Base", position_type: "infielder")
