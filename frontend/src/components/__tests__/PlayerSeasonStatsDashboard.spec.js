@@ -4,6 +4,7 @@ import { flushPromises } from '@vue/test-utils'
 import { beforeEach, vi } from 'vitest'
 
 import PlayerSeasonStatsDashboard from '../PlayerSeasonStatsDashboard.vue'
+import { usePitchData } from '../../composables/usePitchData'
 
 const refreshSpy = vi.fn()
 const refreshPitchDataSpy = vi.fn()
@@ -154,6 +155,7 @@ describe('PlayerSeasonStatsDashboard', () => {
     window.history.replaceState({}, '', '/')
     refreshSpy.mockClear()
     refreshPitchDataSpy.mockClear()
+    usePitchData.mockClear()
     importFileSpy.mockReset()
     importPitchDataFileSpy.mockReset()
     downloadStatsSpy.mockReset()
@@ -184,6 +186,21 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
     expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
+  })
+
+  it('enables pitch-data loading only while Pitch Data mode is selected', async () => {
+    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const pitchDataEnabled = usePitchData.mock.calls[0][1]
+
+    expect(pitchDataEnabled.value).toBe(false)
+
+    const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
+    await categorySelect.setValue('pitchData')
+
+    expect(pitchDataEnabled.value).toBe(true)
+
+    await categorySelect.setValue('batting')
+    expect(pitchDataEnabled.value).toBe(false)
   })
 
   it('hydrates leaderboard filters from the URL query string', () => {

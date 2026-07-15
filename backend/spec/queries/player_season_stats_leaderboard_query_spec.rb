@@ -1,6 +1,18 @@
 require "rails_helper"
 
 RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
+  it "discovers available columns from stat types without scanning season-stat rows" do
+    create_stat_type(name: "homeRuns", label: "HR", category: "batting")
+    create_stat_type(name: "ops", label: "OPS", category: "batting")
+    create_stat_type(name: "ERA", label: "ERA", category: "pitching")
+    query = described_class.new(
+      params: { filter: { category: "batting" } },
+      relation: PlayerSeasonStat.none
+    )
+
+    expect(query.send(:available_stat_names)).to contain_exactly("homeRuns", "ops")
+  end
+
   it "returns player leaderboard rows with batting stats across columns" do
     tigers = create_team(
       mlb_id: 116,

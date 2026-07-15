@@ -1,4 +1,4 @@
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { flushPromises } from '@vue/test-utils'
 
 import { usePitchData } from '../usePitchData'
@@ -187,5 +187,40 @@ describe('usePitchData', () => {
         },
       },
     )
+  })
+
+  it('defers loading until enabled and clears pitch state when disabled again', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [{ id: 11, game_pk: 777, at_bat_number: 1, pitch_number: 1 }],
+        meta: { count: 1, per_page: 20 },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const enabled = ref(false)
+    const query = computed(() => ({ page: 1, perPage: 20 }))
+    const { rows, meta, loading, error } = usePitchData(query, enabled)
+
+    await flushPromises()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(rows.value).toEqual([])
+
+    enabled.value = true
+    await nextTick()
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(rows.value).toHaveLength(1)
+    expect(meta.value.count).toBe(1)
+
+    enabled.value = false
+    await nextTick()
+
+    expect(rows.value).toEqual([])
+    expect(meta.value.count).toBe(0)
+    expect(loading.value).toBe(false)
+    expect(error.value).toBe('')
   })
 })

@@ -128,6 +128,7 @@ const pitchDataQuery = computed(() => ({
   pitchType: pitchDataFilters.pitchType,
   events: pitchDataFilters.events,
 }))
+const pitchDataEnabled = computed(() => filters.category === 'pitchData')
 
 const { rows, meta, loading, error, refresh } = usePlayerSeasonStats(query)
 const {
@@ -136,7 +137,7 @@ const {
   loading: pitchLoading,
   error: pitchError,
   refresh: refreshPitchData,
-} = usePitchData(pitchDataQuery)
+} = usePitchData(pitchDataQuery, pitchDataEnabled)
 const { suggestions: playerSuggestions, loading: playerSuggestionsLoading } = usePlayerSuggestions(playerSuggestionQuery)
 const { suggestions: pitcherSuggestions, loading: pitcherSuggestionsLoading } = usePlayerSuggestions(pitcherSuggestionQuery)
 const { suggestions: batterSuggestions, loading: batterSuggestionsLoading } = usePlayerSuggestions(batterSuggestionQuery)

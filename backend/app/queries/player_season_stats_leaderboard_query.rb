@@ -330,7 +330,7 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def per_page
-    @per_page ||= [positive_integer(params["per_page"] || params[:per_page], DEFAULT_PER_PAGE), MAX_PER_PAGE].min
+    @per_page ||= [ positive_integer(params["per_page"] || params[:per_page], DEFAULT_PER_PAGE), MAX_PER_PAGE ].min
   end
 
   def normalized_filters
@@ -461,7 +461,7 @@ class PlayerSeasonStatsLeaderboardQuery
         mlb_id: row["player_mlb_id"].to_i,
         first_name: row["player_first_name"],
         last_name: row["player_last_name"],
-        full_name: [row["player_first_name"], row["player_last_name"]].compact.join(" ")
+        full_name: [ row["player_first_name"], row["player_last_name"] ].compact.join(" ")
       },
       team: {
         id: row["team_id"]&.to_i,
@@ -509,7 +509,9 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def available_stat_names
-    @available_stat_names ||= filtered_relation.distinct.pluck("stat_types.name")
+    @available_stat_names ||= stat_type_relation
+      .where(category: category, name: available_alias_names)
+      .pluck(:name)
   end
 
   def normalize_scope_type!(filters)

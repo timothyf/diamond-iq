@@ -91,13 +91,21 @@ function normalizeMeta(meta = {}, requestedPerPage = DEFAULT_PER_PAGE) {
   }
 }
 
-export function usePitchData(queryRef) {
+export function usePitchData(queryRef, enabledRef = computed(() => true)) {
   const rows = ref([])
   const meta = ref(normalizeMeta())
   const loading = ref(false)
   const error = ref('')
+  let requestCounter = 0
 
   async function load() {
+    if (!enabledRef.value) {
+      reset()
+      return
+    }
+
+    const requestId = requestCounter + 1
+    requestCounter = requestId
     loading.value = true
     error.value = ''
 
@@ -114,25 +122,37 @@ export function usePitchData(queryRef) {
       }
 
       const payload = await response.json()
+      if (requestId !== requestCounter || !enabledRef.value) return
+
       const sourceRows = Array.isArray(payload.data) ? payload.data : []
       const normalizedRows = sourceRows.map((row, index) => normalizeRow(row, index, queryRef.value || {}))
 
       rows.value = normalizedRows
       meta.value = normalizeMeta(payload.meta, queryRef.value?.perPage || queryRef.value?.limit || DEFAULT_PER_PAGE)
     } catch (fetchError) {
+      if (requestId !== requestCounter || !enabledRef.value) return
+
       rows.value = []
       meta.value = normalizeMeta({}, queryRef.value?.perPage || queryRef.value?.limit || DEFAULT_PER_PAGE)
       error.value = 'Unable to load pitch data. Confirm the Rails API is running and reachable from the frontend.'
       console.error(fetchError)
     } finally {
-      loading.value = false
+      if (requestId === requestCounter) loading.value = false
     }
   }
 
+  function reset() {
+    requestCounter += 1
+    rows.value = []
+    meta.value = normalizeMeta({}, queryRef.value?.perPage || queryRef.value?.limit || DEFAULT_PER_PAGE)
+    loading.value = false
+    error.value = ''
+  }
+
   watch(
-    queryRef,
-    () => {
-      load()
+    [queryRef, enabledRef],
+    ([, enabled]) => {
+      enabled ? load() : reset()
     },
     { deep: true, immediate: true },
   )
