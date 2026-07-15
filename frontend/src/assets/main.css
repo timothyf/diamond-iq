@@ -88,6 +88,23 @@
   color: #8f2d24;
 }
 
+.data-grid .player-profile-link {
+  color: #f9f5e8;
+  text-decoration-color: rgba(210, 182, 119, 0.72);
+}
+
+.data-grid .player-profile-link:hover,
+.data-grid .player-profile-link:focus-visible {
+  color: #f0d28c;
+  text-decoration-color: currentColor;
+}
+
+.data-grid .player-cell .primary-cell span {
+  color: rgba(249, 245, 232, 0.8);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
 .dashboard-shell {
   min-height: 100vh;
   padding: 2.5rem 1.25rem 4rem;

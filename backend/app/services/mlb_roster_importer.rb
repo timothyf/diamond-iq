@@ -127,60 +127,19 @@ class MlbRosterImporter
     player.save!
     summary[:created_player_count] += 1 if player_created
 
-    sync_profile!(player, person, summary)
-    position = sync_position!(player, entry["position"] || person["primaryPosition"], summary)
+    profile_result = MlbPlayerProfileUpserter.call(
+      player: player,
+      person: person,
+      fetched_at: fetched_at,
+      position_payload: entry["position"] || person["primaryPosition"],
+      seasons: [ nil, season ]
+    )
+    summary[:created_profile_count] += 1 if profile_result[:profile_created]
+    summary[:position_assignment_count] += profile_result[:position_assignment_count]
+    position = profile_result[:position]
     sync_membership!(player, team, entry, position, summary)
     summary[:membership_count] += 1
     player
-  end
-
-  def sync_profile!(player, person, summary)
-    profile = player.profile || player.build_profile
-    created = profile.new_record?
-    profile.assign_attributes(
-      birth_date: parse_date(person["birthDate"]),
-      height_inches: parse_height(person["height"]),
-      weight_pounds: parse_integer(person["weight"]),
-      bats: normalized_hand(person.dig("batSide", "code"), allow_switch: true),
-      throws: normalized_hand(person.dig("pitchHand", "code"), allow_switch: false),
-      mlb_debut_date: parse_date(person["mlbDebutDate"]),
-      headshot_id: player.mlb_id.to_s,
-      source_name: SOURCE_NAME,
-      last_synced_at: fetched_at,
-      raw_data: person
-    )
-    profile.save!
-    summary[:created_profile_count] += 1 if created
-  end
-
-  def sync_position!(player, position_payload, summary)
-    return if position_payload.blank?
-
-    mlb_code = position_payload["code"].to_s.strip.upcase
-    abbreviation = position_payload["abbreviation"].to_s.strip.upcase
-    return if mlb_code.blank? || abbreviation.blank?
-
-    position = Position.find_or_initialize_by(mlb_code: mlb_code)
-    position.assign_attributes(
-      abbreviation: abbreviation,
-      name: position_payload["name"].presence || abbreviation,
-      position_type: normalize_position_type(position_payload["type"]),
-      sort_order: position.sort_order.presence || Position.maximum(:sort_order).to_i + 1
-    )
-    position.save!
-
-    [ nil, season ].each do |position_season|
-      player.player_positions.where(season: position_season, is_primary: true).where.not(position: position).update_all(
-        is_primary: false,
-        updated_at: fetched_at
-      )
-      assignment = player.player_positions.find_or_initialize_by(position: position, season: position_season)
-      assignment.assign_attributes(is_primary: true, source_name: SOURCE_NAME, last_synced_at: fetched_at)
-      assignment.save!
-      summary[:position_assignment_count] += 1
-    end
-
-    position
   end
 
   def sync_membership!(player, team, entry, position, summary)
@@ -267,31 +226,6 @@ class MlbRosterImporter
 
   def person_jersey_number(entry)
     entry.dig("person", "primaryNumber").presence
-  end
-
-  def normalize_position_type(value)
-    normalized = value.to_s.downcase
-    return "pitcher" if normalized.include?("pitcher")
-    return "catcher" if normalized.include?("catcher")
-    return "infielder" if normalized.include?("infielder")
-    return "outfielder" if normalized.include?("outfielder")
-    return "designated_hitter" if normalized.include?("designated")
-    return "two_way" if normalized.include?("two-way") || normalized.include?("two way")
-
-    "other"
-  end
-
-  def normalized_hand(value, allow_switch:)
-    hand = value.to_s.strip.upcase
-    allowed = allow_switch ? %w[L R S] : %w[L R]
-    allowed.include?(hand) ? hand : nil
-  end
-
-  def parse_height(value)
-    match = value.to_s.match(/\A\s*(\d+)'\s*(\d+)"\s*\z/)
-    return if match.nil?
-
-    (match[1].to_i * 12) + match[2].to_i
   end
 
   def parse_date(value)
