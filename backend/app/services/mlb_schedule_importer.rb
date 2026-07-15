@@ -243,7 +243,12 @@ class MlbScheduleImporter
   end
 
   def parse_game_types(value)
-    Array(value.to_s.split(",")).map { |item| item.strip.upcase }.reject(&:blank?).uniq.sort
+    Array(value)
+      .flat_map { |item| item.to_s.split(",") }
+      .map { |item| item.strip.upcase }
+      .reject(&:blank?)
+      .uniq
+      .sort
   end
 
   def success(message, data = {})

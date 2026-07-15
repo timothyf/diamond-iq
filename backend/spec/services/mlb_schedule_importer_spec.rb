@@ -9,7 +9,7 @@ RSpec.describe MlbScheduleImporter do
     first_result = import(payload)
     game = Game.find_by!(mlb_id: 823_443)
     second_payload = schedule_payload(games: [ game_payload(home_score: 5, away_score: 3, detailed_status: "Final", abstract_status: "Final") ])
-    second_result = import(second_payload, fetched_at: sync_time + 1.hour)
+    second_result = import(second_payload, fetched_at: sync_time + 1.hour, game_types: [ "R" ])
 
     expect(first_result[:success]).to be(true)
     expect(first_result.dig(:data, :created_game_count)).to eq(1)
@@ -28,6 +28,10 @@ RSpec.describe MlbScheduleImporter do
     expect(game.raw_data.dig("status", "detailedState")).to eq("Final")
     expect(game.last_synced_at).to be_within(1.second).of(sync_time + 1.hour)
     expect(game.schedule.raw_data).to eq(second_payload)
+    expect(game.schedule).to have_attributes(
+      source_key: "mlb:schedule:1:2026-07-14:2026-07-14:R",
+      schedule_type: "R"
+    )
   end
 
   it "normalizes postponed games without discarding the MLB status detail" do
@@ -80,12 +84,12 @@ RSpec.describe MlbScheduleImporter do
 
   private
 
-  def import(payload, fetched_at: sync_time)
+  def import(payload, fetched_at: sync_time, game_types: "R")
     described_class.call(
       payload: payload,
       start_date: "2026-07-14",
       end_date: "2026-07-14",
-      game_types: "R",
+      game_types: game_types,
       sport_id: 1,
       source_url: "https://statsapi.mlb.com/api/v1/schedule?example=true",
       fetched_at: fetched_at
