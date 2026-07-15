@@ -1,16 +1,15 @@
 namespace :mlb_roster do
-  desc "Synchronize one MLB team's roster. Usage: bin/rails 'mlb_roster:sync[116,2026,2026-07-14]' ROSTER_TYPE=40Man"
-  task :sync, [ :team_mlb_id, :season, :as_of ] => :environment do |_task, args|
+  desc "Synchronize one MLB team's roster through season end or today. Usage: bin/rails 'mlb_roster:sync[116,2026]' ROSTER_TYPE=40Man"
+  task :sync, [ :team_mlb_id, :season ] => :environment do |_task, args|
     team_mlb_id = args[:team_mlb_id].presence || ENV["TEAM_MLB_ID"].presence
     season = args[:season].presence || ENV["SEASON"].presence || Date.current.year
-    as_of = args[:as_of].presence || ENV["AS_OF"].presence || Date.current.iso8601
+    season = Integer(season, exception: false)
     roster_type = ENV["ROSTER_TYPE"].presence || MlbRosterDownloader::DEFAULT_ROSTER_TYPE
 
-    if team_mlb_id.blank?
-      abort "Usage: bin/rails 'mlb_roster:sync[116,2026,2026-07-14]' or TEAM_MLB_ID=116 SEASON=2026 AS_OF=2026-07-14 bin/rails mlb_roster:sync"
-    end
+    abort "Usage: bin/rails 'mlb_roster:sync[116,2026]' or TEAM_MLB_ID=116 SEASON=2026 bin/rails mlb_roster:sync" if team_mlb_id.blank?
+    as_of = MlbRosterSyncBoundary.call(season: season)
 
-    puts "Synchronizing #{roster_type} roster for MLB team #{team_mlb_id} as of #{as_of}..."
+    puts "Synchronizing #{roster_type} roster for MLB team #{team_mlb_id} through #{as_of}..."
     result = MlbRosterSync.call(
       team_mlb_id: team_mlb_id,
       season: season,

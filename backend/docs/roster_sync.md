@@ -26,13 +26,15 @@ The team must already exist with the matching `teams.mlb_id`.
 
 ```sh
 bin/rails db:migrate
-bin/rails 'mlb_roster:sync[116,2026,2026-07-14]'
+bin/rails 'mlb_roster:sync[116,2026]'
 ```
 
 Environment variables are also supported:
 
 ```sh
-TEAM_MLB_ID=116 SEASON=2026 AS_OF=2026-07-14 ROSTER_TYPE=40Man bin/rails mlb_roster:sync
+TEAM_MLB_ID=116 SEASON=2026 ROSTER_TYPE=40Man bin/rails mlb_roster:sync
 ```
 
-For a queue-backed refresh, enqueue `MlbRosterSyncJob` with the same arguments.
+The synchronization boundary is derived from `SEASON`: completed seasons run through December 31 of that year, while the current season runs through `Date.current`. Future seasons are rejected.
+
+For a queue-backed refresh, enqueue `MlbRosterSyncJob` with `team_mlb_id`, `season`, and optionally `roster_type`; it applies the same automatic season boundary.

@@ -45,6 +45,7 @@ RSpec.describe AdminTaskRunner do
   end
 
   it "runs roster synchronization for a selected league" do
+    allow(Date).to receive(:current).and_return(Date.new(2026, 7, 15))
     allow(MlbRosterBatchSync).to receive(:call).and_return(
       success: true,
       message: "Synchronized 15 MLB team rosters",
@@ -57,7 +58,7 @@ RSpec.describe AdminTaskRunner do
         team_scope: "national",
         season: "2026",
         roster_type: "active",
-        as_of: "2026-07-15"
+        as_of: "2026-04-01"
       }
     )
 
@@ -68,6 +69,41 @@ RSpec.describe AdminTaskRunner do
       roster_type: "active",
       as_of: Date.new(2026, 7, 15)
     )
+  end
+
+  it "synchronizes a completed roster season through the end of that year" do
+    allow(Date).to receive(:current).and_return(Date.new(2026, 7, 15))
+    allow(MlbRosterBatchSync).to receive(:call).and_return(
+      success: true,
+      message: "Synchronized roster",
+      data: { team_count: 1 }
+    )
+
+    described_class.call(
+      task_name: "mlb_roster_sync",
+      params: { team_scope: "team", team_mlb_id: "116", season: "2025", roster_type: "40Man" }
+    )
+
+    expect(MlbRosterBatchSync).to have_received(:call).with(
+      scope: "team",
+      team_mlb_id: 116,
+      season: 2025,
+      roster_type: "40Man",
+      as_of: Date.new(2025, 12, 31)
+    )
+  end
+
+  it "rejects future roster seasons" do
+    allow(Date).to receive(:current).and_return(Date.new(2026, 7, 15))
+    allow(MlbRosterBatchSync).to receive(:call)
+
+    response = described_class.call(
+      task_name: "mlb_roster_sync",
+      params: { team_scope: "team", team_mlb_id: "116", season: "2027" }
+    )
+
+    expect(response).to include(success: false, message: "Season cannot be in the future")
+    expect(MlbRosterBatchSync).not_to have_received(:call)
   end
 
   it "rejects invalid or reversed schedule dates without calling the synchronizer" do

@@ -44,7 +44,6 @@ const rosterOptions = reactive({
   teamMlbId: '',
   season: currentSeason,
   rosterType: '40Man',
-  asOf: today,
 })
 
 const {
@@ -158,7 +157,6 @@ async function handleRosterSync() {
     team_mlb_id: rosterOptions.teamScope === 'team' ? rosterOptions.teamMlbId : null,
     season: rosterOptions.season,
     roster_type: rosterOptions.rosterType,
-    as_of: rosterOptions.asOf,
   })
 }
 
@@ -497,7 +495,7 @@ function formatCount(value) {
                 </option>
               </select>
             </label>
-            <label><span>Season</span><input v-model.number="rosterOptions.season" type="number" min="1876" required /></label>
+            <label><span>Season</span><input v-model.number="rosterOptions.season" type="number" min="1876" :max="currentSeason" required /></label>
             <label>
               <span>Roster type</span>
               <select v-model="rosterOptions.rosterType">
@@ -506,8 +504,10 @@ function formatCount(value) {
                 <option value="fullSeason">Full season</option>
               </select>
             </label>
-            <label><span>As of</span><input v-model="rosterOptions.asOf" type="date" required /></label>
           </div>
+          <p class="admin-card__hint" data-test="roster-coverage-policy">
+            Completed seasons synchronize through December 31. The current season synchronizes through today.
+          </p>
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_roster_sync' ? 'Synchronizing roster…' : 'Synchronize team roster' }}
           </button>
@@ -920,6 +920,12 @@ function formatCount(value) {
 
 .admin-field--wide {
   grid-column: span 2;
+}
+
+.admin-card__hint {
+  margin: -0.45rem 0 1rem;
+  color: #61707b;
+  font-size: 0.78rem;
 }
 
 .admin-button {

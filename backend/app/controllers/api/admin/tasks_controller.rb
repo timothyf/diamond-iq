@@ -40,8 +40,7 @@ module Api
           :team_scope,
           :team_mlb_id,
           :season,
-          :roster_type,
-          :as_of
+          :roster_type
         )
       end
 

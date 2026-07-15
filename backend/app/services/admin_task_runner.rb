@@ -72,13 +72,14 @@ class AdminTaskRunner
 
   def mlb_roster_sync
     scope = params[:team_scope].presence || "team"
+    season = positive_integer(:season, default: Date.current.year)
 
     MlbRosterBatchSync.call(
       scope: scope,
       team_mlb_id: optional_positive_integer(:team_mlb_id),
-      season: positive_integer(:season, default: Date.current.year),
+      season: season,
       roster_type: params[:roster_type].presence || MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
-      as_of: optional_date(:as_of) || Date.current
+      as_of: MlbRosterSyncBoundary.call(season: season)
     )
   end
 

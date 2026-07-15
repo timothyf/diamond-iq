@@ -119,6 +119,9 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('American League')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('National League')
     expect(wrapper.get('[data-test="roster-team"]').text()).toContain('DET · Detroit Tigers (AL)')
+    expect(wrapper.text()).not.toContain('As of')
+    expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain('Completed seasons')
+    expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain('through today')
     expect(wrapper.text()).toContain('Rebuild current player positions')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
@@ -153,5 +156,6 @@ describe('AdminView', () => {
       'mlb_roster_sync',
       expect.objectContaining({ team_scope: 'national', team_mlb_id: null }),
     )
+    expect(runTask.mock.calls.at(-1)[1]).not.toHaveProperty('as_of')
   })
 })
