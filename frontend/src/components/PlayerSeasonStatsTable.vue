@@ -167,7 +167,7 @@ function formatStatValue(columnKey, value) {
             <td class="season-cell is-numeric">{{ row.season }}</td>
             <td class="team-cell">
               <div class="primary-cell">
-                <strong>{{ row.team.abbreviation }}</strong>
+                <strong><a :href="`/teams/${row.team.id}`">{{ row.team.abbreviation }}</a></strong>
                 <span>{{ row.team.short_name || row.team.team_name || row.team.name }}</span>
               </div>
             </td>

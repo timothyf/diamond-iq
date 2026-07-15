@@ -6,10 +6,20 @@ module Api
 
     def show
       game = Game
-        .includes(:schedule, :home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
+        .includes(
+          :schedule,
+          :home_team,
+          :away_team,
+          :home_probable_pitcher,
+          :away_probable_pitcher,
+          game_player_batting_lines: [ :player, :team ],
+          game_player_pitching_lines: [ :player, :team ],
+          lineup_entries: [ :player, :team ],
+          plate_appearances: [ :batter, :pitcher, :batting_team, :fielding_team, :pitches ]
+        )
         .find(params[:id])
 
-      render json: { data: GameSerializer.call(game) }
+      render json: { data: GameSerializer.call(game).merge(details: GameDetailsSerializer.call(game)) }
     end
 
     def upcoming

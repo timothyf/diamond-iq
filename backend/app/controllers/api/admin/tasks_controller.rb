@@ -10,7 +10,8 @@ module Api
             mlb_teams: mlb_teams,
             database: database_metrics,
             player_season_stats: player_season_stats_metrics,
-            pitch_data: pitch_data_metrics
+            pitch_data: pitch_data_metrics,
+            game_details: game_details_metrics
           }
         }
       end
@@ -40,7 +41,8 @@ module Api
           :team_scope,
           :team_mlb_id,
           :season,
-          :snapshot_on
+          :snapshot_on,
+          :mlb_game_id
         )
       end
 
@@ -120,6 +122,22 @@ module Api
           earliest_game_date: earliest_date&.iso8601,
           latest_game_date: latest_date&.iso8601,
           approximate_row_count: approximate_row_count(PitchDatum)
+        }
+      end
+
+      def game_details_metrics
+        synchronized = Game.where.not(details_last_synced_at: nil)
+        dates = Game.arel_table
+        earliest_date, latest_date = synchronized.pick(dates[:official_date].minimum, dates[:official_date].maximum)
+
+        {
+          synchronized_game_count: synchronized.count,
+          earliest_game_date: earliest_date&.iso8601,
+          latest_game_date: latest_date&.iso8601,
+          batting_line_count: GamePlayerBattingLine.count,
+          pitching_line_count: GamePlayerPitchingLine.count,
+          plate_appearance_count: PlateAppearance.count,
+          linked_pitch_count: PitchDatum.where.not(plate_appearance_id: nil).count
         }
       end
 

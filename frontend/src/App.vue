@@ -14,6 +14,7 @@ import PlayerSearch from './components/PlayerSearch.vue'
     <PlayerSearch />
     <nav aria-label="Primary navigation">
       <RouterLink to="/">Stat board</RouterLink>
+      <RouterLink to="/teams">Teams</RouterLink>
       <RouterLink to="/admin">Admin</RouterLink>
     </nav>
   </header>

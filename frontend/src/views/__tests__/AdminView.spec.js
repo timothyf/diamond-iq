@@ -47,6 +47,15 @@ vi.mock('../../composables/useAdminTask', () => ({
       latestGameDate: '2026-05-31',
       approximateRowCount: 125000,
     })),
+    gameDetailsMetrics: computed(() => ({
+      synchronizedGameCount: 72,
+      earliestGameDate: '2026-03-26',
+      latestGameDate: '2026-05-31',
+      battingLineCount: 2100,
+      pitchingLineCount: 720,
+      plateAppearanceCount: 5400,
+      linkedPitchCount: 18000,
+    })),
     loadOverview,
     runTask,
   }),
@@ -129,6 +138,10 @@ describe('AdminView', () => {
     expect(wrapper.text()).toContain('Local file imports')
     expect(wrapper.text()).toContain('MLB schedule synchronization')
     expect(wrapper.get('[data-test="schedule-sync-form"]').text()).toContain('games, teams, venues, statuses, and probable pitchers')
+    expect(wrapper.get('[data-test="game-details-sync-form"]').text()).toContain('player game lines, batting orders, substitutions, plate appearances')
+    expect(wrapper.get('[data-test="game-details-coverage"]').text()).toContain('72')
+    expect(wrapper.get('[data-test="game-details-coverage"]').text()).toContain('5,400 plate appearances')
+    expect(wrapper.get('[data-test="game-details-coverage"]').text()).toContain('18,000 linked pitches')
     expect(wrapper.text()).toContain('MLB profile synchronization')
     expect(wrapper.get('[data-test="profile-sync-form"]').text()).toContain('biographical, handedness, position, and headshot information')
     expect(wrapper.text()).toContain('MLB 40-man roster synchronization')
@@ -166,6 +179,13 @@ describe('AdminView', () => {
       expect.objectContaining({ game_types: 'R', sport_id: 1 }),
     )
     expect(loadOverview).toHaveBeenCalledTimes(3)
+
+    await wrapper.get('[data-test="game-details-sync-form"]').trigger('submit')
+    expect(runTask).toHaveBeenCalledWith(
+      'mlb_game_details_sync',
+      expect.objectContaining({ start_date: expect.any(String), end_date: expect.any(String), mlb_game_id: null }),
+    )
+    expect(loadOverview).toHaveBeenCalledTimes(4)
 
     await wrapper.get('[data-test="profile-sync-form"]').trigger('submit')
     expect(runTask).toHaveBeenCalledWith(

@@ -139,7 +139,15 @@ function formatTimestamp(value) {
           <p class="eyebrow">Unified player profile · MLB {{ player.mlbId }}</p>
           <h1>{{ player.fullName }}</h1>
           <p class="profile-teamline">
-            <strong>{{ player.currentMembership?.team?.name || player.team?.name || 'Team unavailable' }}</strong>
+            <strong>
+              <RouterLink
+                v-if="player.currentMembership?.team?.id || player.team?.id"
+                :to="{ name: 'team-profile', params: { id: player.currentMembership?.team?.id || player.team?.id } }"
+              >
+                {{ player.currentMembership?.team?.name || player.team?.name }}
+              </RouterLink>
+              <template v-else>Team unavailable</template>
+            </strong>
             <span>{{ positionLabel }}</span>
             <span v-if="player.currentMembership?.jerseyNumber">#{{ player.currentMembership.jerseyNumber }}</span>
           </p>
@@ -257,7 +265,11 @@ function formatTimestamp(value) {
             <li v-for="membership in player.teamHistory" :key="membership.id">
               <span class="team-timeline__mark"></span>
               <div>
-                <strong>{{ membership.team?.name }}</strong>
+                <strong>
+                  <RouterLink v-if="membership.team?.id" :to="{ name: 'team-profile', params: { id: membership.team.id } }">
+                    {{ membership.team.name }}
+                  </RouterLink>
+                </strong>
                 <span>{{ formatDate(membership.startsOn) }} — {{ membership.endsOn ? formatDate(membership.endsOn) : 'Present' }}</span>
               </div>
               <small>{{ membership.sourceStatusDescription || titleize(membership.rosterStatus) }}</small>
@@ -371,6 +383,18 @@ function formatTimestamp(value) {
   gap: 0.45rem 0.8rem;
   margin-top: 1rem;
   color: #455563;
+}
+
+.profile-teamline a,
+.team-timeline a {
+  color: inherit;
+  text-decoration-color: #b79569;
+  text-underline-offset: 0.18em;
+}
+
+.profile-teamline a:hover,
+.team-timeline a:hover {
+  color: #8f2d24;
 }
 
 .profile-teamline span::before {

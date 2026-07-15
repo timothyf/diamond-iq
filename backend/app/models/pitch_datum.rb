@@ -4,6 +4,7 @@ class PitchDatum < ApplicationRecord
   self.inheritance_column = :_type_disabled
 
   belongs_to :game, optional: true, inverse_of: :pitches
+  belongs_to :plate_appearance, optional: true, inverse_of: :pitches
 
   validates :game_pk, presence: true
   validates :at_bat_number, presence: true

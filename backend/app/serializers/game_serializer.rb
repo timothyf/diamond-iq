@@ -29,6 +29,7 @@ class GameSerializer
       source_name: game.source_name,
       source_url: game.source_url,
       last_synced_at: game.last_synced_at,
+      details_last_synced_at: game.details_last_synced_at,
       created_at: game.created_at,
       updated_at: game.updated_at
     }

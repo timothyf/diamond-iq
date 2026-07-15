@@ -44,6 +44,42 @@ RSpec.describe AdminTaskRunner do
     )
   end
 
+  it "runs game-detail synchronization for a stored date range" do
+    allow(MlbGameDetailsBatchSync).to receive(:call).and_return(
+      success: true,
+      message: "Synchronized details for 3 of 3 MLB games",
+      data: { synchronized_game_count: 3 }
+    )
+
+    response = described_class.call(
+      task_name: "mlb_game_details_sync",
+      params: { start_date: "2026-07-15", end_date: "2026-07-17" }
+    )
+
+    expect(response).to include(success: true, task: "mlb_game_details_sync")
+    expect(MlbGameDetailsBatchSync).to have_received(:call).with(
+      start_date: Date.new(2026, 7, 15),
+      end_date: Date.new(2026, 7, 17),
+      mlb_game_id: nil
+    )
+  end
+
+  it "runs game-detail synchronization for one MLB game id" do
+    allow(MlbGameDetailsBatchSync).to receive(:call).and_return(
+      success: true,
+      message: "Synchronized details for 1 of 1 MLB games",
+      data: { synchronized_game_count: 1 }
+    )
+
+    described_class.call(task_name: "mlb_game_details_sync", params: { mlb_game_id: "823443" })
+
+    expect(MlbGameDetailsBatchSync).to have_received(:call).with(
+      start_date: nil,
+      end_date: nil,
+      mlb_game_id: 823_443
+    )
+  end
+
   it "runs roster synchronization for a selected league" do
     allow(Date).to receive(:current).and_return(Date.new(2026, 7, 15))
     allow(MlbRosterBatchSync).to receive(:call).and_return(

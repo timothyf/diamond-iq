@@ -19,6 +19,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data").pluck("id")).to contain_exactly(
       "mlb_schedule_sync",
+      "mlb_game_details_sync",
       "mlb_player_profiles_sync",
       "mlb_roster_sync",
       "mlb_roster_snapshots_sync",
@@ -58,6 +59,11 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "latest_game_date" => "2026-05-31"
     )
     expect(json_body.dig("meta", "pitch_data", "approximate_row_count")).to be_a(Integer)
+    expect(json_body.dig("meta", "game_details")).to include(
+      "synchronized_game_count" => 0,
+      "plate_appearance_count" => 0,
+      "linked_pitch_count" => 0
+    )
   end
 
   it "returns an empty schedule date range when no games are stored" do

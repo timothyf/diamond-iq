@@ -44,6 +44,15 @@ describe('useAdminTask', () => {
               latest_game_date: '2026-05-31',
               approximate_row_count: 125000,
             },
+            game_details: {
+              synchronized_game_count: 72,
+              earliest_game_date: '2026-03-26',
+              latest_game_date: '2026-05-31',
+              batting_line_count: 2100,
+              pitching_line_count: 720,
+              plate_appearance_count: 5400,
+              linked_pitch_count: 18000,
+            },
           },
         }),
       }),
@@ -56,6 +65,7 @@ describe('useAdminTask', () => {
       databaseMetrics,
       playerSeasonStatsMetrics,
       pitchDataMetrics,
+      gameDetailsMetrics,
       overviewError,
     } = useAdminTask()
 
@@ -92,6 +102,15 @@ describe('useAdminTask', () => {
       earliestGameDate: '2026-04-01',
       latestGameDate: '2026-05-31',
       approximateRowCount: 125000,
+    })
+    expect(gameDetailsMetrics.value).toEqual({
+      synchronizedGameCount: 72,
+      earliestGameDate: '2026-03-26',
+      latestGameDate: '2026-05-31',
+      battingLineCount: 2100,
+      pitchingLineCount: 720,
+      plateAppearanceCount: 5400,
+      linkedPitchCount: 18000,
     })
     expect(overviewError.value).toBe('')
   })

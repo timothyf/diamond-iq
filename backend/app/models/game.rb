@@ -5,6 +5,10 @@ class Game < ApplicationRecord
   belongs_to :home_probable_pitcher, class_name: "Player", optional: true
   belongs_to :away_probable_pitcher, class_name: "Player", optional: true
   has_many :pitches, class_name: "PitchDatum", dependent: :nullify, inverse_of: :game
+  has_many :plate_appearances, dependent: :destroy
+  has_many :game_player_batting_lines, dependent: :destroy
+  has_many :game_player_pitching_lines, dependent: :destroy
+  has_many :lineup_entries, dependent: :destroy
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :official_date, presence: true

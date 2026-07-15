@@ -16,6 +16,15 @@ export function useAdminTask() {
   const databaseMetrics = ref({ environment: '', adapter: '', sizeBytes: null })
   const playerSeasonStatsMetrics = ref({ earliestSeason: null, latestSeason: null, approximateRowCount: 0 })
   const pitchDataMetrics = ref({ earliestGameDate: null, latestGameDate: null, approximateRowCount: 0 })
+  const gameDetailsMetrics = ref({
+    synchronizedGameCount: 0,
+    earliestGameDate: null,
+    latestGameDate: null,
+    battingLineCount: 0,
+    pitchingLineCount: 0,
+    plateAppearanceCount: 0,
+    linkedPitchCount: 0,
+  })
 
   async function loadOverview() {
     overviewLoading.value = true
@@ -71,6 +80,16 @@ export function useAdminTask() {
         latestGameDate: pitchData.latest_game_date || null,
         approximateRowCount: Number(pitchData.approximate_row_count || 0),
       }
+      const gameDetails = payload?.meta?.game_details || {}
+      gameDetailsMetrics.value = {
+        synchronizedGameCount: Number(gameDetails.synchronized_game_count || 0),
+        earliestGameDate: gameDetails.earliest_game_date || null,
+        latestGameDate: gameDetails.latest_game_date || null,
+        battingLineCount: Number(gameDetails.batting_line_count || 0),
+        pitchingLineCount: Number(gameDetails.pitching_line_count || 0),
+        plateAppearanceCount: Number(gameDetails.plate_appearance_count || 0),
+        linkedPitchCount: Number(gameDetails.linked_pitch_count || 0),
+      }
       return payload
     } catch (overviewLoadError) {
       overviewError.value = overviewLoadError.message || 'Unable to load the admin overview.'
@@ -124,6 +143,7 @@ export function useAdminTask() {
     databaseMetrics: computed(() => databaseMetrics.value),
     playerSeasonStatsMetrics: computed(() => playerSeasonStatsMetrics.value),
     pitchDataMetrics: computed(() => pitchDataMetrics.value),
+    gameDetailsMetrics: computed(() => gameDetailsMetrics.value),
     loadOverview,
     runTask,
   }

@@ -13,6 +13,7 @@ class PitchDataImporter
     game_date
     game_pk
     game_id
+    plate_appearance_id
     game_type
     home_team
     away_team
@@ -167,6 +168,16 @@ class PitchDataImporter
 
     rows.each do |row|
       row[:game_id] = game_ids_by_mlb_id[row[:game_pk]]
+    end
+
+
+    plate_appearance_ids = PlateAppearance
+      .where(game_id: game_ids_by_mlb_id.values)
+      .pluck(:game_id, :plate_appearance_number, :id)
+      .to_h { |game_id, number, id| [ [ game_id, number ], id ] }
+
+    rows.each do |row|
+      row[:plate_appearance_id] = plate_appearance_ids[[ row[:game_id], row[:at_bat_number] ]]
     end
   end
 

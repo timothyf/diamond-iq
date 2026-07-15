@@ -89,6 +89,8 @@ For the Vue dashboard, expose the matching value as `VITE_ADMIN_API_TOKEN` so im
 ## API Endpoints
 
 - `GET /api/players`
+- `GET /api/teams`
+- `GET /api/teams/:id`
 - `GET /api/games`
 - `GET /api/games/:id`
 - `GET /api/games/upcoming`
@@ -198,6 +200,20 @@ GAME_TYPES=R SPORT_ID=1 bin/rails 'mlb_schedule:sync[2026-04-01,2026-04-30]'
 ```
 
 The synchronization preserves the raw MLB schedule and game payloads, resolves teams and available probable pitchers, and updates existing games by MLB game id without creating duplicates.
+
+After schedule records exist, synchronize box scores and live feeds for those games:
+
+```bash
+bin/rails 'mlb_game_details:sync[2026-04-01,2026-04-07]'
+```
+
+To refresh one stored game by its MLB game id:
+
+```bash
+MLB_GAME_ID=823443 bin/rails mlb_game_details:sync
+```
+
+Game-detail synchronization upserts batting lines, pitching lines, lineup entries, substitutions, and plate appearances. It also connects matching Statcast pitches through `game_pk` and `at_bat_number`. `GET /api/games/:id` returns the normalized box score and the game-to-plate-appearance-to-pitch drill-down.
 
 ## Tests
 

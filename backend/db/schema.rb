@@ -10,10 +10,88 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_162000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
+
+  create_table "game_player_batting_lines", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "player_id", null: false
+    t.bigint "team_id", null: false
+    t.bigint "opponent_team_id", null: false
+    t.boolean "home", null: false
+    t.boolean "starter", default: false, null: false
+    t.integer "batting_order"
+    t.string "position"
+    t.integer "plate_appearances"
+    t.integer "at_bats"
+    t.integer "runs"
+    t.integer "hits"
+    t.integer "doubles"
+    t.integer "triples"
+    t.integer "home_runs"
+    t.integer "runs_batted_in"
+    t.integer "walks"
+    t.integer "strikeouts"
+    t.integer "stolen_bases"
+    t.integer "caught_stealing"
+    t.decimal "batting_average", precision: 6, scale: 4
+    t.decimal "on_base_percentage", precision: 6, scale: 4
+    t.decimal "slugging_percentage", precision: 6, scale: 4
+    t.decimal "ops", precision: 6, scale: 4
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "player_id"], name: "idx_game_batting_lines_game_player", unique: true
+    t.index ["game_id"], name: "index_game_player_batting_lines_on_game_id"
+    t.index ["opponent_team_id"], name: "index_game_player_batting_lines_on_opponent_team_id"
+    t.index ["player_id", "game_id"], name: "idx_game_batting_lines_player_game"
+    t.index ["player_id"], name: "index_game_player_batting_lines_on_player_id"
+    t.index ["team_id"], name: "index_game_player_batting_lines_on_team_id"
+  end
+
+  create_table "game_player_pitching_lines", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "player_id", null: false
+    t.bigint "team_id", null: false
+    t.bigint "opponent_team_id", null: false
+    t.boolean "home", null: false
+    t.boolean "starter", default: false, null: false
+    t.integer "appearance_order"
+    t.string "innings_pitched"
+    t.integer "outs_recorded"
+    t.integer "batters_faced"
+    t.integer "hits"
+    t.integer "runs"
+    t.integer "earned_runs"
+    t.integer "home_runs"
+    t.integer "walks"
+    t.integer "strikeouts"
+    t.integer "pitches"
+    t.integer "strikes"
+    t.decimal "era", precision: 7, scale: 3
+    t.decimal "whip", precision: 7, scale: 3
+    t.string "decision"
+    t.integer "holds"
+    t.integer "saves"
+    t.integer "blown_saves"
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "player_id"], name: "idx_game_pitching_lines_game_player", unique: true
+    t.index ["game_id"], name: "index_game_player_pitching_lines_on_game_id"
+    t.index ["opponent_team_id"], name: "index_game_player_pitching_lines_on_opponent_team_id"
+    t.index ["player_id", "game_id"], name: "idx_game_pitching_lines_player_game"
+    t.index ["player_id"], name: "index_game_player_pitching_lines_on_player_id"
+    t.index ["team_id"], name: "index_game_player_pitching_lines_on_team_id"
+  end
 
   create_table "games", force: :cascade do |t|
     t.bigint "schedule_id", null: false
@@ -38,6 +116,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_162000) do
     t.jsonb "raw_data", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "details_source_url"
+    t.datetime "details_last_synced_at"
+    t.jsonb "boxscore_raw_data", default: {}, null: false
+    t.jsonb "live_feed_raw_data", default: {}, null: false
     t.index ["away_probable_pitcher_id"], name: "index_games_on_away_probable_pitcher_id"
     t.index ["away_team_id", "official_date"], name: "index_games_on_away_team_id_and_official_date"
     t.index ["away_team_id"], name: "index_games_on_away_team_id"
@@ -50,6 +132,29 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_162000) do
     t.check_constraint "away_score IS NULL OR away_score >= 0", name: "games_nonnegative_away_score"
     t.check_constraint "home_score IS NULL OR home_score >= 0", name: "games_nonnegative_home_score"
     t.check_constraint "home_team_id <> away_team_id", name: "games_distinct_teams"
+  end
+
+  create_table "lineup_entries", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "team_id", null: false
+    t.bigint "player_id", null: false
+    t.integer "batting_order"
+    t.integer "batting_slot"
+    t.boolean "starter", default: false, null: false
+    t.string "position"
+    t.jsonb "all_positions", default: [], null: false
+    t.jsonb "substitutions", default: [], null: false
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["game_id", "team_id", "batting_order"], name: "idx_lineup_entries_game_team_order"
+    t.index ["game_id", "team_id", "player_id"], name: "idx_lineup_entries_game_team_player", unique: true
+    t.index ["game_id"], name: "index_lineup_entries_on_game_id"
+    t.index ["player_id"], name: "index_lineup_entries_on_player_id"
+    t.index ["team_id"], name: "index_lineup_entries_on_team_id"
   end
 
   create_table "pitch_data", force: :cascade do |t|
@@ -179,12 +284,52 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_162000) do
     t.float "vz0"
     t.integer "woba_denom"
     t.bigint "game_id"
+    t.bigint "plate_appearance_id"
     t.index ["batter"], name: "index_pitch_data_on_batter"
     t.index ["game_date"], name: "index_pitch_data_on_game_date"
     t.index ["game_id"], name: "index_pitch_data_on_game_id"
     t.index ["game_pk", "at_bat_number", "pitch_number"], name: "idx_pitch_data_unique_pitch", unique: true
     t.index ["pitch_type"], name: "index_pitch_data_on_pitch_type"
     t.index ["pitcher"], name: "index_pitch_data_on_pitcher"
+    t.index ["plate_appearance_id", "pitch_number"], name: "index_pitch_data_on_plate_appearance_id_and_pitch_number"
+    t.index ["plate_appearance_id"], name: "index_pitch_data_on_plate_appearance_id"
+  end
+
+  create_table "plate_appearances", force: :cascade do |t|
+    t.bigint "game_id", null: false
+    t.bigint "batter_id"
+    t.bigint "pitcher_id"
+    t.bigint "batting_team_id"
+    t.bigint "fielding_team_id"
+    t.integer "at_bat_index", null: false
+    t.integer "plate_appearance_number", null: false
+    t.integer "inning"
+    t.string "half_inning"
+    t.string "event"
+    t.string "event_type"
+    t.text "description"
+    t.integer "runs_batted_in"
+    t.integer "away_score"
+    t.integer "home_score"
+    t.integer "outs_after"
+    t.boolean "complete", default: false, null: false
+    t.datetime "started_at"
+    t.datetime "ended_at"
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["batter_id", "game_id"], name: "index_plate_appearances_on_batter_id_and_game_id"
+    t.index ["batter_id"], name: "index_plate_appearances_on_batter_id"
+    t.index ["batting_team_id"], name: "index_plate_appearances_on_batting_team_id"
+    t.index ["fielding_team_id"], name: "index_plate_appearances_on_fielding_team_id"
+    t.index ["game_id", "at_bat_index"], name: "index_plate_appearances_on_game_id_and_at_bat_index", unique: true
+    t.index ["game_id", "plate_appearance_number"], name: "idx_plate_appearances_game_number", unique: true
+    t.index ["game_id"], name: "index_plate_appearances_on_game_id"
+    t.index ["pitcher_id", "game_id"], name: "index_plate_appearances_on_pitcher_id_and_game_id"
+    t.index ["pitcher_id"], name: "index_plate_appearances_on_pitcher_id"
   end
 
   create_table "player_positions", force: :cascade do |t|
@@ -411,12 +556,29 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_162000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  add_foreign_key "game_player_batting_lines", "games"
+  add_foreign_key "game_player_batting_lines", "players"
+  add_foreign_key "game_player_batting_lines", "teams"
+  add_foreign_key "game_player_batting_lines", "teams", column: "opponent_team_id"
+  add_foreign_key "game_player_pitching_lines", "games"
+  add_foreign_key "game_player_pitching_lines", "players"
+  add_foreign_key "game_player_pitching_lines", "teams"
+  add_foreign_key "game_player_pitching_lines", "teams", column: "opponent_team_id"
   add_foreign_key "games", "players", column: "away_probable_pitcher_id"
   add_foreign_key "games", "players", column: "home_probable_pitcher_id"
   add_foreign_key "games", "schedules"
   add_foreign_key "games", "teams", column: "away_team_id"
   add_foreign_key "games", "teams", column: "home_team_id"
+  add_foreign_key "lineup_entries", "games"
+  add_foreign_key "lineup_entries", "players"
+  add_foreign_key "lineup_entries", "teams"
   add_foreign_key "pitch_data", "games"
+  add_foreign_key "pitch_data", "plate_appearances"
+  add_foreign_key "plate_appearances", "games"
+  add_foreign_key "plate_appearances", "players", column: "batter_id"
+  add_foreign_key "plate_appearances", "players", column: "pitcher_id"
+  add_foreign_key "plate_appearances", "teams", column: "batting_team_id"
+  add_foreign_key "plate_appearances", "teams", column: "fielding_team_id"
   add_foreign_key "player_positions", "players"
   add_foreign_key "player_positions", "positions"
   add_foreign_key "player_profiles", "players"

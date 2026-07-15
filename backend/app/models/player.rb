@@ -12,6 +12,11 @@ class Player < ApplicationRecord
   has_many :roster_snapshots, through: :roster_snapshot_players
   has_many :home_probable_pitcher_games, class_name: "Game", foreign_key: :home_probable_pitcher_id, dependent: :nullify
   has_many :away_probable_pitcher_games, class_name: "Game", foreign_key: :away_probable_pitcher_id, dependent: :nullify
+  has_many :game_player_batting_lines, dependent: :destroy
+  has_many :game_player_pitching_lines, dependent: :destroy
+  has_many :batting_plate_appearances, class_name: "PlateAppearance", foreign_key: :batter_id, dependent: :nullify
+  has_many :pitching_plate_appearances, class_name: "PlateAppearance", foreign_key: :pitcher_id, dependent: :nullify
+  has_many :lineup_entries, dependent: :destroy
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :first_name, presence: true

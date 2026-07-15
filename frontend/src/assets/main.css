@@ -827,6 +827,19 @@
   font-size: 0.92rem;
 }
 
+.team-cell a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.team-cell a:hover,
+.team-cell a:focus-visible {
+  color: #f1d7a8;
+  text-decoration: underline;
+  text-decoration-color: #8f2d24;
+  text-underline-offset: 0.2em;
+}
+
 .team-cell .primary-cell span {
   max-width: 72px;
   overflow: hidden;

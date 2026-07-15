@@ -33,6 +33,12 @@ const scheduleOptions = reactive({
   sportId: 1,
 })
 
+const gameDetailsOptions = reactive({
+  startDate: today,
+  endDate: today,
+  mlbGameId: '',
+})
+
 const profileOptions = reactive({
   onlyMissing: true,
   batchSize: 50,
@@ -63,6 +69,7 @@ const {
   databaseMetrics,
   playerSeasonStatsMetrics,
   pitchDataMetrics,
+  gameDetailsMetrics,
   loadOverview,
   runTask,
 } = useAdminTask()
@@ -157,6 +164,16 @@ async function handleScheduleSync() {
     end_date: scheduleOptions.endDate,
     game_types: scheduleOptions.gameTypes,
     sport_id: scheduleOptions.sportId,
+  })
+  if (result) await loadOverview()
+}
+
+async function handleGameDetailsSync() {
+  normalizeDateRange(gameDetailsOptions)
+  const result = await runTask('mlb_game_details_sync', {
+    start_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.startDate,
+    end_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.endDate,
+    mlb_game_id: gameDetailsOptions.mlbGameId || null,
   })
   if (result) await loadOverview()
 }
@@ -488,6 +505,45 @@ function formatCount(value) {
           </div>
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_schedule_sync' ? 'Synchronizing schedule…' : 'Synchronize schedule' }}
+          </button>
+        </form>
+
+        <form class="admin-card" data-test="game-details-sync-form" @submit.prevent="handleGameDetailsSync">
+          <div class="admin-card__title">
+            <div>
+              <p>Box scores & live feeds</p>
+              <h3>MLB game detail synchronization</h3>
+            </div>
+            <code>mlb_game_details:sync</code>
+          </div>
+          <p class="admin-card__description">
+            Downloads player game lines, batting orders, substitutions, plate appearances, and links matching Statcast pitches.
+          </p>
+          <div class="data-coverage" data-test="game-details-coverage">
+            <span>Currently stored</span>
+            <dl v-if="gameDetailsMetrics.synchronizedGameCount">
+              <div>
+                <dt>Games synchronized</dt>
+                <dd>{{ formatCount(gameDetailsMetrics.synchronizedGameCount) }}</dd>
+              </div>
+              <div>
+                <dt>Game-date span</dt>
+                <dd>{{ formatDate(gameDetailsMetrics.earliestGameDate) }}–{{ formatDate(gameDetailsMetrics.latestGameDate) }}</dd>
+              </div>
+            </dl>
+            <p v-else>No game box scores or live feeds have been synchronized.</p>
+            <small>
+              {{ formatCount(gameDetailsMetrics.plateAppearanceCount) }} plate appearances ·
+              {{ formatCount(gameDetailsMetrics.linkedPitchCount) }} linked pitches
+            </small>
+          </div>
+          <div class="admin-fields admin-fields--three">
+            <label><span>Start date</span><input v-model="gameDetailsOptions.startDate" type="date" :disabled="Boolean(gameDetailsOptions.mlbGameId)" /></label>
+            <label><span>End date</span><input v-model="gameDetailsOptions.endDate" type="date" :disabled="Boolean(gameDetailsOptions.mlbGameId)" /></label>
+            <label><span>MLB game ID (optional)</span><input v-model="gameDetailsOptions.mlbGameId" type="number" min="1" placeholder="823443" /></label>
+          </div>
+          <button class="admin-button" type="submit" :disabled="anyActionRunning">
+            {{ runningTask === 'mlb_game_details_sync' ? 'Synchronizing game details…' : 'Synchronize game details' }}
           </button>
         </form>
 

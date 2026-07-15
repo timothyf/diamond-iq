@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     end
 
     resources :players, only: [:index, :show]
+    resources :teams, only: [:index, :show]
     resources :positions, only: [:index]
     resources :games, only: [:index, :show] do
       collection do

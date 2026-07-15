@@ -4,6 +4,10 @@ class AdminTaskRunner
       name: "MLB schedule sync",
       description: "Download schedules and upsert games, teams, venues, and probable pitchers."
     },
+    "mlb_game_details_sync" => {
+      name: "MLB game details sync",
+      description: "Download box scores and live feeds, then upsert player lines, lineups, plate appearances, and pitch links."
+    },
     "mlb_player_profiles_sync" => {
       name: "MLB player profile sync",
       description: "Download MLB profiles for existing players, including bio, handedness, and position data."
@@ -63,6 +67,16 @@ class AdminTaskRunner
       game_types: params[:game_types].presence || MlbScheduleDownloader::DEFAULT_GAME_TYPES,
       sport_id: positive_integer(:sport_id, default: 1)
     )
+  end
+
+  def mlb_game_details_sync
+    mlb_game_id = optional_positive_integer(:mlb_game_id)
+    start_date = optional_date(:start_date)
+    end_date = optional_date(:end_date) || start_date
+    raise ArgumentError, "Start date or MLB game id is required" if start_date.nil? && mlb_game_id.nil?
+    raise ArgumentError, "End date must be on or after start date" if start_date && end_date < start_date
+
+    MlbGameDetailsBatchSync.call(start_date: start_date, end_date: end_date, mlb_game_id: mlb_game_id)
   end
 
   def mlb_player_profiles_sync

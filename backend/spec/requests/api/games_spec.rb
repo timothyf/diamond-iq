@@ -92,6 +92,68 @@ RSpec.describe "Api::Games", type: :request do
     expect(json_body.dig("data", "schedule", "source_key")).to eq("mlb:schedule:1:2026:R")
   end
 
+  it "returns normalized box-score and plate-appearance drill-down data" do
+    @game.update!(
+      details_source_url: "https://statsapi.mlb.com/api/v1.1/game/823443/feed/live",
+      details_last_synced_at: Time.zone.parse("2026-07-14T23:00:00Z")
+    )
+    GamePlayerBattingLine.create!(
+      game: @game,
+      player: @skubal,
+      team: @tigers,
+      opponent_team: @guardians,
+      home: true,
+      starter: true,
+      batting_order: 900,
+      at_bats: 3,
+      hits: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+    appearance = PlateAppearance.create!(
+      game: @game,
+      batter: @skubal,
+      pitcher: @bibee,
+      batting_team: @tigers,
+      fielding_team: @guardians,
+      at_bat_index: 0,
+      plate_appearance_number: 1,
+      inning: 1,
+      half_inning: "bottom",
+      event: "Single",
+      event_type: "single",
+      complete: true,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+    PitchDatum.create!(
+      game: @game,
+      plate_appearance: appearance,
+      game_pk: @game.mlb_id,
+      at_bat_number: 1,
+      pitch_number: 1,
+      pitch_type: "FF",
+      release_speed: 96.4,
+      raw_data: { "pitch_type" => "FF" }
+    )
+
+    get api_game_path(@game)
+
+    expect(json_body.dig("data", "details")).to include(
+      "synchronized" => true,
+      "last_synced_at" => "2026-07-14T23:00:00.000Z"
+    )
+    expect(json_body.dig("data", "details", "batting_lines", 0, "player", "full_name")).to eq("Tarik Skubal")
+    expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
+      "event_type" => "single",
+      "plate_appearance_number" => 1
+    )
+    expect(json_body.dig("data", "details", "plate_appearances", 0, "pitches", 0)).to include(
+      "pitch_type" => "FF",
+      "release_speed" => 96.4
+    )
+  end
+
   it "returns future preview and scheduled games from the upcoming endpoint" do
     upcoming_game = create_game(
       schedule: @schedule,
