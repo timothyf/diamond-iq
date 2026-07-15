@@ -172,7 +172,11 @@ module TestDataHelper
     Roster.create!(
       {
         team: team,
-        season: season
+        season: season,
+        roster_type: "40Man",
+        snapshot_on: Date.current,
+        source_name: "derived_team_memberships",
+        last_synced_at: Time.current
       }.merge(attributes)
     )
   end

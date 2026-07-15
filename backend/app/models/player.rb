@@ -16,10 +16,24 @@ class Player < ApplicationRecord
   validates :last_name, presence: true
 
   def full_name
-    [first_name, last_name].compact.join(" ")
+    [ first_name, last_name ].compact.join(" ")
   end
 
   def primary_position(season: nil)
     player_positions.includes(:position).find_by(season: season, is_primary: true)&.position
+  end
+
+  # players.team_id is a denormalized current-team cache. Historical and
+  # date-specific team ownership must always be read from TeamMembership.
+  def current_team_membership(on: Date.current)
+    team_memberships.active_on(on).includes(:team).to_a.min_by do |membership|
+      [ MlbRosterStatus.priority(membership.roster_status), -membership.starts_on.jd, membership.id ]
+    end
+  end
+
+  def refresh_current_team!(on: Date.current)
+    membership = current_team_membership(on: on)
+    update!(team: membership.team) if membership.present? && team_id != membership.team_id
+    membership&.team
   end
 end

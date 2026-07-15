@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_14_004000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_14_005000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -297,6 +297,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_004000) do
     t.integer "season", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "roster_type", default: "40Man", null: false
+    t.date "snapshot_on", null: false
+    t.string "source_name", default: "derived_team_memberships", null: false
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
     t.index ["team_id", "season"], name: "index_rosters_on_team_id_and_season", unique: true
     t.index ["team_id"], name: "index_rosters_on_team_id"
   end
@@ -340,6 +345,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_14_004000) do
     t.datetime "last_synced_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "source_status_code"
+    t.string "source_status_description"
+    t.string "source_url"
+    t.jsonb "raw_data", default: {}, null: false
     t.index ["player_id", "team_id", "starts_on"], name: "index_team_memberships_on_player_team_start"
     t.index ["player_id"], name: "index_team_memberships_on_player_id"
     t.index ["roster_status"], name: "index_team_memberships_on_roster_status"

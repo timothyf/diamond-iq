@@ -1,4 +1,6 @@
 class TeamMembership < ApplicationRecord
+  SOURCE_OF_TRUTH = true
+
   belongs_to :player
   belongs_to :team
 
@@ -11,6 +13,10 @@ class TeamMembership < ApplicationRecord
 
   scope :active_on, ->(date) { where("starts_on <= ? AND (ends_on IS NULL OR ends_on >= ?)", date, date) }
   scope :current, -> { active_on(Date.current) }
+
+  def injured?
+    MlbRosterStatus.injured?(roster_status)
+  end
 
   private
 
