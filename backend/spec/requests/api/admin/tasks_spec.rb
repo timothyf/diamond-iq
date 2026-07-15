@@ -7,6 +7,12 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     create_game(schedule: early_schedule, official_date: Date.new(2026, 3, 26))
     create_game(schedule: late_schedule, official_date: Date.new(2026, 9, 22))
     tigers = create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
+    player = create_player(team: tigers)
+    stat_type = create_stat_type
+    create_player_season_stat(player: player, stat_type: stat_type, attributes: { season: 1901 })
+    create_player_season_stat(player: player, stat_type: stat_type, attributes: { season: 2026 })
+    PitchDatum.create!(game_pk: 700_001, at_bat_number: 1, pitch_number: 1, game_date: Date.new(2026, 4, 1), raw_data: { "pitch" => 1 })
+    PitchDatum.create!(game_pk: 700_002, at_bat_number: 1, pitch_number: 1, game_date: Date.new(2026, 5, 31), raw_data: { "pitch" => 2 })
 
     get api_admin_tasks_path
 
@@ -41,6 +47,16 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "adapter" => "PostgreSQL"
     )
     expect(json_body.dig("meta", "database", "size_bytes")).to be_positive
+    expect(json_body.dig("meta", "player_season_stats")).to include(
+      "earliest_season" => 1901,
+      "latest_season" => 2026
+    )
+    expect(json_body.dig("meta", "player_season_stats", "approximate_row_count")).to be_a(Integer)
+    expect(json_body.dig("meta", "pitch_data")).to include(
+      "earliest_game_date" => "2026-04-01",
+      "latest_game_date" => "2026-05-31"
+    )
+    expect(json_body.dig("meta", "pitch_data", "approximate_row_count")).to be_a(Integer)
   end
 
   it "returns an empty schedule date range when no games are stored" do

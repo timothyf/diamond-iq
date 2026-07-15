@@ -35,6 +35,16 @@ vi.mock('../../composables/useAdminTask', () => ({
       adapter: 'PostgreSQL',
       sizeBytes: 536870912,
     })),
+    playerSeasonStatsMetrics: computed(() => ({
+      earliestSeason: 1876,
+      latestSeason: 2026,
+      approximateRowCount: 4649481,
+    })),
+    pitchDataMetrics: computed(() => ({
+      earliestGameDate: '2026-04-01',
+      latestGameDate: '2026-05-31',
+      approximateRowCount: 125000,
+    })),
     loadOverview,
     runTask,
   }),
@@ -95,6 +105,12 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('PostgreSQL footprint')
     expect(wrapper.text()).toContain('Player season statistics')
     expect(wrapper.text()).toContain('Statcast pitch data')
+    expect(wrapper.get('[data-test="player-season-stats-coverage"]').text()).toContain('1876')
+    expect(wrapper.get('[data-test="player-season-stats-coverage"]').text()).toContain('2026')
+    expect(wrapper.get('[data-test="player-season-stats-coverage"]').text()).toContain('4,649,481 stat rows')
+    expect(wrapper.get('[data-test="pitch-data-coverage"]').text()).toContain('Apr 1, 2026')
+    expect(wrapper.get('[data-test="pitch-data-coverage"]').text()).toContain('May 31, 2026')
+    expect(wrapper.get('[data-test="pitch-data-coverage"]').text()).toContain('125,000 pitch rows')
     expect(wrapper.text()).toContain('Local file imports')
     expect(wrapper.text()).toContain('MLB schedule synchronization')
     expect(wrapper.text()).toContain('MLB profile synchronization')
@@ -123,7 +139,7 @@ describe('AdminView', () => {
       'mlb_schedule_sync',
       expect.objectContaining({ game_types: 'R', sport_id: 1 }),
     )
-    expect(loadOverview).toHaveBeenCalledTimes(2)
+    expect(loadOverview).toHaveBeenCalledTimes(3)
 
     await wrapper.get('[data-test="profile-sync-form"]').trigger('submit')
     expect(runTask).toHaveBeenCalledWith(

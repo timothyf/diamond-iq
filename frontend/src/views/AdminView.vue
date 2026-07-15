@@ -57,6 +57,8 @@ const {
   scheduleDateRange,
   mlbTeams,
   databaseMetrics,
+  playerSeasonStatsMetrics,
+  pitchDataMetrics,
   loadOverview,
   runTask,
 } = useAdminTask()
@@ -120,12 +122,14 @@ function normalizeDateRange(options) {
 
 async function handleStatsDownload() {
   normalizeYearRange(statsOptions)
-  await downloadStats(statsOptions)
+  const result = await downloadStats(statsOptions)
+  if (result) await loadOverview()
 }
 
 async function handlePitchDownload() {
   normalizeDateRange(pitchOptions)
-  await downloadPitchData(pitchOptions)
+  const result = await downloadPitchData(pitchOptions)
+  if (result) await loadOverview()
 }
 
 async function handleScheduleSync() {
@@ -159,11 +163,13 @@ async function handleRosterSync() {
 }
 
 async function handleStatsImport({ file, replaceSeason }) {
-  await importStatsFile(file, { replaceSeason })
+  const result = await importStatsFile(file, { replaceSeason })
+  if (result) await loadOverview()
 }
 
 async function handlePitchImport({ file }) {
-  await importPitchFile(file)
+  const result = await importPitchFile(file)
+  if (result) await loadOverview()
 }
 
 function humanize(value) {
@@ -202,6 +208,11 @@ function formatBytes(value) {
 
   const precision = unitIndex < 2 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2
   return `${amount.toFixed(precision)} ${units[unitIndex]}`
+}
+
+function formatCount(value) {
+  if (!Number.isFinite(value)) return 'Unavailable'
+  return new Intl.NumberFormat('en-US').format(value)
 }
 </script>
 
@@ -247,6 +258,21 @@ function formatBytes(value) {
             </div>
             <span class="admin-chip">Download + import</span>
           </div>
+          <div class="data-coverage" data-test="player-season-stats-coverage">
+            <span>Currently stored</span>
+            <dl v-if="playerSeasonStatsMetrics.earliestSeason && playerSeasonStatsMetrics.latestSeason">
+              <div>
+                <dt>From season</dt>
+                <dd>{{ playerSeasonStatsMetrics.earliestSeason }}</dd>
+              </div>
+              <div>
+                <dt>Through season</dt>
+                <dd>{{ playerSeasonStatsMetrics.latestSeason }}</dd>
+              </div>
+            </dl>
+            <p v-else>No player season statistics are currently stored.</p>
+            <small>Approximately {{ formatCount(playerSeasonStatsMetrics.approximateRowCount) }} stat rows</small>
+          </div>
           <div class="admin-fields admin-fields--four">
             <label>
               <span>Category</span>
@@ -283,6 +309,21 @@ function formatBytes(value) {
               <h3>Statcast pitch data</h3>
             </div>
             <span class="admin-chip">Download + import</span>
+          </div>
+          <div class="data-coverage" data-test="pitch-data-coverage">
+            <span>Currently stored</span>
+            <dl v-if="pitchDataMetrics.earliestGameDate && pitchDataMetrics.latestGameDate">
+              <div>
+                <dt>Earliest game</dt>
+                <dd>{{ formatDate(pitchDataMetrics.earliestGameDate) }}</dd>
+              </div>
+              <div>
+                <dt>Latest game</dt>
+                <dd>{{ formatDate(pitchDataMetrics.latestGameDate) }}</dd>
+              </div>
+            </dl>
+            <p v-else>No Statcast pitch data is currently stored.</p>
+            <small>Approximately {{ formatCount(pitchDataMetrics.approximateRowCount) }} pitch rows</small>
           </div>
           <div class="admin-fields admin-fields--four">
             <label>
@@ -723,6 +764,48 @@ function formatBytes(value) {
   font-size: 0.68rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.data-coverage {
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 14px;
+  background: rgba(231, 237, 241, 0.7);
+}
+
+.data-coverage > span,
+.data-coverage dt {
+  color: #61707b;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.data-coverage dl {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.45rem;
+}
+
+.data-coverage dd {
+  color: #10263d;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.data-coverage p,
+.data-coverage small {
+  display: block;
+  margin-top: 0.35rem;
+  color: #53616b;
+  font-size: 0.78rem;
+}
+
+.data-coverage small {
+  color: #6b7780;
 }
 
 .schedule-coverage {

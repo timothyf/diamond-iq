@@ -34,11 +34,30 @@ describe('useAdminTask', () => {
               adapter: 'PostgreSQL',
               size_bytes: 536870912,
             },
+            player_season_stats: {
+              earliest_season: 1876,
+              latest_season: 2026,
+              approximate_row_count: 4649481,
+            },
+            pitch_data: {
+              earliest_game_date: '2026-04-01',
+              latest_game_date: '2026-05-31',
+              approximate_row_count: 125000,
+            },
           },
         }),
       }),
     )
-    const { loadOverview, scheduleImportRange, scheduleDateRange, mlbTeams, databaseMetrics, overviewError } = useAdminTask()
+    const {
+      loadOverview,
+      scheduleImportRange,
+      scheduleDateRange,
+      mlbTeams,
+      databaseMetrics,
+      playerSeasonStatsMetrics,
+      pitchDataMetrics,
+      overviewError,
+    } = useAdminTask()
 
     await loadOverview()
 
@@ -63,6 +82,16 @@ describe('useAdminTask', () => {
       environment: 'development',
       adapter: 'PostgreSQL',
       sizeBytes: 536870912,
+    })
+    expect(playerSeasonStatsMetrics.value).toEqual({
+      earliestSeason: 1876,
+      latestSeason: 2026,
+      approximateRowCount: 4649481,
+    })
+    expect(pitchDataMetrics.value).toEqual({
+      earliestGameDate: '2026-04-01',
+      latestGameDate: '2026-05-31',
+      approximateRowCount: 125000,
     })
     expect(overviewError.value).toBe('')
   })

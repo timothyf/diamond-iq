@@ -14,6 +14,8 @@ export function useAdminTask() {
   const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
   const mlbTeams = ref([])
   const databaseMetrics = ref({ environment: '', adapter: '', sizeBytes: null })
+  const playerSeasonStatsMetrics = ref({ earliestSeason: null, latestSeason: null, approximateRowCount: 0 })
+  const pitchDataMetrics = ref({ earliestGameDate: null, latestGameDate: null, approximateRowCount: 0 })
 
   async function loadOverview() {
     overviewLoading.value = true
@@ -56,6 +58,18 @@ export function useAdminTask() {
           Number.isFinite(Number(database.size_bytes))
             ? Number(database.size_bytes)
             : null,
+      }
+      const playerSeasonStats = payload?.meta?.player_season_stats || {}
+      playerSeasonStatsMetrics.value = {
+        earliestSeason: playerSeasonStats.earliest_season ?? null,
+        latestSeason: playerSeasonStats.latest_season ?? null,
+        approximateRowCount: Number(playerSeasonStats.approximate_row_count || 0),
+      }
+      const pitchData = payload?.meta?.pitch_data || {}
+      pitchDataMetrics.value = {
+        earliestGameDate: pitchData.earliest_game_date || null,
+        latestGameDate: pitchData.latest_game_date || null,
+        approximateRowCount: Number(pitchData.approximate_row_count || 0),
       }
       return payload
     } catch (overviewLoadError) {
@@ -108,6 +122,8 @@ export function useAdminTask() {
     scheduleDateRange: computed(() => scheduleDateRange.value),
     mlbTeams: computed(() => mlbTeams.value),
     databaseMetrics: computed(() => databaseMetrics.value),
+    playerSeasonStatsMetrics: computed(() => playerSeasonStatsMetrics.value),
+    pitchDataMetrics: computed(() => pitchDataMetrics.value),
     loadOverview,
     runTask,
   }

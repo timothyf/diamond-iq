@@ -8,7 +8,9 @@ module Api
             schedule_import_range: schedule_import_range,
             schedule_date_range: schedule_date_range,
             mlb_teams: mlb_teams,
-            database: database_metrics
+            database: database_metrics,
+            player_season_stats: player_season_stats_metrics,
+            pitch_data: pitch_data_metrics
           }
         }
       end
@@ -98,6 +100,37 @@ module Api
         return unless connection.adapter_name.downcase.include?("postgres")
 
         connection.select_value("SELECT pg_database_size(current_database())").to_i
+      end
+
+      def player_season_stats_metrics
+        stats = PlayerSeasonStat.arel_table
+        earliest_season, latest_season = PlayerSeasonStat.pick(stats[:season].minimum, stats[:season].maximum)
+
+        {
+          earliest_season: earliest_season,
+          latest_season: latest_season,
+          approximate_row_count: approximate_row_count(PlayerSeasonStat)
+        }
+      end
+
+      def pitch_data_metrics
+        pitches = PitchDatum.arel_table
+        earliest_date, latest_date = PitchDatum.pick(pitches[:game_date].minimum, pitches[:game_date].maximum)
+
+        {
+          earliest_game_date: earliest_date&.iso8601,
+          latest_game_date: latest_date&.iso8601,
+          approximate_row_count: approximate_row_count(PitchDatum)
+        }
+      end
+
+      def approximate_row_count(model)
+        connection = ActiveRecord::Base.connection
+        return model.count unless connection.adapter_name.downcase.include?("postgres")
+
+        table_name = connection.quote(model.table_name)
+        estimate = connection.select_value("SELECT reltuples::bigint FROM pg_class WHERE oid = #{table_name}::regclass").to_i
+        [ estimate, 0 ].max
       end
     end
   end
