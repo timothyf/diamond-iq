@@ -41,6 +41,7 @@ const PITCHING_INTEGER_STAT_KEYS = new Set(['W', 'L', 'G', 'GS', 'CG', 'ShO', 'S
 const fixedColumns = [
   { key: 'rank', label: '#', align: 'numeric', sortable: false },
   { key: 'player_name', label: 'Player' },
+  { key: 'season', label: 'Season', align: 'numeric' },
   { key: 'team_name', label: 'Team' },
 ]
 
@@ -161,9 +162,9 @@ function formatStatValue(columnKey, value) {
             <td class="player-cell">
               <div class="primary-cell">
                 <a class="player-profile-link" :href="`/players/${row.player.id}`">{{ row.player.full_name }}</a>
-                <span>{{ row.season }} Season</span>
               </div>
             </td>
+            <td class="season-cell is-numeric">{{ row.season }}</td>
             <td class="team-cell">
               <div class="primary-cell">
                 <strong>{{ row.team.abbreviation }}</strong>

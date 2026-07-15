@@ -34,9 +34,32 @@ RSpec.describe PlayersIndexQuery, type: :model do
       create_player(team: team, attributes: { mlb_id: 408234, first_name: "Miguel", last_name: "Cabrera" })
       create_player(team: team, attributes: { mlb_id: 545361, first_name: "Mike", last_name: "Trout" })
 
-      expect(described_class.new(params: { filter: { name: "mig" } }).results.map(&:first_name)).to eq(["Miguel"])
-      expect(described_class.new(params: { filter: { name: "out" } }).results.map(&:last_name)).to eq(["Trout"])
-      expect(described_class.new(params: { filter: { name: "Miguel Cabrera" } }).results.map(&:last_name)).to eq(["Cabrera"])
+      expect(described_class.new(params: { filter: { name: "mig" } }).results.map(&:first_name)).to eq([ "Miguel" ])
+      expect(described_class.new(params: { filter: { name: "out" } }).results.map(&:last_name)).to eq([ "Trout" ])
+      expect(described_class.new(params: { filter: { name: "Miguel Cabrera" } }).results.map(&:last_name)).to eq([ "Cabrera" ])
+    end
+
+    it "normalizes reordered, punctuated, and compact player names" do
+      team = create_team
+      judge = create_player(team: team, attributes: { mlb_id: 592450, first_name: "Aaron", last_name: "Judge" })
+      oneill = create_player(team: team, attributes: { mlb_id: 641933, first_name: "Tyler", last_name: "O'Neill" })
+      create_player(team: team, attributes: { mlb_id: 545361, first_name: "Mike", last_name: "Trout" })
+
+      reordered = described_class.new(params: { filter: { name: "  Judge,   Aaron " } })
+      compact = described_class.new(params: { filter: { name: "oneill" } })
+
+      expect(reordered.results).to eq([ judge ])
+      expect(reordered.metadata[:filters]).to eq(name: "Judge Aaron")
+      expect(compact.results).to eq([ oneill ])
+    end
+
+    it "does not treat punctuation-only name input as an unfiltered request" do
+      create_player
+
+      query = described_class.new(params: { filter: { name: "%_--" } })
+
+      expect(query.results).to be_empty
+      expect(query.metadata[:total_count]).to eq(0)
     end
   end
 end

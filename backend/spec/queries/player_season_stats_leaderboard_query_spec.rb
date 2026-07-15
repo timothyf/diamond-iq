@@ -296,6 +296,19 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
     ])
   end
 
+  it "sorts leaderboard rows by season when requested" do
+    older_player = create_player(attributes: { first_name: "Older", last_name: "Season" })
+    newer_player = create_player(attributes: { first_name: "Newer", last_name: "Season" })
+    home_runs = create_stat_type(name: "homeRuns", label: "HR", category: "batting")
+    create_player_season_stat(player: older_player, stat_type: home_runs, attributes: { season: 2024, value: 20 })
+    create_player_season_stat(player: newer_player, stat_type: home_runs, attributes: { season: 2026, value: 18 })
+
+    query = described_class.new(params: { sort: "-season", filter: { category: "batting" } })
+
+    expect(query.results.map { |row| row[:season] }).to eq([ 2026, 2024 ])
+    expect(query.metadata[:sort]).to eq("-season")
+  end
+
   it "uses the MLB-style pitching column order and labels" do
     query = described_class.new(
       params: {

@@ -52,6 +52,8 @@ describe('PlayerSeasonStatsTable', () => {
     expect(wrapper.text()).toContain('25 total matching players')
     expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
     expect(wrapper.text()).toContain('Miguel Cabrera')
+    expect(wrapper.get('.season-cell').text()).toBe('2024')
+    expect(wrapper.get('.player-cell').text()).not.toContain('2024')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('150')
     expect(wrapper.text()).toContain('24')
@@ -79,6 +81,17 @@ describe('PlayerSeasonStatsTable', () => {
     await valueHeader.trigger('click')
 
     expect(wrapper.emitted('sort-change')).toEqual([['-ops']])
+  })
+
+  it('emits a descending season sort when the season header is clicked', async () => {
+    const wrapper = mount(PlayerSeasonStatsTable, {
+      props: buildProps({ sort: '-homeRuns' }),
+    })
+
+    const seasonHeader = wrapper.findAll('th button').find((button) => button.text().includes('Season'))
+    await seasonHeader.trigger('click')
+
+    expect(wrapper.emitted('sort-change')).toEqual([['-season']])
   })
 
   it('adds an active class to the currently sorted column header', () => {
