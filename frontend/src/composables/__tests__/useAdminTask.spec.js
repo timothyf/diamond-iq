@@ -4,6 +4,41 @@ import { vi } from 'vitest'
 import { useAdminTask } from '../useAdminTask'
 
 describe('useAdminTask', () => {
+  it('loads the stored schedule date range from the admin overview', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: [],
+          meta: {
+            schedule_import_range: {
+              earliest_import_date: '2026-03-26',
+              latest_import_date: '2026-05-31',
+            },
+            schedule_date_range: {
+              earliest_game_date: '2026-03-26',
+              latest_game_date: '2026-09-22',
+            },
+          },
+        }),
+      }),
+    )
+    const { loadOverview, scheduleImportRange, scheduleDateRange, overviewError } = useAdminTask()
+
+    await loadOverview()
+
+    expect(scheduleImportRange.value).toEqual({
+      earliestImportDate: '2026-03-26',
+      latestImportDate: '2026-05-31',
+    })
+    expect(scheduleDateRange.value).toEqual({
+      earliestGameDate: '2026-03-26',
+      latestGameDate: '2026-09-22',
+    })
+    expect(overviewError.value).toBe('')
+  })
+
   it('runs an allowlisted backend task and stores its result', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

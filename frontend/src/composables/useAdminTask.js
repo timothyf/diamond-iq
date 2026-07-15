@@ -8,6 +8,43 @@ export function useAdminTask() {
   const runningTask = ref('')
   const error = ref('')
   const lastResult = ref(null)
+  const overviewLoading = ref(false)
+  const overviewError = ref('')
+  const scheduleImportRange = ref({ earliestImportDate: null, latestImportDate: null })
+  const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
+
+  async function loadOverview() {
+    overviewLoading.value = true
+    overviewError.value = ''
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/tasks`, {
+        headers: { Accept: 'application/json' },
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload?.message || `Admin overview failed with status ${response.status}.`)
+      }
+
+      const range = payload?.meta?.schedule_date_range || {}
+      const importRange = payload?.meta?.schedule_import_range || {}
+      scheduleImportRange.value = {
+        earliestImportDate: importRange.earliest_import_date || null,
+        latestImportDate: importRange.latest_import_date || null,
+      }
+      scheduleDateRange.value = {
+        earliestGameDate: range.earliest_game_date || null,
+        latestGameDate: range.latest_game_date || null,
+      }
+      return payload
+    } catch (overviewLoadError) {
+      overviewError.value = overviewLoadError.message || 'Unable to load the admin overview.'
+      return null
+    } finally {
+      overviewLoading.value = false
+    }
+  }
 
   async function runTask(taskName, parameters = {}) {
     runningTask.value = taskName
@@ -45,6 +82,11 @@ export function useAdminTask() {
     runningTask: computed(() => runningTask.value),
     error: computed(() => error.value),
     lastResult: computed(() => lastResult.value),
+    overviewLoading: computed(() => overviewLoading.value),
+    overviewError: computed(() => overviewError.value),
+    scheduleImportRange: computed(() => scheduleImportRange.value),
+    scheduleDateRange: computed(() => scheduleDateRange.value),
+    loadOverview,
     runTask,
   }
 }

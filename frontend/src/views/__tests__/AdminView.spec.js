@@ -9,12 +9,24 @@ const downloadStats = vi.fn()
 const downloadPitchData = vi.fn()
 const importStatsFile = vi.fn()
 const importPitchFile = vi.fn()
+const loadOverview = vi.fn()
 
 vi.mock('../../composables/useAdminTask', () => ({
   useAdminTask: () => ({
     runningTask: computed(() => ''),
     error: computed(() => ''),
     lastResult: ref(null),
+    overviewLoading: computed(() => false),
+    overviewError: computed(() => ''),
+    scheduleImportRange: computed(() => ({
+      earliestImportDate: '2026-03-26',
+      latestImportDate: '2026-05-31',
+    })),
+    scheduleDateRange: computed(() => ({
+      earliestGameDate: '2026-03-26',
+      latestGameDate: '2026-09-22',
+    })),
+    loadOverview,
     runTask,
   }),
 }))
@@ -62,6 +74,7 @@ describe('AdminView', () => {
     downloadPitchData.mockReset().mockResolvedValue({ success: true })
     importStatsFile.mockReset().mockResolvedValue({ success: true })
     importPitchFile.mockReset().mockResolvedValue({ success: true })
+    loadOverview.mockReset().mockResolvedValue({ success: true })
   })
 
   it('centralizes imports, downloads, and Rake-backed synchronization features', () => {
@@ -75,6 +88,10 @@ describe('AdminView', () => {
     expect(wrapper.text()).toContain('MLB profile synchronization')
     expect(wrapper.text()).toContain('MLB team roster synchronization')
     expect(wrapper.text()).toContain('Rebuild current player positions')
+    expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
+    expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
+    expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Stored game-date span')
+    expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Sep 22, 2026')
   })
 
   it('submits download and synchronization forms through their existing services', async () => {
@@ -90,6 +107,7 @@ describe('AdminView', () => {
       'mlb_schedule_sync',
       expect.objectContaining({ game_types: 'R', sport_id: 1 }),
     )
+    expect(loadOverview).toHaveBeenCalledTimes(2)
 
     await wrapper.get('[data-test="profile-sync-form"]').trigger('submit')
     expect(runTask).toHaveBeenCalledWith(

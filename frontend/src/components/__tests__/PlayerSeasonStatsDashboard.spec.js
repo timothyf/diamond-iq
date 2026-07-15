@@ -8,10 +8,6 @@ import { usePitchData } from '../../composables/usePitchData'
 
 const refreshSpy = vi.fn()
 const refreshPitchDataSpy = vi.fn()
-const importFileSpy = vi.fn()
-const importPitchDataFileSpy = vi.fn()
-const downloadStatsSpy = vi.fn()
-const downloadPitchDataSpy = vi.fn()
 
 vi.mock('../../composables/usePlayerSeasonStats', () => ({
   usePlayerSeasonStats: vi.fn(() => ({
@@ -114,75 +110,18 @@ vi.mock('../../composables/usePitchData', () => ({
   })),
 }))
 
-vi.mock('../../composables/usePlayerSeasonStatsImport', () => ({
-  usePlayerSeasonStatsImport: vi.fn(() => ({
-    uploading: computed(() => false),
-    error: computed(() => ''),
-    summary: computed(() => ''),
-    importFile: importFileSpy,
-  })),
-}))
-
-vi.mock('../../composables/usePitchDataDownload', () => ({
-  usePitchDataDownload: vi.fn(() => ({
-    downloading: computed(() => false),
-    error: computed(() => ''),
-    summary: computed(() => ''),
-    downloadPitchData: downloadPitchDataSpy,
-  })),
-}))
-
-vi.mock('../../composables/usePlayerSeasonStatsDownload', () => ({
-  usePlayerSeasonStatsDownload: vi.fn(() => ({
-    downloading: computed(() => false),
-    error: computed(() => ''),
-    summary: computed(() => ''),
-    downloadStats: downloadStatsSpy,
-  })),
-}))
-
-vi.mock('../../composables/usePitchDataImport', () => ({
-  usePitchDataImport: vi.fn(() => ({
-    uploading: computed(() => false),
-    error: computed(() => ''),
-    summary: computed(() => ''),
-    importFile: importPitchDataFileSpy,
-  })),
-}))
-
 describe('PlayerSeasonStatsDashboard', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/')
     refreshSpy.mockClear()
     refreshPitchDataSpy.mockClear()
     usePitchData.mockClear()
-    importFileSpy.mockReset()
-    importPitchDataFileSpy.mockReset()
-    downloadStatsSpy.mockReset()
-    downloadPitchDataSpy.mockReset()
-    importFileSpy.mockResolvedValue({
-      message: 'Imported 1 player season stats',
-      data: { imported_count: 1 },
-    })
-    importPitchDataFileSpy.mockResolvedValue({
-      message: 'Imported 1 pitch data rows',
-      data: { imported_count: 1 },
-    })
-    downloadStatsSpy.mockResolvedValue({
-      message: 'Imported 2 player season stats',
-      data: { imported_count: 2, downloaded_count: 1 },
-    })
-    downloadPitchDataSpy.mockResolvedValue({
-      message: 'Imported 1 pitch data rows',
-      data: { imported_count: 1, downloaded_count: 1 },
-    })
   })
 
   it('renders the table controls and summary metrics', () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
 
     expect(wrapper.text()).toContain('Player Season Stat Board')
-    expect(wrapper.text()).toContain('Data import')
     expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
     expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')
@@ -368,16 +307,6 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(pitcherInput.element.value).toBe('')
   })
 
-  it('opens the import drawer from the table header action', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
-
-    const importButton = wrapper.find('[data-test="open-import-panel"]')
-    await importButton.trigger('click')
-
-    expect(wrapper.text()).toContain('Import CSV Data')
-    expect(wrapper.text()).toContain('CSV Import')
-  })
-
   it('updates and resets the filter summary', async () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
 
@@ -473,128 +402,13 @@ describe('PlayerSeasonStatsDashboard', () => {
     expect(refreshSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('downloads MLB stats and refreshes the leaderboard', async () => {
+  it('keeps data import and download actions off the stat board', () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
 
-    await wrapper.find('[data-test="mlb-download-category"]').setValue('pitching')
-    await wrapper.find('[data-test="mlb-download-start-year"]').setValue('2025')
-    await wrapper.find('[data-test="mlb-download-end-year"]').setValue('2026')
-    await wrapper.find('[data-test="mlb-download-panel"]').trigger('submit')
-    await flushPromises()
-    await nextTick()
-
-    expect(downloadStatsSpy).toHaveBeenCalledWith({
-      category: 'pitching',
-      startYear: 2025,
-      endYear: 2026,
-      replaceSeason: true,
-    })
-    expect(refreshSpy).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Pitching Leaderboard')
-  })
-
-  it('downloads pitch data and refreshes the pitch feed', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
-
-    await wrapper.find('[data-test="mlb-download-category"]').setValue('pitchData')
-    await nextTick()
-
-    expect(wrapper.text()).toContain('Download Pitch Data')
-    expect(wrapper.find('[data-test="mlb-download-start-date"]').exists()).toBe(true)
-    expect(wrapper.find('[data-test="mlb-download-start-year"]').exists()).toBe(false)
-
-    await wrapper.find('[data-test="mlb-download-start-date"]').setValue('2026-04-01')
-    await wrapper.find('[data-test="mlb-download-end-date"]').setValue('2026-04-02')
-    await wrapper.find('[data-test="mlb-download-game-types"]').setValue('R,F')
-    await wrapper.find('[data-test="mlb-download-chunk-days"]').setValue(3)
-    await wrapper.find('[data-test="mlb-download-panel"]').trigger('submit')
-    await flushPromises()
-    await nextTick()
-
-    expect(downloadPitchDataSpy).toHaveBeenCalledWith({
-      startDate: '2026-04-01',
-      endDate: '2026-04-02',
-      gameTypes: 'R,F',
-      chunkDays: 3,
-    })
-    expect(refreshPitchDataSpy).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).toContain('Pitch Data Feed')
-    expect(wrapper.text()).toContain('Game Dates: 2026-04-01 to 2026-04-02')
-  })
-
-  it('updates the import status when a csv file is selected', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
-    const openImportButton = wrapper.find('[data-test="open-import-panel"]')
-    await openImportButton.trigger('click')
-
-    const file = new File(['season,player'], 'season-stats.csv', { type: 'text/csv' })
-    const input = wrapper.find('input[type="file"]')
-
-    Object.defineProperty(input.element, 'files', {
-      configurable: true,
-      value: [file],
-    })
-
-    await input.trigger('change')
-    await nextTick()
-
-    expect(wrapper.text()).toContain('season-stats.csv is selected and ready to import.')
-  })
-
-  it('uploads the selected csv and refreshes the board', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
-    const openImportButton = wrapper.find('[data-test="open-import-panel"]')
-    await openImportButton.trigger('click')
-
-    const file = new File(['season,player'], 'season-stats.csv', { type: 'text/csv' })
-    const input = wrapper.find('input[type="file"]')
-
-    Object.defineProperty(input.element, 'files', {
-      configurable: true,
-      value: [file],
-    })
-
-    await input.trigger('change')
-    await nextTick()
-
-    const importButton = wrapper.find('[data-test="execute-import"]')
-    await importButton.trigger('click')
-    await flushPromises()
-    await nextTick()
-
-    expect(importFileSpy).toHaveBeenCalledWith(file, { replaceSeason: false })
-    expect(refreshSpy).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).not.toContain('Import CSV Data')
-  })
-
-  it('uploads a pitch csv from the unified import drawer', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
-
-    const openImportButton = wrapper.find('[data-test="open-import-panel"]')
-    await openImportButton.trigger('click')
-    await nextTick()
-
-    expect(wrapper.text()).toContain('Import CSV Data')
-
-    const file = new File(['game_pk,at_bat_number,pitch_number'], 'pitch-data.csv', { type: 'text/csv' })
-    const input = wrapper.find('input[type="file"]')
-
-    Object.defineProperty(input.element, 'files', {
-      configurable: true,
-      value: [file],
-    })
-
-    await input.trigger('change')
-    await nextTick()
-
-    const importButton = wrapper.find('[data-test="execute-import"]')
-    await importButton.trigger('click')
-    await flushPromises()
-    await nextTick()
-
-    expect(importPitchDataFileSpy).toHaveBeenCalledWith(file)
-    expect(refreshPitchDataSpy).toHaveBeenCalledTimes(1)
-    expect(wrapper.text()).not.toContain('Import CSV Data')
+    expect(wrapper.find('[data-test="mlb-download-panel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="open-import-panel"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Download MLB Data')
+    expect(wrapper.text()).not.toContain('Import CSV')
   })
 
   it('renders the pitch data table when pitch data category is selected', async () => {

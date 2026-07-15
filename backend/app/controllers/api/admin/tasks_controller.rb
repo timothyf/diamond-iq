@@ -2,7 +2,13 @@ module Api
   module Admin
     class TasksController < ApplicationController
       def index
-        render json: { data: AdminTaskRunner.catalog }
+        render json: {
+          data: AdminTaskRunner.catalog,
+          meta: {
+            schedule_import_range: schedule_import_range,
+            schedule_date_range: schedule_date_range
+          }
+        }
       end
 
       def run
@@ -40,6 +46,26 @@ module Api
           success: result[:success],
           message: result[:message],
           data: result[:data]
+        }
+      end
+
+      def schedule_date_range
+        games = Game.arel_table
+        earliest_date, latest_date = Game.pick(games[:official_date].minimum, games[:official_date].maximum)
+
+        {
+          earliest_game_date: earliest_date&.iso8601,
+          latest_game_date: latest_date&.iso8601
+        }
+      end
+
+      def schedule_import_range
+        schedules = Schedule.arel_table
+        earliest_date, latest_date = Schedule.pick(schedules[:start_date].minimum, schedules[:end_date].maximum)
+
+        {
+          earliest_import_date: earliest_date&.iso8601,
+          latest_import_date: latest_date&.iso8601
         }
       end
     end

@@ -2,6 +2,11 @@ require "rails_helper"
 
 RSpec.describe "Api::Admin::Tasks", type: :request do
   it "lists the admin tasks exposed through the API" do
+    early_schedule = create_schedule(start_date: Date.new(2026, 3, 26), end_date: Date.new(2026, 4, 7))
+    late_schedule = create_schedule(start_date: Date.new(2026, 5, 2), end_date: Date.new(2026, 5, 31))
+    create_game(schedule: early_schedule, official_date: Date.new(2026, 3, 26))
+    create_game(schedule: late_schedule, official_date: Date.new(2026, 9, 22))
+
     get api_admin_tasks_path
 
     expect(response).to have_http_status(:ok)
@@ -10,6 +15,28 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "mlb_player_profiles_sync",
       "mlb_roster_sync",
       "player_positions_backfill"
+    )
+    expect(json_body.dig("meta", "schedule_date_range")).to eq(
+      "earliest_game_date" => "2026-03-26",
+      "latest_game_date" => "2026-09-22"
+    )
+    expect(json_body.dig("meta", "schedule_import_range")).to eq(
+      "earliest_import_date" => "2026-03-26",
+      "latest_import_date" => "2026-05-31"
+    )
+  end
+
+  it "returns an empty schedule date range when no games are stored" do
+    get api_admin_tasks_path
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "schedule_date_range")).to eq(
+      "earliest_game_date" => nil,
+      "latest_game_date" => nil
+    )
+    expect(json_body.dig("meta", "schedule_import_range")).to eq(
+      "earliest_import_date" => nil,
+      "latest_import_date" => nil
     )
   end
 

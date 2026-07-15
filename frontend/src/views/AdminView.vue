@@ -1,5 +1,5 @@
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, onMounted, reactive } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import { useAdminTask } from '../composables/useAdminTask'
@@ -46,7 +46,17 @@ const rosterOptions = reactive({
   asOf: today,
 })
 
-const { runningTask, error: taskError, lastResult, runTask } = useAdminTask()
+const {
+  runningTask,
+  error: taskError,
+  lastResult,
+  overviewLoading,
+  overviewError,
+  scheduleImportRange,
+  scheduleDateRange,
+  loadOverview,
+  runTask,
+} = useAdminTask()
 const {
   downloading: statsDownloading,
   error: statsDownloadError,
@@ -88,6 +98,15 @@ const resultEntries = computed(() => {
     .slice(0, 8)
 })
 
+const hasStoredGames = computed(
+  () => Boolean(scheduleDateRange.value.earliestGameDate && scheduleDateRange.value.latestGameDate),
+)
+const hasImportedSchedule = computed(
+  () => Boolean(scheduleImportRange.value.earliestImportDate && scheduleImportRange.value.latestImportDate),
+)
+
+onMounted(loadOverview)
+
 function normalizeYearRange(options) {
   if (Number(options.startYear) > Number(options.endYear)) options.endYear = options.startYear
 }
@@ -108,12 +127,13 @@ async function handlePitchDownload() {
 
 async function handleScheduleSync() {
   normalizeDateRange(scheduleOptions)
-  await runTask('mlb_schedule_sync', {
+  const result = await runTask('mlb_schedule_sync', {
     start_date: scheduleOptions.startDate,
     end_date: scheduleOptions.endDate,
     game_types: scheduleOptions.gameTypes,
     sport_id: scheduleOptions.sportId,
   })
+  if (result) await loadOverview()
 }
 
 async function handleProfileSync() {
@@ -154,6 +174,15 @@ function formatTimestamp(value) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(value))
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(`${value}T12:00:00`))
 }
 </script>
 
@@ -309,6 +338,40 @@ function formatTimestamp(value) {
               <h3>MLB schedule synchronization</h3>
             </div>
             <code>mlb_schedule:sync</code>
+          </div>
+          <div class="schedule-coverage" data-test="schedule-date-range">
+            <p v-if="overviewLoading">Loading stored dates…</p>
+            <p v-else-if="overviewError" class="schedule-coverage__error">{{ overviewError }}</p>
+            <div v-else class="schedule-coverage__ranges">
+              <section class="schedule-coverage__range">
+                <span>Imported schedule coverage</span>
+                <dl v-if="hasImportedSchedule">
+                  <div>
+                    <dt>From</dt>
+                    <dd>{{ formatDate(scheduleImportRange.earliestImportDate) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Through</dt>
+                    <dd>{{ formatDate(scheduleImportRange.latestImportDate) }}</dd>
+                  </div>
+                </dl>
+                <p v-else>No schedule windows have been imported.</p>
+              </section>
+              <section class="schedule-coverage__range">
+                <span>Stored game-date span</span>
+                <dl v-if="hasStoredGames">
+                  <div>
+                    <dt>Earliest game</dt>
+                    <dd>{{ formatDate(scheduleDateRange.earliestGameDate) }}</dd>
+                  </div>
+                  <div>
+                    <dt>Latest game</dt>
+                    <dd>{{ formatDate(scheduleDateRange.latestGameDate) }}</dd>
+                  </div>
+                </dl>
+                <p v-else>No games are currently stored.</p>
+              </section>
+            </div>
           </div>
           <div class="admin-fields admin-fields--four">
             <label><span>Start date</span><input v-model="scheduleOptions.startDate" type="date" required /></label>
@@ -580,6 +643,66 @@ function formatTimestamp(value) {
   white-space: nowrap;
 }
 
+.schedule-coverage {
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 14px;
+  background: rgba(231, 237, 241, 0.7);
+}
+
+.schedule-coverage__ranges {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.schedule-coverage__range {
+  min-width: 0;
+}
+
+.schedule-coverage__range + .schedule-coverage__range {
+  padding-left: 0.9rem;
+  border-left: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.schedule-coverage__range > span,
+.schedule-coverage dt {
+  color: #61707b;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.schedule-coverage > p,
+.schedule-coverage__range > p {
+  margin-top: 0.35rem;
+  color: #53616b;
+  font-size: 0.84rem;
+}
+
+.schedule-coverage dl {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.45rem;
+}
+
+.schedule-coverage dl div {
+  min-width: 0;
+}
+
+.schedule-coverage dd {
+  color: #10263d;
+  font-size: 0.98rem;
+  font-weight: 850;
+}
+
+.schedule-coverage .schedule-coverage__error {
+  color: #992e26;
+}
+
 .admin-fields {
   position: relative;
   display: grid;
@@ -775,6 +898,17 @@ function formatTimestamp(value) {
 
   .admin-field--wide {
     grid-column: auto;
+  }
+
+  .schedule-coverage__ranges {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-coverage__range + .schedule-coverage__range {
+    padding-top: 0.9rem;
+    padding-left: 0;
+    border-top: 1px solid rgba(16, 38, 61, 0.1);
+    border-left: 0;
   }
 
   .admin-card__title {
