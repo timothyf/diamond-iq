@@ -21,6 +21,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "mlb_schedule_sync",
       "mlb_player_profiles_sync",
       "mlb_roster_sync",
+      "mlb_roster_snapshots_sync",
       "player_positions_backfill"
     )
     expect(json_body.dig("meta", "schedule_date_range")).to eq(

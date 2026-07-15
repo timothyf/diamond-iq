@@ -38,3 +38,23 @@ TEAM_MLB_ID=116 SEASON=2026 ROSTER_TYPE=40Man bin/rails mlb_roster:sync
 The synchronization boundary is derived from `SEASON`: completed seasons run through December 31 of that year, while the current season runs through `Date.current`. Future seasons are rejected.
 
 For a queue-backed refresh, enqueue `MlbRosterSyncJob` with `team_mlb_id`, `season`, and optionally `roster_type`; it applies the same automatic season boundary.
+
+## Dated Active and 40-man snapshots
+
+`RosterSnapshot` and `RosterSnapshotPlayer` preserve exact MLB roster responses independently of `TeamMembership` and the legacy `Roster` cache. A snapshot is uniquely identified by team, date, and roster type. Capturing the same date again replaces its player entries and raw response, while snapshots from other dates remain unchanged.
+
+The Admin task `mlb_roster_snapshots_sync` downloads both the `active` and `40Man` views for one team and date. Both downloads must succeed before either snapshot is written. Snapshot capture never opens, closes, or changes a `TeamMembership` window.
+
+The same capture can be run directly:
+
+```sh
+bin/rails 'mlb_roster_snapshots:sync[116,2026-07-15]'
+```
+
+Stored snapshots can be retrieved with:
+
+```text
+GET /api/roster_snapshots?team_mlb_id=116&on=2026-07-15
+```
+
+This endpoint performs an exact-date lookup and reports either roster view that has not yet been stored in `meta.missing_roster_types`.

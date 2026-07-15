@@ -40,7 +40,7 @@ module Api
           :team_scope,
           :team_mlb_id,
           :season,
-          :roster_type
+          :snapshot_on
         )
       end
 

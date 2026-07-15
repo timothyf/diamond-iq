@@ -3,6 +3,7 @@ class Team < ApplicationRecord
   has_many :team_memberships, dependent: :destroy
   has_many :membership_players, through: :team_memberships, source: :player
   has_many :rosters, dependent: :destroy
+  has_many :roster_snapshots, dependent: :destroy
   has_many :home_games, class_name: "Game", foreign_key: :home_team_id, inverse_of: :home_team, dependent: :restrict_with_error
   has_many :away_games, class_name: "Game", foreign_key: :away_team_id, inverse_of: :away_team, dependent: :restrict_with_error
 

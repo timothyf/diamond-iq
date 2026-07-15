@@ -9,8 +9,12 @@ class AdminTaskRunner
       description: "Download MLB profiles for existing players, including bio, handedness, and position data."
     },
     "mlb_roster_sync" => {
-      name: "MLB roster sync",
-      description: "Download one or more team rosters and update player profiles and historical memberships."
+      name: "MLB 40-man roster sync",
+      description: "Download one or more 40-man rosters and update the current roster state and player profiles."
+    },
+    "mlb_roster_snapshots_sync" => {
+      name: "MLB dated roster snapshots",
+      description: "Store independent Active and 40-man snapshots for a team and date without changing membership history."
     },
     "player_positions_backfill" => {
       name: "Player position backfill",
@@ -78,13 +82,20 @@ class AdminTaskRunner
       scope: scope,
       team_mlb_id: optional_positive_integer(:team_mlb_id),
       season: season,
-      roster_type: params[:roster_type].presence || MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
+      roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
       as_of: MlbRosterSyncBoundary.call(season: season)
     )
   end
 
   def player_positions_backfill
     PlayerPositionsBackfill.call
+  end
+
+  def mlb_roster_snapshots_sync
+    MlbRosterSnapshotSync.call(
+      team_mlb_id: positive_integer(:team_mlb_id, required: true),
+      snapshot_on: required_date(:snapshot_on)
+    )
   end
 
   def required_date(key)

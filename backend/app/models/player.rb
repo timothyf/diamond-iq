@@ -8,6 +8,8 @@ class Player < ApplicationRecord
   has_many :positions, through: :player_positions
   has_many :roster_players, dependent: :destroy
   has_many :rosters, through: :roster_players
+  has_many :roster_snapshot_players, dependent: :nullify
+  has_many :roster_snapshots, through: :roster_snapshot_players
   has_many :home_probable_pitcher_games, class_name: "Game", foreign_key: :home_probable_pitcher_id, dependent: :nullify
   has_many :away_probable_pitcher_games, class_name: "Game", foreign_key: :away_probable_pitcher_id, dependent: :nullify
 

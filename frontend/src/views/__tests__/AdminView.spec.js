@@ -1,5 +1,5 @@
 import { computed, ref } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, vi } from 'vitest'
 
 import AdminView from '../AdminView.vue'
@@ -10,6 +10,8 @@ const downloadPitchData = vi.fn()
 const importStatsFile = vi.fn()
 const importPitchFile = vi.fn()
 const loadOverview = vi.fn()
+const loadSnapshots = vi.fn()
+const rosterSnapshots = ref([])
 
 vi.mock('../../composables/useAdminTask', () => ({
   useAdminTask: () => ({
@@ -86,6 +88,15 @@ vi.mock('../../composables/usePitchDataImport', () => ({
   }),
 }))
 
+vi.mock('../../composables/useRosterSnapshots', () => ({
+  useRosterSnapshots: () => ({
+    snapshots: computed(() => rosterSnapshots.value),
+    loading: computed(() => false),
+    error: computed(() => ''),
+    loadSnapshots,
+  }),
+}))
+
 describe('AdminView', () => {
   beforeEach(() => {
     runTask.mockReset().mockResolvedValue({ success: true })
@@ -94,6 +105,8 @@ describe('AdminView', () => {
     importStatsFile.mockReset().mockResolvedValue({ success: true })
     importPitchFile.mockReset().mockResolvedValue({ success: true })
     loadOverview.mockReset().mockResolvedValue({ success: true })
+    loadSnapshots.mockReset().mockResolvedValue({ data: [] })
+    rosterSnapshots.value = []
   })
 
   it('centralizes imports, downloads, and Rake-backed synchronization features', () => {
@@ -114,14 +127,19 @@ describe('AdminView', () => {
     expect(wrapper.text()).toContain('Local file imports')
     expect(wrapper.text()).toContain('MLB schedule synchronization')
     expect(wrapper.text()).toContain('MLB profile synchronization')
-    expect(wrapper.text()).toContain('MLB team roster synchronization')
+    expect(wrapper.text()).toContain('MLB 40-man roster synchronization')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('All MLB teams')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('American League')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('National League')
     expect(wrapper.get('[data-test="roster-team"]').text()).toContain('DET · Detroit Tigers (AL)')
     expect(wrapper.text()).not.toContain('As of')
+    expect(wrapper.text()).not.toContain('Roster type')
+    expect(wrapper.text()).not.toContain('Full season')
     expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain('Completed seasons')
-    expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain('through today')
+    expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain("40-man roster only")
+    expect(wrapper.get('[data-test="roster-coverage-policy"]').text()).toContain('transaction-based workflow')
+    expect(wrapper.get('[data-test="roster-snapshot-workspace"]').text()).toContain('Active and 40-man roster snapshots')
+    expect(wrapper.get('[data-test="roster-snapshot-workspace"]').text()).toContain('without changing historical team memberships')
     expect(wrapper.text()).toContain('Rebuild current player positions')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
@@ -157,5 +175,47 @@ describe('AdminView', () => {
       expect.objectContaining({ team_scope: 'national', team_mlb_id: null }),
     )
     expect(runTask.mock.calls.at(-1)[1]).not.toHaveProperty('as_of')
+    expect(runTask.mock.calls.at(-1)[1]).not.toHaveProperty('roster_type')
+
+    await wrapper.get('[data-test="snapshot-team"]').setValue('116')
+    await wrapper.get('[data-test="roster-snapshot-form"]').trigger('submit')
+    await flushPromises()
+    expect(runTask).toHaveBeenLastCalledWith(
+      'mlb_roster_snapshots_sync',
+      expect.objectContaining({ team_mlb_id: '116', snapshot_on: expect.any(String) }),
+    )
+    expect(loadSnapshots).toHaveBeenCalledWith(
+      expect.objectContaining({ teamMlbId: '116', on: expect.any(String) }),
+    )
+  })
+
+  it('displays stored Active and 40-man snapshot players', async () => {
+    rosterSnapshots.value = [
+      {
+        id: 1,
+        roster_type: 'active',
+        snapshot_on: '2026-07-15',
+        source_name: 'MLB Stats API',
+        last_synced_at: '2026-07-15T12:00:00Z',
+        players: [{ mlb_id: 592450, player_id: 9, full_name: 'Aaron Judge', jersey_number: '99', position_code: 'RF', status_description: 'Active' }],
+      },
+      {
+        id: 2,
+        roster_type: '40Man',
+        snapshot_on: '2026-07-15',
+        source_name: 'MLB Stats API',
+        last_synced_at: '2026-07-15T12:00:00Z',
+        players: [{ mlb_id: 605280, player_id: null, full_name: 'Test Pitcher', jersey_number: '50', position_code: 'P', status_description: 'Minors' }],
+      },
+    ]
+
+    const wrapper = mount(AdminView)
+    await wrapper.vm.$nextTick()
+
+    const workspace = wrapper.get('[data-test="roster-snapshot-workspace"]')
+    expect(workspace.text()).toContain('Active roster')
+    expect(workspace.text()).toContain('40-man roster')
+    expect(workspace.text()).toContain('Aaron Judge')
+    expect(workspace.text()).toContain('Test Pitcher')
   })
 })

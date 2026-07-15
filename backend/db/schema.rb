@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_15_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -293,6 +293,43 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_000000) do
     t.index ["roster_id"], name: "index_roster_players_on_roster_id"
   end
 
+  create_table "roster_snapshot_players", force: :cascade do |t|
+    t.bigint "roster_snapshot_id", null: false
+    t.bigint "player_id"
+    t.integer "mlb_id", null: false
+    t.string "full_name", null: false
+    t.string "first_name"
+    t.string "last_name"
+    t.string "jersey_number"
+    t.string "position_code"
+    t.string "position_name"
+    t.string "status_code"
+    t.string "status_description"
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mlb_id"], name: "index_roster_snapshot_players_on_mlb_id"
+    t.index ["player_id"], name: "index_roster_snapshot_players_on_player_id"
+    t.index ["roster_snapshot_id", "mlb_id"], name: "index_roster_snapshot_players_on_snapshot_and_mlb_id", unique: true
+    t.index ["roster_snapshot_id"], name: "index_roster_snapshot_players_on_roster_snapshot_id"
+  end
+
+  create_table "roster_snapshots", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.integer "season", null: false
+    t.string "roster_type", null: false
+    t.date "snapshot_on", null: false
+    t.string "source_name", default: "MLB Stats API", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["snapshot_on", "roster_type"], name: "index_roster_snapshots_on_snapshot_on_and_roster_type"
+    t.index ["team_id", "snapshot_on", "roster_type"], name: "index_roster_snapshots_on_team_date_and_type", unique: true
+    t.index ["team_id"], name: "index_roster_snapshots_on_team_id"
+  end
+
   create_table "rosters", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.integer "season", null: false
@@ -388,6 +425,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_000000) do
   add_foreign_key "players", "teams"
   add_foreign_key "roster_players", "players"
   add_foreign_key "roster_players", "rosters"
+  add_foreign_key "roster_snapshot_players", "players"
+  add_foreign_key "roster_snapshot_players", "roster_snapshots"
+  add_foreign_key "roster_snapshots", "teams"
   add_foreign_key "rosters", "teams"
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"

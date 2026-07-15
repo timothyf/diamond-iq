@@ -66,7 +66,7 @@ RSpec.describe AdminTaskRunner do
       scope: "national",
       team_mlb_id: nil,
       season: 2026,
-      roster_type: "active",
+      roster_type: "40Man",
       as_of: Date.new(2026, 7, 15)
     )
   end
@@ -81,7 +81,7 @@ RSpec.describe AdminTaskRunner do
 
     described_class.call(
       task_name: "mlb_roster_sync",
-      params: { team_scope: "team", team_mlb_id: "116", season: "2025", roster_type: "40Man" }
+      params: { team_scope: "team", team_mlb_id: "116", season: "2025" }
     )
 
     expect(MlbRosterBatchSync).to have_received(:call).with(
@@ -104,6 +104,25 @@ RSpec.describe AdminTaskRunner do
 
     expect(response).to include(success: false, message: "Season cannot be in the future")
     expect(MlbRosterBatchSync).not_to have_received(:call)
+  end
+
+  it "captures dated Active and 40-man roster snapshots" do
+    allow(MlbRosterSnapshotSync).to receive(:call).and_return(
+      success: true,
+      message: "Stored snapshots",
+      data: { player_counts: { "active" => 26, "40Man" => 40 } }
+    )
+
+    response = described_class.call(
+      task_name: "mlb_roster_snapshots_sync",
+      params: { team_mlb_id: "116", snapshot_on: "2026-07-15" }
+    )
+
+    expect(response).to include(success: true, task: "mlb_roster_snapshots_sync")
+    expect(MlbRosterSnapshotSync).to have_received(:call).with(
+      team_mlb_id: 116,
+      snapshot_on: Date.new(2026, 7, 15)
+    )
   end
 
   it "rejects invalid or reversed schedule dates without calling the synchronizer" do

@@ -16,6 +16,7 @@ Rails.application.routes.draw do
       end
     end
     resources :schedules, only: [:show]
+    resources :roster_snapshots, only: [:index]
     resources :team_memberships, only: [] do
       collection do
         get :active_today
