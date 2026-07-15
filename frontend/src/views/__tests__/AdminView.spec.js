@@ -35,7 +35,34 @@ vi.mock('../../composables/useAdminTask', () => ({
     databaseMetrics: computed(() => ({
       environment: 'development',
       adapter: 'PostgreSQL',
+      databaseName: 'diamond_iq_development',
+      serverVersion: '16.3',
       sizeBytes: 536870912,
+      userTableSizeBytes: 402653184,
+      tableCount: 20,
+      estimatedRowCount: 4779000,
+      estimatedDeadRowCount: 1250,
+      measuredAt: '2026-07-15T22:00:00Z',
+      largestTables: [
+        {
+          tableName: 'pitch_data',
+          totalSizeBytes: 314572800,
+          dataSizeBytes: 251658240,
+          indexSizeBytes: 62914560,
+          estimatedRowCount: 4649481,
+          estimatedDeadRowCount: 1200,
+          databasePercentage: 58.59,
+        },
+        {
+          tableName: 'player_season_stats',
+          totalSizeBytes: 67108864,
+          dataSizeBytes: 41943040,
+          indexSizeBytes: 25165824,
+          estimatedRowCount: 125000,
+          estimatedDeadRowCount: 50,
+          databasePercentage: 12.5,
+        },
+      ],
     })),
     playerSeasonStatsMetrics: computed(() => ({
       earliestSeason: 1876,
@@ -118,13 +145,29 @@ describe('AdminView', () => {
     rosterSnapshots.value = []
   })
 
-  it('centralizes imports, downloads, and Rake-backed synchronization features', () => {
+  it('centralizes imports, downloads, and Rake-backed synchronization features', async () => {
     const wrapper = mount(AdminView)
 
     expect(wrapper.text()).toContain('Data administration')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('Development database')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('512 MB')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('PostgreSQL footprint')
+    expect(wrapper.find('[data-test="database-details"]').exists()).toBe(false)
+    await wrapper.get('[data-test="database-details-button"]').trigger('click')
+    const databaseDetails = wrapper.get('[data-test="database-details"]')
+    expect(databaseDetails.attributes('role')).toBe('dialog')
+    expect(databaseDetails.attributes('aria-modal')).toBe('true')
+    expect(databaseDetails.text()).toContain('diamond_iq_development')
+    expect(databaseDetails.text()).toContain('PostgreSQL 16.3')
+    expect(databaseDetails.text()).toContain('384 MB')
+    expect(databaseDetails.text()).toContain('20')
+    expect(databaseDetails.text()).toContain('4,779,000')
+    expect(databaseDetails.text()).toContain('pitch_data')
+    expect(databaseDetails.text()).toContain('300 MB')
+    expect(databaseDetails.text()).toContain('60.0 MB')
+    expect(databaseDetails.text()).toContain('58.59%')
+    await wrapper.get('[data-test="database-details-close"]').trigger('click')
+    expect(wrapper.find('[data-test="database-details"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Player season statistics')
     expect(wrapper.text()).toContain('Statcast pitch data')
     expect(wrapper.get('[data-test="player-season-stats-coverage"]').text()).toContain('1876')

@@ -13,7 +13,19 @@ export function useAdminTask() {
   const scheduleImportRange = ref({ earliestImportDate: null, latestImportDate: null })
   const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
   const mlbTeams = ref([])
-  const databaseMetrics = ref({ environment: '', adapter: '', sizeBytes: null })
+  const databaseMetrics = ref({
+    environment: '',
+    adapter: '',
+    databaseName: '',
+    serverVersion: '',
+    sizeBytes: null,
+    userTableSizeBytes: null,
+    tableCount: 0,
+    estimatedRowCount: 0,
+    estimatedDeadRowCount: 0,
+    largestTables: [],
+    measuredAt: null,
+  })
   const playerSeasonStatsMetrics = ref({ earliestSeason: null, latestSeason: null, approximateRowCount: 0 })
   const pitchDataMetrics = ref({ earliestGameDate: null, latestGameDate: null, approximateRowCount: 0 })
   const gameDetailsMetrics = ref({
@@ -61,12 +73,31 @@ export function useAdminTask() {
       databaseMetrics.value = {
         environment: database.environment || '',
         adapter: database.adapter || '',
+        databaseName: database.database_name || '',
+        serverVersion: database.server_version || '',
         sizeBytes:
           database.size_bytes !== null &&
           database.size_bytes !== undefined &&
           Number.isFinite(Number(database.size_bytes))
             ? Number(database.size_bytes)
             : null,
+        userTableSizeBytes:
+          database.user_table_size_bytes !== null && database.user_table_size_bytes !== undefined
+            ? Number(database.user_table_size_bytes)
+            : null,
+        tableCount: Number(database.table_count || 0),
+        estimatedRowCount: Number(database.estimated_row_count || 0),
+        estimatedDeadRowCount: Number(database.estimated_dead_row_count || 0),
+        largestTables: (database.largest_tables || []).map((table) => ({
+          tableName: table.table_name,
+          totalSizeBytes: Number(table.total_size_bytes || 0),
+          dataSizeBytes: Number(table.data_size_bytes || 0),
+          indexSizeBytes: Number(table.index_size_bytes || 0),
+          estimatedRowCount: Number(table.estimated_row_count || 0),
+          estimatedDeadRowCount: Number(table.estimated_dead_row_count || 0),
+          databasePercentage: Number(table.database_percentage || 0),
+        })),
+        measuredAt: database.measured_at || null,
       }
       const playerSeasonStats = payload?.meta?.player_season_stats || {}
       playerSeasonStatsMetrics.value = {

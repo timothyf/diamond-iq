@@ -32,7 +32,25 @@ describe('useAdminTask', () => {
             database: {
               environment: 'development',
               adapter: 'PostgreSQL',
+              database_name: 'diamond_iq_development',
+              server_version: '16.3',
               size_bytes: 536870912,
+              user_table_size_bytes: 402653184,
+              table_count: 20,
+              estimated_row_count: 4779000,
+              estimated_dead_row_count: 1250,
+              measured_at: '2026-07-15T22:00:00Z',
+              largest_tables: [
+                {
+                  table_name: 'pitch_data',
+                  total_size_bytes: 314572800,
+                  data_size_bytes: 251658240,
+                  index_size_bytes: 62914560,
+                  estimated_row_count: 4649481,
+                  estimated_dead_row_count: 1200,
+                  database_percentage: 58.59,
+                },
+              ],
             },
             player_season_stats: {
               earliest_season: 1876,
@@ -91,7 +109,25 @@ describe('useAdminTask', () => {
     expect(databaseMetrics.value).toEqual({
       environment: 'development',
       adapter: 'PostgreSQL',
+      databaseName: 'diamond_iq_development',
+      serverVersion: '16.3',
       sizeBytes: 536870912,
+      userTableSizeBytes: 402653184,
+      tableCount: 20,
+      estimatedRowCount: 4779000,
+      estimatedDeadRowCount: 1250,
+      measuredAt: '2026-07-15T22:00:00Z',
+      largestTables: [
+        {
+          tableName: 'pitch_data',
+          totalSizeBytes: 314572800,
+          dataSizeBytes: 251658240,
+          indexSizeBytes: 62914560,
+          estimatedRowCount: 4649481,
+          estimatedDeadRowCount: 1200,
+          databasePercentage: 58.59,
+        },
+      ],
     })
     expect(playerSeasonStatsMetrics.value).toEqual({
       earliestSeason: 1876,

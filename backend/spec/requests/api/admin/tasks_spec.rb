@@ -49,6 +49,25 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "adapter" => "PostgreSQL"
     )
     expect(json_body.dig("meta", "database", "size_bytes")).to be_positive
+    expect(json_body.dig("meta", "database", "database_name")).to be_present
+    expect(json_body.dig("meta", "database", "server_version")).to be_present
+    expect(json_body.dig("meta", "database", "table_count")).to be >= 16
+    expect(json_body.dig("meta", "database", "user_table_size_bytes")).to be_positive
+    expect(json_body.dig("meta", "database", "estimated_row_count")).to be_a(Integer)
+    expect(json_body.dig("meta", "database", "estimated_dead_row_count")).to be_a(Integer)
+    expect(json_body.dig("meta", "database", "measured_at")).to be_present
+    expect(json_body.dig("meta", "database", "largest_tables")).not_to be_empty
+    expect(json_body.dig("meta", "database", "largest_tables", 0)).to include(
+      "table_name",
+      "total_size_bytes",
+      "data_size_bytes",
+      "index_size_bytes",
+      "estimated_row_count",
+      "estimated_dead_row_count",
+      "database_percentage"
+    )
+    table_sizes = json_body.dig("meta", "database", "largest_tables").pluck("total_size_bytes")
+    expect(table_sizes).to eq(table_sizes.sort.reverse)
     expect(json_body.dig("meta", "player_season_stats")).to include(
       "earliest_season" => 1901,
       "latest_season" => 2026

@@ -89,11 +89,23 @@ module Api
 
       def database_metrics
         connection = ActiveRecord::Base.connection
+        size_bytes = database_size_bytes(connection)
+        tables = database_table_metrics(connection)
 
         {
           environment: Rails.env,
           adapter: connection.adapter_name,
-          size_bytes: database_size_bytes(connection)
+          database_name: database_name(connection),
+          server_version: database_server_version(connection),
+          size_bytes: size_bytes,
+          user_table_size_bytes: tables.sum { |table| table[:total_size_bytes] },
+          table_count: tables.length,
+          estimated_row_count: tables.sum { |table| table[:estimated_row_count] },
+          estimated_dead_row_count: tables.sum { |table| table[:estimated_dead_row_count] },
+          largest_tables: tables.first(10).map do |table|
+            table.merge(database_percentage: percentage(table[:total_size_bytes], size_bytes))
+          end,
+          measured_at: Time.current
         }
       end
 
@@ -101,6 +113,60 @@ module Api
         return unless connection.adapter_name.downcase.include?("postgres")
 
         connection.select_value("SELECT pg_database_size(current_database())").to_i
+      end
+
+      def database_name(connection)
+        return connection.pool.db_config.database unless postgres?(connection)
+
+        connection.select_value("SELECT current_database()")
+      end
+
+      def database_server_version(connection)
+        return unless postgres?(connection)
+
+        connection.select_value("SHOW server_version")
+      end
+
+      def database_table_metrics(connection)
+        return [] unless postgres?(connection)
+
+        sql = <<~SQL.squish
+          SELECT
+            c.relname AS table_name,
+            pg_total_relation_size(c.oid)::bigint AS total_size_bytes,
+            pg_relation_size(c.oid)::bigint AS data_size_bytes,
+            pg_indexes_size(c.oid)::bigint AS index_size_bytes,
+            GREATEST(COALESCE(s.n_live_tup, c.reltuples)::bigint, 0) AS estimated_row_count,
+            GREATEST(COALESCE(s.n_dead_tup, 0)::bigint, 0) AS estimated_dead_row_count
+          FROM pg_class c
+          INNER JOIN pg_namespace n ON n.oid = c.relnamespace
+          LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+          WHERE c.relkind IN ('r', 'p')
+            AND n.nspname = current_schema()
+            AND c.relname NOT IN ('schema_migrations', 'ar_internal_metadata')
+          ORDER BY total_size_bytes DESC, table_name ASC
+        SQL
+
+        connection.select_all(sql).map do |row|
+          {
+            table_name: row.fetch("table_name"),
+            total_size_bytes: row.fetch("total_size_bytes").to_i,
+            data_size_bytes: row.fetch("data_size_bytes").to_i,
+            index_size_bytes: row.fetch("index_size_bytes").to_i,
+            estimated_row_count: row.fetch("estimated_row_count").to_i,
+            estimated_dead_row_count: row.fetch("estimated_dead_row_count").to_i
+          }
+        end
+      end
+
+      def percentage(value, total)
+        return 0.0 if total.to_i.zero?
+
+        ((value.to_f / total) * 100).round(2)
+      end
+
+      def postgres?(connection)
+        connection.adapter_name.downcase.include?("postgres")
       end
 
       def player_season_stats_metrics

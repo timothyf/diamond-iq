@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import { useAdminTask } from '../composables/useAdminTask'
@@ -11,6 +11,9 @@ import { useRosterSnapshots } from '../composables/useRosterSnapshots'
 
 const today = new Date().toISOString().slice(0, 10)
 const currentSeason = new Date().getFullYear()
+const databaseDetailsOpen = ref(false)
+const databaseDetailsDialog = ref(null)
+const databaseDetailsButton = ref(null)
 
 const statsOptions = reactive({
   category: 'batting',
@@ -262,6 +265,18 @@ function formatCount(value) {
   if (!Number.isFinite(value)) return 'Unavailable'
   return new Intl.NumberFormat('en-US').format(value)
 }
+
+async function openDatabaseDetails() {
+  databaseDetailsOpen.value = true
+  await nextTick()
+  databaseDetailsDialog.value?.focus()
+}
+
+async function closeDatabaseDetails() {
+  databaseDetailsOpen.value = false
+  await nextTick()
+  databaseDetailsButton.value?.focus()
+}
 </script>
 
 <template>
@@ -279,6 +294,9 @@ function formatCount(value) {
           <span>{{ humanize(databaseMetrics.environment || 'current') }} database</span>
           <strong>{{ overviewLoading ? 'Measuring…' : formatBytes(databaseMetrics.sizeBytes) }}</strong>
           <small>{{ databaseMetrics.adapter || 'Database' }} footprint</small>
+          <button ref="databaseDetailsButton" type="button" data-test="database-details-button" @click="openDatabaseDetails">
+            View details
+          </button>
         </div>
         <div class="admin-hero__status" :class="{ 'admin-hero__status--busy': anyActionRunning }">
           <span aria-hidden="true"></span>
@@ -286,6 +304,100 @@ function formatCount(value) {
         </div>
       </div>
     </section>
+
+    <div
+      v-if="databaseDetailsOpen"
+      class="database-modal"
+      data-test="database-details-modal"
+      @click.self="closeDatabaseDetails"
+      @keydown.esc="closeDatabaseDetails"
+    >
+      <section
+        ref="databaseDetailsDialog"
+        class="database-insights"
+        data-test="database-details"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="database-details-title"
+        tabindex="-1"
+      >
+      <header class="database-insights__heading">
+        <div>
+          <p class="eyebrow">Storage health</p>
+          <h2 id="database-details-title">Database footprint</h2>
+        </div>
+        <div class="database-insights__heading-actions">
+          <p>
+            {{ databaseMetrics.databaseName || 'Current database' }}
+            <span v-if="databaseMetrics.serverVersion">· PostgreSQL {{ databaseMetrics.serverVersion }}</span>
+            <span v-if="databaseMetrics.measuredAt">· Measured {{ formatTimestamp(databaseMetrics.measuredAt) }}</span>
+          </p>
+          <button type="button" data-test="database-details-close" aria-label="Close database details" @click="closeDatabaseDetails">×</button>
+        </div>
+      </header>
+
+      <div class="database-summary-grid">
+        <article>
+          <span>Total database</span>
+          <strong>{{ overviewLoading ? 'Measuring…' : formatBytes(databaseMetrics.sizeBytes) }}</strong>
+          <small>Entire PostgreSQL database</small>
+        </article>
+        <article>
+          <span>Application tables</span>
+          <strong>{{ formatBytes(databaseMetrics.userTableSizeBytes) }}</strong>
+          <small>Table data, TOAST, and indexes</small>
+        </article>
+        <article>
+          <span>Tables</span>
+          <strong>{{ formatCount(databaseMetrics.tableCount) }}</strong>
+          <small>DiamondIQ application tables</small>
+        </article>
+        <article>
+          <span>Estimated rows</span>
+          <strong>{{ formatCount(databaseMetrics.estimatedRowCount) }}</strong>
+          <small>{{ formatCount(databaseMetrics.estimatedDeadRowCount) }} dead rows awaiting cleanup</small>
+        </article>
+      </div>
+
+      <div v-if="databaseMetrics.largestTables.length" class="database-table-wrap">
+        <table class="database-table">
+          <thead>
+            <tr>
+              <th>Largest tables</th>
+              <th>Est. rows</th>
+              <th>Dead rows</th>
+              <th>Data</th>
+              <th>Indexes</th>
+              <th>Total</th>
+              <th>% of DB</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="table in databaseMetrics.largestTables" :key="table.tableName">
+              <th>
+                <code>{{ table.tableName }}</code>
+                <span class="database-table__bar" aria-hidden="true">
+                  <i :style="{ width: `${Math.min(table.databasePercentage, 100)}%` }"></i>
+                </span>
+              </th>
+              <td>{{ formatCount(table.estimatedRowCount) }}</td>
+              <td>{{ formatCount(table.estimatedDeadRowCount) }}</td>
+              <td>{{ formatBytes(table.dataSizeBytes) }}</td>
+              <td>{{ formatBytes(table.indexSizeBytes) }}</td>
+              <td><strong>{{ formatBytes(table.totalSizeBytes) }}</strong></td>
+              <td>{{ table.databasePercentage.toFixed(2) }}%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p v-else class="database-insights__empty">
+        Per-table storage metrics are available when DiamondIQ uses PostgreSQL.
+      </p>
+      <footer>
+        Row counts come from PostgreSQL statistics and are approximate. Run <code>ANALYZE</code> to refresh estimates after a large import.
+      </footer>
+      </section>
+    </div>
 
     <section class="admin-section">
       <header class="admin-section__heading">
@@ -791,6 +903,220 @@ function formatCount(value) {
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.database-footprint button {
+  justify-self: end;
+  margin-top: 0.55rem;
+  padding: 0;
+  border: 0;
+  color: #8f2d24;
+  background: transparent;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.database-footprint button:hover,
+.database-footprint button:focus-visible {
+  color: #10263d;
+}
+
+.database-modal {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 22, 35, 0.7);
+  backdrop-filter: blur(5px);
+}
+
+.database-insights {
+  width: min(1200px, calc(100vw - 2rem));
+  max-height: min(88vh, 900px);
+  padding: 1.5rem;
+  overflow: auto;
+  outline: none;
+  border: 1px solid rgba(16, 38, 61, 0.12);
+  border-radius: 28px;
+  background: rgba(255, 252, 245, 0.86);
+  box-shadow: 0 16px 44px rgba(73, 52, 24, 0.07);
+}
+
+.database-insights__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.database-insights__heading h2 {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 2rem;
+  text-transform: uppercase;
+}
+
+.database-insights__heading-actions {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+}
+
+.database-insights__heading-actions p {
+  color: #61707b;
+  font-size: 0.72rem;
+  text-align: right;
+}
+
+.database-insights__heading-actions button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(16, 38, 61, 0.14);
+  border-radius: 50%;
+  color: #10263d;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.database-insights__heading-actions button:hover,
+.database-insights__heading-actions button:focus-visible {
+  color: #fff;
+  background: #8f2d24;
+}
+
+.database-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.database-summary-grid article {
+  padding: 0.9rem;
+  border: 1px solid rgba(16, 38, 61, 0.09);
+  border-radius: 14px;
+  background: rgba(231, 237, 241, 0.58);
+}
+
+.database-summary-grid span,
+.database-summary-grid strong,
+.database-summary-grid small {
+  display: block;
+}
+
+.database-summary-grid span {
+  color: #61707b;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.database-summary-grid strong {
+  margin: 0.2rem 0;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.65rem;
+}
+
+.database-summary-grid small {
+  color: #6d787f;
+  font-size: 0.65rem;
+}
+
+.database-table-wrap {
+  margin-top: 1rem;
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+}
+
+.database-table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.database-table th,
+.database-table td {
+  padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.database-table thead th {
+  color: #64717b;
+  background: rgba(16, 38, 61, 0.04);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.database-table th:first-child {
+  width: 30%;
+  min-width: 220px;
+  text-align: left;
+}
+
+.database-table tbody th code {
+  color: #173652;
+  font-size: 0.72rem;
+}
+
+.database-table td {
+  color: #53616b;
+  font-family: 'SFMono-Regular', Menlo, monospace;
+  font-size: 0.7rem;
+}
+
+.database-table td strong {
+  color: #10263d;
+}
+
+.database-table tbody tr:last-child th,
+.database-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.database-table__bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 0.38rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 38, 61, 0.1);
+}
+
+.database-table__bar i {
+  display: block;
+  height: 100%;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a93627, #d09a55);
+}
+
+.database-insights > footer,
+.database-insights__empty {
+  margin-top: 0.75rem;
+  color: #69747c;
+  font-size: 0.68rem;
 }
 
 .database-footprint strong {
@@ -1354,6 +1680,10 @@ function formatCount(value) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .database-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .roster-snapshot-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1383,6 +1713,28 @@ function formatCount(value) {
 
   .database-footprint {
     text-align: left;
+  }
+
+  .database-footprint button {
+    justify-self: start;
+  }
+
+  .database-insights__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .database-insights__heading-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .database-insights__heading-actions p {
+    text-align: left;
+  }
+
+  .database-summary-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-section__heading > p {
