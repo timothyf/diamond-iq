@@ -1,0 +1,132 @@
+class AdminTaskRunner
+  TASKS = {
+    "mlb_schedule_sync" => {
+      name: "MLB schedule sync",
+      description: "Download schedules and upsert games, teams, venues, and probable pitchers."
+    },
+    "mlb_player_profiles_sync" => {
+      name: "MLB player profile sync",
+      description: "Download MLB profiles for existing players, including bio, handedness, and position data."
+    },
+    "mlb_roster_sync" => {
+      name: "MLB roster sync",
+      description: "Download one team's roster and update player profiles and historical memberships."
+    },
+    "player_positions_backfill" => {
+      name: "Player position backfill",
+      description: "Rebuild normalized current-position assignments from active team memberships."
+    }
+  }.freeze
+
+  def self.catalog
+    TASKS.map do |id, definition|
+      definition.merge(id: id)
+    end
+  end
+
+  def self.call(task_name:, params: {})
+    new(task_name: task_name, params: params).call
+  end
+
+  def initialize(task_name:, params: {})
+    @task_name = task_name.to_s
+    @params = params.to_h.with_indifferent_access
+  end
+
+  def call
+    return unknown_task unless TASKS.key?(task_name)
+
+    result = send(task_name)
+    result.merge(task: task_name)
+  rescue ArgumentError => error
+    failure(error.message)
+  rescue StandardError => error
+    failure("Unable to run #{task_name.humanize.downcase}: #{error.message}")
+  end
+
+  private
+
+  attr_reader :params, :task_name
+
+  def mlb_schedule_sync
+    start_date = required_date(:start_date)
+    end_date = optional_date(:end_date) || start_date
+    raise ArgumentError, "End date must be on or after start date" if end_date < start_date
+
+    MlbScheduleSync.call(
+      start_date: start_date,
+      end_date: end_date,
+      game_types: params[:game_types].presence || MlbScheduleDownloader::DEFAULT_GAME_TYPES,
+      sport_id: positive_integer(:sport_id, default: 1)
+    )
+  end
+
+  def mlb_player_profiles_sync
+    MlbPlayerProfilesSync.call(
+      only_missing: params.key?(:only_missing) ? params[:only_missing] : true,
+      batch_size: positive_integer(:batch_size, default: MlbPlayerProfilesSync::DEFAULT_BATCH_SIZE),
+      limit: optional_positive_integer(:limit),
+      mlb_ids: params[:mlb_ids].presence
+    )
+  end
+
+  def mlb_roster_sync
+    MlbRosterSync.call(
+      team_mlb_id: positive_integer(:team_mlb_id, required: true),
+      season: positive_integer(:season, default: Date.current.year),
+      roster_type: params[:roster_type].presence || MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
+      as_of: optional_date(:as_of) || Date.current
+    )
+  end
+
+  def player_positions_backfill
+    PlayerPositionsBackfill.call
+  end
+
+  def required_date(key)
+    value = params[key].presence
+    raise ArgumentError, "#{key.to_s.humanize} is required" if value.blank?
+
+    parse_date(key, value)
+  end
+
+  def optional_date(key)
+    value = params[key].presence
+    parse_date(key, value) if value.present?
+  end
+
+  def parse_date(key, value)
+    Date.iso8601(value.to_s)
+  rescue Date::Error
+    raise ArgumentError, "#{key.to_s.humanize} must be a valid ISO date"
+  end
+
+  def positive_integer(key, default: nil, required: false)
+    value = params[key].presence
+    return default if value.blank? && !required
+    raise ArgumentError, "#{key.to_s.humanize} is required" if value.blank?
+
+    parsed = Integer(value, exception: false)
+    raise ArgumentError, "#{key.to_s.humanize} must be a positive integer" unless parsed&.positive?
+
+    parsed
+  end
+
+  def optional_positive_integer(key)
+    positive_integer(key) if params[key].present?
+  end
+
+  def unknown_task
+    failure("Unknown admin task: #{task_name}", error: :not_found)
+  end
+
+  def failure(message, error: :unprocessable_entity)
+    {
+      success: false,
+      message: message,
+      data: { errors: [ message ] },
+      error: error,
+      task: task_name
+    }
+  end
+end

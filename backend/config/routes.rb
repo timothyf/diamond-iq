@@ -1,5 +1,13 @@
 Rails.application.routes.draw do
   namespace :api do
+    namespace :admin do
+      resources :tasks, only: [:index], param: :task_name do
+        member do
+          post :run
+        end
+      end
+    end
+
     resources :players, only: [:index, :show]
     resources :positions, only: [:index]
     resources :games, only: [:index, :show] do

@@ -9,6 +9,7 @@
     </RouterLink>
     <nav aria-label="Primary navigation">
       <RouterLink to="/">Stat board</RouterLink>
+      <RouterLink to="/admin">Admin</RouterLink>
     </nav>
   </header>
   <RouterView />
