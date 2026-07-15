@@ -143,18 +143,22 @@ module TestDataHelper
   end
 
   def create_game(attributes = {})
+    attributes = attributes.dup
     index = Game.count + 1
+    schedule = attributes.delete(:schedule) || create_schedule
+    home_team = attributes.delete(:home_team) || create_team
+    away_team = attributes.delete(:away_team) || create_team
 
     Game.create!(
       {
-        schedule: create_schedule,
+        schedule: schedule,
         mlb_id: 700_000 + index,
         official_date: Date.current + index.days,
         scheduled_at: Time.current + index.days,
         game_type: "R",
         status: "scheduled",
-        home_team: create_team,
-        away_team: create_team,
+        home_team: home_team,
+        away_team: away_team,
         source_name: "MLB Stats API",
         source_url: "https://statsapi.mlb.com/api/v1.1/game/#{700_000 + index}/feed/live",
         last_synced_at: Time.current

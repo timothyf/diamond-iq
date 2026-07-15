@@ -89,6 +89,10 @@ For the Vue dashboard, expose the matching value as `VITE_ADMIN_API_TOKEN` so im
 ## API Endpoints
 
 - `GET /api/players`
+- `GET /api/games`
+- `GET /api/games/:id`
+- `GET /api/games/upcoming`
+- `GET /api/schedules/:id`
 - `GET /api/player_season_stats`
 - `POST /api/player_season_stats/import`
 - `POST /api/player_season_stats/download`
