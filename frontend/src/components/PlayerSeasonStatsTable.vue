@@ -160,7 +160,7 @@ function formatStatValue(columnKey, value) {
             <td class="row-rank is-numeric">{{ row.rank }}</td>
             <td class="player-cell">
               <div class="primary-cell">
-                <strong>{{ row.player.full_name }}</strong>
+                <a class="player-profile-link" :href="`/players/${row.player.id}`">{{ row.player.full_name }}</a>
                 <span>{{ row.season }} Season</span>
               </div>
             </td>

@@ -11,16 +11,17 @@ module Api
 
     def show
       player = Player.includes(:profile, :team, player_positions: :position).find(params[:id])
+      snapshot = PlayerProfileSnapshotQuery.new(player: player).result
 
       render json: {
-        data: serialize_player(player, include_profile: true, include_positions: true)
+        data: serialize_player(player, include_profile: true, include_positions: true).merge(snapshot)
       }
     end
 
     private
 
     def index_params
-      params.permit(:page, :per_page, :sort, filter: [:name, :first_name, :last_name, :team_id, :team_name]).to_h
+      params.permit(:page, :per_page, :sort, filter: [ :name, :first_name, :last_name, :team_id, :team_name ]).to_h
     end
 
     def serialize_player(player, include_profile: false, include_positions: false)
@@ -107,6 +108,7 @@ module Api
     def serialize_team(team)
       {
         id: team.id,
+        mlb_id: team.mlb_id,
         name: team.name,
         abbreviation: team.abbreviation,
         team_name: team.team_name,

@@ -10,6 +10,7 @@ function buildProps(overrides = {}) {
         rank: 16,
         season: 2024,
         player: {
+          id: 42,
           full_name: 'Miguel Cabrera',
           mlb_id: 408234,
         },
@@ -55,6 +56,7 @@ describe('PlayerSeasonStatsTable', () => {
     expect(wrapper.text()).toContain('150')
     expect(wrapper.text()).toContain('24')
     expect(wrapper.text()).toContain('0.887')
+    expect(wrapper.get('.player-profile-link').attributes('href')).toBe('/players/42')
   })
 
   it('emits sort-change when a column header is clicked', async () => {

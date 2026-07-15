@@ -4,6 +4,90 @@
   min-height: 100vh;
 }
 
+.app-bar {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 74px;
+  padding: 0.7rem max(1.25rem, calc((100vw - 1680px) / 2));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff7e7;
+  background: rgba(16, 38, 61, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.app-brand {
+  display: inline-flex;
+  gap: 0.7rem;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-brand__mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  color: #10263d;
+  background: #f1d7a8;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 0.83rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.app-brand strong,
+.app-brand small {
+  display: block;
+  line-height: 1.1;
+}
+
+.app-brand strong {
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+}
+
+.app-brand small {
+  margin-top: 0.15rem;
+  color: #c9d1d7;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-bar nav a {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  color: #dce4e9;
+  font-size: 0.84rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.app-bar nav a.router-link-active {
+  color: #10263d;
+  background: #f1d7a8;
+}
+
+.player-profile-link {
+  color: #10263d;
+  font-weight: 800;
+  text-decoration-color: rgba(143, 45, 36, 0.35);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.player-profile-link:hover {
+  color: #8f2d24;
+}
+
 .dashboard-shell {
   min-height: 100vh;
   padding: 2.5rem 1.25rem 4rem;
