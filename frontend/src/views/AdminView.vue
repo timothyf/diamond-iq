@@ -289,6 +289,9 @@ function formatCount(value) {
             </div>
             <span class="admin-chip">Download + import</span>
           </div>
+          <p class="admin-card__description">
+            Downloads and imports season-level batting or pitching statistics for the selected year range.
+          </p>
           <div class="data-coverage" data-test="player-season-stats-coverage">
             <span>Currently stored</span>
             <dl v-if="playerSeasonStatsMetrics.earliestSeason && playerSeasonStatsMetrics.latestSeason">
@@ -341,6 +344,9 @@ function formatCount(value) {
             </div>
             <span class="admin-chip">Download + import</span>
           </div>
+          <p class="admin-card__description">
+            Downloads pitch-by-pitch Statcast data from Baseball Savant for the selected games and date range.
+          </p>
           <div class="data-coverage" data-test="pitch-data-coverage">
             <span>Currently stored</span>
             <dl v-if="pitchDataMetrics.earliestGameDate && pitchDataMetrics.latestGameDate">
@@ -437,6 +443,9 @@ function formatCount(value) {
             </div>
             <code>mlb_schedule:sync</code>
           </div>
+          <p class="admin-card__description">
+            Downloads MLB schedules and updates games, teams, venues, statuses, and probable pitchers for the selected dates.
+          </p>
           <div class="schedule-coverage" data-test="schedule-date-range">
             <p v-if="overviewLoading">Loading stored dates…</p>
             <p v-else-if="overviewError" class="schedule-coverage__error">{{ overviewError }}</p>
@@ -490,6 +499,9 @@ function formatCount(value) {
             </div>
             <code>mlb_player_profiles:sync</code>
           </div>
+          <p class="admin-card__description">
+            Downloads MLB biographical, handedness, position, and headshot information for players already stored in DiamondIQ.
+          </p>
           <div class="admin-fields admin-fields--four">
             <label><span>Batch size</span><input v-model.number="profileOptions.batchSize" type="number" min="1" max="100" required /></label>
             <label><span>Limit (optional)</span><input v-model="profileOptions.limit" type="number" min="1" /></label>
@@ -509,6 +521,9 @@ function formatCount(value) {
             </div>
             <code>mlb_roster:sync</code>
           </div>
+          <p class="admin-card__description">
+            Downloads MLB 40-man rosters and updates player profiles, roster status, and dated team memberships for the selected season.
+          </p>
           <div class="admin-fields admin-fields--three">
             <label>
               <span>Team selection</span>
@@ -1028,6 +1043,13 @@ function formatCount(value) {
   margin: -0.45rem 0 1rem;
   color: #61707b;
   font-size: 0.78rem;
+}
+
+.admin-card__description {
+  margin-top: 0.7rem;
+  color: #61707b;
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .roster-snapshot-workspace {
