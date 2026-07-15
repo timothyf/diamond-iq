@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe PitchDataImporter, type: :service do
   it "imports pitch data rows and upserts duplicate pitch identities" do
+    game = create_game(mlb_id: 1001)
     csv_data = <<~CSV
       source_start_date,source_end_date,fetched_at_utc,game_date,game_pk,game_type,home_team,away_team,inning,inning_topbot,at_bat_number,pitch_number,pitcher,player_name,batter,stand,p_throws,pitch_type,pitch_name,description,events,balls,strikes,release_speed,release_spin_rate,bat_score,fielder_2,on_1b,if_fielding_alignment,vx0,woba_denom
       2026-04-01,2026-04-30,2026-05-01T00:00:00Z,2026-04-15,1001,R,DET,LAD,1,Top,3,1,9001,Pitcher One,8001,R,R,FF,4-Seam Fastball,called_strike,strikeout,0,1,96.3,2450.7,0,7001,4001,Standard,-7.2,1
@@ -31,6 +32,24 @@ RSpec.describe PitchDataImporter, type: :service do
     expect(first_pitch.vx0).to eq(-7.0)
     expect(first_pitch.woba_denom).to eq(1)
     expect(second_pitch.pitch_type).to eq("SL")
+    expect(first_pitch.game).to eq(game)
+    expect(second_pitch.game).to eq(game)
+    expect(result.dig(:data, :linked_game_count)).to eq(2)
+    expect(result.dig(:data, :unlinked_game_count)).to eq(0)
+  end
+
+  it "leaves pitches nullable when their canonical game has not been synchronized" do
+    csv_data = <<~CSV
+      game_pk,at_bat_number,pitch_number,game_date,pitch_type
+      999999,1,1,2026-04-15,FF
+    CSV
+
+    result = described_class.call(csv_data: csv_data, source_name: "spec/imports/unmatched_pitch_data.csv")
+
+    expect(result[:success]).to be(true)
+    expect(PitchDatum.last.game).to be_nil
+    expect(result.dig(:data, :linked_game_count)).to eq(0)
+    expect(result.dig(:data, :unlinked_game_count)).to eq(1)
   end
 
   it "returns failure when required columns are missing" do

@@ -4,6 +4,7 @@ class Game < ApplicationRecord
   belongs_to :away_team, class_name: "Team", inverse_of: :away_games
   belongs_to :home_probable_pitcher, class_name: "Player", optional: true
   belongs_to :away_probable_pitcher, class_name: "Player", optional: true
+  has_many :pitches, class_name: "PitchDatum", dependent: :nullify, inverse_of: :game
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :official_date, presence: true

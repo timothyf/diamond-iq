@@ -12,6 +12,7 @@ class PitchDataImporter
     fetched_at_utc
     game_date
     game_pk
+    game_id
     game_type
     home_team
     away_team
@@ -53,7 +54,10 @@ class PitchDataImporter
     rows = build_rows(csv)
     return failure("No valid pitch data rows found in CSV") if rows.empty?
 
+    link_games(rows)
     PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
+
+    linked_count = rows.count { |row| row[:game_id].present? }
 
     success(
       "Imported #{rows.length} pitch data rows",
@@ -61,6 +65,8 @@ class PitchDataImporter
         imported_count: rows.length,
         skipped_count: errors.length,
         duplicate_count: @duplicate_count || 0,
+        linked_game_count: linked_count,
+        unlinked_game_count: rows.length - linked_count,
         source_name: resolved_source_name,
         errors: errors
       }
@@ -103,7 +109,7 @@ class PitchDataImporter
       attrs = build_row(row.to_h, source_row_number)
       next if attrs.nil?
 
-      row_key = [attrs[:game_pk], attrs[:at_bat_number], attrs[:pitch_number]]
+      row_key = [ attrs[:game_pk], attrs[:at_bat_number], attrs[:pitch_number] ]
       @duplicate_count += 1 if rows_by_identity.key?(row_key)
       rows_by_identity[row_key] = attrs.merge(created_at: timestamp, updated_at: timestamp)
     end
@@ -151,6 +157,17 @@ class PitchDataImporter
       **build_dynamic_attributes(normalized),
       raw_data: normalized
     }
+  end
+
+  def link_games(rows)
+    game_ids_by_mlb_id = Game
+      .where(mlb_id: rows.map { |row| row[:game_pk] }.uniq)
+      .pluck(:mlb_id, :id)
+      .to_h
+
+    rows.each do |row|
+      row[:game_id] = game_ids_by_mlb_id[row[:game_pk]]
+    end
   end
 
   def build_dynamic_attributes(normalized)

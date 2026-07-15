@@ -3,6 +3,8 @@ class PitchDatum < ApplicationRecord
   # Override Rails' STI inheritance_column so it doesn't collide with that field.
   self.inheritance_column = :_type_disabled
 
+  belongs_to :game, optional: true, inverse_of: :pitches
+
   validates :game_pk, presence: true
   validates :at_bat_number, presence: true
   validates :pitch_number, presence: true

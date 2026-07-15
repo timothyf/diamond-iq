@@ -2,6 +2,24 @@ require "rails_helper"
 require "tempfile"
 
 RSpec.describe "Api::PitchData", type: :request do
+  it "returns the canonical game id when a pitch is linked" do
+    game = create_game(mlb_id: 823_443)
+    pitch = PitchDatum.create!(
+      game: game,
+      game_pk: game.mlb_id,
+      at_bat_number: 1,
+      pitch_number: 1,
+      game_date: game.official_date,
+      raw_data: { "game_pk" => game.mlb_id.to_s, "at_bat_number" => "1", "pitch_number" => "1" }
+    )
+
+    get api_pitch_data_path, params: { game_pk: game.mlb_id }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", 0, "id")).to eq(pitch.id)
+    expect(json_body.dig("data", 0, "game_id")).to eq(game.id)
+  end
+
   it "lists pitch data rows ordered by most recent game context and applies a bounded limit" do
     earlier = PitchDatum.create!(
       game_pk: 123,

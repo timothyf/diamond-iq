@@ -193,6 +193,7 @@ module Api
     def serialize_pitch_datum(row, player_names = {})
       {
         id: row.id,
+        game_id: row.game_id,
         game_date: row.game_date,
         game_pk: row.game_pk,
         at_bat_number: row.at_bat_number,
