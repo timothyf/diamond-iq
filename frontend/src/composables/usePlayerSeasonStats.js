@@ -9,6 +9,8 @@ function buildSearchParams(query) {
   if (query.page) searchParams.set('page', String(query.page))
   if (query.perPage) searchParams.set('per_page', String(query.perPage))
   if (query.sort) searchParams.set('sort', query.sort)
+  if (query.deferFacets) searchParams.set('defer_facets', 'true')
+  if (query.metadataOnly) searchParams.set('metadata_only', 'true')
 
   Object.entries(query.filters || {}).forEach(([key, value]) => {
     if (value === '' || value === null || value === undefined) return
@@ -31,6 +33,7 @@ function normalizeMeta(meta = {}) {
     availableSeasons: meta.available_seasons || [],
     availableTeams: meta.available_teams || [],
     columns: meta.columns || [],
+    facetsComplete: meta.facets_complete !== false,
   }
 }
 
@@ -48,7 +51,8 @@ export function usePlayerSeasonStats(queryRef) {
     error.value = ''
 
     try {
-      const searchParams = buildSearchParams(queryRef.value)
+      const requestQuery = { ...queryRef.value, deferFacets: true }
+      const searchParams = buildSearchParams(requestQuery)
       const response = await fetch(`${API_BASE_URL}/api/player_season_stats?${searchParams.toString()}`, {
         headers: {
           Accept: 'application/json',
@@ -63,7 +67,22 @@ export function usePlayerSeasonStats(queryRef) {
       if (requestId !== requestCounter) return
 
       rows.value = payload.data || []
-      meta.value = normalizeMeta(payload.meta)
+      const nextMeta = normalizeMeta(payload.meta)
+      meta.value = payload.meta?.facets_complete === false
+        ? {
+            ...nextMeta,
+            totalCount: meta.value.totalCount,
+            totalPages: meta.value.totalPages,
+            dataRange: meta.value.dataRange,
+            availableSeasons: meta.value.availableSeasons,
+            availableTeams: meta.value.availableTeams,
+          }
+        : nextMeta
+
+      loading.value = false
+      if (payload.meta?.facets_complete === false) {
+        await loadFacets(requestId)
+      }
     } catch (fetchError) {
       if (requestId !== requestCounter) return
 
@@ -75,6 +94,25 @@ export function usePlayerSeasonStats(queryRef) {
       if (requestId === requestCounter) {
         loading.value = false
       }
+    }
+  }
+
+  async function loadFacets(requestId) {
+    try {
+      const searchParams = buildSearchParams({ ...queryRef.value, metadataOnly: true })
+      const response = await fetch(`${API_BASE_URL}/api/player_season_stats?${searchParams.toString()}`, {
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+      if (!response.ok) return
+
+      const payload = await response.json()
+      if (requestId !== requestCounter) return
+
+      meta.value = normalizeMeta(payload.meta)
+    } catch (facetError) {
+      console.error(facetError)
     }
   }
 

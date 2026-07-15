@@ -198,6 +198,23 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     expect(json_body.dig("data", 0, "stats", "ops")).to eq("1.013")
   end
 
+  it "can defer expensive leaderboard facets until after rows render" do
+    get api_player_season_stats_path,
+        params: { view: "leaderboard", defer_facets: true, filter: { category: "batting" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "facets_complete")).to be(false)
+    expect(json_body.fetch("meta")).not_to have_key("total_count")
+
+    get api_player_season_stats_path,
+        params: { view: "leaderboard", metadata_only: true, filter: { category: "batting" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data")).to eq([])
+    expect(json_body.dig("meta", "facets_complete")).to be(true)
+    expect(json_body.dig("meta", "total_count")).to be_a(Integer)
+  end
+
   it "filters leaderboard rows by an inclusive season range" do
     get api_player_season_stats_path,
         params: {

@@ -64,7 +64,7 @@ describe('usePlayerSeasonStats', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/player_season_stats?view=leaderboard&page=2&per_page=12&sort=-homeRuns&filter%5Bcategory%5D=batting&filter%5Bplayer_name%5D=miguel',
+      '/api/player_season_stats?view=leaderboard&page=2&per_page=12&sort=-homeRuns&defer_facets=true&filter%5Bcategory%5D=batting&filter%5Bplayer_name%5D=miguel',
       {
         headers: {
           Accept: 'application/json',
@@ -84,9 +84,63 @@ describe('usePlayerSeasonStats', () => {
       availableSeasons: [2026, 2025, 2024],
       availableTeams: [{ id: 1, abbreviation: 'DET', short_name: 'Tigers' }],
       columns: [{ key: 'homeRuns', label: 'HR', align: 'numeric' }],
+      facetsComplete: true,
     })
     expect(loading.value).toBe(false)
     expect(error.value).toBe('')
+  })
+
+  it('renders rows before loading deferred leaderboard facets', async () => {
+    const rowsResponse = deferredResponse({
+      data: [{ id: 1, player: { full_name: 'Barry Bonds' } }],
+      meta: {
+        page: 1,
+        per_page: 15,
+        sort: '-homeRuns',
+        category: 'batting',
+        columns: [{ key: 'homeRuns', label: 'HR', align: 'numeric' }],
+        facets_complete: false,
+      },
+    })
+    const facetsResponse = deferredResponse({
+      data: [],
+      meta: {
+        page: 1,
+        per_page: 15,
+        total_count: 57355,
+        total_pages: 3824,
+        sort: '-homeRuns',
+        category: 'batting',
+        available_seasons: [2026, 2025],
+        available_teams: [{ id: 1, abbreviation: 'DET' }],
+        columns: [{ key: 'homeRuns', label: 'HR', align: 'numeric' }],
+        facets_complete: true,
+      },
+    })
+    vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(rowsResponse.promise).mockReturnValueOnce(facetsResponse.promise))
+
+    const query = computed(() => ({
+      view: 'leaderboard',
+      page: 1,
+      perPage: 15,
+      sort: '-homeRuns',
+      filters: { category: 'batting' },
+    }))
+    const { rows, meta, loading } = usePlayerSeasonStats(query)
+
+    rowsResponse.resolve()
+    await flushPromises()
+
+    expect(rows.value[0].player.full_name).toBe('Barry Bonds')
+    expect(loading.value).toBe(false)
+    expect(meta.value.facetsComplete).toBe(false)
+
+    facetsResponse.resolve()
+    await flushPromises()
+
+    expect(meta.value.totalCount).toBe(57355)
+    expect(meta.value.availableSeasons).toEqual([2026, 2025])
+    expect(meta.value.facetsComplete).toBe(true)
   })
 
   it('ignores stale responses when the player filter changes quickly', async () => {

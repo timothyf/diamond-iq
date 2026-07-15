@@ -6,9 +6,14 @@ module Api
       if params[:view] == "leaderboard"
         query = PlayerSeasonStatsLeaderboardQuery.new(params: index_params)
 
+        if ActiveModel::Type::Boolean.new.cast(params[:metadata_only])
+          render json: { data: [], meta: query.metadata }
+          return
+        end
+
         render json: {
           data: query.results,
-          meta: query.metadata
+          meta: ActiveModel::Type::Boolean.new.cast(params[:defer_facets]) ? query.base_metadata : query.metadata
         }
         return
       end
@@ -114,6 +119,8 @@ module Api
         :page,
         :per_page,
         :sort,
+        :defer_facets,
+        :metadata_only,
         filter: [:season, :season_start, :season_end, :team_id, :scope_type, :scope_key, :player_id, :team_name, :player_name, :stat_type_name, :category, :min_value, :max_value]
       ).to_h
     end

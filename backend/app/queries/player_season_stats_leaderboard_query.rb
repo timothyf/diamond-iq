@@ -83,17 +83,24 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def metadata
-    {
-      page: page,
-      per_page: per_page,
+    base_metadata.merge(
       total_count: total_count,
       total_pages: total_pages,
-      sort: normalized_sort,
-      filters: normalized_filters,
-      category: category,
       data_range: data_range,
       available_seasons: available_seasons,
       available_teams: available_teams,
+      facets_complete: true
+    )
+  end
+
+  def base_metadata
+    {
+      page: page,
+      per_page: per_page,
+      sort: normalized_sort,
+      filters: normalized_filters,
+      category: category,
+      facets_complete: false,
       columns: visible_column_definitions.map do |column_definition|
         {
           key: column_definition.fetch(:key),
@@ -135,10 +142,57 @@ class PlayerSeasonStatsLeaderboardQuery
   end
 
   def paginated_relation
+    return standard_paginated_relation unless initial_default_stat_page?
+
+    keys = paginated_sort_keys
+    return standard_paginated_relation if keys.length < per_page
+
+    grouped_relation
+      .where(Arel.sql(group_key_predicate(keys)))
+      .order(Arel.sql(order_expression))
+  end
+
+  def standard_paginated_relation
     grouped_relation
       .order(Arel.sql(order_expression))
       .offset((page - 1) * per_page)
       .limit(per_page)
+  end
+
+  def initial_default_stat_page?
+    page == DEFAULT_PAGE &&
+      requested_sort_field == default_sort.delete_prefix("-") &&
+      sort_direction == "DESC" &&
+      !column_definition_for(sort_field).key?(:derived_from) &&
+      !single_player_results?
+  end
+
+  def paginated_sort_keys
+    sort_definition = column_definition_for(sort_field)
+    stat_names = Array(sort_definition.fetch(:aliases))
+    key_relation = apply_filters(base_relation, include_season: true, include_team: true, stat_names: stat_names)
+      .select(*group_select_fields, "#{aggregate_expression(sort_definition)} AS leaderboard_sort_value")
+      .group(*group_by_fields)
+      .order(Arel.sql(order_expression))
+      .limit(per_page)
+
+    connection.select_all(key_relation.to_sql)
+  end
+
+  def group_key_predicate(keys)
+    keys.map do |key|
+      [
+        null_safe_equality("player_season_stats.player_id", key["player_id"]),
+        null_safe_equality("player_season_stats.team_id", key["team_id"]),
+        null_safe_equality("player_season_stats.season", key["season"]),
+        null_safe_equality("player_season_stats.scope_type", key["scope_type"]),
+        null_safe_equality("player_season_stats.scope_key", key["scope_key"])
+      ].join(" AND ").then { |condition| "(#{condition})" }
+    end.join(" OR ")
+  end
+
+  def null_safe_equality(column, value)
+    "#{column} IS NOT DISTINCT FROM #{connection.quote(value)}"
   end
 
   def order_expression
@@ -391,8 +445,8 @@ class PlayerSeasonStatsLeaderboardQuery
     filters["season_start"], filters["season_end"] = filters["season_end"], filters["season_start"]
   end
 
-  def apply_filters(scope, include_season:, include_team:)
-    filtered_scope = scope.where(stat_types: { category: category, name: available_alias_names })
+  def apply_filters(scope, include_season:, include_team:, stat_names: available_alias_names)
+    filtered_scope = scope.where(stat_types: { category: category, name: stat_names })
 
     if include_season && normalized_filters[:season].present?
       filtered_scope = filtered_scope.where(player_season_stats: { season: normalized_filters[:season] })
