@@ -86,7 +86,8 @@ class MlbRosterImporter
       end
 
       close_missing_memberships!(team, players.map(&:id), summary)
-      players.each { |player| player.refresh_current_team!(on: as_of) }
+      refresh_on = as_of < Date.current ? Date.current : as_of
+      players.each { |player| player.refresh_current_team!(on: refresh_on) }
 
       roster = team.rosters.find_or_initialize_by(season: season)
       if roster.new_record?
@@ -169,7 +170,7 @@ class MlbRosterImporter
     )
     created = membership.new_record?
     membership.assign_attributes(
-      ends_on: nil,
+      ends_on: inferred_membership_end_on(player),
       primary_position: position&.abbreviation,
       secondary_positions: [],
       jersey_number: entry["jerseyNumber"].presence || person_jersey_number(entry),
@@ -181,6 +182,11 @@ class MlbRosterImporter
     )
     membership.save!
     summary[created ? :created_membership_count : :updated_membership_count] += 1
+  end
+
+  def inferred_membership_end_on(player)
+    future_start = player.team_memberships.where("starts_on > ?", as_of).minimum(:starts_on)
+    future_start&.-(1.day)
   end
 
   def close_other_team_memberships!(player, team, summary)

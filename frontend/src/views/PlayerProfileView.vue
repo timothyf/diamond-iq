@@ -82,6 +82,11 @@ function displayValue(value) {
   return value === null || value === undefined || value === '' ? '—' : value
 }
 
+function seasonTeamLabel(seasonRow) {
+  const abbreviations = (seasonRow.teams || []).map((team) => team?.abbreviation).filter(Boolean)
+  return abbreviations.length ? [...new Set(abbreviations)].join(' / ') : '—'
+}
+
 function formatDate(value) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
@@ -164,42 +169,47 @@ function formatTimestamp(value) {
         </dl>
       </section>
 
-      <section class="profile-panel profile-season">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Season snapshot</p>
-            <h2>{{ player.seasonOverview.season || 'Current' }} {{ titleize(player.seasonOverview.category) }}</h2>
-          </div>
-          <span>{{ player.seasonOverview.stats.length }} available measures</span>
-        </header>
-
-        <div v-if="player.seasonOverview.stats.length" class="profile-stat-grid">
-          <article v-for="stat in player.seasonOverview.stats" :key="stat.key" class="profile-stat">
-            <span>{{ stat.label }}</span>
-            <strong>{{ stat.value }}</strong>
-            <small>{{ stat.scope_key }}</small>
-          </article>
-        </div>
-        <p v-else class="profile-empty">No season overview has been imported for this player yet.</p>
-      </section>
-
-      <section class="profile-panel profile-career">
+      <section class="profile-panel profile-career-table">
         <header class="profile-section-heading">
           <div>
             <p class="eyebrow">Career ledger</p>
-            <h2>Career {{ titleize(player.careerOverview.category) }} Stats</h2>
+            <h2>{{ titleize(player.careerOverview.category) }} by season</h2>
           </div>
           <span>{{ careerRangeLabel }}</span>
         </header>
 
-        <div v-if="player.careerOverview.stats.length" class="profile-stat-grid">
-          <article v-for="stat in player.careerOverview.stats" :key="stat.key" class="profile-stat">
-            <span>{{ stat.label }}</span>
-            <strong>{{ stat.value }}</strong>
-            <small>Career</small>
-          </article>
+        <div v-if="player.careerOverview.seasons.length" class="career-table-wrap" data-test="career-season-table">
+          <table class="career-table">
+            <thead>
+              <tr>
+                <th class="career-table__season">Season</th>
+                <th class="career-table__team">Team</th>
+                <th v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ column.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="seasonRow in player.careerOverview.seasons" :key="seasonRow.season">
+                <th class="career-table__season">{{ seasonRow.season }}</th>
+                <td class="career-table__team">{{ seasonTeamLabel(seasonRow) }}</td>
+                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ displayValue(seasonRow.statValues[column.key]) }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th class="career-table__season">Career</th>
+                <td class="career-table__team">Total</td>
+                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ displayValue(player.careerOverview.statValues[column.key]) }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
-        <p v-else class="profile-empty">No career statistics have been imported for this player yet.</p>
+        <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
       </section>
 
       <div class="profile-two-column">
@@ -473,6 +483,90 @@ function formatTimestamp(value) {
   color: #8f2d24;
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 2rem;
+}
+
+.career-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+  background: #fffdf7;
+}
+
+.career-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #243b50;
+  font-variant-numeric: tabular-nums;
+}
+
+.career-table th,
+.career-table td {
+  padding: 0.72rem 0.78rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.career-table thead th {
+  color: #697784;
+  background: #e7edf1;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.career-table tbody tr:nth-child(even) td,
+.career-table tbody tr:nth-child(even) th {
+  background: #faf5ea;
+}
+
+.career-table tbody th {
+  color: #10263d;
+  font-weight: 900;
+}
+
+.career-table__season,
+.career-table__team {
+  position: sticky;
+  z-index: 1;
+  text-align: left !important;
+  background: #fffdf7;
+}
+
+.career-table__season {
+  left: 0;
+  width: 82px;
+  min-width: 82px;
+}
+
+.career-table__team {
+  left: 82px;
+  width: 100px;
+  min-width: 100px;
+  border-right: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.career-table thead .career-table__season,
+.career-table thead .career-table__team {
+  z-index: 2;
+  background: #e7edf1;
+}
+
+.career-table tfoot th,
+.career-table tfoot td {
+  border-bottom: 0;
+  color: #fffaf0;
+  background: #10263d;
+  font-weight: 900;
+}
+
+.career-table tfoot .career-table__season,
+.career-table tfoot .career-table__team {
+  z-index: 2;
+  background: #10263d;
 }
 
 .profile-two-column {

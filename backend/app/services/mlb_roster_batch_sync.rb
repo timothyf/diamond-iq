@@ -57,7 +57,7 @@ class MlbRosterBatchSync
     if summary[:failed_team_count].positive?
       return {
         success: false,
-        message: "Synchronized #{summary[:successful_team_count]} of #{summary[:team_count]} MLB team rosters",
+        message: failure_message(summary),
         data: summary
       }
     end
@@ -120,5 +120,14 @@ class MlbRosterBatchSync
 
   def failure(message, data = {})
     { success: false, message: message, data: data.merge(errors: [ message ]) }
+  end
+
+  def failure_message(summary)
+    message = "Synchronized #{summary[:successful_team_count]} of #{summary[:team_count]} MLB team rosters"
+    first_failure = summary[:errors].first
+    return message if first_failure.nil?
+
+    details = Array(first_failure[:errors]).presence || [ first_failure[:message] ]
+    "#{message}. First failure for MLB team #{first_failure[:team_mlb_id]}: #{details.join(', ')}"
   end
 end

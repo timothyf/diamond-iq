@@ -57,6 +57,7 @@ RSpec.describe PlayerProfileSnapshotQuery do
 
     career = described_class.new(player: player).result.fetch(:career_overview)
     stats = career.fetch(:stats).index_by { |stat| stat.fetch(:key) }
+    seasons = career.fetch(:seasons).index_by { |row| row.fetch(:season) }
 
     expect(career).to include(
       category: "batting",
@@ -68,6 +69,17 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(stats.fetch("homeRuns").fetch(:value)).to eq("30")
     expect(stats.fetch("avg").fetch(:value)).to eq("0.267")
     expect(stats.fetch("slg").fetch(:value)).to eq("0.477")
+    expect(career.fetch(:columns).map { |column| column.fetch(:key) }).to include("gamesPlayed", "homeRuns", "avg", "slg")
+    expect(seasons.fetch(2025).fetch(:stats)).to include(
+      hash_including(key: "gamesPlayed", value: "120"),
+      hash_including(key: "homeRuns", value: "10"),
+      hash_including(key: "avg", value: "0.250")
+    )
+    expect(seasons.fetch(2026).fetch(:stats)).to include(
+      hash_including(key: "gamesPlayed", value: "60"),
+      hash_including(key: "homeRuns", value: "20"),
+      hash_including(key: "avg", value: "0.300")
+    )
   end
 
   it "combines baseball innings and recalculates career pitching rates" do
@@ -99,10 +111,13 @@ RSpec.describe PlayerProfileSnapshotQuery do
 
     career = described_class.new(player: player).result.fetch(:career_overview)
     stats = career.fetch(:stats).index_by { |stat| stat.fetch(:key) }
+    seasons = career.fetch(:seasons).index_by { |row| row.fetch(:season) }
 
     expect(career).to include(category: "pitching", season_count: 2)
     expect(stats.fetch("inningsPitched").fetch(:value)).to eq("16.0")
     expect(stats.fetch("ERA").fetch(:value)).to eq("2.81")
     expect(stats.fetch("whip").fetch(:value)).to eq("0.938")
+    expect(seasons.fetch(2025).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "10.2"))
+    expect(seasons.fetch(2026).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "5.1"))
   end
 end

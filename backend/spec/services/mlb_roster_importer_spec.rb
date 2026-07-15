@@ -180,4 +180,37 @@ RSpec.describe MlbRosterImporter do
     expect(result.dig(:data, :errors).join).to include("before existing snapshot")
     expect(TeamMembership.sole.ends_on).to be_nil
   end
+
+  it "places a historical snapshot before known future membership without changing the current team" do
+    current_team = create_team(mlb_id: 147, abbreviation: "NYY")
+    player = create_player(
+      team: current_team,
+      attributes: { mlb_id: 680_776, first_name: "Riley", last_name: "Greene" }
+    )
+    current_membership = create_team_membership(
+      player: player,
+      team: current_team,
+      starts_on: Date.new(2026, 3, 26),
+      roster_status: "active"
+    )
+
+    result = described_class.call(
+      payload: { "roster" => [ roster_entry ] },
+      team_mlb_id: team.mlb_id,
+      season: 2025,
+      as_of: Date.new(2025, 12, 31),
+      source_url: "https://statsapi.mlb.com/api/v1/teams/116/roster",
+      fetched_at: fetched_at
+    )
+
+    expect(result[:success]).to be(true)
+    historical_membership = player.team_memberships.find_by!(team: team)
+    expect(historical_membership).to have_attributes(
+      starts_on: Date.new(2025, 12, 31),
+      ends_on: Date.new(2026, 3, 25)
+    )
+    expect(current_membership.reload.ends_on).to be_nil
+    expect(player.reload.team).to eq(current_team)
+    expect(team.rosters.find_by!(season: 2025).snapshot_on).to eq(Date.new(2025, 12, 31))
+  end
 end

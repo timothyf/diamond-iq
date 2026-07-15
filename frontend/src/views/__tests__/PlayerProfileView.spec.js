@@ -43,6 +43,31 @@ function apiPayload() {
         first_season: 2022,
         last_season: 2026,
         season_count: 5,
+        columns: [
+          { key: 'gamesPlayed', label: 'G' },
+          { key: 'homeRuns', label: 'HR' },
+          { key: 'ops', label: 'OPS' },
+        ],
+        seasons: [
+          {
+            season: 2022,
+            teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
+            stats: [
+              { key: 'gamesPlayed', label: 'G', value: '93' },
+              { key: 'homeRuns', label: 'HR', value: '5' },
+              { key: 'ops', label: 'OPS', value: '0.740' },
+            ],
+          },
+          {
+            season: 2026,
+            teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
+            stats: [
+              { key: 'gamesPlayed', label: 'G', value: '120' },
+              { key: 'homeRuns', label: 'HR', value: '18' },
+              { key: 'ops', label: 'OPS', value: '0.842' },
+            ],
+          },
+        ],
         stats: [
           { key: 'gamesPlayed', label: 'G', value: '590' },
           { key: 'homeRuns', label: 'HR', value: '82' },
@@ -114,11 +139,16 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('Active')
-    expect(wrapper.text()).toContain('2026 Batting')
-    expect(wrapper.text()).toContain('18.0')
-    expect(wrapper.text()).toContain('Career Batting Stats')
+    expect(wrapper.text()).toContain('Batting by season')
     expect(wrapper.text()).toContain('2022–2026 · 5 seasons')
-    expect(wrapper.text()).toContain('0.821')
+    const careerTable = wrapper.get('[data-test="career-season-table"]')
+    expect(careerTable.text()).toContain('2022')
+    expect(careerTable.text()).toContain('2026')
+    expect(careerTable.text()).toContain('DET')
+    expect(careerTable.text()).toContain('0.740')
+    expect(careerTable.text()).toContain('Career')
+    expect(careerTable.text()).toContain('0.821')
+    expect(wrapper.text()).not.toContain('Season snapshot')
     expect(wrapper.text()).toContain('Recent pitch indicators')
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')

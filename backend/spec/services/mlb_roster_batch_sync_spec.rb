@@ -58,4 +58,20 @@ RSpec.describe MlbRosterBatchSync do
     expect(result[:data]).to include(missing_team_mlb_ids: [ 116 ])
     expect(MlbRosterSync).not_to have_received(:call)
   end
+
+  it "includes the first team error in a failed batch summary" do
+    create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
+    allow(MlbRosterSync).to receive(:call).and_return(
+      success: false,
+      message: "MLB roster import validation failed",
+      data: { errors: [ "Cannot synchronize before existing snapshot" ] }
+    )
+
+    result = described_class.call(scope: "team", team_mlb_id: 116)
+
+    expect(result[:success]).to be(false)
+    expect(result[:message]).to eq(
+      "Synchronized 0 of 1 MLB team rosters. First failure for MLB team 116: Cannot synchronize before existing snapshot"
+    )
+  end
 end
