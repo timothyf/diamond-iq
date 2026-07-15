@@ -1,6 +1,8 @@
 class PlayerProfileSnapshotQuery
   PITCH_SAMPLE_SIZE = 100
   SEASON_CATEGORIES = %w[batting pitching].freeze
+  BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
+  PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
 
   def initialize(player:, on: Date.current)
     @player = player
@@ -10,6 +12,7 @@ class PlayerProfileSnapshotQuery
   def result
     {
       season_overview: season_overview,
+      career_overview: career_overview,
       current_membership: serialize_membership(current_membership),
       team_history: memberships.map { |membership| serialize_membership(membership) },
       recent_pitch_indicators: recent_pitch_indicators,
@@ -39,15 +42,218 @@ class PlayerProfileSnapshotQuery
     { season: nil, category: preferred_category, preferred_category: preferred_category, stats: [] }
   end
 
+  def career_overview
+    category = career_category
+    rows = career_rows(category)
+    return empty_career_overview if rows.empty?
+
+    seasons = rows.map(&:season).uniq.sort
+
+    {
+      category: category,
+      preferred_category: preferred_category,
+      first_season: seasons.first,
+      last_season: seasons.last,
+      season_count: seasons.length,
+      stats: serialized_career_stats(category)
+    }
+  end
+
+  def empty_career_overview
+    {
+      category: preferred_category,
+      preferred_category: preferred_category,
+      first_season: nil,
+      last_season: nil,
+      season_count: 0,
+      stats: []
+    }
+  end
+
+  def career_category
+    available_categories = all_season_rows.map { |row| row.stat_type.category }.uniq & SEASON_CATEGORIES
+    available_categories.include?(preferred_category) ? preferred_category : available_categories.first || preferred_category
+  end
+
+  def serialized_career_stats(category)
+    definitions = PlayerSeasonStatsLeaderboardQuery::COLUMN_DEFINITIONS_BY_CATEGORY.fetch(category)
+
+    definitions.filter_map do |definition|
+      value = career_stat_value(category, definition)
+      next if value.nil?
+
+      {
+        key: definition.fetch(:key),
+        label: definition.fetch(:label),
+        value: format_career_value(category, definition.fetch(:key), value)
+      }
+    end
+  end
+
+  def career_stat_value(category, definition)
+    key = definition.fetch(:key)
+    aliases = Array(definition.fetch(:aliases))
+
+    return format_innings(career_innings_outs) if category == "pitching" && key == "inningsPitched"
+    return batting_average if category == "batting" && key == "avg"
+    return batting_slugging if category == "batting" && key == "slg"
+    return batting_ops if category == "batting" && key == "ops"
+    return weighted_career_rate(category, aliases, %w[atBats AB]) if category == "batting" && key == "obp"
+    return pitching_era if category == "pitching" && key == "ERA"
+    return pitching_whip if category == "pitching" && key == "whip"
+    return weighted_career_rate(category, aliases, %w[inningsPitched IP], innings_weight: true) if category == "pitching" && key == "avg"
+
+    additive_career_value(category, aliases)
+  end
+
+  def batting_average
+    divide(
+      additive_career_value("batting", %w[hits H]),
+      additive_career_value("batting", %w[atBats AB])
+    ) || weighted_career_rate("batting", %w[avg AVG], %w[atBats AB])
+  end
+
+  def batting_slugging
+    hits = additive_career_value("batting", %w[hits H])
+    at_bats = additive_career_value("batting", %w[atBats AB])
+    doubles = additive_career_value("batting", %w[doubles 2B]) || 0.to_d
+    triples = additive_career_value("batting", %w[triples 3B]) || 0.to_d
+    home_runs = additive_career_value("batting", %w[homeRuns HR]) || 0.to_d
+    return weighted_career_rate("batting", %w[slg SLG], %w[atBats AB]) if hits.nil? || at_bats.nil?
+
+    total_bases = hits + doubles + (triples * 2) + (home_runs * 3)
+    divide(total_bases, at_bats)
+  end
+
+  def batting_ops
+    obp = weighted_career_rate("batting", %w[obp OBP], %w[atBats AB])
+    slg = batting_slugging
+    return weighted_career_rate("batting", %w[ops OPS], %w[atBats AB]) if obp.nil? || slg.nil?
+
+    obp + slg
+  end
+
+  def pitching_era
+    earned_runs = additive_career_value("pitching", %w[ER earnedRuns])
+    innings = innings_as_decimal(career_innings_outs)
+    return weighted_career_rate("pitching", %w[ERA era], %w[inningsPitched IP], innings_weight: true) if earned_runs.nil?
+
+    divide(earned_runs * 9, innings)
+  end
+
+  def pitching_whip
+    hits = additive_career_value("pitching", %w[hits H])
+    walks = additive_career_value("pitching", %w[baseOnBalls BB])
+    innings = innings_as_decimal(career_innings_outs)
+    if hits.nil? || walks.nil?
+      return weighted_career_rate("pitching", %w[whip WHIP], %w[inningsPitched IP], innings_weight: true)
+    end
+
+    divide(hits + walks, innings)
+  end
+
+  def additive_career_value(category, aliases)
+    values = career_rows_by_season(category).values.filter_map do |rows|
+      season_additive_value(rows, aliases)
+    end
+    return nil if values.empty?
+
+    values.sum(0.to_d)
+  end
+
+  def season_additive_value(rows, aliases)
+    candidates = rows_for_preferred_alias(rows, aliases)
+    return if candidates.empty?
+
+    combined = candidates.select { |row| row.scope_type == "combined" }.max_by(&:updated_at)
+    return combined.value if combined.present?
+
+    team_rows = candidates.select { |row| row.scope_type == "team" }
+    return team_rows.sum(0.to_d, &:value) if team_rows.any?
+
+    candidates.min_by { |row| [ scope_priority(row), -row.updated_at.to_f ] }.value
+  end
+
+  def weighted_career_rate(category, rate_aliases, weight_aliases, innings_weight: false)
+    weighted_values = career_rows_by_season(category).values.filter_map do |rows|
+      rate_row = best_stat_row_from(rows, rate_aliases)
+      weight = season_additive_value(rows, weight_aliases)
+      next if rate_row.nil? || weight.nil?
+
+      numeric_weight = innings_weight ? innings_as_decimal(innings_to_outs(weight)) : weight
+      next unless numeric_weight&.positive?
+
+      [ rate_row.value, numeric_weight ]
+    end
+    return nil if weighted_values.empty?
+
+    numerator = weighted_values.sum(0.to_d) { |value, weight| value * weight }
+    denominator = weighted_values.sum(0.to_d) { |_value, weight| weight }
+    divide(numerator, denominator)
+  end
+
+  def career_innings_outs
+    values = career_rows_by_season("pitching").values.filter_map do |rows|
+      season_additive_value(rows, %w[inningsPitched IP])
+    end
+    return if values.empty?
+
+    values.sum { |value| innings_to_outs(value) }
+  end
+
+  def innings_to_outs(value)
+    whole_innings = value.floor
+    partial_outs = ((value - whole_innings) * 10).round.to_i.clamp(0, 2)
+    (whole_innings * 3) + partial_outs
+  end
+
+  def innings_as_decimal(outs)
+    return if outs.nil? || outs.zero?
+
+    outs.to_d / 3
+  end
+
+  def format_innings(outs)
+    return if outs.nil?
+
+    "#{outs / 3}.#{outs % 3}"
+  end
+
+  def divide(numerator, denominator)
+    return if numerator.nil? || denominator.nil? || denominator.zero?
+
+    numerator.to_d / denominator.to_d
+  end
+
+  def format_career_value(category, key, value)
+    return value if value.is_a?(String)
+    return format("%.3f", value) if category == "batting" && BATTING_RATE_KEYS.include?(key)
+    return format("%.2f", value) if category == "pitching" && key == "ERA"
+    return format("%.3f", value) if category == "pitching" && PITCHING_RATE_KEYS.include?(key)
+
+    decimal = value.to_d
+    decimal.frac.zero? ? decimal.to_i.to_s : decimal.to_s("F")
+  end
+
   def latest_season
     @latest_season ||= player.player_season_stats.maximum(:season)
   end
 
   def season_rows
-    @season_rows ||= player.player_season_stats
-      .where(season: latest_season)
-      .includes(:stat_type, :team)
-      .to_a
+    @season_rows ||= all_season_rows.select { |row| row.season == latest_season }
+  end
+
+  def all_season_rows
+    @all_season_rows ||= player.player_season_stats.includes(:stat_type, :team).to_a
+  end
+
+  def career_rows(category)
+    all_season_rows.select { |row| row.stat_type.category == category }
+  end
+
+  def career_rows_by_season(category)
+    @career_rows_by_season ||= {}
+    @career_rows_by_season[category] ||= career_rows(category).group_by(&:season)
   end
 
   def serialized_season_stats(category)
@@ -70,11 +276,24 @@ class PlayerProfileSnapshotQuery
   end
 
   def best_stat_row(category, aliases)
-    season_rows
-      .select { |row| row.stat_type.category == category && aliases.include?(row.stat_type.name) }
-      .min_by do |row|
-        [ aliases.index(row.stat_type.name), scope_priority(row), -row.updated_at.to_f ]
-      end
+    best_stat_row_from(
+      season_rows.select { |row| row.stat_type.category == category },
+      aliases
+    )
+  end
+
+  def best_stat_row_from(rows, aliases)
+    rows_for_preferred_alias(rows, aliases)
+      .min_by { |row| [ scope_priority(row), -row.updated_at.to_f ] }
+  end
+
+  def rows_for_preferred_alias(rows, aliases)
+    aliases.each do |alias_name|
+      matching_rows = rows.select { |row| row.stat_type.name == alias_name }
+      return matching_rows if matching_rows.any?
+    end
+
+    []
   end
 
   def scope_priority(row)
@@ -233,7 +452,7 @@ class PlayerProfileSnapshotQuery
       dataset("profile", player.profile&.source_name, player.profile&.last_synced_at),
       dataset_for_records("positions", player.player_positions.to_a, :source_name, :last_synced_at),
       dataset_for_records("memberships", memberships, :source_name, :last_synced_at),
-      dataset_for_records("season_stats", season_rows, nil, :updated_at, source_name: "Imported season stats"),
+      dataset_for_records("season_stats", all_season_rows, nil, :updated_at, source_name: "Imported season stats"),
       pitch_dataset
     ]
   end

@@ -30,6 +30,14 @@ describe('usePlayerProfile', () => {
             preferred_category: 'batting',
             stats: [{ key: 'homeRuns', label: 'HR', value: '18.0' }],
           },
+          career_overview: {
+            category: 'batting',
+            preferred_category: 'batting',
+            first_season: 2022,
+            last_season: 2026,
+            season_count: 5,
+            stats: [{ key: 'homeRuns', label: 'HR', value: '82' }],
+          },
           current_membership: {
             id: 8,
             team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
@@ -68,6 +76,7 @@ describe('usePlayerProfile', () => {
       team: { abbreviation: 'DET' },
       currentMembership: { rosterStatus: 'active' },
       seasonOverview: { season: 2026, category: 'batting' },
+      careerOverview: { category: 'batting', firstSeason: 2022, lastSeason: 2026, seasonCount: 5 },
       pitchIndicators: { primaryRole: 'batter' },
     })
     expect(player.value.sourceMetadata.datasets[0]).toEqual({

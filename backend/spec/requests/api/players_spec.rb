@@ -164,6 +164,16 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "season_overview", "stats")).to include(
       hash_including("key" => "homeRuns", "label" => "HR", "value" => "22.0", "scope_type" => "combined")
     )
+    expect(json_body.dig("data", "career_overview")).to include(
+      "category" => "batting",
+      "first_season" => 2025,
+      "last_season" => 2026,
+      "season_count" => 2
+    )
+    expect(json_body.dig("data", "career_overview", "stats")).to include(
+      hash_including("key" => "hits", "label" => "H", "value" => "100"),
+      hash_including("key" => "homeRuns", "label" => "HR", "value" => "22")
+    )
     expect(json_body.dig("data", "current_membership")).to include(
       "id" => current_membership.id,
       "roster_status" => "injured_10_day",

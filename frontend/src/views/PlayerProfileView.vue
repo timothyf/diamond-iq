@@ -39,6 +39,17 @@ const positionLabel = computed(() => {
   return position ? `${position.abbreviation} · ${position.name}` : 'Position unavailable'
 })
 
+const careerRangeLabel = computed(() => {
+  const career = player.value?.careerOverview
+  if (!career?.firstSeason) return 'No seasons stored'
+
+  const range = career.firstSeason === career.lastSeason
+    ? String(career.firstSeason)
+    : `${career.firstSeason}–${career.lastSeason}`
+  const seasonLabel = career.seasonCount === 1 ? 'season' : 'seasons'
+  return `${range} · ${career.seasonCount} ${seasonLabel}`
+})
+
 const pitchingMetrics = computed(() => [
   ['Pitches', player.value?.pitchIndicators.pitching.pitch_count],
   ['Games', player.value?.pitchIndicators.pitching.game_count],
@@ -170,6 +181,25 @@ function formatTimestamp(value) {
           </article>
         </div>
         <p v-else class="profile-empty">No season overview has been imported for this player yet.</p>
+      </section>
+
+      <section class="profile-panel profile-career">
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Career ledger</p>
+            <h2>Career {{ titleize(player.careerOverview.category) }} Stats</h2>
+          </div>
+          <span>{{ careerRangeLabel }}</span>
+        </header>
+
+        <div v-if="player.careerOverview.stats.length" class="profile-stat-grid">
+          <article v-for="stat in player.careerOverview.stats" :key="stat.key" class="profile-stat">
+            <span>{{ stat.label }}</span>
+            <strong>{{ stat.value }}</strong>
+            <small>Career</small>
+          </article>
+        </div>
+        <p v-else class="profile-empty">No career statistics have been imported for this player yet.</p>
       </section>
 
       <div class="profile-two-column">

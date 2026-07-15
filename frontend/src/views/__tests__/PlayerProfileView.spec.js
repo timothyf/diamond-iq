@@ -37,6 +37,18 @@ function apiPayload() {
           { key: 'ops', label: 'OPS', value: '0.842', scope_key: 'DET' },
         ],
       },
+      career_overview: {
+        category: 'batting',
+        preferred_category: 'batting',
+        first_season: 2022,
+        last_season: 2026,
+        season_count: 5,
+        stats: [
+          { key: 'gamesPlayed', label: 'G', value: '590' },
+          { key: 'homeRuns', label: 'HR', value: '82' },
+          { key: 'ops', label: 'OPS', value: '0.821' },
+        ],
+      },
       current_membership: {
         id: 8,
         team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
@@ -104,6 +116,9 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Active')
     expect(wrapper.text()).toContain('2026 Batting')
     expect(wrapper.text()).toContain('18.0')
+    expect(wrapper.text()).toContain('Career Batting Stats')
+    expect(wrapper.text()).toContain('2022–2026 · 5 seasons')
+    expect(wrapper.text()).toContain('0.821')
     expect(wrapper.text()).toContain('Recent pitch indicators')
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')

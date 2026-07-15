@@ -51,6 +51,7 @@ function normalizeProfile(data = {}) {
       }
     : null
   const season = data.season_overview || {}
+  const career = data.career_overview || {}
   const indicators = data.recent_pitch_indicators || {}
   const source = data.source_metadata || {}
 
@@ -68,6 +69,14 @@ function normalizeProfile(data = {}) {
       category: season.category,
       preferredCategory: season.preferred_category,
       stats: season.stats || [],
+    },
+    careerOverview: {
+      category: career.category,
+      preferredCategory: career.preferred_category,
+      firstSeason: career.first_season,
+      lastSeason: career.last_season,
+      seasonCount: career.season_count || 0,
+      stats: career.stats || [],
     },
     currentMembership: normalizeMembership(data.current_membership),
     teamHistory: (data.team_history || []).map(normalizeMembership),
