@@ -127,6 +127,9 @@ const visibleTrendGroups = computed(() => {
   return player.value?.pitchIndicators?.primaryRole === 'pitcher' ? ['pitching'] : ['batting']
 })
 
+const showBattingIndicators = computed(() => visibleTrendGroups.value.includes('batting'))
+const showPitchingIndicators = computed(() => visibleTrendGroups.value.includes('pitching'))
+
 const trendCharts = computed(() => {
   const analysis = player.value?.analysis
   if (!analysis) return []
@@ -498,7 +501,12 @@ function formatTimestamp(value) {
           </header>
 
           <div class="indicator-groups">
-            <article class="indicator-card" :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'batter' }">
+            <article
+              v-if="showBattingIndicators"
+              class="indicator-card"
+              data-test="indicator-card-batting"
+              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'batter' }"
+            >
               <h3>As batter</h3>
               <dl>
                 <div v-for="metric in battingMetrics" :key="metric[0]">
@@ -507,7 +515,12 @@ function formatTimestamp(value) {
                 </div>
               </dl>
             </article>
-            <article class="indicator-card" :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'pitcher' }">
+            <article
+              v-if="showPitchingIndicators"
+              class="indicator-card"
+              data-test="indicator-card-pitching"
+              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'pitcher' }"
+            >
               <h3>As pitcher</h3>
               <dl>
                 <div v-for="metric in pitchingMetrics" :key="metric[0]">

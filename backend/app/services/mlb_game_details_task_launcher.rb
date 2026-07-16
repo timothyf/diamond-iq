@@ -1,4 +1,5 @@
 class MlbGameDetailsTaskLauncher
+  EnqueueFailure = Class.new(StandardError)
   TASK_NAME = MlbGameDetailsTaskEstimate::TASK_NAME
 
   def self.call(start_date: nil, end_date: nil, mlb_game_id: nil)
@@ -28,17 +29,24 @@ class MlbGameDetailsTaskLauncher
       total_items: estimate.fetch(:game_count)
     )
     enqueued_job = MlbGameDetailsSyncJob.perform_later(task_run.id)
-    raise ActiveJob::EnqueueError, "Game detail synchronization could not be enqueued" unless enqueued_job
+    raise EnqueueFailure, "Game detail synchronization could not be enqueued" unless enqueued_job
 
     task_run
-  rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError => error
-    task_run&.update(status: "failed", error_message: error.message, finished_at: Time.current)
-    raise
   rescue ActiveRecord::RecordNotUnique
     raise ArgumentError, "A game detail synchronization is already queued or running"
+  rescue StandardError => error
+    if enqueue_error?(error)
+      task_run&.update(status: "failed", error_message: error.message, finished_at: Time.current)
+    end
+
+    raise
   end
 
   private
 
   attr_reader :start_date_input, :end_date_input, :mlb_game_id_input
+
+  def enqueue_error?(error)
+    error.is_a?(EnqueueFailure) || error.is_a?(SolidQueue::Job::EnqueueError) || error.class.name == "ActiveJob::EnqueueError"
+  end
 end

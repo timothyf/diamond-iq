@@ -859,10 +859,10 @@ async function closeDatabaseDetails() {
               </div>
             </dl>
             <p v-if="pitchDataTask.currentItemLabel" class="sync-progress__current">
-              <span>Current chunk</span>{{ pitchDataTask.currentItemLabel }}
+              <span>Current game</span>{{ pitchDataTask.currentItemLabel }}
             </p>
             <p v-if="pitchDataTask.cancelRequested && pitchDataSyncActive" class="sync-progress__notice">
-              Cancellation requested. The current chunk will finish safely before the task stops.
+              Cancellation requested. The current game will finish safely before the task stops.
             </p>
             <p v-else-if="pitchDataTask.errorMessage" class="sync-progress__error">{{ pitchDataTask.errorMessage }}</p>
             <button
@@ -873,7 +873,7 @@ async function closeDatabaseDetails() {
               :disabled="pitchDataTask.cancelRequested"
               @click="cancelActivePitchDataSync"
             >
-              {{ pitchDataTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current chunk' }}
+              {{ pitchDataTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
             </button>
           </section>
           <p v-if="pitchDataSyncError" class="admin-message admin-message--error">{{ pitchDataSyncError }}</p>

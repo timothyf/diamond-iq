@@ -296,6 +296,8 @@ describe('PlayerProfileView', () => {
     expect(trends.text()).toContain('Pitching · Velocity')
     expect(trends.text()).not.toContain('Batting · Exit velocity')
     expect(trends.find('svg').attributes('aria-label')).toBe('Pitching · Velocity rolling trend')
+    expect(wrapper.find('[data-test="indicator-card-batting"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
   })
 
   it('shows both batting and pitching trends for two-way players', async () => {
@@ -342,6 +344,8 @@ describe('PlayerProfileView', () => {
     const trends = wrapper.get('[data-test="player-trends"]')
     expect(trends.text()).toContain('Batting · Exit velocity')
     expect(trends.text()).toContain('Pitching · Velocity')
+    expect(wrapper.find('[data-test="indicator-card-batting"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
   })
 
   it('falls back to player initials when the headshot cannot load', async () => {

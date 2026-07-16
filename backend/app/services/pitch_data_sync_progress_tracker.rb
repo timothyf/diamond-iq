@@ -26,6 +26,14 @@ class PitchDataSyncProgressTracker
     )
   end
 
+  def game_started!(game)
+    task_run.update!(
+      current_item_mlb_id: game.mlb_id,
+      current_item_label: game_label(game),
+      last_heartbeat_at: Time.current
+    )
+  end
+
   def chunk_finished!(success:, processed_game_count:, result_data: {}, message: nil)
     task_run.with_lock do
       task_run.reload
@@ -80,5 +88,10 @@ class PitchDataSyncProgressTracker
       finished_at: Time.current,
       last_heartbeat_at: Time.current
     )
+  end
+
+  def game_label(game)
+    matchup = [game.away_team&.abbreviation, game.home_team&.abbreviation].compact.join(" at ")
+    [matchup.presence || "MLB game #{game.mlb_id}", game.official_date&.to_fs(:long)].compact.join(" — ")
   end
 end

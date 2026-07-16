@@ -34,8 +34,12 @@ module Api
         render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
       rescue ArgumentError => error
         render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
-      rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError => error
-        render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
+      rescue StandardError => error
+        if enqueue_error?(error)
+          render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
+        else
+          raise
+        end
       end
 
       def estimate
@@ -70,6 +74,12 @@ module Api
 
       def task_run
         @task_run ||= AdminTaskRun.find(params[:id])
+      end
+
+      def enqueue_error?(error)
+        error.is_a?(SolidQueue::Job::EnqueueError) ||
+          error.class.name == "ActiveJob::EnqueueError" ||
+          error.class.name.end_with?("::EnqueueFailure")
       end
     end
   end

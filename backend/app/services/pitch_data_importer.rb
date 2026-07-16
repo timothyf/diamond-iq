@@ -36,6 +36,14 @@ class PitchDataImporter
     new(csv_data: csv_data, file_path: file_path, source_name: source_name).call
   end
 
+  def self.import_rows(rows:, source_name: nil)
+    new(source_name: source_name).import_rows(rows)
+  end
+
+  def self.import_raw_rows(rows:, source_name: nil)
+    new(source_name: source_name).send(:import_raw_rows, rows)
+  end
+
   def initialize(csv_data: nil, file_path: nil, source_name: nil)
     @csv_data = csv_data
     @file_path = file_path
@@ -85,6 +93,48 @@ class PitchDataImporter
   private
 
   attr_reader :csv_data, :file_path, :source_name, :errors
+
+  def import_rows(rows)
+    return failure("No valid pitch data rows found in CSV") if rows.blank?
+
+    link_games(rows)
+    PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
+
+    linked_count = rows.count { |row| row[:game_id].present? }
+    analytics_refresh = refresh_daily_analytics(rows)
+
+    success(
+      "Imported #{rows.length} pitch data rows",
+      {
+        imported_count: rows.length,
+        skipped_count: errors.length,
+        duplicate_count: @duplicate_count || 0,
+        linked_game_count: linked_count,
+        unlinked_game_count: rows.length - linked_count,
+        source_name: resolved_source_name,
+        analytics_refresh: analytics_refresh,
+        errors: errors
+      }
+    )
+  end
+
+  def import_raw_rows(rows)
+    timestamp = Time.current
+    @duplicate_count = 0
+    rows_by_identity = {}
+
+    rows.each_with_index do |row, index|
+      source_row_number = index + 1
+      attrs = build_row(row, source_row_number)
+      next if attrs.nil?
+
+      row_key = [attrs[:game_pk], attrs[:at_bat_number], attrs[:pitch_number]]
+      @duplicate_count += 1 if rows_by_identity.key?(row_key)
+      rows_by_identity[row_key] = attrs.merge(created_at: timestamp, updated_at: timestamp)
+    end
+
+    import_rows(rows_by_identity.values)
+  end
 
   def refresh_daily_analytics(rows)
     dates = rows.filter_map { |row| row[:game_date] }.uniq

@@ -429,7 +429,7 @@ describe('AdminView', () => {
       failedItems: 2,
       processedItems: 10,
       progressPercentage: 50.0,
-      currentItemLabel: '2026-07-08 — 2026-07-14 · 6 games',
+      currentItemLabel: 'DET at CLE — July 10, 2026',
       cancelRequested: false,
       elapsedSeconds: 180,
       estimatedRemainingSeconds: 180,
@@ -440,7 +440,9 @@ describe('AdminView', () => {
     const progress = wrapper.get('[data-test="pitch-data-progress"]')
   expect(progress.text()).toContain('10 of 18 games')
   expect(progress.text()).toContain('8')
-  expect(progress.text()).toContain('2026-07-08 — 2026-07-14 · 6 games')
+    expect(progress.text()).toContain('Current game')
+    expect(progress.text()).toContain('DET at CLE — July 10, 2026')
+    expect(progress.text()).toContain('Cancel after current game')
     expect(progress.text()).toContain('3m')
     expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
 

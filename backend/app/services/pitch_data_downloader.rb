@@ -96,6 +96,7 @@ class PitchDataDownloader
 
     success(
       "Downloaded #{rows.length} pitch data rows from Baseball Savant",
+      rows: rows,
       csv_data: build_csv(rows),
       row_count: rows.length,
       start_date: start_date.iso8601,
