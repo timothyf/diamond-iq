@@ -70,9 +70,11 @@ class DailyAnalyticsRefresh
       end.compact
       next if stored_dates.empty?
 
-      first_date = stored_dates.min
       last_date = stored_dates.max
-      ranges = [ [ first_date, last_date ], [ [ last_date - 29.days, first_date ].max, last_date ] ].uniq
+      ranges = [
+        [ Date.new(year, 1, 1), last_date ],
+        *[ 7, 14, 30 ].map { |days| [ last_date - (days - 1).days, last_date ] }
+      ].uniq
       ranges.map do |range_start, range_end|
         ContextualBenchmarkRefresh.call(
           start_date: range_start,

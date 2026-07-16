@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
+import PlayerTrendChart from '../components/PlayerTrendChart.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 
 const props = defineProps({
@@ -11,7 +12,10 @@ const props = defineProps({
 })
 
 const playerId = computed(() => props.playerId)
-const { player, loading, error, refresh } = usePlayerProfile(playerId)
+const analysisOptions = ref({ range: 'season', paWindow: 50, pitchWindow: 100 })
+const customStartDate = ref('')
+const customEndDate = ref('')
+const { player, loading, error, refresh } = usePlayerProfile(playerId, analysisOptions)
 const headshotFailed = ref(false)
 
 watch(
@@ -73,6 +77,76 @@ const benchmarkPeriodLabel = computed(() => {
   if (!context?.sourceStartDate || !context?.sourceEndDate) return 'No benchmark period calculated'
   return `${formatDate(context.sourceStartDate)} — ${formatDate(context.sourceEndDate)}`
 })
+
+const rangePresets = [
+  { value: 'season', label: 'Full season' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '14', label: 'Last 14 days' },
+  { value: '30', label: 'Last 30 days' },
+]
+
+const comparisonMetrics = computed(() => {
+  const current = player.value?.analysis?.summary?.current || {}
+  const previous = player.value?.analysis?.summary?.previous || {}
+  const definitions = [
+    ['batting', 'average_exit_velocity', 'Exit velocity', 'mph'],
+    ['batting', 'hard_hit_percentage', 'Hard-hit rate', 'percent'],
+    ['batting', 'whiff_percentage', 'Batter whiff', 'percent'],
+    ['batting', 'chase_percentage', 'Batter chase', 'percent'],
+    ['pitching', 'average_velocity', 'Pitch velocity', 'mph'],
+    ['pitching', 'whiff_percentage', 'Pitcher whiff', 'percent'],
+    ['pitching', 'chase_percentage', 'Pitcher chase', 'percent'],
+  ]
+  return definitions.map(([group, key, label, unit]) => {
+    const currentValue = current[group]?.[key]
+    const previousValue = previous[group]?.[key]
+    return {
+      key: `${group}-${key}`,
+      label,
+      unit,
+      current: currentValue,
+      previous: previousValue,
+      change: currentValue === null || currentValue === undefined || previousValue === null || previousValue === undefined
+        ? null
+        : Number(currentValue) - Number(previousValue),
+    }
+  })
+})
+
+const trendCharts = computed(() => {
+  const analysis = player.value?.analysis
+  if (!analysis) return []
+  return [
+    ...(analysis.batting?.charts || []).map((chart) => ({
+      ...chart,
+      subtitle: `Rolling ${analysis.batting.windowSize} plate appearances`,
+      group: 'Batting',
+    })),
+    ...(analysis.pitching?.charts || []).map((chart) => ({
+      ...chart,
+      subtitle: `Rolling ${analysis.pitching.windowSize} pitches`,
+      group: 'Pitching',
+    })),
+  ]
+})
+
+function selectPreset(range) {
+  analysisOptions.value = { ...analysisOptions.value, range, startDate: null, endDate: null }
+}
+
+function applyCustomRange() {
+  if (!customStartDate.value || !customEndDate.value) return
+  analysisOptions.value = {
+    ...analysisOptions.value,
+    range: 'custom',
+    startDate: customStartDate.value,
+    endDate: customEndDate.value,
+  }
+}
+
+function updateWindow(key, value) {
+  analysisOptions.value = { ...analysisOptions.value, [key]: Number(value) }
+}
 
 function titleize(value) {
   return String(value || '')
@@ -211,6 +285,41 @@ function formatTimestamp(value) {
         </dl>
       </section>
 
+      <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
+        <div>
+          <p class="eyebrow">Analysis period</p>
+          <div class="range-presets" role="group" aria-label="Player analysis range">
+            <button v-for="preset in rangePresets" :key="preset.value" type="button"
+              :class="{ 'is-active': analysisOptions.range === preset.value }" @click="selectPreset(preset.value)">
+              {{ preset.label }}
+            </button>
+          </div>
+        </div>
+        <div class="custom-range">
+          <label>From <input v-model="customStartDate" type="date" /></label>
+          <label>Through <input v-model="customEndDate" type="date" /></label>
+          <button type="button" :disabled="!customStartDate || !customEndDate" @click="applyCustomRange">Apply custom</button>
+        </div>
+        <div class="rolling-window-controls">
+          <label>
+            Batting window
+            <select :value="analysisOptions.paWindow" @change="updateWindow('paWindow', $event.target.value)">
+              <option :value="25">25 PA</option>
+              <option :value="50">50 PA</option>
+              <option :value="100">100 PA</option>
+            </select>
+          </label>
+          <label>
+            Pitching window
+            <select :value="analysisOptions.pitchWindow" @change="updateWindow('pitchWindow', $event.target.value)">
+              <option :value="50">50 pitches</option>
+              <option :value="100">100 pitches</option>
+              <option :value="250">250 pitches</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
       <section class="profile-panel profile-career-table">
         <header class="profile-section-heading">
           <div>
@@ -252,6 +361,35 @@ function formatTimestamp(value) {
           </table>
         </div>
         <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
+      </section>
+
+      <section class="profile-panel trend-panel" data-test="player-trends">
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Rolling intelligence</p>
+            <h2>Performance trends</h2>
+          </div>
+          <span v-if="player.analysis?.range?.startDate">
+            {{ formatDate(player.analysis.range.startDate) }} — {{ formatDate(player.analysis.range.endDate) }}
+          </span>
+        </header>
+
+        <div class="period-comparison">
+          <article v-for="metric in comparisonMetrics" :key="metric.key">
+            <span>{{ metric.label }}</span>
+            <strong>{{ contextualValue(metric.current, metric.unit) }}</strong>
+            <small>
+              Previous {{ contextualValue(metric.previous, metric.unit) }} ·
+              {{ signedContextualValue(metric.change, metric.unit) }}
+            </small>
+          </article>
+        </div>
+
+        <div v-if="trendCharts.length" class="trend-grid">
+          <PlayerTrendChart v-for="chart in trendCharts" :key="`${chart.group}-${chart.key}`"
+            :title="`${chart.group} · ${chart.title}`" :subtitle="chart.subtitle" :unit="chart.unit" :series="chart.series" />
+        </div>
+        <p v-else class="profile-empty">No pitch-level trend data is available for this period.</p>
       </section>
 
       <section class="profile-panel contextual-panel" data-test="contextual-benchmarks">
@@ -419,6 +557,111 @@ function formatTimestamp(value) {
   border-radius: 28px;
   background: rgba(255, 252, 244, 0.91);
   box-shadow: 0 20px 58px rgba(64, 43, 20, 0.11);
+}
+
+.analysis-controls {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) auto auto;
+  gap: 1.25rem;
+  align-items: end;
+}
+
+.range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
+.range-presets button,
+.custom-range button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(16, 38, 61, 0.16);
+  border-radius: 999px;
+  color: #405362;
+  background: #fffdf7;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.range-presets button.is-active {
+  border-color: #8f2d24;
+  color: #fffaf0;
+  background: #8f2d24;
+}
+
+.custom-range,
+.rolling-window-controls {
+  display: flex;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+.custom-range label,
+.rolling-window-controls label {
+  display: grid;
+  gap: 0.25rem;
+  color: #697784;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.custom-range input,
+.rolling-window-controls select {
+  min-height: 38px;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid rgba(16, 38, 61, 0.16);
+  border-radius: 10px;
+  color: #10263d;
+  background: #fffdf7;
+  font: inherit;
+}
+
+.custom-range button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.period-comparison {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+
+.period-comparison article {
+  display: flex;
+  min-height: 100px;
+  flex-direction: column;
+  padding: 0.8rem;
+  border-radius: 15px;
+  background: rgba(16, 38, 61, 0.045);
+}
+
+.period-comparison span,
+.period-comparison small {
+  color: #71808c;
+  font-size: 0.68rem;
+}
+
+.period-comparison span {
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.period-comparison strong {
+  margin-block: auto;
+  color: #10263d;
+  font-size: 1.25rem;
+}
+
+.trend-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
 .profile-hero {
@@ -907,11 +1150,26 @@ function formatTimestamp(value) {
   .profile-two-column {
     grid-template-columns: 1fr;
   }
+
+  .analysis-controls {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .trend-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
   .profile-shell {
     padding-inline: 0.75rem;
+  }
+
+  .custom-range,
+  .rolling-window-controls {
+    flex-wrap: wrap;
+    align-items: stretch;
   }
 
   .profile-shell > * {

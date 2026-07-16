@@ -91,6 +91,47 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile")).to be_nil
   end
 
+  it "supports custom profile analysis ranges and rolling windows" do
+    PitchDatum.create!(
+      game_pk: 900_100,
+      game_date: Date.new(2026, 7, 10),
+      at_bat_number: 1,
+      pitch_number: 1,
+      batter: @miguel.mlb_id,
+      description: "hit_into_play",
+      launch_speed: 99.0,
+      raw_data: { "source" => "spec" }
+    )
+
+    get api_player_path(@miguel), params: {
+      range: "custom",
+      start_date: "2026-07-01",
+      end_date: "2026-07-15",
+      pa_window: 25,
+      pitch_window: 50
+    }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "analysis", "range")).to include(
+      "preset" => "custom",
+      "start_date" => "2026-07-01",
+      "end_date" => "2026-07-15",
+      "previous_start_date" => "2026-06-16",
+      "previous_end_date" => "2026-06-30",
+      "plate_appearance_window" => 25,
+      "pitch_window" => 50
+    )
+    expect(json_body.dig("data", "analysis", "summary", "current", "batting", "average_exit_velocity")).to eq(99.0)
+    expect(json_body.dig("data", "analysis", "batting", "charts").pluck("key")).to include("exit_velocity", "hard_hit_rate")
+  end
+
+  it "rejects invalid player analysis controls" do
+    get api_player_path(@miguel), params: { range: "custom", start_date: "2026-07-15", end_date: "2026-07-01" }
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body.fetch("message")).to eq("End date must be on or after start date")
+  end
+
   it "returns the canonical MLB headshot URL when an override is not configured" do
     create_player_profile(player: @miguel, attributes: { headshot_id: "408234" })
 

@@ -11,17 +11,24 @@ module Api
 
     def show
       player = Player.includes(:profile, :team, player_positions: :position).find(params[:id])
-      snapshot = PlayerProfileSnapshotQuery.new(player: player).result
+      analysis_range = PlayerAnalysisRange.resolve(player: player, params: analysis_params)
+      snapshot = PlayerProfileSnapshotQuery.new(player: player, analysis_range: analysis_range).result
 
       render json: {
         data: serialize_player(player, include_profile: true, include_positions: true).merge(snapshot)
       }
+    rescue ArgumentError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
     end
 
     private
 
     def index_params
       params.permit(:page, :per_page, :sort, filter: [ :name, :first_name, :last_name, :team_id, :team_name ]).to_h
+    end
+
+    def analysis_params
+      params.permit(:range, :start_date, :end_date, :pa_window, :pitch_window).to_h
     end
 
     def serialize_player(player, include_profile: false, include_positions: false)

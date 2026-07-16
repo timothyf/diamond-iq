@@ -17,6 +17,10 @@ class ContextualBenchmarkRefresh
     new(start_date: start_date, end_date: end_date, calculation_version: calculation_version).call
   end
 
+  def self.preview(player_id:, start_date:, end_date:, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
+    new(start_date: start_date, end_date: end_date, calculation_version: calculation_version).preview_for(player_id)
+  end
+
   def initialize(start_date:, end_date:, calculation_version:)
     @start_date = parse_date(start_date)
     @end_date = parse_date(end_date)
@@ -64,9 +68,77 @@ class ContextualBenchmarkRefresh
     failure("Failed to refresh contextual benchmarks: #{error.message}")
   end
 
+  def preview_for(player_id)
+    return preview_result([]) if end_date < start_date || calculation_version.blank?
+
+    current = observations(start_date, end_date)
+    previous = observations(previous_start_date, previous_end_date).index_by { |row| observation_identity(row) }
+    metrics = grouped_observations(current).filter_map do |_identity, metric_rows|
+      player_row = metric_rows.find { |row| row[:player_id] == player_id }
+      next if player_row.nil?
+
+      groups = peer_groups(metric_rows)
+      league = groups.find { |type, _key, _peers| type == "mlb" }
+      position = groups.find { |type, _key, peers| type == "position" && peers.include?(player_row) }
+      role = groups.find { |type, _key, peers| type == "pitcher_role" && peers.include?(player_row) }
+      previous_row = previous[observation_identity(player_row)]
+      preview_metric(player_row, league, position, role, previous_row)
+    end
+    preview_result(metrics.sort_by { |metric| [ metric[:metric_group], metric[:display_name], metric[:dimension_value].to_s ] })
+  end
+
   private
 
   attr_reader :start_date, :end_date, :calculation_version, :calculated_at
+
+  def preview_result(metrics)
+    {
+      available: metrics.any?,
+      cached: false,
+      source_start_date: start_date,
+      source_end_date: end_date,
+      previous_start_date: previous_start_date,
+      previous_end_date: previous_end_date,
+      calculation_version: calculation_version,
+      calculated_at: calculated_at,
+      metrics: metrics
+    }
+  end
+
+  def preview_metric(player_row, league, position, role, previous_row)
+    definition = METRICS.fetch(player_row[:metric_key])
+    league_type, league_key, league_peers = league
+    position_type, position_key, position_peers = position
+    role_type, role_key, role_peers = role
+    change_value = previous_row ? round(player_row[:value] - previous_row[:value]) : nil
+    change_percentage = previous_row && !previous_row[:value].zero? ? round(change_value / previous_row[:value].abs * 100) : nil
+    {
+      metric_key: player_row[:metric_key],
+      metric_group: player_row[:metric_group],
+      display_name: player_row[:display_name],
+      unit: definition.fetch(:unit),
+      directionality: player_row[:directionality],
+      dimension_type: player_row[:dimension_type].presence,
+      dimension_value: player_row[:dimension_value].presence,
+      raw_value: player_row[:value],
+      mlb_average: benchmark_average(player_row[:metric_key], league_peers),
+      position_average: position_type ? benchmark_average(player_row[:metric_key], position_peers) : nil,
+      position_key: position_key,
+      pitcher_role_average: role_type ? benchmark_average(player_row[:metric_key], role_peers) : nil,
+      pitcher_role_key: role_key,
+      percentile: percentile(player_row[:value], league_peers.map { |row| row[:value] }, player_row[:directionality]),
+      position_percentile: position_type ? percentile(player_row[:value], position_peers.map { |row| row[:value] }, player_row[:directionality]) : nil,
+      pitcher_role_percentile: role_type ? percentile(player_row[:value], role_peers.map { |row| row[:value] }, player_row[:directionality]) : nil,
+      previous_value: previous_row&.dig(:value),
+      change_value: change_value,
+      change_percentage: change_percentage,
+      sample_size: player_row[:sample_size],
+      mlb_sample_size: league_peers.sum { |row| row[:sample_size] },
+      mlb_player_count: league_peers.length,
+      position_player_count: position_peers&.length,
+      pitcher_role_player_count: role_peers&.length
+    }
+  end
 
   def observations(range_start, range_end)
     batting_observations(range_start, range_end) +
@@ -262,7 +334,7 @@ class ContextualBenchmarkRefresh
   end
 
   def benchmark_average(metric_key, peers)
-    return pooled_ops(peers) if metric_key == "ops"
+    return round(pooled_ops(peers)) if metric_key == "ops"
 
     denominator = peers.sum { |row| row[:denominator] }
     return 0 if denominator.zero?

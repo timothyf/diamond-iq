@@ -4,9 +4,10 @@ class PlayerProfileSnapshotQuery
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
 
-  def initialize(player:, on: Date.current)
+  def initialize(player:, on: Date.current, analysis_range: nil)
     @player = player
     @on = on
+    @analysis_range = analysis_range || PlayerAnalysisRange.resolve(player: player)
   end
 
   def result
@@ -16,14 +17,19 @@ class PlayerProfileSnapshotQuery
       current_membership: serialize_membership(current_membership),
       team_history: memberships.map { |membership| serialize_membership(membership) },
       recent_pitch_indicators: recent_pitch_indicators,
-      contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(player: player).result,
+      contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(
+        player: player,
+        start_date: analysis_range.start_date,
+        end_date: analysis_range.end_date
+      ).result,
+      analysis: PlayerTrendQuery.new(player: player, analysis_range: analysis_range).result,
       source_metadata: source_metadata
     }
   end
 
   private
 
-  attr_reader :player, :on
+  attr_reader :player, :on, :analysis_range
 
   def season_overview
     return empty_season_overview if latest_season.nil?

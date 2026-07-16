@@ -1,14 +1,26 @@
 class PlayerBenchmarkSnapshotQuery
-  def initialize(player:, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
+  def initialize(player:, start_date: nil, end_date: nil, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
     @player = player
+    @start_date = start_date
+    @end_date = end_date
     @calculation_version = calculation_version
   end
 
   def result
-    return empty_result if latest_rows.empty?
+    if latest_rows.empty?
+      return ContextualBenchmarkRefresh.preview(
+        player_id: player.id,
+        start_date: start_date,
+        end_date: end_date,
+        calculation_version: calculation_version
+      ) if start_date.present? && end_date.present?
+
+      return empty_result
+    end
 
     {
       available: true,
+      cached: true,
       source_start_date: latest_rows.first.source_start_date,
       source_end_date: latest_rows.first.source_end_date,
       previous_start_date: latest_rows.first.previous_start_date,
@@ -21,7 +33,7 @@ class PlayerBenchmarkSnapshotQuery
 
   private
 
-  attr_reader :player, :calculation_version
+  attr_reader :player, :start_date, :end_date, :calculation_version
 
   def rows
     @rows ||= player.player_metric_percentiles
@@ -32,12 +44,16 @@ class PlayerBenchmarkSnapshotQuery
 
   def latest_rows
     @latest_rows ||= begin
-      latest = rows.max_by { |row| [ row.source_end_date, row.source_start_date, row.calculated_at ] }
-      if latest.nil?
-        []
+      if start_date.present? && end_date.present?
+        rows.select { |row| row.source_start_date == start_date && row.source_end_date == end_date }
       else
-        rows.select do |row|
-          row.source_start_date == latest.source_start_date && row.source_end_date == latest.source_end_date
+        latest = rows.max_by { |row| [ row.source_end_date, row.source_start_date, row.calculated_at ] }
+        if latest.nil?
+          []
+        else
+          rows.select do |row|
+            row.source_start_date == latest.source_start_date && row.source_end_date == latest.source_end_date
+          end
         end
       end
     end
@@ -91,6 +107,7 @@ class PlayerBenchmarkSnapshotQuery
   def empty_result
     {
       available: false,
+      cached: false,
       source_start_date: nil,
       source_end_date: nil,
       previous_start_date: nil,

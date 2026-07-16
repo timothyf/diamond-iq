@@ -54,6 +54,8 @@ function normalizeProfile(data = {}) {
   const career = data.career_overview || {}
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
+  const analysis = data.analysis || {}
+  const analysisRange = analysis.range || {}
   const source = data.source_metadata || {}
 
   return {
@@ -130,6 +132,20 @@ function normalizeProfile(data = {}) {
         pitcherRolePlayerCount: metric.pitcher_role_player_count,
       })),
     },
+    analysis: {
+      range: {
+        preset: analysisRange.preset || 'season',
+        startDate: analysisRange.start_date,
+        endDate: analysisRange.end_date,
+        previousStartDate: analysisRange.previous_start_date,
+        previousEndDate: analysisRange.previous_end_date,
+        plateAppearanceWindow: analysisRange.plate_appearance_window || 50,
+        pitchWindow: analysisRange.pitch_window || 100,
+      },
+      summary: analysis.summary || { current: { batting: {}, pitching: {} }, previous: { batting: {}, pitching: {} }, changes: {} },
+      batting: normalizeTrendGroup(analysis.batting),
+      pitching: normalizeTrendGroup(analysis.pitching),
+    },
     sourceMetadata: {
       lastUpdatedAt: source.last_updated_at,
       sources: source.sources || [],
@@ -142,7 +158,30 @@ function normalizeProfile(data = {}) {
   }
 }
 
-export function usePlayerProfile(playerIdRef) {
+function normalizeTrendGroup(group = {}) {
+  return {
+    windowType: group.window_type,
+    windowSize: group.window_size,
+    totalObservations: group.total_observations || 0,
+    charts: (group.charts || []).map((chart) => ({
+      key: chart.key,
+      title: chart.title,
+      unit: chart.unit,
+      series: (chart.series || []).map((series) => ({
+        key: series.key,
+        label: series.label,
+        points: (series.points || []).map((point) => ({
+          date: point.date,
+          sequence: point.sequence,
+          value: point.value,
+          sampleSize: point.sample_size,
+        })),
+      })),
+    })),
+  }
+}
+
+export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
   const player = ref(null)
   const loading = ref(false)
   const error = ref('')
@@ -163,12 +202,16 @@ export function usePlayerProfile(playerIdRef) {
     error.value = ''
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}`, {
+      const query = analysisQuery(analysisOptionsRef?.value)
+      const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}${query}`, {
         headers: { Accept: 'application/json' },
       })
 
       if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}`)
+        const errorPayload = typeof response.json === 'function' ? await response.json().catch(() => ({})) : {}
+        const requestError = new Error(errorPayload?.message || `Request failed with status ${response.status}`)
+        requestError.status = response.status
+        throw requestError
       }
 
       const payload = await response.json()
@@ -186,7 +229,9 @@ export function usePlayerProfile(playerIdRef) {
     }
   }
 
-  watch(playerIdRef, load, { immediate: true })
+  analysisOptionsRef
+    ? watch([playerIdRef, analysisOptionsRef], load, { immediate: true, deep: true })
+    : watch(playerIdRef, load, { immediate: true })
 
   return {
     player: computed(() => player.value),
@@ -196,7 +241,20 @@ export function usePlayerProfile(playerIdRef) {
   }
 }
 
+function analysisQuery(options) {
+  if (!options) return ''
+  const params = new URLSearchParams()
+  if (options.range) params.set('range', options.range)
+  if (options.startDate) params.set('start_date', options.startDate)
+  if (options.endDate) params.set('end_date', options.endDate)
+  if (options.paWindow) params.set('pa_window', options.paWindow)
+  if (options.pitchWindow) params.set('pitch_window', options.pitchWindow)
+  const query = params.toString()
+  return query ? `?${query}` : ''
+}
+
 function responseMessage(error) {
-  if (error.message.includes('404')) return 'That player could not be found.'
+  if (error.status === 404 || error.message.includes('404')) return 'That player could not be found.'
+  if (error.status === 422) return error.message
   return 'Unable to load this player profile. Confirm the Rails API is running and reachable.'
 }

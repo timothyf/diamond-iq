@@ -129,6 +129,43 @@ function apiPayload() {
           },
         ],
       },
+      analysis: {
+        range: {
+          preset: 'season',
+          start_date: '2026-01-01',
+          end_date: '2026-07-14',
+          previous_start_date: '2025-06-20',
+          previous_end_date: '2025-12-31',
+          plate_appearance_window: 50,
+          pitch_window: 100,
+        },
+        summary: {
+          current: {
+            batting: { average_exit_velocity: 91.2, hard_hit_percentage: 45.5, whiff_percentage: 24.0, chase_percentage: 28.0 },
+            pitching: { average_velocity: null, whiff_percentage: null, chase_percentage: null },
+          },
+          previous: {
+            batting: { average_exit_velocity: 89.8, hard_hit_percentage: 40.0, whiff_percentage: 26.0, chase_percentage: 30.0 },
+            pitching: { average_velocity: null, whiff_percentage: null, chase_percentage: null },
+          },
+          changes: {},
+        },
+        batting: {
+          window_type: 'plate_appearances',
+          window_size: 50,
+          total_observations: 480,
+          charts: [
+            {
+              key: 'exit_velocity', title: 'Exit velocity', unit: 'mph',
+              series: [{ key: 'exit_velocity', label: 'Exit velocity', points: [
+                { date: '2026-04-01', sequence: 1, value: 89.0, sample_size: 1 },
+                { date: '2026-07-14', sequence: 480, value: 91.2, sample_size: 18 },
+              ] }],
+            },
+          ],
+        },
+        pitching: { window_type: 'pitches', window_size: 100, total_observations: 0, charts: [] },
+      },
       source_metadata: {
         last_updated_at: '2026-07-14T12:00:00Z',
         sources: ['MLB Stats API', 'Baseball Savant'],
@@ -177,6 +214,11 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Recent pitch indicators')
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')
+    expect(wrapper.get('[data-test="player-date-range-controls"]').text()).toContain('Full season')
+    expect(wrapper.get('[data-test="player-date-range-controls"]').text()).toContain('Last 30 days')
+    expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Performance trends')
+    expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Batting · Exit velocity')
+    expect(wrapper.get('[data-test="player-trends"] svg').attributes('aria-label')).toBe('Batting · Exit velocity rolling trend')
     const benchmarks = wrapper.get('[data-test="contextual-benchmarks"]')
     expect(benchmarks.text()).toContain('Benchmarks & percentiles')
     expect(benchmarks.text()).toContain('0.842')
@@ -191,6 +233,12 @@ describe('PlayerProfileView', () => {
       alt: 'Riley Greene headshot',
     })
     expect(wrapper.get('.profile-portrait').classes()).toContain('profile-portrait--photo')
+
+    await wrapper.get('.range-presets button:nth-child(2)').trigger('click')
+    await flushPromises()
+    expect(fetch).toHaveBeenLastCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
+      headers: { Accept: 'application/json' },
+    })
   })
 
   it('falls back to player initials when the headshot cannot load', async () => {

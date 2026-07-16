@@ -45,6 +45,22 @@ RSpec.describe PlayerBenchmarkSnapshotQuery do
     )
   end
 
+  it "uses only cached benchmarks for the requested date range" do
+    old_league = create_benchmark(peer_group_type: "mlb", peer_group_key: "all", average_value: 0.700, player_count: 280)
+    create_percentile(old_league, {})
+    requested_start = start_date + 1.day
+
+    result = described_class.new(player: player, start_date: requested_start, end_date: end_date).result
+
+    expect(result).to include(
+      available: false,
+      cached: false,
+      source_start_date: requested_start,
+      source_end_date: end_date,
+      metrics: []
+    )
+  end
+
   def create_benchmark(attributes)
     LeagueMetricBenchmark.create!(
       {

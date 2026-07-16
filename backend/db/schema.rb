@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_220000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_15_230000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -335,11 +335,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_220000) do
     t.integer "woba_denom"
     t.bigint "game_id"
     t.bigint "plate_appearance_id"
+    t.index ["batter", "game_date"], name: "idx_pitch_data_batter_game_date"
     t.index ["batter"], name: "index_pitch_data_on_batter"
     t.index ["game_date"], name: "index_pitch_data_on_game_date"
     t.index ["game_id"], name: "index_pitch_data_on_game_id"
     t.index ["game_pk", "at_bat_number", "pitch_number"], name: "idx_pitch_data_unique_pitch", unique: true
     t.index ["pitch_type"], name: "index_pitch_data_on_pitch_type"
+    t.index ["pitcher", "game_date"], name: "idx_pitch_data_pitcher_game_date"
     t.index ["pitcher"], name: "index_pitch_data_on_pitcher"
     t.index ["plate_appearance_id", "pitch_number"], name: "index_pitch_data_on_plate_appearance_id_and_pitch_number"
     t.index ["plate_appearance_id"], name: "index_pitch_data_on_plate_appearance_id"

@@ -73,6 +73,34 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     expect([ LeagueMetricBenchmark.count, PlayerMetricPercentile.count ]).to eq(counts)
   end
 
+  it "previews an uncached player range without writing benchmark records" do
+    counts = [ LeagueMetricBenchmark.count, PlayerMetricPercentile.count ]
+
+    result = described_class.preview(player_id: batter_one.id, start_date: date, end_date: date)
+
+    expect(result).to include(
+      available: true,
+      cached: false,
+      source_start_date: date,
+      source_end_date: date,
+      previous_start_date: previous_date,
+      previous_end_date: previous_date
+    )
+    ops = result.fetch(:metrics).find { |metric| metric[:metric_key] == "ops" }
+    expect(ops).to include(
+      raw_value: 1.35,
+      position_key: "3B",
+      percentile: 75.0,
+      previous_value: 0.5,
+      change_value: 0.85,
+      sample_size: 5,
+      mlb_player_count: 2
+    )
+    expect(ops[:mlb_average]).to be_within(0.0001).of(0.9444)
+    expect(ops[:position_average]).to be_within(0.0001).of(0.9444)
+    expect([ LeagueMetricBenchmark.count, PlayerMetricPercentile.count ]).to eq(counts)
+  end
+
   def common_daily(player, metric_date)
     {
       player: player,
