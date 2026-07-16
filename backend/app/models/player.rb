@@ -17,6 +17,11 @@ class Player < ApplicationRecord
   has_many :batting_plate_appearances, class_name: "PlateAppearance", foreign_key: :batter_id, dependent: :nullify
   has_many :pitching_plate_appearances, class_name: "PlateAppearance", foreign_key: :pitcher_id, dependent: :nullify
   has_many :lineup_entries, dependent: :destroy
+  has_many :player_batting_daily, dependent: :destroy
+  has_many :player_pitching_daily, dependent: :destroy
+  has_many :pitcher_pitch_type_daily, dependent: :destroy
+  has_many :batter_split_summaries, dependent: :destroy
+  has_many :pitcher_split_summaries, dependent: :destroy
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :first_name, presence: true

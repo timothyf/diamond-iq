@@ -10,10 +10,33 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_15_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
+
+  create_table "batter_split_summaries", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id"
+    t.string "split_type", null: false
+    t.string "split_value", null: false
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_4c26b0c526"
+    t.index ["player_id", "metric_date", "split_type", "split_value", "calculation_version"], name: "idx_batter_split_summaries_identity", unique: true
+    t.index ["player_id"], name: "index_batter_split_summaries_on_player_id"
+    t.index ["team_id"], name: "index_batter_split_summaries_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "batter_split_summaries_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "batter_split_summaries_source_range_valid"
+  end
 
   create_table "game_player_batting_lines", force: :cascade do |t|
     t.bigint "game_id", null: false
@@ -295,6 +318,52 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
     t.index ["plate_appearance_id"], name: "index_pitch_data_on_plate_appearance_id"
   end
 
+  create_table "pitcher_pitch_type_daily", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id"
+    t.string "pitch_type", null: false
+    t.string "pitch_name"
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_6c0612609d"
+    t.index ["player_id", "metric_date", "pitch_type", "calculation_version"], name: "idx_pitcher_pitch_type_daily_identity", unique: true
+    t.index ["player_id"], name: "index_pitcher_pitch_type_daily_on_player_id"
+    t.index ["team_id"], name: "index_pitcher_pitch_type_daily_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "pitcher_pitch_type_daily_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "pitcher_pitch_type_daily_source_range_valid"
+  end
+
+  create_table "pitcher_split_summaries", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id"
+    t.string "split_type", null: false
+    t.string "split_value", null: false
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_99e6483c5d"
+    t.index ["player_id", "metric_date", "split_type", "split_value", "calculation_version"], name: "idx_pitcher_split_summaries_identity", unique: true
+    t.index ["player_id"], name: "index_pitcher_split_summaries_on_player_id"
+    t.index ["team_id"], name: "index_pitcher_split_summaries_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "pitcher_split_summaries_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "pitcher_split_summaries_source_range_valid"
+  end
+
   create_table "plate_appearances", force: :cascade do |t|
     t.bigint "game_id", null: false
     t.bigint "batter_id"
@@ -330,6 +399,48 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
     t.index ["game_id"], name: "index_plate_appearances_on_game_id"
     t.index ["pitcher_id", "game_id"], name: "index_plate_appearances_on_pitcher_id_and_game_id"
     t.index ["pitcher_id"], name: "index_plate_appearances_on_pitcher_id"
+  end
+
+  create_table "player_batting_daily", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id", null: false
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_786d18fcc2"
+    t.index ["player_id", "team_id", "metric_date", "calculation_version"], name: "idx_player_batting_daily_identity", unique: true
+    t.index ["player_id"], name: "index_player_batting_daily_on_player_id"
+    t.index ["team_id"], name: "index_player_batting_daily_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "player_batting_daily_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "player_batting_daily_source_range_valid"
+  end
+
+  create_table "player_pitching_daily", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id", null: false
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_ffce0e8cff"
+    t.index ["player_id", "team_id", "metric_date", "calculation_version"], name: "idx_player_pitching_daily_identity", unique: true
+    t.index ["player_id"], name: "index_player_pitching_daily_on_player_id"
+    t.index ["team_id"], name: "index_player_pitching_daily_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "player_pitching_daily_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "player_pitching_daily_source_range_valid"
   end
 
   create_table "player_positions", force: :cascade do |t|
@@ -516,6 +627,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
     t.index ["name", "category"], name: "index_stat_types_on_name_and_category", unique: true
   end
 
+  create_table "team_daily_metrics", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.date "metric_date", null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.integer "sample_size", default: 0, null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metrics", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_6b9dab98af"
+    t.index ["team_id", "metric_date", "calculation_version"], name: "idx_team_daily_metrics_identity", unique: true
+    t.index ["team_id"], name: "index_team_daily_metrics_on_team_id"
+    t.check_constraint "sample_size >= 0", name: "team_daily_metrics_sample_size_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "team_daily_metrics_source_range_valid"
+  end
+
   create_table "team_memberships", force: :cascade do |t|
     t.bigint "player_id", null: false
     t.bigint "team_id", null: false
@@ -556,6 +686,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  add_foreign_key "batter_split_summaries", "players"
+  add_foreign_key "batter_split_summaries", "teams"
   add_foreign_key "game_player_batting_lines", "games"
   add_foreign_key "game_player_batting_lines", "players"
   add_foreign_key "game_player_batting_lines", "teams"
@@ -574,11 +706,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
   add_foreign_key "lineup_entries", "teams"
   add_foreign_key "pitch_data", "games"
   add_foreign_key "pitch_data", "plate_appearances"
+  add_foreign_key "pitcher_pitch_type_daily", "players"
+  add_foreign_key "pitcher_pitch_type_daily", "teams"
+  add_foreign_key "pitcher_split_summaries", "players"
+  add_foreign_key "pitcher_split_summaries", "teams"
   add_foreign_key "plate_appearances", "games"
   add_foreign_key "plate_appearances", "players", column: "batter_id"
   add_foreign_key "plate_appearances", "players", column: "pitcher_id"
   add_foreign_key "plate_appearances", "teams", column: "batting_team_id"
   add_foreign_key "plate_appearances", "teams", column: "fielding_team_id"
+  add_foreign_key "player_batting_daily", "players"
+  add_foreign_key "player_batting_daily", "teams"
+  add_foreign_key "player_pitching_daily", "players"
+  add_foreign_key "player_pitching_daily", "teams"
   add_foreign_key "player_positions", "players"
   add_foreign_key "player_positions", "positions"
   add_foreign_key "player_profiles", "players"
@@ -592,6 +732,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_190000) do
   add_foreign_key "roster_snapshot_players", "roster_snapshots"
   add_foreign_key "roster_snapshots", "teams"
   add_foreign_key "rosters", "teams"
+  add_foreign_key "team_daily_metrics", "teams"
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"
 end

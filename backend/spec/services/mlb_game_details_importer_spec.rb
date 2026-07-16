@@ -29,6 +29,7 @@ RSpec.describe MlbGameDetailsImporter do
 
     expect(first_result[:success]).to be(true)
     expect(second_result[:success]).to be(true)
+    expect(second_result.dig(:data, :analytics_refresh, :success)).to be(true)
     expect(first_result.dig(:data, :linked_pitch_count)).to eq(1)
     expect(second_result.dig(:data, :linked_pitch_count)).to eq(0)
     expect(GamePlayerBattingLine.count).to eq(2)

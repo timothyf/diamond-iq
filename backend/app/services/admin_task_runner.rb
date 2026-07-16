@@ -23,6 +23,10 @@ class AdminTaskRunner
     "player_positions_backfill" => {
       name: "Player position backfill",
       description: "Rebuild normalized current-position assignments from active team memberships."
+    },
+    "daily_analytics_refresh" => {
+      name: "Daily analytics refresh",
+      description: "Incrementally rebuild versioned player, pitch-type, split, and team summaries for a date range."
     }
   }.freeze
 
@@ -109,6 +113,18 @@ class AdminTaskRunner
     MlbRosterSnapshotSync.call(
       team_mlb_id: positive_integer(:team_mlb_id, required: true),
       snapshot_on: required_date(:snapshot_on)
+    )
+  end
+
+  def daily_analytics_refresh
+    start_date = required_date(:start_date)
+    end_date = optional_date(:end_date) || start_date
+    raise ArgumentError, "End date must be on or after start date" if end_date < start_date
+
+    DailyAnalyticsRefresh.call(
+      start_date: start_date,
+      end_date: end_date,
+      calculation_version: params[:calculation_version].presence || DailyAnalyticsRefresh::CALCULATION_VERSION
     )
   end
 

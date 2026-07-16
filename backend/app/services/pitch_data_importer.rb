@@ -59,6 +59,7 @@ class PitchDataImporter
     PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
 
     linked_count = rows.count { |row| row[:game_id].present? }
+    analytics_refresh = refresh_daily_analytics(rows)
 
     success(
       "Imported #{rows.length} pitch data rows",
@@ -69,6 +70,7 @@ class PitchDataImporter
         linked_game_count: linked_count,
         unlinked_game_count: rows.length - linked_count,
         source_name: resolved_source_name,
+        analytics_refresh: analytics_refresh,
         errors: errors
       }
     )
@@ -83,6 +85,15 @@ class PitchDataImporter
   private
 
   attr_reader :csv_data, :file_path, :source_name, :errors
+
+  def refresh_daily_analytics(rows)
+    dates = rows.filter_map { |row| row[:game_date] }.uniq
+    return { skipped: true, reason: "Imported rows did not include game dates" } if dates.empty?
+
+    DailyAnalyticsRefresh.call(dates: dates)
+  rescue StandardError => error
+    { success: false, message: "Pitch data was imported, but daily analytics refresh failed: #{error.message}" }
+  end
 
   def required_headers
     %w[game_pk at_bat_number pitch_number]

@@ -9,6 +9,12 @@ class Team < ApplicationRecord
   has_many :game_player_batting_lines, dependent: :restrict_with_error
   has_many :game_player_pitching_lines, dependent: :restrict_with_error
   has_many :lineup_entries, dependent: :restrict_with_error
+  has_many :player_batting_daily, dependent: :restrict_with_error
+  has_many :player_pitching_daily, dependent: :restrict_with_error
+  has_many :pitcher_pitch_type_daily, dependent: :nullify
+  has_many :batter_split_summaries, dependent: :nullify
+  has_many :pitcher_split_summaries, dependent: :nullify
+  has_many :team_daily_metrics, dependent: :restrict_with_error
 
   def logo_url
     "https://www.mlbstatic.com/team-logos/#{mlb_id}.svg"

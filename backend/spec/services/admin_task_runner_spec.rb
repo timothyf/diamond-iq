@@ -178,4 +178,20 @@ RSpec.describe AdminTaskRunner do
 
     expect(response).to include(success: false, error: :not_found, task: "db_drop")
   end
+
+  it "runs an incremental daily analytics refresh" do
+    allow(DailyAnalyticsRefresh).to receive(:call).and_return(success: true, message: "Refreshed", data: {})
+
+    response = described_class.call(
+      task_name: "daily_analytics_refresh",
+      params: { start_date: "2026-07-15", end_date: "2026-07-16", calculation_version: "2.0.0" }
+    )
+
+    expect(response).to include(success: true, task: "daily_analytics_refresh")
+    expect(DailyAnalyticsRefresh).to have_received(:call).with(
+      start_date: Date.new(2026, 7, 15),
+      end_date: Date.new(2026, 7, 16),
+      calculation_version: "2.0.0"
+    )
+  end
 end

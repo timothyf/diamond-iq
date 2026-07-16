@@ -42,6 +42,16 @@ RSpec.describe "Api::Teams", type: :request do
       primary_position: "CF",
       source_status_description: "Active"
     )
+    optioned_player = create_player(team: @tigers, attributes: { mlb_id: 679_529, first_name: "Spencer", last_name: "Torkelson" })
+    optioned_membership = create_team_membership(
+      player: optioned_player,
+      team: @tigers,
+      starts_on: Date.current - 20.days,
+      roster_status: "minors",
+      jersey_number: "20",
+      primary_position: "1B",
+      source_status_description: "Minors"
+    )
     completed_game = create_game(
       schedule: @schedule,
       home_team: @tigers,
@@ -72,12 +82,21 @@ RSpec.describe "Api::Teams", type: :request do
       "runs_scored" => 5,
       "runs_allowed" => 2
     )
-    expect(json_body.dig("data", "roster", 0)).to include(
+    serialized_membership = json_body.dig("data", "roster").find { |entry| entry.fetch("id") == membership.id }
+    expect(serialized_membership).to include(
       "id" => membership.id,
       "jersey_number" => "31",
       "primary_position" => "CF"
     )
-    expect(json_body.dig("data", "roster", 0, "player", "full_name")).to eq("Riley Greene")
+    expect(serialized_membership.dig("player", "full_name")).to eq("Riley Greene")
+    expect(json_body.dig("data", "roster_as_of")).to eq(Date.current.iso8601)
+    expect(json_body.dig("data", "rosters", "forty_man").pluck("id")).to contain_exactly(membership.id, optioned_membership.id)
+    expect(json_body.dig("data", "rosters", "active").pluck("id")).to eq([ membership.id ])
+    expect(json_body.dig("data", "roster_summary")).to include(
+      "total" => 2,
+      "active" => 1,
+      "other" => 1
+    )
     expect(json_body.dig("data", "recent_games", 0, "id")).to eq(completed_game.id)
     expect(json_body.dig("data", "upcoming_games", 0, "id")).to eq(upcoming_game.id)
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present

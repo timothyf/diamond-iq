@@ -17,6 +17,7 @@ const payload = {
     available_seasons: [2025, 2026],
     record: { wins: 52, losses: 43, ties: 0, games_played: 95, runs_scored: 430, runs_allowed: 401 },
     roster_summary: { total: 40, active: 26, injured: 6, other: 8 },
+    roster_as_of: '2026-07-15',
     roster: [
       {
         id: 9,
@@ -28,7 +29,53 @@ const payload = {
         starts_on: '2026-03-26',
         player: { id: 42, mlb_id: 680776, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null },
       },
+      {
+        id: 10,
+        roster_status: 'minors',
+        status_description: 'Minors',
+        injured: false,
+        jersey_number: '20',
+        primary_position: '1B',
+        starts_on: '2026-06-01',
+        player: { id: 43, mlb_id: 679529, full_name: 'Spencer Torkelson', first_name: 'Spencer', last_name: 'Torkelson', headshot_url: null },
+      },
     ],
+    rosters: {
+      forty_man: [
+        {
+          id: 9,
+          roster_status: 'active',
+          status_description: 'Active',
+          injured: false,
+          jersey_number: '31',
+          primary_position: 'CF',
+          starts_on: '2026-03-26',
+          player: { id: 42, mlb_id: 680776, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null },
+        },
+        {
+          id: 10,
+          roster_status: 'minors',
+          status_description: 'Minors',
+          injured: false,
+          jersey_number: '20',
+          primary_position: '1B',
+          starts_on: '2026-06-01',
+          player: { id: 43, mlb_id: 679529, full_name: 'Spencer Torkelson', first_name: 'Spencer', last_name: 'Torkelson', headshot_url: null },
+        },
+      ],
+      active: [
+        {
+          id: 9,
+          roster_status: 'active',
+          status_description: 'Active',
+          injured: false,
+          jersey_number: '31',
+          primary_position: 'CF',
+          starts_on: '2026-03-26',
+          player: { id: 42, mlb_id: 680776, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null },
+        },
+      ],
+    },
     recent_games: [
       { id: 80, official_date: '2026-07-14', home_score: 5, away_score: 2, home_team: { id: 1, abbreviation: 'DET' }, away_team: { id: 2, abbreviation: 'CLE' } },
     ],
@@ -54,6 +101,16 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="recent-games"]').text()).toContain('5–2')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('CF')
+    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Spencer Torkelson')
+    expect(wrapper.get('[data-test="roster-view-40man"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="roster-view-40man"]').text()).toContain('2')
+    expect(wrapper.get('[data-test="roster-view-active"]').text()).toContain('1')
+
+    await wrapper.get('[data-test="roster-view-active"]').trigger('click')
+
+    expect(wrapper.get('[data-test="roster-view-active"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
+    expect(wrapper.get('[data-test="team-roster"]').text()).not.toContain('Spencer Torkelson')
     expect(wrapper.get('[data-test="team-season-select"]').text()).toContain('2025')
   })
 

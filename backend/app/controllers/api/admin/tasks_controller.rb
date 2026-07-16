@@ -11,7 +11,8 @@ module Api
             database: database_metrics,
             player_season_stats: player_season_stats_metrics,
             pitch_data: pitch_data_metrics,
-            game_details: game_details_metrics
+            game_details: game_details_metrics,
+            daily_analytics: daily_analytics_metrics
           }
         }
       end
@@ -42,7 +43,8 @@ module Api
           :team_mlb_id,
           :season,
           :snapshot_on,
-          :mlb_game_id
+          :mlb_game_id,
+          :calculation_version
         )
       end
 
@@ -204,6 +206,22 @@ module Api
           pitching_line_count: GamePlayerPitchingLine.count,
           plate_appearance_count: PlateAppearance.count,
           linked_pitch_count: PitchDatum.where.not(plate_appearance_id: nil).count
+        }
+      end
+
+      def daily_analytics_metrics
+        models = DailyAnalyticsRefresh::SUMMARY_MODELS
+        ranges = models.flat_map do |model|
+          table = model.arel_table
+          model.pick(table[:metric_date].minimum, table[:metric_date].maximum)
+        end.compact
+
+        {
+          calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+          earliest_metric_date: ranges.min&.iso8601,
+          latest_metric_date: ranges.max&.iso8601,
+          row_counts: models.to_h { |model| [ model.table_name, approximate_row_count(model) ] },
+          last_calculated_at: models.filter_map { |model| model.maximum(:calculated_at) }.max
         }
       end
 

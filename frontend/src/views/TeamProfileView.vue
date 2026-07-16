@@ -9,6 +9,7 @@ const props = defineProps({
 
 const teamId = computed(() => props.teamId)
 const selectedSeason = ref(null)
+const selectedRosterView = ref('fortyMan')
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
 
 watch(
@@ -17,6 +18,14 @@ watch(
     if (season && selectedSeason.value === null) selectedSeason.value = season
   },
 )
+
+watch(teamId, () => {
+  selectedRosterView.value = 'fortyMan'
+})
+
+const displayedRoster = computed(() => team.value?.rosters?.[selectedRosterView.value] || [])
+
+const rosterViewLabel = computed(() => (selectedRosterView.value === 'active' ? 'Active roster' : '40-man roster'))
 
 const recordLabel = computed(() => {
   const record = team.value?.record
@@ -131,12 +140,37 @@ function probablePitcher(game) {
       </div>
 
       <section class="team-panel roster-panel">
-        <header><div><p>Dated roster state</p><h2>Current roster</h2></div><span>As of today</span></header>
-        <div v-if="team.roster.length" class="roster-table-wrap" data-test="team-roster">
+        <header>
+          <div><p>Dated roster state</p><h2>Current roster</h2></div>
+          <div class="roster-view-controls">
+            <div role="group" aria-label="Roster view">
+              <button
+                type="button"
+                data-test="roster-view-40man"
+                :class="{ 'is-selected': selectedRosterView === 'fortyMan' }"
+                :aria-pressed="selectedRosterView === 'fortyMan'"
+                @click="selectedRosterView = 'fortyMan'"
+              >
+                40-man <span>{{ team.rosters.fortyMan.length }}</span>
+              </button>
+              <button
+                type="button"
+                data-test="roster-view-active"
+                :class="{ 'is-selected': selectedRosterView === 'active' }"
+                :aria-pressed="selectedRosterView === 'active'"
+                @click="selectedRosterView = 'active'"
+              >
+                Active <span>{{ team.rosters.active.length }}</span>
+              </button>
+            </div>
+            <small>As of {{ formatDate(team.rosterAsOf, true) }}</small>
+          </div>
+        </header>
+        <div v-if="displayedRoster.length" class="roster-table-wrap" data-test="team-roster">
           <table>
             <thead><tr><th>Player</th><th>#</th><th>Pos</th><th>Status</th><th>Member since</th></tr></thead>
             <tbody>
-              <tr v-for="membership in team.roster" :key="membership.id">
+              <tr v-for="membership in displayedRoster" :key="membership.id">
                 <td>
                   <RouterLink class="roster-player" :to="{ name: 'player-profile', params: { id: membership.player.id } }">
                     <span class="roster-headshot">
@@ -154,7 +188,7 @@ function probablePitcher(game) {
             </tbody>
           </table>
         </div>
-        <p v-else class="team-empty">No active membership records are stored for this team.</p>
+        <p v-else class="team-empty">No players are stored for this team's {{ rosterViewLabel.toLowerCase() }}.</p>
       </section>
 
       <footer class="team-freshness">
@@ -198,6 +232,13 @@ function probablePitcher(game) {
 .result { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: white; font-size: .75rem; }
 .result--w { background: #176044; } .result--l { background: #9c382c; } .result--t { background: #69747c; }
 .roster-panel { margin-top: 1rem; }
+.roster-view-controls { display: flex; gap: .8rem; align-items: center; }
+.roster-view-controls > div { display: inline-flex; padding: .2rem; border-radius: 999px; background: #e9e6dd; }
+.roster-view-controls button { display: inline-flex; gap: .35rem; align-items: center; padding: .42rem .7rem; border: 0; border-radius: 999px; color: #5c6871; background: transparent; font: inherit; font-size: .72rem; font-weight: 800; cursor: pointer; }
+.roster-view-controls button span { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 .3rem; border-radius: 999px; color: inherit; background: rgba(16,38,61,.09); font-size: .64rem; }
+.roster-view-controls button.is-selected { color: #fffaf0; background: #10263d; box-shadow: 0 3px 10px rgba(16,38,61,.18); }
+.roster-view-controls button.is-selected span { background: rgba(255,255,255,.16); }
+.roster-view-controls > small { color: #778087; font-size: .7rem; white-space: nowrap; }
 .roster-table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: .75rem .8rem; border-bottom: 1px solid #e8e5dd; text-align: left; }
@@ -214,6 +255,6 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state { margin-top: 2rem; padding: 2rem; border-radius: 20px; background: #fffaf0; }
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
-@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .game-list li { grid-template-columns: 68px 1fr auto; } }
+@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .game-list li { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 </style>

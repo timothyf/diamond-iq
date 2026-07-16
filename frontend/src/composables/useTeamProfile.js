@@ -20,6 +20,27 @@ function normalizeGame(game) {
   }
 }
 
+function normalizeMembership(membership) {
+  return {
+    id: membership.id,
+    rosterStatus: membership.roster_status,
+    statusDescription: membership.status_description,
+    injured: membership.injured,
+    jerseyNumber: membership.jersey_number,
+    primaryPosition: membership.primary_position,
+    startsOn: membership.starts_on,
+    lastSyncedAt: membership.last_synced_at,
+    player: {
+      id: membership.player.id,
+      mlbId: membership.player.mlb_id,
+      fullName: membership.player.full_name,
+      firstName: membership.player.first_name,
+      lastName: membership.player.last_name,
+      headshotUrl: membership.player.headshot_url,
+    },
+  }
+}
+
 function normalizeProfile(data) {
   return {
     id: data.id,
@@ -33,24 +54,12 @@ function normalizeProfile(data) {
     season: data.season,
     availableSeasons: data.available_seasons || [],
     record: data.record || {},
-    roster: (data.roster || []).map((membership) => ({
-      id: membership.id,
-      rosterStatus: membership.roster_status,
-      statusDescription: membership.status_description,
-      injured: membership.injured,
-      jerseyNumber: membership.jersey_number,
-      primaryPosition: membership.primary_position,
-      startsOn: membership.starts_on,
-      lastSyncedAt: membership.last_synced_at,
-      player: {
-        id: membership.player.id,
-        mlbId: membership.player.mlb_id,
-        fullName: membership.player.full_name,
-        firstName: membership.player.first_name,
-        lastName: membership.player.last_name,
-        headshotUrl: membership.player.headshot_url,
-      },
-    })),
+    roster: (data.roster || []).map(normalizeMembership),
+    rosters: {
+      fortyMan: (data.rosters?.forty_man || data.roster || []).map(normalizeMembership),
+      active: (data.rosters?.active || (data.roster || []).filter((membership) => membership.roster_status === 'active')).map(normalizeMembership),
+    },
+    rosterAsOf: data.roster_as_of,
     rosterSummary: data.roster_summary || {},
     recentGames: (data.recent_games || []).map(normalizeGame),
     upcomingGames: (data.upcoming_games || []).map(normalizeGame),

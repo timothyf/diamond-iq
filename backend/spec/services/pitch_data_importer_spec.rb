@@ -46,6 +46,7 @@ RSpec.describe PitchDataImporter, type: :service do
     expect(second_pitch.plate_appearance).to eq(plate_appearance)
     expect(result.dig(:data, :linked_game_count)).to eq(2)
     expect(result.dig(:data, :unlinked_game_count)).to eq(0)
+    expect(result.dig(:data, :analytics_refresh, :success)).to be(true)
   end
 
   it "leaves pitches nullable when their canonical game has not been synchronized" do

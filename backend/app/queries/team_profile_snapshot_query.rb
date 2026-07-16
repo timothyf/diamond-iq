@@ -13,6 +13,11 @@ class TeamProfileSnapshotQuery
       available_seasons: available_seasons,
       record: record,
       roster: roster_memberships.map { |membership| serialize_membership(membership) },
+      rosters: {
+        forty_man: roster_memberships.map { |membership| serialize_membership(membership) },
+        active: active_roster_memberships.map { |membership| serialize_membership(membership) }
+      },
+      roster_as_of: on,
       roster_summary: roster_summary,
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
@@ -134,6 +139,12 @@ class TeamProfileSnapshotQuery
     }
   end
 
+  def active_roster_memberships
+    @active_roster_memberships ||= roster_memberships.select do |membership|
+      membership.roster_status.to_s.casecmp("active").zero?
+    end
+  end
+
   def current_primary_position(player)
     player.player_positions.find { |assignment| assignment.season.nil? && assignment.is_primary? }&.position
   end
@@ -141,7 +152,7 @@ class TeamProfileSnapshotQuery
   def roster_summary
     {
       total: roster_memberships.length,
-      active: roster_memberships.count { |membership| membership.roster_status == "active" },
+      active: active_roster_memberships.length,
       injured: roster_memberships.count(&:injured?),
       other: roster_memberships.count { |membership| membership.roster_status != "active" && !membership.injured? }
     }

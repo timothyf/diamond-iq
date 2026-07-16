@@ -23,7 +23,8 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "mlb_player_profiles_sync",
       "mlb_roster_sync",
       "mlb_roster_snapshots_sync",
-      "player_positions_backfill"
+      "player_positions_backfill",
+      "daily_analytics_refresh"
     )
     expect(json_body.dig("meta", "schedule_date_range")).to eq(
       "earliest_game_date" => "2026-03-26",
@@ -82,6 +83,13 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "synchronized_game_count" => 0,
       "plate_appearance_count" => 0,
       "linked_pitch_count" => 0
+    )
+    expect(json_body.dig("meta", "daily_analytics")).to include(
+      "calculation_version" => "1.0.0",
+      "row_counts" => include(
+        "player_batting_daily" => 0,
+        "team_daily_metrics" => 0
+      )
     )
   end
 

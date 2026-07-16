@@ -32,7 +32,11 @@ class MlbGameDetailsImporter
     return failure("Game detail import validation failed", input_errors) if input_errors.any?
 
     counts = persist!
-    success("Synchronized details for MLB game #{game.mlb_id}", counts.merge(game_id: game.id, mlb_id: game.mlb_id))
+    analytics_refresh = refresh_daily_analytics
+    success(
+      "Synchronized details for MLB game #{game.mlb_id}",
+      counts.merge(game_id: game.id, mlb_id: game.mlb_id, analytics_refresh: analytics_refresh)
+    )
   rescue ImportError => e
     failure("Game detail import validation failed", [ e.message ])
   rescue ActiveRecord::ActiveRecordError => e
@@ -42,6 +46,12 @@ class MlbGameDetailsImporter
   private
 
   attr_reader :game, :boxscore, :live_feed, :boxscore_source_url, :live_feed_source_url, :fetched_at, :players_by_mlb_id
+
+  def refresh_daily_analytics
+    DailyAnalyticsRefresh.call(dates: [ game.official_date ])
+  rescue StandardError => error
+    { success: false, message: "Game details were imported, but daily analytics refresh failed: #{error.message}" }
+  end
 
   def input_errors
     errors = []
