@@ -9,6 +9,7 @@ const ACTIVE_STATUSES = ['queued', 'running']
 export function useGameDetailsSync() {
   const task = ref(null)
   const starting = ref(false)
+  const estimating = ref(false)
   const error = ref('')
   let pollTimer = null
 
@@ -81,6 +82,43 @@ export function useGameDetailsSync() {
     }
   }
 
+  async function estimate(parameters) {
+    estimating.value = true
+    error.value = ''
+    try {
+      const query = new URLSearchParams(
+        Object.entries(parameters).filter(([, value]) => value !== null && value !== undefined && value !== ''),
+      )
+      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs/estimate?${query}`, {
+        headers: { Accept: 'application/json' },
+      })
+      const payload = await response.json()
+      if (!response.ok) throw new Error(payload?.message || `Unable to estimate game synchronization (${response.status}).`)
+
+      return normalizeEstimate(payload.data)
+    } catch (estimateError) {
+      error.value = estimateError.message || 'Unable to estimate game synchronization.'
+      return null
+    } finally {
+      estimating.value = false
+    }
+  }
+
+  function normalizeEstimate(data) {
+    if (!data) return null
+    return {
+      taskParameters: data.task_parameters || {},
+      gameCount: Number(data.game_count || 0),
+      estimatedSeconds: Number(data.estimated_seconds || 0),
+      lowEstimatedSeconds: Number(data.low_estimated_seconds || 0),
+      highEstimatedSeconds: Number(data.high_estimated_seconds || 0),
+      secondsPerGame: Number(data.seconds_per_game || 0),
+      timingSampleGameCount: Number(data.timing_sample_game_count || 0),
+      timingSampleRunCount: Number(data.timing_sample_run_count || 0),
+      estimateSource: data.estimate_source,
+    }
+  }
+
   async function poll() {
     if (!task.value?.id) return
     try {
@@ -140,8 +178,10 @@ export function useGameDetailsSync() {
     task: computed(() => task.value),
     active: computed(() => Boolean(task.value && ACTIVE_STATUSES.includes(task.value.status))),
     starting: computed(() => starting.value),
+    estimating: computed(() => estimating.value),
     error: computed(() => error.value),
     start,
+    estimate,
     cancel,
     poll,
     loadActiveTask,

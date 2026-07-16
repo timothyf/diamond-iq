@@ -72,6 +72,36 @@ describe('useGameDetailsSync', () => {
     wrapper.unmount()
   })
 
+  it('loads an exact preflight estimate before synchronization begins', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          task_parameters: { start_date: '2026-07-01', end_date: '2026-07-02' },
+          game_count: 25,
+          estimated_seconds: 1326,
+          low_estimated_seconds: 1061,
+          high_estimated_seconds: 1724,
+          seconds_per_game: 53.04,
+          timing_sample_game_count: 25,
+          timing_sample_run_count: 1,
+          estimate_source: 'historical',
+        },
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { api, wrapper } = mountComposable()
+
+    const estimate = await api.estimate({ start_date: '2026-07-01', end_date: '2026-07-02', mlb_game_id: null })
+
+    expect(estimate).toMatchObject({ gameCount: 25, estimatedSeconds: 1326, estimateSource: 'historical' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/task_runs/estimate?start_date=2026-07-01&end_date=2026-07-02',
+      expect.any(Object),
+    )
+    wrapper.unmount()
+  })
+
   it('recovers an active task after reload and polls until it completes', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({ ok: true, json: async () => ({ data: [taskPayload()] }) })

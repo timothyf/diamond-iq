@@ -14,6 +14,7 @@ const loadSnapshots = vi.fn()
 const startGameDetailsSync = vi.fn()
 const cancelGameDetailsSync = vi.fn()
 const loadActiveGameDetailsSync = vi.fn()
+const estimateGameDetailsSync = vi.fn()
 const gameDetailsTask = ref(null)
 const rosterSnapshots = ref([])
 
@@ -106,8 +107,10 @@ vi.mock('../../composables/useGameDetailsSync', () => ({
     task: computed(() => gameDetailsTask.value),
     active: computed(() => ['queued', 'running'].includes(gameDetailsTask.value?.status)),
     starting: computed(() => false),
+    estimating: computed(() => false),
     error: computed(() => ''),
     start: startGameDetailsSync,
+    estimate: estimateGameDetailsSync,
     cancel: cancelGameDetailsSync,
     loadActiveTask: loadActiveGameDetailsSync,
   }),
@@ -161,6 +164,16 @@ describe('AdminView', () => {
     startGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'queued' })
     cancelGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'running', cancelRequested: true })
     loadActiveGameDetailsSync.mockReset().mockResolvedValue(null)
+    estimateGameDetailsSync.mockReset().mockResolvedValue({
+      gameCount: 25,
+      estimatedSeconds: 1326,
+      lowEstimatedSeconds: 1061,
+      highEstimatedSeconds: 1724,
+      secondsPerGame: 53.04,
+      timingSampleGameCount: 25,
+      timingSampleRunCount: 1,
+      estimateSource: 'historical',
+    })
     gameDetailsTask.value = null
     rosterSnapshots.value = []
   })
@@ -244,6 +257,7 @@ describe('AdminView', () => {
     expect(loadOverview).toHaveBeenCalledTimes(3)
 
     await wrapper.get('[data-test="game-details-sync-form"]').trigger('submit')
+    await flushPromises()
     expect(wrapper.get('[data-test="game-details-confirmation"]').attributes('role')).toBe('dialog')
     expect(startGameDetailsSync).not.toHaveBeenCalled()
     await wrapper.get('[data-test="game-details-continue"]').trigger('click')
@@ -288,13 +302,15 @@ describe('AdminView', () => {
     await dateInputs[1].setValue('2026-07-07')
 
     await form.trigger('submit')
+    await flushPromises()
 
     const confirmation = wrapper.get('[data-test="game-details-confirmation"]')
     expect(confirmation.attributes('aria-modal')).toBe('true')
     expect(confirmation.text()).toContain('7 calendar days')
     expect(confirmation.text()).toContain('Jul 1, 2026–Jul 7, 2026')
-    expect(confirmation.text()).toContain('about 6–11 minutes')
-    expect(confirmation.text()).toContain('up to approximately 105 games')
+    expect(confirmation.text()).toContain('about 22 minutes')
+    expect(confirmation.text()).toContain('typically 18–29 minutes')
+    expect(confirmation.text()).toContain('25 stored games')
     expect(confirmation.text()).toContain('Keep the Rails server running')
     expect(startGameDetailsSync).not.toHaveBeenCalled()
 
@@ -303,6 +319,7 @@ describe('AdminView', () => {
     expect(startGameDetailsSync).not.toHaveBeenCalled()
 
     await form.trigger('submit')
+    await flushPromises()
     await wrapper.get('[data-test="game-details-continue"]').trigger('click')
     await flushPromises()
     expect(startGameDetailsSync).toHaveBeenCalledWith(

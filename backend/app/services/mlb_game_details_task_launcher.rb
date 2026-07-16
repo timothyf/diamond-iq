@@ -1,5 +1,5 @@
 class MlbGameDetailsTaskLauncher
-  TASK_NAME = "mlb_game_details_sync"
+  TASK_NAME = MlbGameDetailsTaskEstimate::TASK_NAME
 
   def self.call(start_date: nil, end_date: nil, mlb_game_id: nil)
     new(start_date: start_date, end_date: end_date, mlb_game_id: mlb_game_id).call
@@ -12,7 +12,12 @@ class MlbGameDetailsTaskLauncher
   end
 
   def call
-    attributes = normalized_attributes
+    estimate = MlbGameDetailsTaskEstimate.call(
+      start_date: start_date_input,
+      end_date: end_date_input,
+      mlb_game_id: mlb_game_id_input
+    )
+    attributes = estimate.fetch(:task_parameters)
     if AdminTaskRun.active.exists?(task_name: TASK_NAME)
       raise ArgumentError, "A game detail synchronization is already queued or running"
     end
@@ -20,7 +25,7 @@ class MlbGameDetailsTaskLauncher
     task_run = AdminTaskRun.create!(
       task_name: TASK_NAME,
       task_parameters: attributes,
-      total_items: selected_games(attributes).count
+      total_items: estimate.fetch(:game_count)
     )
     enqueued_job = MlbGameDetailsSyncJob.perform_later(task_run.id)
     raise ActiveJob::EnqueueError, "Game detail synchronization could not be enqueued" unless enqueued_job
@@ -36,34 +41,4 @@ class MlbGameDetailsTaskLauncher
   private
 
   attr_reader :start_date_input, :end_date_input, :mlb_game_id_input
-
-  def normalized_attributes
-    if mlb_game_id_input.present?
-      mlb_game_id = Integer(mlb_game_id_input, exception: false)
-      raise ArgumentError, "MLB game id must be a positive integer" unless mlb_game_id&.positive?
-      raise ArgumentError, "No stored game was found for MLB game id #{mlb_game_id}" unless Game.exists?(mlb_id: mlb_game_id)
-
-      return { "mlb_game_id" => mlb_game_id }
-    end
-
-    start_date = parse_required_date(:start_date, start_date_input)
-    end_date = parse_required_date(:end_date, end_date_input)
-    raise ArgumentError, "End date must be on or after start date" if end_date < start_date
-
-    { "start_date" => start_date.iso8601, "end_date" => end_date.iso8601 }
-  end
-
-  def selected_games(attributes)
-    return Game.where(mlb_id: attributes.fetch("mlb_game_id")) if attributes["mlb_game_id"]
-
-    Game.where(official_date: Date.iso8601(attributes.fetch("start_date"))..Date.iso8601(attributes.fetch("end_date")))
-  end
-
-  def parse_required_date(name, value)
-    raise ArgumentError, "#{name.to_s.humanize} is required" if value.blank?
-
-    Date.iso8601(value.to_s)
-  rescue Date::Error
-    raise ArgumentError, "#{name.to_s.humanize} must be a valid ISO date"
-  end
 end

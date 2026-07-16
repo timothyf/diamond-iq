@@ -28,6 +28,17 @@ module Api
         render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
       end
 
+      def estimate
+        estimate = MlbGameDetailsTaskEstimate.call(
+          start_date: params[:start_date],
+          end_date: params[:end_date],
+          mlb_game_id: params[:mlb_game_id]
+        )
+        render json: { data: estimate }
+      rescue ArgumentError => error
+        render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+      end
+
       def cancel
         task_run.update!(cancel_requested_at: Time.current) if task_run.active? && !task_run.cancel_requested?
         render json: { data: AdminTaskRunSerializer.call(task_run.reload) }, status: :accepted

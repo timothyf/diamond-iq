@@ -3,6 +3,20 @@ require "rails_helper"
 RSpec.describe "Api::Admin::TaskRuns", type: :request do
   include ActiveJob::TestHelper
 
+  it "estimates from the exact stored-game count before starting a task" do
+    create_game(mlb_id: 810_001, official_date: Date.new(2026, 7, 15))
+    create_game(mlb_id: 810_002, official_date: Date.new(2026, 7, 15))
+
+    get estimate_api_admin_task_runs_path, params: { start_date: "2026-07-15", end_date: "2026-07-15" }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data")).to include(
+      "game_count" => 2,
+      "estimated_seconds" => 100,
+      "estimate_source" => "conservative_default"
+    )
+  end
+
   it "enqueues a tracked game-detail synchronization with a stored game count" do
     create_game(mlb_id: 810_001, official_date: Date.new(2026, 7, 15))
     create_game(mlb_id: 810_002, official_date: Date.new(2026, 7, 15))

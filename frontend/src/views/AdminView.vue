@@ -19,6 +19,7 @@ const gameDetailsConfirmationOpen = ref(false)
 const gameDetailsConfirmationDialog = ref(null)
 const gameDetailsSyncButton = ref(null)
 const pendingGameDetailsParameters = ref(null)
+const pendingGameDetailsEstimate = ref(null)
 
 const statsOptions = reactive({
   category: 'batting',
@@ -85,8 +86,10 @@ const {
   task: gameDetailsTask,
   active: gameDetailsSyncActive,
   starting: gameDetailsSyncStarting,
+  estimating: gameDetailsSyncEstimating,
   error: gameDetailsSyncError,
   start: startGameDetailsSync,
+  estimate: estimateGameDetailsSync,
   cancel: cancelActiveGameDetailsSync,
   loadActiveTask: loadActiveGameDetailsSync,
 } = useGameDetailsSync()
@@ -126,6 +129,7 @@ const anyActionRunning = computed(
     Boolean(runningTask.value) ||
     gameDetailsSyncActive.value ||
     gameDetailsSyncStarting.value ||
+    gameDetailsSyncEstimating.value ||
     statsDownloading.value ||
     pitchDownloading.value ||
     statsUploading.value ||
@@ -156,26 +160,21 @@ const hasImportedSchedule = computed(
 
 const gameDetailsEstimate = computed(() => {
   const parameters = pendingGameDetailsParameters.value
+  const estimate = pendingGameDetailsEstimate.value
   if (!parameters) return null
 
-  if (parameters.mlb_game_id) {
-    return {
-      scope: `MLB game ${parameters.mlb_game_id}`,
-      estimatedGames: 1,
-      duration: 'about 1 minute',
-      assumption: 'A single stored game will be downloaded and its daily analytics will be refreshed.',
-    }
-  }
-
-  const spanDays = inclusiveDayCount(parameters.start_date, parameters.end_date)
-  const estimatedGames = spanDays * 15
-  const lowMinutes = Math.max(1, Math.ceil((estimatedGames * 3) / 60))
-  const highMinutes = Math.max(lowMinutes + 1, Math.ceil((estimatedGames * 6) / 60))
+  const spanDays = parameters.mlb_game_id ? null : inclusiveDayCount(parameters.start_date, parameters.end_date)
+  const historicalTiming = estimate?.estimateSource === 'historical'
   return {
-    scope: `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
-    estimatedGames,
-    duration: `about ${formatDurationRange(lowMinutes, highMinutes)}`,
-    assumption: 'Estimate assumes approximately 15 stored MLB games per day and 3–6 seconds per game.',
+    scope: parameters.mlb_game_id
+      ? `MLB game ${parameters.mlb_game_id}`
+      : `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
+    estimatedGames: estimate?.gameCount ?? 0,
+    duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
+    range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
+    assumption: historicalTiming
+      ? `Based on ${formatCount(estimate.timingSampleGameCount)} completed game${estimate.timingSampleGameCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerGame)} per game).`
+      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerGame ?? 50)} per stored game. It will improve as completed sync timings are recorded.`,
   }
 })
 
@@ -223,11 +222,16 @@ async function handleScheduleSync() {
 
 async function requestGameDetailsSync() {
   normalizeDateRange(gameDetailsOptions)
-  pendingGameDetailsParameters.value = {
+  const parameters = {
     start_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.startDate,
     end_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.endDate,
     mlb_game_id: gameDetailsOptions.mlbGameId || null,
   }
+  const estimate = await estimateGameDetailsSync(parameters)
+  if (!estimate) return
+
+  pendingGameDetailsParameters.value = parameters
+  pendingGameDetailsEstimate.value = estimate
   gameDetailsConfirmationOpen.value = true
   await nextTick()
   gameDetailsConfirmationDialog.value?.focus()
@@ -236,6 +240,7 @@ async function requestGameDetailsSync() {
 async function cancelGameDetailsSync() {
   gameDetailsConfirmationOpen.value = false
   pendingGameDetailsParameters.value = null
+  pendingGameDetailsEstimate.value = null
   await nextTick()
   gameDetailsSyncButton.value?.focus()
 }
@@ -246,6 +251,7 @@ async function confirmGameDetailsSync() {
 
   gameDetailsConfirmationOpen.value = false
   pendingGameDetailsParameters.value = null
+  pendingGameDetailsEstimate.value = null
   await startGameDetailsSync(parameters)
 }
 
@@ -351,6 +357,17 @@ function formatDuration(minutes) {
 function formatDurationRange(lowMinutes, highMinutes) {
   if (highMinutes < 60) return `${lowMinutes}–${highMinutes} minutes`
   return `${formatDuration(lowMinutes)}–${formatDuration(highMinutes)}`
+}
+
+function formatDurationSeconds(seconds) {
+  const roundedMinutes = Math.max(1, Math.round(seconds / 60))
+  return formatDuration(roundedMinutes)
+}
+
+function formatDurationRangeSeconds(lowSeconds, highSeconds) {
+  const lowMinutes = Math.max(1, Math.round(lowSeconds / 60))
+  const highMinutes = Math.max(lowMinutes, Math.round(highSeconds / 60))
+  return formatDurationRange(lowMinutes, highMinutes)
 }
 
 function formatElapsed(seconds) {
@@ -526,16 +543,17 @@ async function closeDatabaseDetails() {
         <p class="eyebrow">Before you continue</p>
         <h2 id="game-details-confirmation-title">Game detail synchronization may take a while</h2>
         <p id="game-details-confirmation-description">
-          DiamondIQ will process <strong>{{ gameDetailsEstimate.scope }}</strong>. Based on this selection, the operation should take
-          <strong>{{ gameDetailsEstimate.duration }}</strong>.
+          DiamondIQ found <strong>{{ formatCount(gameDetailsEstimate.estimatedGames) }} stored {{ gameDetailsEstimate.estimatedGames === 1 ? 'game' : 'games' }}</strong>
+          in <strong>{{ gameDetailsEstimate.scope }}</strong>. Based on this selection, the operation should take
+          <strong>{{ gameDetailsEstimate.duration }}</strong> (typically {{ gameDetailsEstimate.range }}).
         </p>
         <dl>
           <div>
             <dt>Estimated workload</dt>
             <dd>
               {{ gameDetailsEstimate.estimatedGames === 1
-                ? '1 game'
-                : `up to approximately ${formatCount(gameDetailsEstimate.estimatedGames)} games` }}
+                ? '1 stored game'
+                : `${formatCount(gameDetailsEstimate.estimatedGames)} stored games` }}
             </dd>
           </div>
           <div>

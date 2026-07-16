@@ -2,6 +2,9 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :admin do
       resources :task_runs, only: [ :index, :show, :create ] do
+        collection do
+          get :estimate
+        end
         member do
           post :cancel
         end
