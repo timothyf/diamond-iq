@@ -212,6 +212,11 @@ RSpec.describe "Api::Players", type: :request do
       "Baseball Savant"
     )
     expect(json_body.dig("data", "source_metadata", "last_updated_at")).to be_present
+    expect(json_body.dig("data", "contextual_benchmarks")).to include(
+      "available" => false,
+      "calculation_version" => "1.0.0",
+      "metrics" => []
+    )
     expect(json_body.dig("data", "profile", "id")).to eq(profile.id)
   end
 

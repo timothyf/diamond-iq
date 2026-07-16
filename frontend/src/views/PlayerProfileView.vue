@@ -68,6 +68,12 @@ const battingMetrics = computed(() => [
   ['Hard-hit rate', withUnit(player.value?.pitchIndicators.batting.hard_hit_percentage, '%')],
 ])
 
+const benchmarkPeriodLabel = computed(() => {
+  const context = player.value?.contextualBenchmarks
+  if (!context?.sourceStartDate || !context?.sourceEndDate) return 'No benchmark period calculated'
+  return `${formatDate(context.sourceStartDate)} — ${formatDate(context.sourceEndDate)}`
+})
+
 function titleize(value) {
   return String(value || '')
     .replaceAll('_', ' ')
@@ -80,6 +86,34 @@ function withUnit(value, unit) {
 
 function displayValue(value) {
   return value === null || value === undefined || value === '' ? '—' : value
+}
+
+function contextualMetricLabel(metric) {
+  return metric.dimensionValue ? `${metric.displayName} · ${metric.dimensionValue}` : metric.displayName
+}
+
+function contextualValue(value, unit) {
+  if (value === null || value === undefined) return '—'
+  if (unit === 'percent') return `${Number(value).toFixed(1)}%`
+  if (unit === 'mph') return `${Number(value).toFixed(1)} mph`
+  if (unit === 'rpm') return `${Math.round(Number(value)).toLocaleString()} rpm`
+  return Number(value).toFixed(3)
+}
+
+function signedContextualValue(value, unit) {
+  if (value === null || value === undefined) return '—'
+  const prefix = Number(value) > 0 ? '+' : ''
+  return `${prefix}${contextualValue(value, unit)}`
+}
+
+function peerAverage(metric) {
+  return metric.positionAverage ?? metric.pitcherRoleAverage
+}
+
+function peerLabel(metric) {
+  if (metric.positionAverage !== null && metric.positionAverage !== undefined) return metric.positionKey || 'Position'
+  if (metric.pitcherRoleAverage !== null && metric.pitcherRoleAverage !== undefined) return titleize(metric.pitcherRoleKey || 'Role')
+  return 'Peer group unavailable'
 }
 
 function seasonTeamLabel(seasonRow) {
@@ -218,6 +252,62 @@ function formatTimestamp(value) {
           </table>
         </div>
         <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
+      </section>
+
+      <section class="profile-panel contextual-panel" data-test="contextual-benchmarks">
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">P1.5 context</p>
+            <h2>Benchmarks & percentiles</h2>
+          </div>
+          <span>{{ benchmarkPeriodLabel }}</span>
+        </header>
+
+        <div v-if="player.contextualBenchmarks.metrics.length" class="context-table-wrap">
+          <table class="context-table">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Player</th>
+                <th>MLB average</th>
+                <th>Position / role</th>
+                <th>Percentile</th>
+                <th>Previous-period change</th>
+                <th>Sample</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="metric in player.contextualBenchmarks.metrics" :key="`${metric.metricKey}-${metric.dimensionValue || 'all'}`">
+                <th>
+                  <strong>{{ contextualMetricLabel(metric) }}</strong>
+                  <small>{{ titleize(metric.metricGroup) }}</small>
+                </th>
+                <td><strong>{{ contextualValue(metric.rawValue, metric.unit) }}</strong></td>
+                <td>
+                  {{ contextualValue(metric.mlbAverage, metric.unit) }}
+                  <small>{{ metric.mlbPlayerCount }} players</small>
+                </td>
+                <td>
+                  {{ contextualValue(peerAverage(metric), metric.unit) }}
+                  <small>{{ peerLabel(metric) }}</small>
+                </td>
+                <td>
+                  <span class="percentile-pill">P{{ Math.round(metric.percentile) }}</span>
+                </td>
+                <td>
+                  {{ signedContextualValue(metric.changeValue, metric.unit) }}
+                  <small v-if="metric.previousValue !== null && metric.previousValue !== undefined">
+                    from {{ contextualValue(metric.previousValue, metric.unit) }}
+                  </small>
+                </td>
+                <td>{{ Number(metric.sampleSize || 0).toLocaleString() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="profile-empty">
+          Benchmark context will appear after daily analytics have been calculated for multiple players.
+        </p>
       </section>
 
       <div class="profile-two-column">
@@ -591,6 +681,71 @@ function formatTimestamp(value) {
 .career-table tfoot .career-table__team {
   z-index: 2;
   background: #10263d;
+}
+
+.context-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+  background: #fffdf7;
+}
+
+.context-table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+  color: #243b50;
+  font-variant-numeric: tabular-nums;
+}
+
+.context-table th,
+.context-table td {
+  padding: 0.8rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.context-table thead th {
+  color: #697784;
+  background: #e7edf1;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.context-table th:first-child {
+  text-align: left;
+}
+
+.context-table tbody th strong,
+.context-table tbody th small,
+.context-table td small {
+  display: block;
+}
+
+.context-table tbody th small,
+.context-table td small {
+  margin-top: 0.15rem;
+  color: #71808c;
+  font-size: 0.7rem;
+}
+
+.context-table tbody tr:last-child th,
+.context-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.percentile-pill {
+  display: inline-flex;
+  min-width: 3.25rem;
+  justify-content: center;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  color: #fffaf0;
+  background: #8f2d24;
+  font-weight: 900;
 }
 
 .profile-two-column {

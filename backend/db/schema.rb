@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_210000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_15_220000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -155,6 +155,33 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_210000) do
     t.check_constraint "away_score IS NULL OR away_score >= 0", name: "games_nonnegative_away_score"
     t.check_constraint "home_score IS NULL OR home_score >= 0", name: "games_nonnegative_home_score"
     t.check_constraint "home_team_id <> away_team_id", name: "games_distinct_teams"
+  end
+
+  create_table "league_metric_benchmarks", force: :cascade do |t|
+    t.string "metric_key", null: false
+    t.string "metric_group", null: false
+    t.string "display_name", null: false
+    t.string "peer_group_type", null: false
+    t.string "peer_group_key", null: false
+    t.string "dimension_type", default: "", null: false
+    t.string "dimension_value", default: "", null: false
+    t.string "directionality", null: false
+    t.decimal "average_value", precision: 14, scale: 6, null: false
+    t.bigint "sample_size", default: 0, null: false
+    t.integer "player_count", default: 0, null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["metric_key", "peer_group_type", "peer_group_key", "dimension_type", "dimension_value", "source_start_date", "source_end_date", "calculation_version"], name: "idx_league_metric_benchmarks_identity", unique: true
+    t.index ["source_end_date", "calculation_version"], name: "idx_league_metric_benchmarks_latest"
+    t.check_constraint "player_count >= 0", name: "league_benchmarks_players_nonnegative"
+    t.check_constraint "sample_size >= 0", name: "league_benchmarks_sample_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "league_benchmarks_range_valid"
   end
 
   create_table "lineup_entries", force: :cascade do |t|
@@ -420,6 +447,36 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_210000) do
     t.index ["team_id"], name: "index_player_batting_daily_on_team_id"
     t.check_constraint "sample_size >= 0", name: "player_batting_daily_sample_size_nonnegative"
     t.check_constraint "source_end_date >= source_start_date", name: "player_batting_daily_source_range_valid"
+  end
+
+  create_table "player_metric_percentiles", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "league_metric_benchmark_id", null: false
+    t.decimal "raw_value", precision: 14, scale: 6, null: false
+    t.decimal "percentile", precision: 6, scale: 2, null: false
+    t.decimal "previous_value", precision: 14, scale: 6
+    t.decimal "change_value", precision: 14, scale: 6
+    t.decimal "change_percentage", precision: 12, scale: 4
+    t.bigint "sample_size", default: 0, null: false
+    t.integer "peer_player_count", default: 0, null: false
+    t.date "source_start_date", null: false
+    t.date "source_end_date", null: false
+    t.date "previous_start_date"
+    t.date "previous_end_date"
+    t.string "calculation_version", null: false
+    t.datetime "calculated_at", null: false
+    t.string "source_name", null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["league_metric_benchmark_id"], name: "index_player_metric_percentiles_on_league_metric_benchmark_id"
+    t.index ["player_id", "league_metric_benchmark_id"], name: "idx_player_metric_percentiles_identity", unique: true
+    t.index ["player_id", "source_end_date", "calculation_version"], name: "idx_player_metric_percentiles_latest"
+    t.index ["player_id"], name: "index_player_metric_percentiles_on_player_id"
+    t.check_constraint "peer_player_count >= 0", name: "player_percentiles_peers_nonnegative"
+    t.check_constraint "percentile >= 0::numeric AND percentile <= 100::numeric", name: "player_percentiles_value_valid"
+    t.check_constraint "sample_size >= 0", name: "player_percentiles_sample_nonnegative"
+    t.check_constraint "source_end_date >= source_start_date", name: "player_percentiles_range_valid"
   end
 
   create_table "player_pitching_daily", force: :cascade do |t|
@@ -717,6 +774,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_210000) do
   add_foreign_key "plate_appearances", "teams", column: "fielding_team_id"
   add_foreign_key "player_batting_daily", "players"
   add_foreign_key "player_batting_daily", "teams"
+  add_foreign_key "player_metric_percentiles", "league_metric_benchmarks"
+  add_foreign_key "player_metric_percentiles", "players"
   add_foreign_key "player_pitching_daily", "players"
   add_foreign_key "player_pitching_daily", "teams"
   add_foreign_key "player_positions", "players"

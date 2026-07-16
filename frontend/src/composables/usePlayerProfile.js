@@ -53,6 +53,7 @@ function normalizeProfile(data = {}) {
   const season = data.season_overview || {}
   const career = data.career_overview || {}
   const indicators = data.recent_pitch_indicators || {}
+  const benchmarks = data.contextual_benchmarks || {}
   const source = data.source_metadata || {}
 
   return {
@@ -93,6 +94,41 @@ function normalizeProfile(data = {}) {
       primaryRole: indicators.primary_role || 'batter',
       pitching: indicators.pitching || {},
       batting: indicators.batting || {},
+    },
+    contextualBenchmarks: {
+      available: benchmarks.available === true,
+      sourceStartDate: benchmarks.source_start_date,
+      sourceEndDate: benchmarks.source_end_date,
+      previousStartDate: benchmarks.previous_start_date,
+      previousEndDate: benchmarks.previous_end_date,
+      calculationVersion: benchmarks.calculation_version,
+      calculatedAt: benchmarks.calculated_at,
+      metrics: (benchmarks.metrics || []).map((metric) => ({
+        metricKey: metric.metric_key,
+        metricGroup: metric.metric_group,
+        displayName: metric.display_name,
+        unit: metric.unit,
+        directionality: metric.directionality,
+        dimensionType: metric.dimension_type,
+        dimensionValue: metric.dimension_value,
+        rawValue: metric.raw_value,
+        mlbAverage: metric.mlb_average,
+        positionAverage: metric.position_average,
+        positionKey: metric.position_key,
+        pitcherRoleAverage: metric.pitcher_role_average,
+        pitcherRoleKey: metric.pitcher_role_key,
+        percentile: metric.percentile,
+        positionPercentile: metric.position_percentile,
+        pitcherRolePercentile: metric.pitcher_role_percentile,
+        previousValue: metric.previous_value,
+        changeValue: metric.change_value,
+        changePercentage: metric.change_percentage,
+        sampleSize: metric.sample_size,
+        mlbSampleSize: metric.mlb_sample_size,
+        mlbPlayerCount: metric.mlb_player_count,
+        positionPlayerCount: metric.position_player_count,
+        pitcherRolePlayerCount: metric.pitcher_role_player_count,
+      })),
     },
     sourceMetadata: {
       lastUpdatedAt: source.last_updated_at,

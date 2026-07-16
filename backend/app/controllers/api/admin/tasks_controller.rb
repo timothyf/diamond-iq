@@ -12,7 +12,8 @@ module Api
             player_season_stats: player_season_stats_metrics,
             pitch_data: pitch_data_metrics,
             game_details: game_details_metrics,
-            daily_analytics: daily_analytics_metrics
+            daily_analytics: daily_analytics_metrics,
+            contextual_benchmarks: contextual_benchmark_metrics
           }
         }
       end
@@ -222,6 +223,18 @@ module Api
           latest_metric_date: ranges.max&.iso8601,
           row_counts: models.to_h { |model| [ model.table_name, approximate_row_count(model) ] },
           last_calculated_at: models.filter_map { |model| model.maximum(:calculated_at) }.max
+        }
+      end
+
+      def contextual_benchmark_metrics
+        benchmarks = LeagueMetricBenchmark.for_version(DailyAnalyticsRefresh::CALCULATION_VERSION)
+        {
+          calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+          benchmark_count: approximate_row_count(LeagueMetricBenchmark),
+          percentile_count: approximate_row_count(PlayerMetricPercentile),
+          earliest_source_date: benchmarks.minimum(:source_start_date)&.iso8601,
+          latest_source_date: benchmarks.maximum(:source_end_date)&.iso8601,
+          last_calculated_at: benchmarks.maximum(:calculated_at)
         }
       end
 

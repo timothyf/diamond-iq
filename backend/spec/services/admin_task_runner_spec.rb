@@ -194,4 +194,20 @@ RSpec.describe AdminTaskRunner do
       calculation_version: "2.0.0"
     )
   end
+
+  it "runs a contextual benchmark refresh" do
+    allow(ContextualBenchmarkRefresh).to receive(:call).and_return(success: true, message: "Refreshed", data: {})
+
+    response = described_class.call(
+      task_name: "contextual_benchmarks_refresh",
+      params: { start_date: "2026-04-01", end_date: "2026-07-15", calculation_version: "2.0.0" }
+    )
+
+    expect(response).to include(success: true, task: "contextual_benchmarks_refresh")
+    expect(ContextualBenchmarkRefresh).to have_received(:call).with(
+      start_date: Date.new(2026, 4, 1),
+      end_date: Date.new(2026, 7, 15),
+      calculation_version: "2.0.0"
+    )
+  end
 end

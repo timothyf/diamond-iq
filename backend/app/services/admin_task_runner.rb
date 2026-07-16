@@ -27,6 +27,10 @@ class AdminTaskRunner
     "daily_analytics_refresh" => {
       name: "Daily analytics refresh",
       description: "Incrementally rebuild versioned player, pitch-type, split, and team summaries for a date range."
+    },
+    "contextual_benchmarks_refresh" => {
+      name: "Contextual benchmarks refresh",
+      description: "Rebuild cached MLB, position, pitcher-role, and player-percentile context for a date range."
     }
   }.freeze
 
@@ -122,6 +126,18 @@ class AdminTaskRunner
     raise ArgumentError, "End date must be on or after start date" if end_date < start_date
 
     DailyAnalyticsRefresh.call(
+      start_date: start_date,
+      end_date: end_date,
+      calculation_version: params[:calculation_version].presence || DailyAnalyticsRefresh::CALCULATION_VERSION
+    )
+  end
+
+  def contextual_benchmarks_refresh
+    start_date = required_date(:start_date)
+    end_date = optional_date(:end_date) || start_date
+    raise ArgumentError, "End date must be on or after start date" if end_date < start_date
+
+    ContextualBenchmarkRefresh.call(
       start_date: start_date,
       end_date: end_date,
       calculation_version: params[:calculation_version].presence || DailyAnalyticsRefresh::CALCULATION_VERSION

@@ -16,6 +16,7 @@ class PlayerProfileSnapshotQuery
       current_membership: serialize_membership(current_membership),
       team_history: memberships.map { |membership| serialize_membership(membership) },
       recent_pitch_indicators: recent_pitch_indicators,
+      contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(player: player).result,
       source_metadata: source_metadata
     }
   end
@@ -584,6 +585,7 @@ class PlayerProfileSnapshotQuery
       dataset_for_records("positions", player.player_positions.to_a, :source_name, :last_synced_at),
       dataset_for_records("memberships", memberships, :source_name, :last_synced_at),
       dataset_for_records("season_stats", all_season_rows, nil, :updated_at, source_name: "Imported season stats"),
+      benchmark_dataset,
       pitch_dataset
     ]
   end
@@ -607,5 +609,13 @@ class PlayerProfileSnapshotQuery
 
     timestamp = rows.filter_map { |row| row.fetched_at_utc || row.updated_at }.max
     dataset("pitch_data", "Baseball Savant", timestamp)
+  end
+
+  def benchmark_dataset
+    record = player.player_metric_percentiles
+      .for_version(DailyAnalyticsRefresh::CALCULATION_VERSION)
+      .order(calculated_at: :desc)
+      .first
+    dataset("contextual_benchmarks", record&.source_name, record&.calculated_at)
   end
 end

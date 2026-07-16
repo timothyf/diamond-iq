@@ -104,6 +104,31 @@ function apiPayload() {
         },
         pitching: { pitch_count: 0, game_count: 0 },
       },
+      contextual_benchmarks: {
+        available: true,
+        source_start_date: '2026-03-26',
+        source_end_date: '2026-07-14',
+        previous_start_date: '2025-12-05',
+        previous_end_date: '2026-03-25',
+        calculation_version: '1.0.0',
+        metrics: [
+          {
+            metric_key: 'ops',
+            metric_group: 'batting',
+            display_name: 'OPS',
+            unit: 'rate',
+            raw_value: 0.842,
+            mlb_average: 0.72,
+            position_average: 0.745,
+            position_key: 'CF',
+            percentile: 82.5,
+            previous_value: 0.79,
+            change_value: 0.052,
+            sample_size: 480,
+            mlb_player_count: 280,
+          },
+        ],
+      },
       source_metadata: {
         last_updated_at: '2026-07-14T12:00:00Z',
         sources: ['MLB Stats API', 'Baseball Savant'],
@@ -152,6 +177,14 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Recent pitch indicators')
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')
+    const benchmarks = wrapper.get('[data-test="contextual-benchmarks"]')
+    expect(benchmarks.text()).toContain('Benchmarks & percentiles')
+    expect(benchmarks.text()).toContain('0.842')
+    expect(benchmarks.text()).toContain('0.720')
+    expect(benchmarks.text()).toContain('CF')
+    expect(benchmarks.text()).toContain('P83')
+    expect(benchmarks.text()).toContain('+0.052')
+    expect(benchmarks.text()).toContain('480')
     expect(wrapper.text()).toContain('Baseball Savant')
     expect(wrapper.get('.profile-portrait img').attributes()).toMatchObject({
       src: 'https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/680776/headshot/67/current',

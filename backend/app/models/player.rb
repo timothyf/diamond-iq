@@ -22,6 +22,7 @@ class Player < ApplicationRecord
   has_many :pitcher_pitch_type_daily, dependent: :destroy
   has_many :batter_split_summaries, dependent: :destroy
   has_many :pitcher_split_summaries, dependent: :destroy
+  has_many :player_metric_percentiles, dependent: :destroy
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :first_name, presence: true

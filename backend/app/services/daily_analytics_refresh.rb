@@ -36,6 +36,7 @@ class DailyAnalyticsRefresh
       counts = DailyAnalyticsCalculator.call(metric_date: date, calculation_version: calculation_version)
       counts.each { |table, count| totals[table] += count }
     end
+    benchmark_refreshes = refresh_contextual_benchmarks(calculation_dates)
 
     {
       success: true,
@@ -45,7 +46,8 @@ class DailyAnalyticsRefresh
         source_start_date: calculation_dates.min.iso8601,
         source_end_date: calculation_dates.max.iso8601,
         calculated_date_count: calculation_dates.length,
-        row_counts: totals
+        row_counts: totals,
+        benchmark_refreshes: benchmark_refreshes
       }
     }
   rescue ArgumentError => error
@@ -57,6 +59,31 @@ class DailyAnalyticsRefresh
   private
 
   attr_reader :start_date, :end_date, :dates, :calculation_version
+
+  def refresh_contextual_benchmarks(calculation_dates)
+    calculation_dates.map(&:year).uniq.sort.flat_map do |year|
+      year_range = Date.new(year, 1, 1)..Date.new(year, 12, 31)
+      stored_dates = SUMMARY_MODELS.flat_map do |model|
+        scope = model.where(calculation_version: calculation_version, metric_date: year_range)
+        table = model.arel_table
+        scope.pick(table[:metric_date].minimum, table[:metric_date].maximum)
+      end.compact
+      next if stored_dates.empty?
+
+      first_date = stored_dates.min
+      last_date = stored_dates.max
+      ranges = [ [ first_date, last_date ], [ [ last_date - 29.days, first_date ].max, last_date ] ].uniq
+      ranges.map do |range_start, range_end|
+        ContextualBenchmarkRefresh.call(
+          start_date: range_start,
+          end_date: range_end,
+          calculation_version: calculation_version
+        )
+      end
+    end.compact
+  rescue StandardError => error
+    [ { success: false, message: "Daily summaries were refreshed, but contextual benchmarks failed: #{error.message}" } ]
+  end
 
   def normalized_dates
     values = if dates.present?

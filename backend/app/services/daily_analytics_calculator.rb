@@ -106,6 +106,9 @@ class DailyAnalyticsCalculator
       swings = grouped.count { |pitch| swing?(pitch) }
       whiffs = grouped.count { |pitch| whiff?(pitch) }
       velocities = values(grouped, :release_speed)
+      spin_rates = values(grouped, :release_spin_rate)
+      chase_opportunities = grouped.count { |pitch| chase_opportunity?(pitch) }
+      chases = grouped.count { |pitch| chase?(pitch) }
 
       common_row(sample_size: grouped.length).merge(
         player_id: player.id,
@@ -117,7 +120,9 @@ class DailyAnalyticsCalculator
           usage_percentage: percent(grouped.length, totals_by_pitcher.fetch(mlb_id)),
           average_velocity: average(velocities),
           maximum_velocity: velocities.max,
-          average_spin_rate: average(values(grouped, :release_spin_rate)),
+          velocity_sample_size: velocities.length,
+          average_spin_rate: average(spin_rates),
+          spin_sample_size: spin_rates.length,
           average_extension: average(values(grouped, :release_extension)),
           average_horizontal_break: average(values(grouped, :pfx_x)),
           average_vertical_break: average(values(grouped, :pfx_z)),
@@ -126,6 +131,9 @@ class DailyAnalyticsCalculator
           swing_percentage: percent(swings, grouped.length),
           whiffs: whiffs,
           whiff_percentage: percent(whiffs, swings),
+          chase_opportunities: chase_opportunities,
+          chases: chases,
+          chase_percentage: percent(chases, chase_opportunities),
           delta_run_expectancy_per_100: scaled_average(values(grouped, :delta_run_exp), 100)
         }
       )
@@ -137,6 +145,8 @@ class DailyAnalyticsCalculator
       swings = grouped.count { |pitch| swing?(pitch) }
       batted_balls = grouped.select { |pitch| pitch.launch_speed.present? }
       hard_hit = batted_balls.count { |pitch| pitch.launch_speed >= 95 }
+      chase_opportunities = grouped.count { |pitch| chase_opportunity?(pitch) }
+      chases = grouped.count { |pitch| chase?(pitch) }
 
       {
         pitches_seen: grouped.length,
@@ -146,11 +156,15 @@ class DailyAnalyticsCalculator
         whiffs: grouped.count { |pitch| whiff?(pitch) },
         whiff_percentage: percent(grouped.count { |pitch| whiff?(pitch) }, swings),
         batted_balls: batted_balls.length,
+        exit_velocity_sample_size: batted_balls.length,
         average_exit_velocity: average(values(batted_balls, :launch_speed)),
         maximum_exit_velocity: values(batted_balls, :launch_speed).max,
         hard_hit_percentage: percent(hard_hit, batted_balls.length),
         average_launch_angle: average(values(batted_balls, :launch_angle)),
         estimated_woba: average(values(grouped, :estimated_woba_using_speedangle)),
+        chase_opportunities: chase_opportunities,
+        chases: chases,
+        chase_percentage: percent(chases, chase_opportunities),
         hits: terminal_event_count(grouped, HIT_EVENTS),
         walks: terminal_event_count(grouped, WALK_EVENTS),
         strikeouts: terminal_event_count(grouped, STRIKEOUT_EVENTS)
@@ -162,6 +176,9 @@ class DailyAnalyticsCalculator
     split_rows(:pitcher, pitcher_split_dimensions, pitching: true) do |grouped|
       swings = grouped.count { |pitch| swing?(pitch) }
       velocities = values(grouped, :release_speed)
+      spin_rates = values(grouped, :release_spin_rate)
+      chase_opportunities = grouped.count { |pitch| chase_opportunity?(pitch) }
+      chases = grouped.count { |pitch| chase?(pitch) }
 
       {
         pitch_count: grouped.length,
@@ -172,7 +189,12 @@ class DailyAnalyticsCalculator
         whiff_percentage: percent(grouped.count { |pitch| whiff?(pitch) }, swings),
         average_velocity: average(velocities),
         maximum_velocity: velocities.max,
-        average_spin_rate: average(values(grouped, :release_spin_rate)),
+        velocity_sample_size: velocities.length,
+        average_spin_rate: average(spin_rates),
+        spin_sample_size: spin_rates.length,
+        chase_opportunities: chase_opportunities,
+        chases: chases,
+        chase_percentage: percent(chases, chase_opportunities),
         strikeouts: terminal_event_count(grouped, STRIKEOUT_EVENTS),
         walks: terminal_event_count(grouped, WALK_EVENTS),
         delta_run_expectancy_per_100: scaled_average(values(grouped, :delta_run_exp), 100)
@@ -347,6 +369,14 @@ class DailyAnalyticsCalculator
 
   def whiff?(pitch)
     WHIFF_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+  end
+
+  def chase_opportunity?(pitch)
+    pitch.zone.present? && !pitch.zone.to_i.between?(1, 9)
+  end
+
+  def chase?(pitch)
+    chase_opportunity?(pitch) && swing?(pitch)
   end
 
   def average(numbers)

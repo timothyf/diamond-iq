@@ -51,6 +51,24 @@ describe('usePlayerProfile', () => {
             batting: { pitches_seen: 100, average_exit_velocity: 91.2 },
             pitching: { pitch_count: 0 },
           },
+          contextual_benchmarks: {
+            available: true,
+            source_start_date: '2026-03-26',
+            source_end_date: '2026-07-14',
+            calculation_version: '1.0.0',
+            metrics: [
+              {
+                metric_key: 'ops',
+                metric_group: 'batting',
+                display_name: 'OPS',
+                unit: 'rate',
+                raw_value: 0.842,
+                mlb_average: 0.72,
+                percentile: 82.5,
+                sample_size: 480,
+              },
+            ],
+          },
           source_metadata: {
             last_updated_at: '2026-07-14T12:00:00Z',
             sources: ['MLB Stats API'],
@@ -78,6 +96,14 @@ describe('usePlayerProfile', () => {
       seasonOverview: { season: 2026, category: 'batting' },
       careerOverview: { category: 'batting', firstSeason: 2022, lastSeason: 2026, seasonCount: 5 },
       pitchIndicators: { primaryRole: 'batter' },
+      contextualBenchmarks: {
+        available: true,
+        sourceStartDate: '2026-03-26',
+        sourceEndDate: '2026-07-14',
+        metrics: [
+          expect.objectContaining({ metricKey: 'ops', rawValue: 0.842, mlbAverage: 0.72, percentile: 82.5 }),
+        ],
+      },
     })
     expect(player.value.sourceMetadata.datasets[0]).toEqual({
       name: 'profile',

@@ -43,6 +43,7 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     result = described_class.call(start_date: date, end_date: date)
 
     expect(result).to include(success: true)
+    expect(result.dig(:data, :benchmark_refreshes, 0, :success)).to be(true)
     expect(result.dig(:data, :row_counts)).to include(
       "player_batting_daily" => 1,
       "player_pitching_daily" => 1,
