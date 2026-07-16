@@ -447,6 +447,29 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="game-details-analytics-refresh"]').text()).toContain('Refreshed daily analytics for 4 dates')
   })
 
+  it('shows analytics refresh processing note after game synchronization completes', async () => {
+    gameDetailsTask.value = {
+      id: 11,
+      status: 'running',
+      totalItems: 12,
+      completedItems: 12,
+      failedItems: 0,
+      processedItems: 12,
+      progressPercentage: 100,
+      currentItemLabel: null,
+      cancelRequested: false,
+      elapsedSeconds: 321,
+      estimatedRemainingSeconds: 42,
+      errorMessage: null,
+      resultData: {},
+    }
+
+    const wrapper = mount(AdminView)
+
+    expect(wrapper.get('[data-test="game-details-analytics-refresh-processing"]').text())
+      .toContain('Daily analytics refresh is now processing')
+  })
+
   it('shows persisted pitch synchronization progress and requests safe cancellation', async () => {
     pitchDataTask.value = {
       id: 12,
