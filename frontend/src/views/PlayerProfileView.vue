@@ -97,7 +97,9 @@ const comparisonMetrics = computed(() => {
     ['pitching', 'whiff_percentage', 'Pitcher whiff', 'percent'],
     ['pitching', 'chase_percentage', 'Pitcher chase', 'percent'],
   ]
-  return definitions.map(([group, key, label, unit]) => {
+  return definitions
+    .filter(([group]) => visibleTrendGroups.value.includes(group))
+    .map(([group, key, label, unit]) => {
     const currentValue = current[group]?.[key]
     const previousValue = previous[group]?.[key]
     return {
@@ -113,22 +115,59 @@ const comparisonMetrics = computed(() => {
   })
 })
 
+const visibleTrendGroups = computed(() => {
+  if (!player.value) return []
+
+  if (isTwoWayPlayer(player.value)) return ['batting', 'pitching']
+
+  const primaryPositionType = player.value?.positions?.primary?.position_type
+  if (primaryPositionType === 'pitcher') return ['pitching']
+  if (primaryPositionType) return ['batting']
+
+  return player.value?.pitchIndicators?.primaryRole === 'pitcher' ? ['pitching'] : ['batting']
+})
+
 const trendCharts = computed(() => {
   const analysis = player.value?.analysis
   if (!analysis) return []
-  return [
-    ...(analysis.batting?.charts || []).map((chart) => ({
-      ...chart,
-      subtitle: `Rolling ${analysis.batting.windowSize} plate appearances`,
-      group: 'Batting',
-    })),
-    ...(analysis.pitching?.charts || []).map((chart) => ({
-      ...chart,
-      subtitle: `Rolling ${analysis.pitching.windowSize} pitches`,
-      group: 'Pitching',
-    })),
-  ]
+  const charts = []
+
+  if (visibleTrendGroups.value.includes('batting')) {
+    charts.push(
+      ...(analysis.batting?.charts || []).map((chart) => ({
+        ...chart,
+        subtitle: `Rolling ${analysis.batting.windowSize} plate appearances`,
+        group: 'Batting',
+      })),
+    )
+  }
+
+  if (visibleTrendGroups.value.includes('pitching')) {
+    charts.push(
+      ...(analysis.pitching?.charts || []).map((chart) => ({
+        ...chart,
+        subtitle: `Rolling ${analysis.pitching.windowSize} pitches`,
+        group: 'Pitching',
+      })),
+    )
+  }
+
+  return charts
 })
+
+function isTwoWayPlayer(playerData) {
+  const primaryPositionType = playerData?.positions?.primary?.position_type
+  if (primaryPositionType === 'two_way') return true
+
+  const currentAssignments = (playerData?.positions?.assignments || []).filter((assignment) => assignment.current)
+  const hasPitchingAssignment = currentAssignments.some((assignment) => assignment.position?.position_type === 'pitcher')
+  const hasNonPitchingAssignment = currentAssignments.some((assignment) => {
+    const type = assignment.position?.position_type
+    return type && type !== 'pitcher'
+  })
+
+  return hasPitchingAssignment && hasNonPitchingAssignment
+}
 
 function selectPreset(range) {
   analysisOptions.value = { ...analysisOptions.value, range, startDate: null, endDate: null }

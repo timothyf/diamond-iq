@@ -178,6 +178,12 @@ function apiPayload() {
   }
 }
 
+function apiPayloadWith(mutator) {
+  const payload = structuredClone(apiPayload())
+  mutator(payload)
+  return payload
+}
+
 describe('PlayerProfileView', () => {
   it('renders the unified player workflow', async () => {
     vi.stubGlobal(
@@ -239,6 +245,103 @@ describe('PlayerProfileView', () => {
     expect(fetch).toHaveBeenLastCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
       headers: { Accept: 'application/json' },
     })
+  })
+
+  it('shows pitching trends for primary pitchers', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => apiPayloadWith((payload) => {
+          payload.data.positions = {
+            primary: { abbreviation: 'SP', name: 'Starting Pitcher', position_type: 'pitcher' },
+            secondary: [],
+            assignments: [],
+          }
+          payload.data.recent_pitch_indicators.primary_role = 'pitcher'
+          payload.data.analysis.batting.charts = [
+            {
+              key: 'exit_velocity', title: 'Exit velocity', unit: 'mph',
+              series: [{ key: 'exit_velocity', label: 'Exit velocity', points: [
+                { date: '2026-04-01', sequence: 1, value: 89.0, sample_size: 1 },
+                { date: '2026-07-14', sequence: 480, value: 91.2, sample_size: 18 },
+              ] }],
+            },
+          ]
+          payload.data.analysis.pitching = {
+            window_type: 'pitches',
+            window_size: 100,
+            total_observations: 320,
+            charts: [
+              {
+                key: 'velocity', title: 'Velocity', unit: 'mph',
+                series: [{ key: 'velocity', label: 'Velocity', points: [
+                  { date: '2026-04-01', sequence: 1, value: 96.1, sample_size: 20 },
+                  { date: '2026-07-14', sequence: 320, value: 97.3, sample_size: 25 },
+                ] }],
+              },
+            ],
+          }
+        }),
+      }),
+    )
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const trends = wrapper.get('[data-test="player-trends"]')
+    expect(trends.text()).toContain('Pitching · Velocity')
+    expect(trends.text()).not.toContain('Batting · Exit velocity')
+    expect(trends.find('svg').attributes('aria-label')).toBe('Pitching · Velocity rolling trend')
+  })
+
+  it('shows both batting and pitching trends for two-way players', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => apiPayloadWith((payload) => {
+          payload.data.positions = {
+            primary: { abbreviation: 'TWP', name: 'Two-Way Player', position_type: 'two_way' },
+            secondary: [
+              { abbreviation: 'DH', name: 'Designated Hitter', position_type: 'designated_hitter' },
+              { abbreviation: 'SP', name: 'Starting Pitcher', position_type: 'pitcher' },
+            ],
+            assignments: [
+              { current: true, primary: true, position: { abbreviation: 'TWP', name: 'Two-Way Player', position_type: 'two_way', sort_order: 1 } },
+              { current: true, primary: false, position: { abbreviation: 'SP', name: 'Starting Pitcher', position_type: 'pitcher', sort_order: 2 } },
+            ],
+          }
+          payload.data.analysis.pitching = {
+            window_type: 'pitches',
+            window_size: 100,
+            total_observations: 320,
+            charts: [
+              {
+                key: 'velocity', title: 'Velocity', unit: 'mph',
+                series: [{ key: 'velocity', label: 'Velocity', points: [
+                  { date: '2026-04-01', sequence: 1, value: 96.1, sample_size: 20 },
+                  { date: '2026-07-14', sequence: 320, value: 97.3, sample_size: 25 },
+                ] }],
+              },
+            ],
+          }
+        }),
+      }),
+    )
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const trends = wrapper.get('[data-test="player-trends"]')
+    expect(trends.text()).toContain('Batting · Exit velocity')
+    expect(trends.text()).toContain('Pitching · Velocity')
   })
 
   it('falls back to player initials when the headshot cannot load', async () => {
