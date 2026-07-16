@@ -101,12 +101,12 @@ export function usePitchDataSync() {
     if (!data) return null
     return {
       taskParameters: data.task_parameters || {},
-      chunkCount: Number(data.chunk_count || 0),
+      gameCount: Number(data.game_count || 0),
       estimatedSeconds: Number(data.estimated_seconds || 0),
       lowEstimatedSeconds: Number(data.low_estimated_seconds || 0),
       highEstimatedSeconds: Number(data.high_estimated_seconds || 0),
-      secondsPerChunk: Number(data.seconds_per_chunk || 0),
-      timingSampleChunkCount: Number(data.timing_sample_chunk_count || 0),
+      secondsPerGame: Number(data.seconds_per_game || 0),
+      timingSampleGameCount: Number(data.timing_sample_game_count || 0),
       timingSampleRunCount: Number(data.timing_sample_run_count || 0),
       estimateSource: data.estimate_source,
     }

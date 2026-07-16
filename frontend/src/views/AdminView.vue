@@ -199,12 +199,12 @@ const pitchDataEstimate = computed(() => {
   const historicalTiming = estimate?.estimateSource === 'historical'
   return {
     scope: `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
-    estimatedChunks: estimate?.chunkCount ?? 0,
+    estimatedGames: estimate?.gameCount ?? 0,
     duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
     range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
     assumption: historicalTiming
-      ? `Based on ${formatCount(estimate.timingSampleChunkCount)} completed chunk${estimate.timingSampleChunkCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerChunk)} per chunk).`
-      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerChunk ?? 90)} per Statcast request chunk. It will improve as completed sync timings are recorded.`,
+      ? `Based on ${formatCount(estimate.timingSampleGameCount)} completed game${estimate.timingSampleGameCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerGame)} per game).`
+      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerGame ?? 45)} per stored game. It will improve as completed sync timings are recorded.`,
   }
 })
 
@@ -622,7 +622,7 @@ async function closeDatabaseDetails() {
         <p class="eyebrow">Before you continue</p>
         <h2 id="pitch-data-confirmation-title">Statcast pitch synchronization may take a while</h2>
         <p id="pitch-data-confirmation-description">
-          DiamondIQ found <strong>{{ formatCount(pitchDataEstimate.estimatedChunks) }} request {{ pitchDataEstimate.estimatedChunks === 1 ? 'chunk' : 'chunks' }}</strong>
+          DiamondIQ found <strong>{{ formatCount(pitchDataEstimate.estimatedGames) }} stored {{ pitchDataEstimate.estimatedGames === 1 ? 'game' : 'games' }}</strong>
           in <strong>{{ pitchDataEstimate.scope }}</strong>. Based on this selection, the operation should take
           <strong>{{ pitchDataEstimate.duration }}</strong> (typically {{ pitchDataEstimate.range }}).
         </p>
@@ -630,9 +630,9 @@ async function closeDatabaseDetails() {
           <div>
             <dt>Estimated workload</dt>
             <dd>
-              {{ pitchDataEstimate.estimatedChunks === 1
-                ? '1 Statcast request chunk'
-                : `${formatCount(pitchDataEstimate.estimatedChunks)} Statcast request chunks` }}
+              {{ pitchDataEstimate.estimatedGames === 1
+                ? '1 stored game'
+                : `${formatCount(pitchDataEstimate.estimatedGames)} stored games` }}
             </dd>
           </div>
           <div>
@@ -825,7 +825,7 @@ async function closeDatabaseDetails() {
               <div>
                 <span>{{ pitchDataStatusLabel(pitchDataTask.status) }}</span>
                 <strong>
-                  {{ formatCount(pitchDataTask.processedItems) }} of {{ formatCount(pitchDataTask.totalItems) }} chunks
+                  {{ formatCount(pitchDataTask.processedItems) }} of {{ formatCount(pitchDataTask.totalItems) }} games
                 </strong>
               </div>
               <b>{{ pitchDataTask.progressPercentage.toFixed(1) }}%</b>

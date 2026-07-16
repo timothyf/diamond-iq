@@ -186,12 +186,12 @@ describe('AdminView', () => {
     cancelPitchDataSync.mockReset().mockResolvedValue({ id: 12, status: 'running', cancelRequested: true })
     loadActivePitchDataSync.mockReset().mockResolvedValue(null)
     estimatePitchDataSync.mockReset().mockResolvedValue({
-      chunkCount: 3,
+      gameCount: 18,
       estimatedSeconds: 312,
       lowEstimatedSeconds: 250,
       highEstimatedSeconds: 420,
-      secondsPerChunk: 104,
-      timingSampleChunkCount: 12,
+      secondsPerGame: 17.3,
+      timingSampleGameCount: 12,
       timingSampleRunCount: 4,
       estimateSource: 'historical',
     })
@@ -375,7 +375,7 @@ describe('AdminView', () => {
     expect(confirmation.text()).toContain('Jul 1, 2026–Jul 7, 2026')
     expect(confirmation.text()).toContain('about 5 minutes')
     expect(confirmation.text()).toContain('typically 4–7 minutes')
-    expect(confirmation.text()).toContain('3 Statcast request chunks')
+    expect(confirmation.text()).toContain('18 stored games')
     expect(startPitchDataSync).not.toHaveBeenCalled()
 
     await wrapper.get('[data-test="pitch-data-cancel"]').trigger('click')
@@ -424,12 +424,12 @@ describe('AdminView', () => {
     pitchDataTask.value = {
       id: 12,
       status: 'running',
-      totalItems: 6,
-      completedItems: 2,
-      failedItems: 1,
-      processedItems: 3,
+      totalItems: 18,
+      completedItems: 8,
+      failedItems: 2,
+      processedItems: 10,
       progressPercentage: 50.0,
-      currentItemLabel: '2026-07-08 — 2026-07-14',
+      currentItemLabel: '2026-07-08 — 2026-07-14 · 6 games',
       cancelRequested: false,
       elapsedSeconds: 180,
       estimatedRemainingSeconds: 180,
@@ -438,9 +438,9 @@ describe('AdminView', () => {
     const wrapper = mount(AdminView)
 
     const progress = wrapper.get('[data-test="pitch-data-progress"]')
-    expect(progress.text()).toContain('3 of 6 chunks')
-    expect(progress.text()).toContain('2')
-    expect(progress.text()).toContain('2026-07-08 — 2026-07-14')
+  expect(progress.text()).toContain('10 of 18 games')
+  expect(progress.text()).toContain('8')
+  expect(progress.text()).toContain('2026-07-08 — 2026-07-14 · 6 games')
     expect(progress.text()).toContain('3m')
     expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
 

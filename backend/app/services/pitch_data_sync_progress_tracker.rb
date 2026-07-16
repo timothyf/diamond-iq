@@ -19,11 +19,14 @@ class PitchDataSyncProgressTracker
     )
   end
 
-  def chunk_started!(chunk_start:, chunk_end:)
-    task_run.update!(current_item_label: "#{chunk_start.iso8601} — #{chunk_end.iso8601}", last_heartbeat_at: Time.current)
+  def chunk_started!(chunk_start:, chunk_end:, targeted_game_count:)
+    task_run.update!(
+      current_item_label: "#{chunk_start.iso8601} — #{chunk_end.iso8601} · #{targeted_game_count} #{targeted_game_count == 1 ? 'game' : 'games'}",
+      last_heartbeat_at: Time.current
+    )
   end
 
-  def chunk_finished!(success:, result_data: {}, message: nil)
+  def chunk_finished!(success:, processed_game_count:, result_data: {}, message: nil)
     task_run.with_lock do
       task_run.reload
       merged_result = task_run.result_data.deep_dup
@@ -31,6 +34,7 @@ class PitchDataSyncProgressTracker
       merged_result["downloaded_count"] = merged_result.fetch("downloaded_count", 0) + result_data.fetch(:downloaded_count, 0)
       merged_result["duplicate_count"] = merged_result.fetch("duplicate_count", 0) + result_data.fetch(:duplicate_count, 0)
       merged_result["skipped_count"] = merged_result.fetch("skipped_count", 0) + result_data.fetch(:skipped_count, 0)
+      merged_result["progress_unit"] = result_data.fetch(:progress_unit, merged_result["progress_unit"])
       unless success
         failures = Array(merged_result["failures"])
         failures << { "message" => message, "chunk" => task_run.current_item_label }
@@ -38,8 +42,8 @@ class PitchDataSyncProgressTracker
       end
 
       task_run.update!(
-        completed_items: task_run.completed_items + (success ? 1 : 0),
-        failed_items: task_run.failed_items + (success ? 0 : 1),
+        completed_items: task_run.completed_items + (success ? processed_game_count : 0),
+        failed_items: task_run.failed_items + (success ? 0 : processed_game_count),
         result_data: merged_result,
         last_heartbeat_at: Time.current
       )

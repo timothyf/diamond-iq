@@ -1,6 +1,6 @@
 class PitchDataSyncTaskEstimate
   TASK_NAME = "pitch_data_sync"
-  DEFAULT_SECONDS_PER_CHUNK = 90.0
+  DEFAULT_SECONDS_PER_GAME = 45.0
   LOW_RANGE_FACTOR = 0.8
   HIGH_RANGE_FACTOR = 1.35
   DEFAULT_CHUNK_DAYS = PitchDataDownloader::DEFAULT_CHUNK_DAYS
@@ -18,20 +18,20 @@ class PitchDataSyncTaskEstimate
 
   def call
     attributes = normalized_attributes
-    chunk_count = date_chunks(attributes).count
+    game_count = selected_games(attributes).count
     timing = historical_timing
-    seconds_per_chunk = timing.fetch(:seconds_per_chunk, DEFAULT_SECONDS_PER_CHUNK)
+    seconds_per_game = timing.fetch(:seconds_per_game, DEFAULT_SECONDS_PER_GAME)
 
     {
       task_parameters: attributes,
-      chunk_count: chunk_count,
-      estimated_seconds: (chunk_count * seconds_per_chunk).round,
-      low_estimated_seconds: (chunk_count * seconds_per_chunk * LOW_RANGE_FACTOR).ceil,
-      high_estimated_seconds: (chunk_count * seconds_per_chunk * HIGH_RANGE_FACTOR).ceil,
-      seconds_per_chunk: seconds_per_chunk.round(1),
-      timing_sample_chunk_count: timing.fetch(:chunk_count),
+      game_count: game_count,
+      estimated_seconds: (game_count * seconds_per_game).round,
+      low_estimated_seconds: (game_count * seconds_per_game * LOW_RANGE_FACTOR).ceil,
+      high_estimated_seconds: (game_count * seconds_per_game * HIGH_RANGE_FACTOR).ceil,
+      seconds_per_game: seconds_per_game.round(1),
+      timing_sample_game_count: timing.fetch(:game_count),
       timing_sample_run_count: timing.fetch(:run_count),
-      estimate_source: timing[:seconds_per_chunk] ? "historical" : "conservative_default"
+      estimate_source: timing[:seconds_per_game] ? "historical" : "conservative_default"
     }
   end
 
@@ -78,8 +78,17 @@ class PitchDataSyncTaskEstimate
     chunks
   end
 
+  def selected_games(attributes)
+    game_types = attributes.fetch("game_types").split(",")
+    Game.where(
+      official_date: Date.iso8601(attributes.fetch("start_date"))..Date.iso8601(attributes.fetch("end_date")),
+      game_type: game_types
+    )
+  end
+
   def historical_timing
     rows = AdminTaskRun.where(task_name: TASK_NAME, status: %w[completed cancelled])
+      .where("result_data ->> 'progress_unit' = ?", "games")
       .where.not(started_at: nil, finished_at: nil)
       .pluck(:completed_items, :failed_items, :started_at, :finished_at)
 
@@ -89,12 +98,12 @@ class PitchDataSyncTaskEstimate
       [processed_items, elapsed_seconds] if processed_items.positive? && elapsed_seconds.positive?
     end
 
-    total_chunks = completed_runs.sum(&:first)
-    return { chunk_count: 0, run_count: 0 } if total_chunks.zero?
+    total_games = completed_runs.sum(&:first)
+    return { game_count: 0, run_count: 0 } if total_games.zero?
 
     {
-      seconds_per_chunk: completed_runs.sum(&:last) / total_chunks,
-      chunk_count: total_chunks,
+      seconds_per_game: completed_runs.sum(&:last) / total_games,
+      game_count: total_games,
       run_count: completed_runs.size
     }
   end

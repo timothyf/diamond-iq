@@ -13,8 +13,19 @@ class PitchDataBatchSync
 
   def call
     chunks = date_chunks
-    summary = { downloaded_count: 0, imported_count: 0, duplicate_count: 0, skipped_count: 0, cancelled: false, chunk_count: chunks.length, errors: [] }
-    progress_tracker&.start!(total: chunks.length)
+    games_by_chunk = selected_games_by_chunk
+    summary = {
+      downloaded_count: 0,
+      imported_count: 0,
+      duplicate_count: 0,
+      skipped_count: 0,
+      cancelled: false,
+      chunk_count: chunks.length,
+      game_count: games_by_chunk.values.sum(&:length),
+      progress_unit: "games",
+      errors: []
+    }
+    progress_tracker&.start!(total: summary[:game_count])
 
     chunks.each do |chunk_start, chunk_end|
       if progress_tracker&.cancel_requested?
@@ -22,7 +33,8 @@ class PitchDataBatchSync
         break
       end
 
-      progress_tracker&.chunk_started!(chunk_start: chunk_start, chunk_end: chunk_end)
+      targeted_games = games_by_chunk.fetch([chunk_start, chunk_end], [])
+      progress_tracker&.chunk_started!(chunk_start: chunk_start, chunk_end: chunk_end, targeted_game_count: targeted_games.length)
       result = sync_chunk(chunk_start:, chunk_end:)
       if result[:success]
         summary[:downloaded_count] += result.dig(:data, :downloaded_count).to_i
@@ -32,7 +44,12 @@ class PitchDataBatchSync
       else
         summary[:errors] << { chunk: "#{chunk_start.iso8601} — #{chunk_end.iso8601}", message: result[:message], errors: Array(result.dig(:data, :errors)) }
       end
-      progress_tracker&.chunk_finished!(success: result[:success], result_data: result[:data] || {}, message: result[:message])
+      progress_tracker&.chunk_finished!(
+        success: result[:success],
+        processed_game_count: targeted_games.length,
+        result_data: (result[:data] || {}).merge(progress_unit: "games"),
+        message: result[:message]
+      )
     end
 
     if summary[:cancelled]
@@ -79,6 +96,21 @@ class PitchDataBatchSync
     end
 
     chunks
+  end
+
+  def selected_games_by_chunk
+    selected_games.group_by do |game|
+      chunk_start = game.official_date
+      days_from_start = (chunk_start - start_date).to_i
+      offset = days_from_start % chunk_days
+      actual_start = chunk_start - offset.days
+      actual_end = [actual_start + chunk_days.days - 1.day, end_date].min
+      [actual_start, actual_end]
+    end
+  end
+
+  def selected_games
+    @selected_games ||= Game.where(official_date: start_date..end_date, game_type: game_types.split(",")).to_a
   end
 
   def success(message, data)
