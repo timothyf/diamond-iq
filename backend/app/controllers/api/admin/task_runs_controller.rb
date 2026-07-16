@@ -97,10 +97,11 @@ module Api
         has_claim = SolidQueue::ClaimedExecution.exists?(job_id: queue_job.id)
         return task_run if has_claim
 
-        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < ORPHANED_HEARTBEAT_SECONDS.seconds.ago
-        return task_run unless stale_heartbeat
-
         failed_execution = SolidQueue::FailedExecution.where(job_id: queue_job.id).order(created_at: :desc).first
+
+        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < ORPHANED_HEARTBEAT_SECONDS.seconds.ago
+        return task_run if failed_execution.blank? && !stale_heartbeat
+
         return task_run if failed_execution.blank? && queue_job.finished_at.present?
 
         failure_message = failed_execution&.message.presence || "Background worker exited before this task could finish"

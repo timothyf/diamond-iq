@@ -112,6 +112,36 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     expect(json_body.dig("data", "result_data", "active_execution_job_id")).to be_nil
   end
 
+  it "marks orphaned running game-detail tasks as failed immediately when queue failure exists" do
+    run = AdminTaskRun.create!(
+      task_name: "mlb_game_details_sync",
+      status: "running",
+      total_items: 59,
+      completed_items: 44,
+      failed_items: 0,
+      result_data: { "active_execution_job_id" => "fresh-exec-id" },
+      last_heartbeat_at: 5.seconds.ago,
+      started_at: 2.minutes.ago
+    )
+
+    queue_job = instance_double("SolidQueue::Job", id: 456, finished_at: nil)
+    failed_execution = instance_double("SolidQueue::FailedExecution", message: "Process pid=19201 exited unexpectedly. Received unhandled signal 9.")
+    failed_scope = instance_double("ActiveRecord::Relation")
+
+    allow(SolidQueue::Job).to receive(:find_by).with(active_job_id: "fresh-exec-id").and_return(queue_job)
+    allow(SolidQueue::ClaimedExecution).to receive(:exists?).with(job_id: 456).and_return(false)
+    allow(SolidQueue::FailedExecution).to receive(:where).with(job_id: 456).and_return(failed_scope)
+    allow(failed_scope).to receive(:order).with(created_at: :desc).and_return(failed_scope)
+    allow(failed_scope).to receive(:first).and_return(failed_execution)
+
+    get api_admin_task_run_path(run)
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "status")).to eq("failed")
+    expect(json_body.dig("data", "error_message")).to include("Received unhandled signal 9")
+    expect(json_body.dig("data", "result_data", "active_execution_job_id")).to be_nil
+  end
+
   it "prevents concurrent game-detail synchronizations" do
     AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "running")
 
