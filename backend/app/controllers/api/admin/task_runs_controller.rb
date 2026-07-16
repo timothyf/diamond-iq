@@ -14,13 +14,23 @@ module Api
       end
 
       def create
-        raise ArgumentError, "Only MLB game detail synchronization supports tracked execution" unless params[:task_name] == MlbGameDetailsTaskLauncher::TASK_NAME
-
-        run = MlbGameDetailsTaskLauncher.call(
-          start_date: params[:start_date],
-          end_date: params[:end_date],
-          mlb_game_id: params[:mlb_game_id]
-        )
+        run = case params[:task_name]
+        when MlbGameDetailsTaskLauncher::TASK_NAME
+          MlbGameDetailsTaskLauncher.call(
+            start_date: params[:start_date],
+            end_date: params[:end_date],
+            mlb_game_id: params[:mlb_game_id]
+          )
+        when PitchDataSyncTaskLauncher::TASK_NAME
+          PitchDataSyncTaskLauncher.call(
+            start_date: params[:start_date],
+            end_date: params[:end_date],
+            game_types: params[:game_types],
+            chunk_days: params[:chunk_days]
+          )
+        else
+          raise ArgumentError, "Only tracked synchronization tasks support tracked execution"
+        end
         render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
       rescue ArgumentError => error
         render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
@@ -29,11 +39,23 @@ module Api
       end
 
       def estimate
-        estimate = MlbGameDetailsTaskEstimate.call(
-          start_date: params[:start_date],
-          end_date: params[:end_date],
-          mlb_game_id: params[:mlb_game_id]
-        )
+        estimate = case params[:task_name]
+        when nil, "", MlbGameDetailsTaskEstimate::TASK_NAME
+          MlbGameDetailsTaskEstimate.call(
+            start_date: params[:start_date],
+            end_date: params[:end_date],
+            mlb_game_id: params[:mlb_game_id]
+          )
+        when PitchDataSyncTaskEstimate::TASK_NAME
+          PitchDataSyncTaskEstimate.call(
+            start_date: params[:start_date],
+            end_date: params[:end_date],
+            game_types: params[:game_types],
+            chunk_days: params[:chunk_days]
+          )
+        else
+          raise ArgumentError, "Unsupported tracked task estimate request"
+        end
         render json: { data: estimate }
       rescue ArgumentError => error
         render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content

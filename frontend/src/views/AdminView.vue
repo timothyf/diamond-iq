@@ -4,7 +4,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import { useAdminTask } from '../composables/useAdminTask'
 import { useGameDetailsSync } from '../composables/useGameDetailsSync'
-import { usePitchDataDownload } from '../composables/usePitchDataDownload'
+import { usePitchDataSync } from '../composables/usePitchDataSync'
 import { usePitchDataImport } from '../composables/usePitchDataImport'
 import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
@@ -20,6 +20,11 @@ const gameDetailsConfirmationDialog = ref(null)
 const gameDetailsSyncButton = ref(null)
 const pendingGameDetailsParameters = ref(null)
 const pendingGameDetailsEstimate = ref(null)
+const pitchDataConfirmationOpen = ref(false)
+const pitchDataConfirmationDialog = ref(null)
+const pitchDataSyncButton = ref(null)
+const pendingPitchDataParameters = ref(null)
+const pendingPitchDataEstimate = ref(null)
 
 const statsOptions = reactive({
   category: 'batting',
@@ -100,11 +105,16 @@ const {
   downloadStats,
 } = usePlayerSeasonStatsDownload()
 const {
-  downloading: pitchDownloading,
-  error: pitchDownloadError,
-  summary: pitchDownloadSummary,
-  downloadPitchData,
-} = usePitchDataDownload()
+  task: pitchDataTask,
+  active: pitchDataSyncActive,
+  starting: pitchDataSyncStarting,
+  estimating: pitchDataSyncEstimating,
+  error: pitchDataSyncError,
+  start: startPitchDataSync,
+  estimate: estimatePitchDataSync,
+  cancel: cancelActivePitchDataSync,
+  loadActiveTask: loadActivePitchDataSync,
+} = usePitchDataSync()
 const {
   uploading: statsUploading,
   error: statsImportError,
@@ -130,8 +140,10 @@ const anyActionRunning = computed(
     gameDetailsSyncActive.value ||
     gameDetailsSyncStarting.value ||
     gameDetailsSyncEstimating.value ||
+    pitchDataSyncActive.value ||
+    pitchDataSyncStarting.value ||
+    pitchDataSyncEstimating.value ||
     statsDownloading.value ||
-    pitchDownloading.value ||
     statsUploading.value ||
     pitchUploading.value ||
     rosterSnapshotsLoading.value,
@@ -178,10 +190,37 @@ const gameDetailsEstimate = computed(() => {
   }
 })
 
-onMounted(() => Promise.all([loadOverview(), loadActiveGameDetailsSync()]))
+const pitchDataEstimate = computed(() => {
+  const parameters = pendingPitchDataParameters.value
+  const estimate = pendingPitchDataEstimate.value
+  if (!parameters) return null
+
+  const spanDays = inclusiveDayCount(parameters.start_date, parameters.end_date)
+  const historicalTiming = estimate?.estimateSource === 'historical'
+  return {
+    scope: `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
+    estimatedChunks: estimate?.chunkCount ?? 0,
+    duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
+    range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
+    assumption: historicalTiming
+      ? `Based on ${formatCount(estimate.timingSampleChunkCount)} completed chunk${estimate.timingSampleChunkCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerChunk)} per chunk).`
+      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerChunk ?? 90)} per Statcast request chunk. It will improve as completed sync timings are recorded.`,
+  }
+})
+
+onMounted(() => Promise.all([loadOverview(), loadActiveGameDetailsSync(), loadActivePitchDataSync()]))
 
 watch(
   () => gameDetailsTask.value?.status,
+  (status, previousStatus) => {
+    if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
+      loadOverview()
+    }
+  },
+)
+
+watch(
+  () => pitchDataTask.value?.status,
   (status, previousStatus) => {
     if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
       loadOverview()
@@ -203,10 +242,40 @@ async function handleStatsDownload() {
   if (result) await loadOverview()
 }
 
-async function handlePitchDownload() {
+async function requestPitchDataSync() {
   normalizeDateRange(pitchOptions)
-  const result = await downloadPitchData(pitchOptions)
-  if (result) await loadOverview()
+  const parameters = {
+    start_date: pitchOptions.startDate,
+    end_date: pitchOptions.endDate,
+    game_types: pitchOptions.gameTypes,
+    chunk_days: pitchOptions.chunkDays,
+  }
+  const estimate = await estimatePitchDataSync(parameters)
+  if (!estimate) return
+
+  pendingPitchDataParameters.value = parameters
+  pendingPitchDataEstimate.value = estimate
+  pitchDataConfirmationOpen.value = true
+  await nextTick()
+  pitchDataConfirmationDialog.value?.focus()
+}
+
+async function cancelPitchDataSync() {
+  pitchDataConfirmationOpen.value = false
+  pendingPitchDataParameters.value = null
+  pendingPitchDataEstimate.value = null
+  await nextTick()
+  pitchDataSyncButton.value?.focus()
+}
+
+async function confirmPitchDataSync() {
+  const parameters = pendingPitchDataParameters.value
+  if (!parameters) return
+
+  pitchDataConfirmationOpen.value = false
+  pendingPitchDataParameters.value = null
+  pendingPitchDataEstimate.value = null
+  await startPitchDataSync(parameters)
 }
 
 async function handleScheduleSync() {
@@ -389,6 +458,16 @@ function gameDetailsStatusLabel(status) {
   }[status] || humanize(status)
 }
 
+function pitchDataStatusLabel(status) {
+  return {
+    queued: 'Queued',
+    running: 'Synchronizing',
+    completed: 'Completed',
+    failed: 'Completed with an error',
+    cancelled: 'Cancelled',
+  }[status] || humanize(status)
+}
+
 async function openDatabaseDetails() {
   databaseDetailsOpen.value = true
   await nextTick()
@@ -523,6 +602,59 @@ async function closeDatabaseDetails() {
     </div>
 
     <div
+      v-if="pitchDataConfirmationOpen"
+      class="confirmation-modal"
+      data-test="pitch-data-confirmation-modal"
+      @click.self="cancelPitchDataSync"
+      @keydown.esc="cancelPitchDataSync"
+    >
+      <section
+        ref="pitchDataConfirmationDialog"
+        class="confirmation-dialog"
+        data-test="pitch-data-confirmation"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pitch-data-confirmation-title"
+        aria-describedby="pitch-data-confirmation-description"
+        tabindex="-1"
+      >
+        <div class="confirmation-dialog__icon" aria-hidden="true">!</div>
+        <p class="eyebrow">Before you continue</p>
+        <h2 id="pitch-data-confirmation-title">Statcast pitch synchronization may take a while</h2>
+        <p id="pitch-data-confirmation-description">
+          DiamondIQ found <strong>{{ formatCount(pitchDataEstimate.estimatedChunks) }} request {{ pitchDataEstimate.estimatedChunks === 1 ? 'chunk' : 'chunks' }}</strong>
+          in <strong>{{ pitchDataEstimate.scope }}</strong>. Based on this selection, the operation should take
+          <strong>{{ pitchDataEstimate.duration }}</strong> (typically {{ pitchDataEstimate.range }}).
+        </p>
+        <dl>
+          <div>
+            <dt>Estimated workload</dt>
+            <dd>
+              {{ pitchDataEstimate.estimatedChunks === 1
+                ? '1 Statcast request chunk'
+                : `${formatCount(pitchDataEstimate.estimatedChunks)} Statcast request chunks` }}
+            </dd>
+          </div>
+          <div>
+            <dt>How this estimate works</dt>
+            <dd>{{ pitchDataEstimate.assumption }}</dd>
+          </div>
+        </dl>
+        <p class="confirmation-dialog__note">
+          Baseball Savant response times and local CSV import work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes.
+        </p>
+        <div class="confirmation-dialog__actions">
+          <button type="button" class="admin-button admin-button--secondary" data-test="pitch-data-cancel" @click="cancelPitchDataSync">
+            Cancel
+          </button>
+          <button type="button" class="admin-button" data-test="pitch-data-continue" @click="confirmPitchDataSync">
+            Continue synchronization
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <div
       v-if="gameDetailsConfirmationOpen"
       class="confirmation-modal"
       data-test="game-details-confirmation-modal"
@@ -640,7 +772,7 @@ async function closeDatabaseDetails() {
           <p v-else-if="statsDownloadSummary" class="admin-message admin-message--success">{{ statsDownloadSummary }}</p>
         </form>
 
-        <form class="admin-card" data-test="pitch-download-form" @submit.prevent="handlePitchDownload">
+        <form class="admin-card" data-test="pitch-download-form" @submit.prevent="requestPitchDataSync">
           <div class="admin-card__number">02</div>
           <div class="admin-card__title">
             <div>
@@ -685,11 +817,66 @@ async function closeDatabaseDetails() {
               <input v-model.number="pitchOptions.chunkDays" type="number" min="1" max="31" required />
             </label>
           </div>
-          <button class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ pitchDownloading ? 'Downloading pitches…' : 'Retrieve Statcast pitches' }}
+          <button ref="pitchDataSyncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
+            {{ pitchDataSyncStarting ? 'Starting synchronization…' : pitchDataSyncActive ? 'Synchronization in progress…' : 'Retrieve Statcast pitches' }}
           </button>
-          <p v-if="pitchDownloadError" class="admin-message admin-message--error">{{ pitchDownloadError }}</p>
-          <p v-else-if="pitchDownloadSummary" class="admin-message admin-message--success">{{ pitchDownloadSummary }}</p>
+          <section v-if="pitchDataTask" class="sync-progress" data-test="pitch-data-progress" aria-live="polite">
+            <header>
+              <div>
+                <span>{{ pitchDataStatusLabel(pitchDataTask.status) }}</span>
+                <strong>
+                  {{ formatCount(pitchDataTask.processedItems) }} of {{ formatCount(pitchDataTask.totalItems) }} chunks
+                </strong>
+              </div>
+              <b>{{ pitchDataTask.progressPercentage.toFixed(1) }}%</b>
+            </header>
+            <div
+              class="sync-progress__track"
+              role="progressbar"
+              :aria-valuenow="pitchDataTask.progressPercentage"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`Statcast pitch synchronization ${pitchDataTask.progressPercentage}% complete`"
+            >
+              <i :style="{ width: `${pitchDataTask.progressPercentage}%` }"></i>
+            </div>
+            <dl>
+              <div>
+                <dt>Completed</dt>
+                <dd>{{ formatCount(pitchDataTask.completedItems) }}</dd>
+              </div>
+              <div>
+                <dt>Failed</dt>
+                <dd>{{ formatCount(pitchDataTask.failedItems) }}</dd>
+              </div>
+              <div>
+                <dt>Elapsed</dt>
+                <dd>{{ formatElapsed(pitchDataTask.elapsedSeconds) }}</dd>
+              </div>
+              <div>
+                <dt>Remaining</dt>
+                <dd>{{ pitchDataSyncActive ? formatElapsed(pitchDataTask.estimatedRemainingSeconds) : '—' }}</dd>
+              </div>
+            </dl>
+            <p v-if="pitchDataTask.currentItemLabel" class="sync-progress__current">
+              <span>Current chunk</span>{{ pitchDataTask.currentItemLabel }}
+            </p>
+            <p v-if="pitchDataTask.cancelRequested && pitchDataSyncActive" class="sync-progress__notice">
+              Cancellation requested. The current chunk will finish safely before the task stops.
+            </p>
+            <p v-else-if="pitchDataTask.errorMessage" class="sync-progress__error">{{ pitchDataTask.errorMessage }}</p>
+            <button
+              v-if="pitchDataSyncActive"
+              type="button"
+              class="admin-button admin-button--danger"
+              data-test="pitch-data-cancel-active"
+              :disabled="pitchDataTask.cancelRequested"
+              @click="cancelActivePitchDataSync"
+            >
+              {{ pitchDataTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current chunk' }}
+            </button>
+          </section>
+          <p v-if="pitchDataSyncError" class="admin-message admin-message--error">{{ pitchDataSyncError }}</p>
         </form>
       </div>
     </section>

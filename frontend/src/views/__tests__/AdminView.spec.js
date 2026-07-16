@@ -6,7 +6,6 @@ import AdminView from '../AdminView.vue'
 
 const runTask = vi.fn()
 const downloadStats = vi.fn()
-const downloadPitchData = vi.fn()
 const importStatsFile = vi.fn()
 const importPitchFile = vi.fn()
 const loadOverview = vi.fn()
@@ -16,6 +15,11 @@ const cancelGameDetailsSync = vi.fn()
 const loadActiveGameDetailsSync = vi.fn()
 const estimateGameDetailsSync = vi.fn()
 const gameDetailsTask = ref(null)
+const startPitchDataSync = vi.fn()
+const cancelPitchDataSync = vi.fn()
+const loadActivePitchDataSync = vi.fn()
+const estimatePitchDataSync = vi.fn()
+const pitchDataTask = ref(null)
 const rosterSnapshots = ref([])
 
 vi.mock('../../composables/useAdminTask', () => ({
@@ -116,12 +120,17 @@ vi.mock('../../composables/useGameDetailsSync', () => ({
   }),
 }))
 
-vi.mock('../../composables/usePitchDataDownload', () => ({
-  usePitchDataDownload: () => ({
-    downloading: computed(() => false),
+vi.mock('../../composables/usePitchDataSync', () => ({
+  usePitchDataSync: () => ({
+    task: computed(() => pitchDataTask.value),
+    active: computed(() => ['queued', 'running'].includes(pitchDataTask.value?.status)),
+    starting: computed(() => false),
+    estimating: computed(() => false),
     error: computed(() => ''),
-    summary: computed(() => ''),
-    downloadPitchData,
+    start: startPitchDataSync,
+    estimate: estimatePitchDataSync,
+    cancel: cancelPitchDataSync,
+    loadActiveTask: loadActivePitchDataSync,
   }),
 }))
 
@@ -156,7 +165,6 @@ describe('AdminView', () => {
   beforeEach(() => {
     runTask.mockReset().mockResolvedValue({ success: true })
     downloadStats.mockReset().mockResolvedValue({ success: true })
-    downloadPitchData.mockReset().mockResolvedValue({ success: true })
     importStatsFile.mockReset().mockResolvedValue({ success: true })
     importPitchFile.mockReset().mockResolvedValue({ success: true })
     loadOverview.mockReset().mockResolvedValue({ success: true })
@@ -174,7 +182,21 @@ describe('AdminView', () => {
       timingSampleRunCount: 1,
       estimateSource: 'historical',
     })
+    startPitchDataSync.mockReset().mockResolvedValue({ id: 12, status: 'queued' })
+    cancelPitchDataSync.mockReset().mockResolvedValue({ id: 12, status: 'running', cancelRequested: true })
+    loadActivePitchDataSync.mockReset().mockResolvedValue(null)
+    estimatePitchDataSync.mockReset().mockResolvedValue({
+      chunkCount: 3,
+      estimatedSeconds: 312,
+      lowEstimatedSeconds: 250,
+      highEstimatedSeconds: 420,
+      secondsPerChunk: 104,
+      timingSampleChunkCount: 12,
+      timingSampleRunCount: 4,
+      estimateSource: 'historical',
+    })
     gameDetailsTask.value = null
+    pitchDataTask.value = null
     rosterSnapshots.value = []
   })
 
@@ -267,6 +289,16 @@ describe('AdminView', () => {
     )
     expect(loadOverview).toHaveBeenCalledTimes(3)
 
+    await wrapper.get('[data-test="pitch-download-form"]').trigger('submit')
+    await flushPromises()
+    expect(wrapper.get('[data-test="pitch-data-confirmation"]').attributes('role')).toBe('dialog')
+    expect(startPitchDataSync).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="pitch-data-continue"]').trigger('click')
+    await flushPromises()
+    expect(startPitchDataSync).toHaveBeenCalledWith(
+      expect.objectContaining({ start_date: expect.any(String), end_date: expect.any(String), game_types: 'R', chunk_days: 7 }),
+    )
+
     await wrapper.get('[data-test="profile-sync-form"]').trigger('submit')
     expect(runTask).toHaveBeenCalledWith(
       'mlb_player_profiles_sync',
@@ -327,6 +359,38 @@ describe('AdminView', () => {
     )
   })
 
+  it('warns with a chunk estimate and allows cancellation before synchronizing pitch data', async () => {
+    const wrapper = mount(AdminView)
+    const form = wrapper.get('[data-test="pitch-download-form"]')
+    const dateInputs = form.findAll('input[type="date"]')
+    await dateInputs[0].setValue('2026-07-01')
+    await dateInputs[1].setValue('2026-07-07')
+
+    await form.trigger('submit')
+    await flushPromises()
+
+    const confirmation = wrapper.get('[data-test="pitch-data-confirmation"]')
+    expect(confirmation.attributes('aria-modal')).toBe('true')
+    expect(confirmation.text()).toContain('7 calendar days')
+    expect(confirmation.text()).toContain('Jul 1, 2026–Jul 7, 2026')
+    expect(confirmation.text()).toContain('about 5 minutes')
+    expect(confirmation.text()).toContain('typically 4–7 minutes')
+    expect(confirmation.text()).toContain('3 Statcast request chunks')
+    expect(startPitchDataSync).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-test="pitch-data-cancel"]').trigger('click')
+    expect(wrapper.find('[data-test="pitch-data-confirmation"]').exists()).toBe(false)
+    expect(startPitchDataSync).not.toHaveBeenCalled()
+
+    await form.trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-test="pitch-data-continue"]').trigger('click')
+    await flushPromises()
+    expect(startPitchDataSync).toHaveBeenCalledWith(
+      { start_date: '2026-07-01', end_date: '2026-07-07', game_types: 'R', chunk_days: 7 },
+    )
+  })
+
   it('shows persisted game synchronization progress and requests safe cancellation', async () => {
     gameDetailsTask.value = {
       id: 11,
@@ -354,6 +418,34 @@ describe('AdminView', () => {
 
     await wrapper.get('[data-test="game-details-cancel-active"]').trigger('click')
     expect(cancelGameDetailsSync).toHaveBeenCalledOnce()
+  })
+
+  it('shows persisted pitch synchronization progress and requests safe cancellation', async () => {
+    pitchDataTask.value = {
+      id: 12,
+      status: 'running',
+      totalItems: 6,
+      completedItems: 2,
+      failedItems: 1,
+      processedItems: 3,
+      progressPercentage: 50.0,
+      currentItemLabel: '2026-07-08 — 2026-07-14',
+      cancelRequested: false,
+      elapsedSeconds: 180,
+      estimatedRemainingSeconds: 180,
+      errorMessage: null,
+    }
+    const wrapper = mount(AdminView)
+
+    const progress = wrapper.get('[data-test="pitch-data-progress"]')
+    expect(progress.text()).toContain('3 of 6 chunks')
+    expect(progress.text()).toContain('2')
+    expect(progress.text()).toContain('2026-07-08 — 2026-07-14')
+    expect(progress.text()).toContain('3m')
+    expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
+
+    await wrapper.get('[data-test="pitch-data-cancel-active"]').trigger('click')
+    expect(cancelPitchDataSync).toHaveBeenCalledOnce()
   })
 
   it('displays stored Active and 40-man snapshot players', async () => {
