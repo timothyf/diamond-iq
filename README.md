@@ -59,6 +59,7 @@ The `/admin` page centralizes the application's data operations:
 
 - Download and import player season statistics and Statcast pitches.
 - Synchronize MLB schedules, game details, player profiles, and 40-man rosters.
+- Track game-detail progress in real time, recover active progress after a page reload, and cancel safely between games.
 - Capture dated active and 40-man roster snapshots.
 - Rebuild normalized current player positions.
 - Inspect currently stored date or season coverage for each major dataset.
@@ -82,7 +83,7 @@ flowchart LR
 
 ## Tech Stack
 
-- Backend: Ruby 3.2.3, Rails 7.1, PostgreSQL, RSpec, and SeedFu
+- Backend: Ruby 3.2.3, Rails 7.1, PostgreSQL, Solid Queue, RSpec, and SeedFu
 - Frontend: Vue 3, Vue Router, Vite, and Vitest
 - Sources:
   - MLB Stats API for schedules, games, box scores, live feeds, teams, rosters, profiles, and season statistics
@@ -108,6 +109,16 @@ bin/rails server
 ```
 
 The Rails API runs at `http://127.0.0.1:3000` by default. Use `backend/.ruby-version` to select the expected Ruby version.
+In development, Puma also starts the Solid Queue worker used by tracked Admin tasks.
+
+For production, run the durable job worker as a separate process:
+
+```bash
+cd backend
+bin/jobs start
+```
+
+Alternatively, set `SOLID_QUEUE_IN_PUMA=1` to run it with Puma.
 
 ### Frontend
 

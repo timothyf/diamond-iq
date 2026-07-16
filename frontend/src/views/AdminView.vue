@@ -1,8 +1,9 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import { useAdminTask } from '../composables/useAdminTask'
+import { useGameDetailsSync } from '../composables/useGameDetailsSync'
 import { usePitchDataDownload } from '../composables/usePitchDataDownload'
 import { usePitchDataImport } from '../composables/usePitchDataImport'
 import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
@@ -81,6 +82,15 @@ const {
   runTask,
 } = useAdminTask()
 const {
+  task: gameDetailsTask,
+  active: gameDetailsSyncActive,
+  starting: gameDetailsSyncStarting,
+  error: gameDetailsSyncError,
+  start: startGameDetailsSync,
+  cancel: cancelActiveGameDetailsSync,
+  loadActiveTask: loadActiveGameDetailsSync,
+} = useGameDetailsSync()
+const {
   downloading: statsDownloading,
   error: statsDownloadError,
   summary: statsDownloadSummary,
@@ -114,6 +124,8 @@ const {
 const anyActionRunning = computed(
   () =>
     Boolean(runningTask.value) ||
+    gameDetailsSyncActive.value ||
+    gameDetailsSyncStarting.value ||
     statsDownloading.value ||
     pitchDownloading.value ||
     statsUploading.value ||
@@ -167,7 +179,16 @@ const gameDetailsEstimate = computed(() => {
   }
 })
 
-onMounted(loadOverview)
+onMounted(() => Promise.all([loadOverview(), loadActiveGameDetailsSync()]))
+
+watch(
+  () => gameDetailsTask.value?.status,
+  (status, previousStatus) => {
+    if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
+      loadOverview()
+    }
+  },
+)
 
 function normalizeYearRange(options) {
   if (Number(options.startYear) > Number(options.endYear)) options.endYear = options.startYear
@@ -225,8 +246,7 @@ async function confirmGameDetailsSync() {
 
   gameDetailsConfirmationOpen.value = false
   pendingGameDetailsParameters.value = null
-  const result = await runTask('mlb_game_details_sync', parameters)
-  if (result) await loadOverview()
+  await startGameDetailsSync(parameters)
 }
 
 async function handleProfileSync() {
@@ -331,6 +351,25 @@ function formatDuration(minutes) {
 function formatDurationRange(lowMinutes, highMinutes) {
   if (highMinutes < 60) return `${lowMinutes}–${highMinutes} minutes`
   return `${formatDuration(lowMinutes)}–${formatDuration(highMinutes)}`
+}
+
+function formatElapsed(seconds) {
+  if (!Number.isFinite(seconds)) return 'Calculating…'
+  if (seconds < 60) return `${seconds}s`
+
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}m${remainingSeconds ? ` ${remainingSeconds}s` : ''}`
+}
+
+function gameDetailsStatusLabel(status) {
+  return {
+    queued: 'Queued',
+    running: 'Synchronizing',
+    completed: 'Completed',
+    failed: 'Completed with an error',
+    cancelled: 'Cancelled',
+  }[status] || humanize(status)
 }
 
 async function openDatabaseDetails() {
@@ -774,8 +813,65 @@ async function closeDatabaseDetails() {
             <label><span>MLB game ID (optional)</span><input v-model="gameDetailsOptions.mlbGameId" type="number" min="1" placeholder="823443" /></label>
           </div>
           <button ref="gameDetailsSyncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ runningTask === 'mlb_game_details_sync' ? 'Synchronizing game details…' : 'Synchronize game details' }}
+            {{ gameDetailsSyncStarting ? 'Starting synchronization…' : gameDetailsSyncActive ? 'Synchronization in progress…' : 'Synchronize game details' }}
           </button>
+          <section v-if="gameDetailsTask" class="sync-progress" data-test="game-details-progress" aria-live="polite">
+            <header>
+              <div>
+                <span>{{ gameDetailsStatusLabel(gameDetailsTask.status) }}</span>
+                <strong>
+                  {{ formatCount(gameDetailsTask.processedItems) }} of {{ formatCount(gameDetailsTask.totalItems) }} games
+                </strong>
+              </div>
+              <b>{{ gameDetailsTask.progressPercentage.toFixed(1) }}%</b>
+            </header>
+            <div
+              class="sync-progress__track"
+              role="progressbar"
+              :aria-valuenow="gameDetailsTask.progressPercentage"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`Game detail synchronization ${gameDetailsTask.progressPercentage}% complete`"
+            >
+              <i :style="{ width: `${gameDetailsTask.progressPercentage}%` }"></i>
+            </div>
+            <dl>
+              <div>
+                <dt>Completed</dt>
+                <dd>{{ formatCount(gameDetailsTask.completedItems) }}</dd>
+              </div>
+              <div>
+                <dt>Failed</dt>
+                <dd>{{ formatCount(gameDetailsTask.failedItems) }}</dd>
+              </div>
+              <div>
+                <dt>Elapsed</dt>
+                <dd>{{ formatElapsed(gameDetailsTask.elapsedSeconds) }}</dd>
+              </div>
+              <div>
+                <dt>Remaining</dt>
+                <dd>{{ gameDetailsSyncActive ? formatElapsed(gameDetailsTask.estimatedRemainingSeconds) : '—' }}</dd>
+              </div>
+            </dl>
+            <p v-if="gameDetailsTask.currentItemLabel" class="sync-progress__current">
+              <span>Current game</span>{{ gameDetailsTask.currentItemLabel }}
+            </p>
+            <p v-if="gameDetailsTask.cancelRequested && gameDetailsSyncActive" class="sync-progress__notice">
+              Cancellation requested. The current game will finish safely before the task stops.
+            </p>
+            <p v-else-if="gameDetailsTask.errorMessage" class="sync-progress__error">{{ gameDetailsTask.errorMessage }}</p>
+            <button
+              v-if="gameDetailsSyncActive"
+              type="button"
+              class="admin-button admin-button--danger"
+              data-test="game-details-cancel-active"
+              :disabled="gameDetailsTask.cancelRequested"
+              @click="cancelActiveGameDetailsSync"
+            >
+              {{ gameDetailsTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
+            </button>
+          </section>
+          <p v-if="gameDetailsSyncError" class="admin-message admin-message--error" role="alert">{{ gameDetailsSyncError }}</p>
         </form>
 
         <form class="admin-card" data-test="profile-sync-form" @submit.prevent="handleProfileSync">
@@ -1503,6 +1599,110 @@ async function closeDatabaseDetails() {
   color: #6b7780;
 }
 
+.sync-progress {
+  margin-top: 1rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(23, 96, 135, 0.2);
+  border-radius: 14px;
+  background: rgba(231, 237, 241, 0.72);
+}
+
+.sync-progress header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.sync-progress header div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.sync-progress header span,
+.sync-progress dt,
+.sync-progress__current span {
+  color: #61707b;
+  font-size: 0.64rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sync-progress header strong,
+.sync-progress header b {
+  color: #10263d;
+}
+
+.sync-progress header b {
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.4rem;
+}
+
+.sync-progress__track {
+  height: 10px;
+  margin-top: 0.65rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 38, 61, 0.12);
+}
+
+.sync-progress__track i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #176087, #2f7d32);
+  transition: width 240ms ease;
+}
+
+.sync-progress dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.sync-progress dl div {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.sync-progress dd {
+  color: #263e52;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.sync-progress__current,
+.sync-progress__notice,
+.sync-progress__error {
+  margin-top: 0.7rem;
+  color: #405362;
+  font-size: 0.78rem;
+}
+
+.sync-progress__current span {
+  display: block;
+  margin-bottom: 0.12rem;
+}
+
+.sync-progress__notice {
+  color: #8a5a12;
+}
+
+.sync-progress__error {
+  color: #992e26;
+}
+
+.sync-progress .admin-button {
+  margin-top: 0.75rem;
+}
+
+.admin-button--danger {
+  background: #8f2d24;
+}
+
 .schedule-coverage {
   margin-top: 1rem;
   padding: 0.8rem 0.9rem;
@@ -1945,6 +2145,10 @@ async function closeDatabaseDetails() {
   .admin-fields--three,
   .admin-result dl {
     grid-template-columns: 1fr;
+  }
+
+  .sync-progress dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .roster-snapshot-controls,

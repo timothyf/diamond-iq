@@ -1,6 +1,11 @@
 Rails.application.routes.draw do
   namespace :api do
     namespace :admin do
+      resources :task_runs, only: [ :index, :show, :create ] do
+        member do
+          post :cancel
+        end
+      end
       resources :tasks, only: [:index], param: :task_name do
         member do
           post :run

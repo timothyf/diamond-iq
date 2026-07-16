@@ -11,6 +11,10 @@ const importStatsFile = vi.fn()
 const importPitchFile = vi.fn()
 const loadOverview = vi.fn()
 const loadSnapshots = vi.fn()
+const startGameDetailsSync = vi.fn()
+const cancelGameDetailsSync = vi.fn()
+const loadActiveGameDetailsSync = vi.fn()
+const gameDetailsTask = ref(null)
 const rosterSnapshots = ref([])
 
 vi.mock('../../composables/useAdminTask', () => ({
@@ -97,6 +101,18 @@ vi.mock('../../composables/usePlayerSeasonStatsDownload', () => ({
   }),
 }))
 
+vi.mock('../../composables/useGameDetailsSync', () => ({
+  useGameDetailsSync: () => ({
+    task: computed(() => gameDetailsTask.value),
+    active: computed(() => ['queued', 'running'].includes(gameDetailsTask.value?.status)),
+    starting: computed(() => false),
+    error: computed(() => ''),
+    start: startGameDetailsSync,
+    cancel: cancelGameDetailsSync,
+    loadActiveTask: loadActiveGameDetailsSync,
+  }),
+}))
+
 vi.mock('../../composables/usePitchDataDownload', () => ({
   usePitchDataDownload: () => ({
     downloading: computed(() => false),
@@ -142,6 +158,10 @@ describe('AdminView', () => {
     importPitchFile.mockReset().mockResolvedValue({ success: true })
     loadOverview.mockReset().mockResolvedValue({ success: true })
     loadSnapshots.mockReset().mockResolvedValue({ data: [] })
+    startGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'queued' })
+    cancelGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'running', cancelRequested: true })
+    loadActiveGameDetailsSync.mockReset().mockResolvedValue(null)
+    gameDetailsTask.value = null
     rosterSnapshots.value = []
   })
 
@@ -225,14 +245,13 @@ describe('AdminView', () => {
 
     await wrapper.get('[data-test="game-details-sync-form"]').trigger('submit')
     expect(wrapper.get('[data-test="game-details-confirmation"]').attributes('role')).toBe('dialog')
-    expect(runTask).not.toHaveBeenCalledWith('mlb_game_details_sync', expect.anything())
+    expect(startGameDetailsSync).not.toHaveBeenCalled()
     await wrapper.get('[data-test="game-details-continue"]').trigger('click')
     await flushPromises()
-    expect(runTask).toHaveBeenCalledWith(
-      'mlb_game_details_sync',
+    expect(startGameDetailsSync).toHaveBeenCalledWith(
       expect.objectContaining({ start_date: expect.any(String), end_date: expect.any(String), mlb_game_id: null }),
     )
-    expect(loadOverview).toHaveBeenCalledTimes(4)
+    expect(loadOverview).toHaveBeenCalledTimes(3)
 
     await wrapper.get('[data-test="profile-sync-form"]').trigger('submit')
     expect(runTask).toHaveBeenCalledWith(
@@ -277,19 +296,47 @@ describe('AdminView', () => {
     expect(confirmation.text()).toContain('about 6–11 minutes')
     expect(confirmation.text()).toContain('up to approximately 105 games')
     expect(confirmation.text()).toContain('Keep the Rails server running')
-    expect(runTask).not.toHaveBeenCalled()
+    expect(startGameDetailsSync).not.toHaveBeenCalled()
 
     await wrapper.get('[data-test="game-details-cancel"]').trigger('click')
     expect(wrapper.find('[data-test="game-details-confirmation"]').exists()).toBe(false)
-    expect(runTask).not.toHaveBeenCalled()
+    expect(startGameDetailsSync).not.toHaveBeenCalled()
 
     await form.trigger('submit')
     await wrapper.get('[data-test="game-details-continue"]').trigger('click')
     await flushPromises()
-    expect(runTask).toHaveBeenCalledWith(
-      'mlb_game_details_sync',
+    expect(startGameDetailsSync).toHaveBeenCalledWith(
       { start_date: '2026-07-01', end_date: '2026-07-07', mlb_game_id: null },
     )
+  })
+
+  it('shows persisted game synchronization progress and requests safe cancellation', async () => {
+    gameDetailsTask.value = {
+      id: 11,
+      status: 'running',
+      totalItems: 105,
+      completedItems: 45,
+      failedItems: 2,
+      processedItems: 47,
+      progressPercentage: 44.8,
+      currentItemLabel: 'DET at CLE — July 4, 2026',
+      cancelRequested: false,
+      elapsedSeconds: 252,
+      estimatedRemainingSeconds: 311,
+      errorMessage: null,
+    }
+    const wrapper = mount(AdminView)
+
+    const progress = wrapper.get('[data-test="game-details-progress"]')
+    expect(progress.text()).toContain('47 of 105 games')
+    expect(progress.text()).toContain('45')
+    expect(progress.text()).toContain('DET at CLE — July 4, 2026')
+    expect(progress.text()).toContain('4m 12s')
+    expect(progress.text()).toContain('5m 11s')
+    expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('44.8')
+
+    await wrapper.get('[data-test="game-details-cancel-active"]').trigger('click')
+    expect(cancelGameDetailsSync).toHaveBeenCalledOnce()
   })
 
   it('displays stored Active and 40-man snapshot players', async () => {
