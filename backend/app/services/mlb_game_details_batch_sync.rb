@@ -1,6 +1,9 @@
+require "timeout"
+
 class MlbGameDetailsBatchSync
   DEFAULT_WORKER_COUNT = 4
   MAX_WORKER_COUNT = 6
+  PER_GAME_TIMEOUT_SECONDS = 60
 
   def self.call(start_date: nil, end_date: nil, mlb_game_id: nil, progress_tracker: nil, worker_count: nil)
     new(
@@ -33,12 +36,30 @@ class MlbGameDetailsBatchSync
 
     process_games_in_pool!(games: games, summary: summary, failures: failures, refreshed_dates: refreshed_dates)
 
+    summary[:errors] = failures
+    processed = summary[:synchronized_game_count] + summary[:failed_game_count]
+    incomplete = !summary[:cancelled] && processed < games.length
+    if incomplete
+      missing_count = games.length - processed
+      failures << {
+        mlb_id: nil,
+        message: "#{missing_count} game#{'s' unless missing_count == 1} were not processed",
+        errors: [ "worker_pool_incomplete" ]
+      }
+      summary[:failed_game_count] += missing_count
+      summary[:errors] = failures
+    end
+
     summary[:analytics_refresh] = refresh_daily_analytics_for!(refreshed_dates)
 
-    summary[:errors] = failures
     if summary[:cancelled]
       processed = summary[:synchronized_game_count] + summary[:failed_game_count]
       return success("Cancelled after processing #{processed} of #{games.length} MLB games", summary)
+    end
+
+    if incomplete
+      processed = summary[:synchronized_game_count] + summary[:failed_game_count]
+      return failure("Synchronization ended early after processing #{processed} of #{games.length} MLB games", failures, summary)
     end
 
     if games.any? && summary[:synchronized_game_count].zero?
@@ -79,14 +100,35 @@ class MlbGameDetailsBatchSync
   end
 
   def process_games_in_pool!(games:, summary:, failures:, refreshed_dates:)
-    return if games.empty?
+    if games.empty?
+      summary[:worker_pool_summary] = {
+        configured_workers: resolved_worker_count(0),
+        active_workers: 0,
+        games_enqueued: 0,
+        games_dequeued: 0,
+        games_finalized: 0,
+        worker_error_count: 0,
+        worker_errors: []
+      }
+      return
+    end
 
     queue = Queue.new
     games.each { |game| queue << game }
 
-    active_workers = [ resolved_worker_count(games.length), games.length ].min
+    configured_workers = resolved_worker_count(games.length)
+    active_workers = [ configured_workers, games.length ].min
     active_workers.times { queue << nil }
     lock = Mutex.new
+    diagnostics = {
+      configured_workers: configured_workers,
+      active_workers: active_workers,
+      games_enqueued: games.length,
+      games_dequeued: 0,
+      games_finalized: 0,
+      worker_error_count: 0,
+      worker_errors: []
+    }
 
     workers = Array.new(active_workers) do
       Thread.new do
@@ -96,36 +138,62 @@ class MlbGameDetailsBatchSync
 
             game = queue.pop
             break if game.nil?
+            lock.synchronize { diagnostics[:games_dequeued] += 1 }
 
             if progress_tracker&.cancel_requested?
               mark_cancelled!(summary, lock)
               break
             end
 
-            progress_tracker&.game_started!(game)
-            result = MlbGameDetailsSync.call(game: game)
-            lock.synchronize do
-              if result[:success]
-                accumulate!(summary, result.fetch(:data))
-                summary[:synchronized_game_count] += 1
-                refreshed_dates << game.official_date if game.official_date.present?
-              else
+            finalized = false
+            begin
+              progress_tracker&.game_started!(game)
+              result = Timeout.timeout(PER_GAME_TIMEOUT_SECONDS) { MlbGameDetailsSync.call(game: game) }
+              lock.synchronize do
+                if result[:success]
+                  accumulate!(summary, result.fetch(:data))
+                  summary[:synchronized_game_count] += 1
+                  refreshed_dates << game.official_date if game.official_date.present?
+                else
+                  summary[:failed_game_count] += 1
+                  failures << { mlb_id: game.mlb_id, message: result[:message], errors: Array(result.dig(:data, :errors)) }
+                end
+              end
+              progress_tracker&.game_finished!(game: game, success: result[:success], message: result[:message])
+            rescue Timeout::Error
+              timeout_message = "Game details sync timed out after #{PER_GAME_TIMEOUT_SECONDS} seconds"
+              lock.synchronize do
                 summary[:failed_game_count] += 1
-                failures << { mlb_id: game.mlb_id, message: result[:message], errors: Array(result.dig(:data, :errors)) }
+                failures << { mlb_id: game.mlb_id, message: timeout_message, errors: [ "Timeout::Error" ] }
+              end
+              progress_tracker&.game_finished!(game: game, success: false, message: timeout_message)
+            rescue StandardError => error
+              lock.synchronize do
+                summary[:failed_game_count] += 1
+                failures << { mlb_id: game.mlb_id, message: error.message, errors: [ error.class.name ] }
+              end
+              progress_tracker&.game_finished!(game: game, success: false, message: error.message)
+            ensure
+              lock.synchronize do
+                unless finalized
+                  diagnostics[:games_finalized] += 1
+                  finalized = true
+                end
               end
             end
-            progress_tracker&.game_finished!(game: game, success: result[:success], message: result[:message])
           end
         end
       rescue StandardError => error
         lock.synchronize do
-          summary[:failed_game_count] += 1
           failures << { mlb_id: nil, message: error.message, errors: [ error.class.name ] }
+          diagnostics[:worker_error_count] += 1
+          diagnostics[:worker_errors] << error.message
         end
       end
     end
 
     workers.each(&:join)
+    summary[:worker_pool_summary] = diagnostics
   end
 
   def resolved_worker_count(game_count)
@@ -156,12 +224,13 @@ class MlbGameDetailsBatchSync
       created_player_count: 0,
       linked_pitch_count: 0,
       analytics_refresh: nil,
+      worker_pool_summary: nil,
       cancelled: false
     }
   end
 
   def accumulate!(summary, data)
-    empty_summary.except(:game_count, :synchronized_game_count, :failed_game_count, :analytics_refresh, :cancelled).each_key do |key|
+    empty_summary.except(:game_count, :synchronized_game_count, :failed_game_count, :analytics_refresh, :worker_pool_summary, :cancelled).each_key do |key|
       summary[key] += data.fetch(key, 0)
     end
   end
@@ -178,7 +247,7 @@ class MlbGameDetailsBatchSync
     unique_dates = dates.compact.uniq.sort
     return { success: true, skipped: true, message: "No synchronized games required analytics refresh" } if unique_dates.empty?
 
-    DailyAnalyticsRefresh.call(dates: unique_dates)
+    DailyAnalyticsRefresh.call(dates: unique_dates, refresh_contextual_benchmarks: false)
   rescue StandardError => error
     {
       success: false,

@@ -99,6 +99,14 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     expect(result).to include(success: false, message: "End date must be on or after start date")
   end
 
+  it "can refresh daily summaries without contextual benchmark rebuild" do
+    result = described_class.call(start_date: date, end_date: date, refresh_contextual_benchmarks: false)
+
+    expect(result).to include(success: true)
+    expect(result.dig(:data, :contextual_benchmarks_refreshed)).to be(false)
+    expect(result.dig(:data, :benchmark_refreshes)).to eq([])
+  end
+
   def create_pitch(attributes)
     PitchDatum.create!(
       {

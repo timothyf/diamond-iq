@@ -71,6 +71,11 @@ const rosterSnapshotOptions = reactive({
   snapshotOn: today,
 })
 
+const contextualBenchmarkOptions = reactive({
+  startDate: today,
+  endDate: today,
+})
+
 const {
   runningTask,
   error: taskError,
@@ -356,6 +361,26 @@ async function handleRosterSnapshotLoad() {
   })
 }
 
+async function handleContextualBenchmarksRefresh() {
+  normalizeDateRange(contextualBenchmarkOptions)
+  const result = await runTask('contextual_benchmarks_refresh', {
+    start_date: contextualBenchmarkOptions.startDate,
+    end_date: contextualBenchmarkOptions.endDate,
+  })
+  if (result) await loadOverview()
+}
+
+async function handleGameDetailsDeferredAnalyticsRefresh() {
+  const parameters = gameDetailsRefreshParameters(gameDetailsTask.value)
+  if (!parameters) return
+
+  const result = await runTask('daily_analytics_refresh', parameters)
+  if (result) {
+    await loadOverview()
+    await loadActiveGameDetailsSync()
+  }
+}
+
 async function handleStatsImport({ file, replaceSeason }) {
   const result = await importStatsFile(file, { replaceSeason })
   if (result) await loadOverview()
@@ -476,10 +501,84 @@ function gameDetailsAnalyticsRefreshClass(task) {
   return refresh.success || refresh.skipped ? 'sync-progress__notice' : 'sync-progress__error'
 }
 
+function gameDetailsWorkerPoolSummary(task) {
+  return task?.resultData?.worker_pool_summary || null
+}
+
+function gameDetailsWorkerPoolMessage(task) {
+  const summary = gameDetailsWorkerPoolSummary(task)
+  if (!summary) return ''
+
+  return [
+    `Worker pool: ${summary.active_workers || 0}/${summary.configured_workers || 0}`,
+    `dequeued ${summary.games_dequeued || 0}`,
+    `finalized ${summary.games_finalized || 0}`,
+    `errors ${summary.worker_error_count || 0}`,
+  ].join(' · ')
+}
+
+function gameDetailsFailureRows(task) {
+  if (!task?.resultData) return []
+
+  const normalized = []
+  const pushFailure = (failure) => {
+    if (!failure || typeof failure !== 'object') return
+    const message = String(failure.message || '').trim()
+    if (!message) return
+
+    const mlbId = failure.mlb_id ?? failure.mlbId ?? null
+    const errorList = Array.isArray(failure.errors) ? failure.errors.filter(Boolean).map(String) : []
+    normalized.push({ mlbId, message, errors: errorList })
+  }
+
+  Array.isArray(task.resultData.errors) && task.resultData.errors.forEach(pushFailure)
+  Array.isArray(task.resultData.failures) && task.resultData.failures.forEach(pushFailure)
+
+  const seen = new Set()
+  return normalized.filter((entry) => {
+    const key = `${entry.mlbId || 'none'}|${entry.message}|${entry.errors.join(',')}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+function gameDetailsFailureText(entry) {
+  const gameLabel = entry.mlbId ? `Game ${entry.mlbId}` : 'Worker pool'
+  const errorSuffix = entry.errors.length ? ` (${entry.errors.join(', ')})` : ''
+  return `${gameLabel}: ${entry.message}${errorSuffix}`
+}
+
+function gameDetailsWorkerErrorRows(task) {
+  const summary = gameDetailsWorkerPoolSummary(task)
+  if (!summary) return []
+
+  return Array.isArray(summary.worker_errors)
+    ? summary.worker_errors.filter(Boolean).map((message) => String(message))
+    : []
+}
+
 function gameDetailsAnalyticsRefreshProcessing(task) {
   if (!task) return false
   const allGamesProcessed = Number(task.processedItems || 0) >= Number(task.totalItems || 0)
   return task.status === 'running' && allGamesProcessed && !gameDetailsAnalyticsRefresh(task)
+}
+
+function gameDetailsRefreshParameters(task) {
+  if (!task?.taskParameters) return null
+  const startDate = task.taskParameters.start_date
+  const endDate = task.taskParameters.end_date || startDate
+  if (!startDate || !endDate) return null
+
+  return {
+    start_date: startDate,
+    end_date: endDate,
+  }
+}
+
+function gameDetailsDeferredAnalyticsRefreshAvailable(task) {
+  const refresh = gameDetailsAnalyticsRefresh(task)
+  return Boolean(refresh?.deferred && gameDetailsRefreshParameters(task))
 }
 
 function pitchDataStatusLabel(status) {
@@ -1104,6 +1203,47 @@ async function closeDatabaseDetails() {
               {{ gameDetailsAnalyticsRefreshMessage(gameDetailsTask) }}
             </p>
             <button
+              v-if="gameDetailsDeferredAnalyticsRefreshAvailable(gameDetailsTask)"
+              type="button"
+              class="admin-button admin-button--secondary"
+              data-test="game-details-run-deferred-analytics-refresh"
+              :disabled="anyActionRunning"
+              @click="handleGameDetailsDeferredAnalyticsRefresh"
+            >
+              {{ runningTask === 'daily_analytics_refresh' ? 'Refreshing daily analytics…' : 'Run daily analytics refresh for this range' }}
+            </button>
+            <p
+              v-if="gameDetailsWorkerPoolMessage(gameDetailsTask)"
+              class="sync-progress__notice"
+              data-test="game-details-worker-pool-summary"
+            >
+              {{ gameDetailsWorkerPoolMessage(gameDetailsTask) }}
+            </p>
+            <div
+              v-if="gameDetailsFailureRows(gameDetailsTask).length"
+              class="sync-progress__failure-block"
+              data-test="game-details-failure-details"
+            >
+              <p class="sync-progress__error">Failure details</p>
+              <ul class="sync-progress__failure-list">
+                <li v-for="(entry, index) in gameDetailsFailureRows(gameDetailsTask)" :key="`${entry.mlbId || 'worker'}-${index}`">
+                  {{ gameDetailsFailureText(entry) }}
+                </li>
+              </ul>
+            </div>
+            <div
+              v-if="gameDetailsWorkerErrorRows(gameDetailsTask).length"
+              class="sync-progress__failure-block"
+              data-test="game-details-worker-errors"
+            >
+              <p class="sync-progress__error">Worker errors</p>
+              <ul class="sync-progress__failure-list">
+                <li v-for="(message, index) in gameDetailsWorkerErrorRows(gameDetailsTask)" :key="`worker-error-${index}`">
+                  {{ message }}
+                </li>
+              </ul>
+            </div>
+            <button
               v-if="gameDetailsSyncActive"
               type="button"
               class="admin-button admin-button--danger"
@@ -1198,6 +1338,26 @@ async function closeDatabaseDetails() {
             {{ runningTask === 'player_positions_backfill' ? 'Rebuilding positions…' : 'Rebuild player positions' }}
           </button>
         </article>
+
+        <form class="admin-card admin-card--maintenance" data-test="contextual-benchmarks-refresh-form" @submit.prevent="handleContextualBenchmarksRefresh">
+          <div class="admin-card__title">
+            <div>
+              <p>Advanced analytics</p>
+              <h3>Refresh contextual benchmarks</h3>
+            </div>
+            <code>contextual_benchmarks:refresh</code>
+          </div>
+          <p class="admin-card__description">
+            Rebuild MLB, position, and player-percentile benchmark context for a selected date range.
+          </p>
+          <div class="admin-fields admin-fields--two">
+            <label><span>Start date</span><input v-model="contextualBenchmarkOptions.startDate" type="date" required /></label>
+            <label><span>End date</span><input v-model="contextualBenchmarkOptions.endDate" type="date" required /></label>
+          </div>
+          <button class="admin-button" type="submit" :disabled="anyActionRunning">
+            {{ runningTask === 'contextual_benchmarks_refresh' ? 'Refreshing contextual benchmarks…' : 'Refresh contextual benchmarks' }}
+          </button>
+        </form>
       </div>
 
       <section class="roster-snapshot-workspace" data-test="roster-snapshot-workspace">
@@ -1936,6 +2096,22 @@ async function closeDatabaseDetails() {
 
 .sync-progress__error {
   color: #992e26;
+}
+
+.sync-progress__failure-block {
+  margin-top: 0.55rem;
+}
+
+.sync-progress__failure-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1rem;
+  color: #992e26;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+.sync-progress__failure-list li + li {
+  margin-top: 0.18rem;
 }
 
 .sync-progress .admin-button {

@@ -257,6 +257,8 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="roster-snapshot-workspace"]').text()).toContain('Active and 40-man roster snapshots')
     expect(wrapper.get('[data-test="roster-snapshot-workspace"]').text()).toContain('without changing historical team memberships')
     expect(wrapper.text()).toContain('Rebuild current player positions')
+    expect(wrapper.get('[data-test="contextual-benchmarks-refresh-form"]').text()).toContain('Refresh contextual benchmarks')
+    expect(wrapper.get('[data-test="contextual-benchmarks-refresh-form"]').text()).toContain('position, and player-percentile benchmark context')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Stored game-date span')
@@ -323,6 +325,16 @@ describe('AdminView', () => {
     )
     expect(loadSnapshots).toHaveBeenCalledWith(
       expect.objectContaining({ teamMlbId: '116', on: expect.any(String) }),
+    )
+
+    const benchmarksForm = wrapper.get('[data-test="contextual-benchmarks-refresh-form"]')
+    const benchmarkDateInputs = benchmarksForm.findAll('input[type="date"]')
+    await benchmarkDateInputs[0].setValue('2026-05-01')
+    await benchmarkDateInputs[1].setValue('2026-05-02')
+    await benchmarksForm.trigger('submit')
+    expect(runTask).toHaveBeenCalledWith(
+      'contextual_benchmarks_refresh',
+      expect.objectContaining({ start_date: '2026-05-01', end_date: '2026-05-02' }),
     )
   })
 
@@ -439,12 +451,65 @@ describe('AdminView', () => {
           success: true,
           message: 'Refreshed daily analytics for 4 dates',
         },
+        worker_pool_summary: {
+          configured_workers: 4,
+          active_workers: 4,
+          games_enqueued: 70,
+          games_dequeued: 70,
+          games_finalized: 70,
+          worker_error_count: 0,
+        },
       },
     }
 
     const wrapper = mount(AdminView)
 
     expect(wrapper.get('[data-test="game-details-analytics-refresh"]').text()).toContain('Refreshed daily analytics for 4 dates')
+    expect(wrapper.get('[data-test="game-details-worker-pool-summary"]').text()).toContain('Worker pool: 4/4 · dequeued 70 · finalized 70 · errors 0')
+  })
+
+  it('shows game detail failure diagnostics with game ids and worker error messages', async () => {
+    gameDetailsTask.value = {
+      id: 11,
+      status: 'completed',
+      totalItems: 53,
+      completedItems: 51,
+      failedItems: 2,
+      processedItems: 53,
+      progressPercentage: 100,
+      currentItemLabel: null,
+      cancelRequested: false,
+      elapsedSeconds: 76,
+      estimatedRemainingSeconds: null,
+      errorMessage: null,
+      resultData: {
+        errors: [
+          { mlb_id: 823441, message: 'Lock wait timeout exceeded', errors: ['ActiveRecord::LockWaitTimeout'] },
+          { mlb_id: 823442, message: 'PG::UniqueViolation duplicate key value', errors: ['PG::UniqueViolation'] },
+        ],
+        worker_pool_summary: {
+          configured_workers: 4,
+          active_workers: 4,
+          games_enqueued: 53,
+          games_dequeued: 53,
+          games_finalized: 55,
+          worker_error_count: 2,
+          worker_errors: ['deadlock detected while locking tuple', 'failed to obtain advisory lock'],
+        },
+      },
+    }
+
+    const wrapper = mount(AdminView)
+
+    const failureDetails = wrapper.get('[data-test="game-details-failure-details"]').text()
+    expect(failureDetails).toContain('Failure details')
+    expect(failureDetails).toContain('Game 823441: Lock wait timeout exceeded (ActiveRecord::LockWaitTimeout)')
+    expect(failureDetails).toContain('Game 823442: PG::UniqueViolation duplicate key value (PG::UniqueViolation)')
+
+    const workerErrors = wrapper.get('[data-test="game-details-worker-errors"]').text()
+    expect(workerErrors).toContain('Worker errors')
+    expect(workerErrors).toContain('deadlock detected while locking tuple')
+    expect(workerErrors).toContain('failed to obtain advisory lock')
   })
 
   it('shows analytics refresh processing note after game synchronization completes', async () => {
@@ -468,6 +533,43 @@ describe('AdminView', () => {
 
     expect(wrapper.get('[data-test="game-details-analytics-refresh-processing"]').text())
       .toContain('Daily analytics refresh is now processing')
+  })
+
+  it('runs daily analytics refresh for deferred game-details runs using the same date range', async () => {
+    gameDetailsTask.value = {
+      id: 20,
+      status: 'completed',
+      totalItems: 26,
+      completedItems: 26,
+      failedItems: 0,
+      processedItems: 26,
+      progressPercentage: 100,
+      currentItemLabel: null,
+      cancelRequested: false,
+      elapsedSeconds: 420,
+      estimatedRemainingSeconds: null,
+      errorMessage: null,
+      taskParameters: {
+        start_date: '2026-05-12',
+        end_date: '2026-05-15',
+      },
+      resultData: {
+        analytics_refresh: {
+          success: false,
+          deferred: true,
+          message: 'Game details synchronized, but analytics refresh was interrupted by a worker restart.',
+        },
+      },
+    }
+
+    const wrapper = mount(AdminView)
+    await wrapper.get('[data-test="game-details-run-deferred-analytics-refresh"]').trigger('click')
+    await flushPromises()
+
+    expect(runTask).toHaveBeenCalledWith('daily_analytics_refresh', {
+      start_date: '2026-05-12',
+      end_date: '2026-05-15',
+    })
   })
 
   it('shows persisted pitch synchronization progress and requests safe cancellation', async () => {

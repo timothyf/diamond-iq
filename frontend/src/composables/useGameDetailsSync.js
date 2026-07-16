@@ -15,16 +15,24 @@ export function useGameDetailsSync() {
 
   function normalizeTask(data) {
     if (!data) return null
+    const totalItems = Number(data.total_items || 0)
+    const completedItems = Number(data.completed_items || 0)
+    const failedItems = Number(data.failed_items || 0)
+    const processedRaw = Number(data.processed_items || 0)
+    const processedItems = totalItems > 0 ? Math.min(processedRaw, totalItems) : processedRaw
+    const progressRaw = Number(data.progress_percentage || 0)
+    const progressPercentage = Math.min(Math.max(progressRaw, 0), 100)
+
     return {
       id: data.id,
       taskName: data.task_name,
       status: data.status,
       taskParameters: data.task_parameters || {},
-      totalItems: Number(data.total_items || 0),
-      completedItems: Number(data.completed_items || 0),
-      failedItems: Number(data.failed_items || 0),
-      processedItems: Number(data.processed_items || 0),
-      progressPercentage: Number(data.progress_percentage || 0),
+      totalItems,
+      completedItems,
+      failedItems,
+      processedItems,
+      progressPercentage,
       currentItemMlbId: data.current_item_mlb_id,
       currentItemLabel: data.current_item_label,
       cancelRequested: data.cancel_requested === true,

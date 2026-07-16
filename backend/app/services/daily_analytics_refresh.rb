@@ -10,20 +10,22 @@ class DailyAnalyticsRefresh
     TeamDailyMetric
   ].freeze
 
-  def self.call(start_date: nil, end_date: nil, dates: nil, calculation_version: CALCULATION_VERSION)
+  def self.call(start_date: nil, end_date: nil, dates: nil, calculation_version: CALCULATION_VERSION, refresh_contextual_benchmarks: true)
     new(
       start_date: start_date,
       end_date: end_date,
       dates: dates,
-      calculation_version: calculation_version
+      calculation_version: calculation_version,
+      refresh_contextual_benchmarks: refresh_contextual_benchmarks
     ).call
   end
 
-  def initialize(start_date: nil, end_date: nil, dates: nil, calculation_version: CALCULATION_VERSION)
+  def initialize(start_date: nil, end_date: nil, dates: nil, calculation_version: CALCULATION_VERSION, refresh_contextual_benchmarks: true)
     @start_date = start_date
     @end_date = end_date
     @dates = dates
     @calculation_version = calculation_version.to_s.strip
+    @refresh_contextual_benchmarks = refresh_contextual_benchmarks
   end
 
   def call
@@ -36,7 +38,7 @@ class DailyAnalyticsRefresh
       counts = DailyAnalyticsCalculator.call(metric_date: date, calculation_version: calculation_version)
       counts.each { |table, count| totals[table] += count }
     end
-    benchmark_refreshes = refresh_contextual_benchmarks(calculation_dates)
+    benchmark_refreshes = refresh_contextual_benchmarks ? refresh_contextual_benchmark_ranges(calculation_dates) : []
 
     {
       success: true,
@@ -47,6 +49,7 @@ class DailyAnalyticsRefresh
         source_end_date: calculation_dates.max.iso8601,
         calculated_date_count: calculation_dates.length,
         row_counts: totals,
+        contextual_benchmarks_refreshed: refresh_contextual_benchmarks,
         benchmark_refreshes: benchmark_refreshes
       }
     }
@@ -58,9 +61,9 @@ class DailyAnalyticsRefresh
 
   private
 
-  attr_reader :start_date, :end_date, :dates, :calculation_version
+  attr_reader :start_date, :end_date, :dates, :calculation_version, :refresh_contextual_benchmarks
 
-  def refresh_contextual_benchmarks(calculation_dates)
+  def refresh_contextual_benchmark_ranges(calculation_dates)
     calculation_dates.map(&:year).uniq.sort.flat_map do |year|
       year_range = Date.new(year, 1, 1)..Date.new(year, 12, 31)
       stored_dates = SUMMARY_MODELS.flat_map do |model|

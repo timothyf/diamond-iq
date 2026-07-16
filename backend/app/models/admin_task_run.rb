@@ -31,7 +31,7 @@ class AdminTaskRun < ApplicationRecord
     return 100.0 if status == "completed"
     return 0.0 if total_items.zero?
 
-    (processed_items.to_f / total_items * 100).round(1)
+    [ (processed_items.to_f / total_items * 100).round(1), 100.0 ].min
   end
 
   def elapsed_seconds
