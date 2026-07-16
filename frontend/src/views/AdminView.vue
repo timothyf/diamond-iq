@@ -458,6 +458,24 @@ function gameDetailsStatusLabel(status) {
   }[status] || humanize(status)
 }
 
+function gameDetailsAnalyticsRefresh(task) {
+  return task?.resultData?.analytics_refresh || null
+}
+
+function gameDetailsAnalyticsRefreshMessage(task) {
+  const refresh = gameDetailsAnalyticsRefresh(task)
+  if (!refresh) return ''
+  if (refresh.skipped) return refresh.message || 'Daily analytics refresh was skipped.'
+  if (refresh.success) return refresh.message || 'Daily analytics refresh completed.'
+  return refresh.message || 'Daily analytics refresh failed.'
+}
+
+function gameDetailsAnalyticsRefreshClass(task) {
+  const refresh = gameDetailsAnalyticsRefresh(task)
+  if (!refresh) return ''
+  return refresh.success || refresh.skipped ? 'sync-progress__notice' : 'sync-progress__error'
+}
+
 function pitchDataStatusLabel(status) {
   return {
     queued: 'Queued',
@@ -1065,6 +1083,13 @@ async function closeDatabaseDetails() {
               Cancellation requested. The current game will finish safely before the task stops.
             </p>
             <p v-else-if="gameDetailsTask.errorMessage" class="sync-progress__error">{{ gameDetailsTask.errorMessage }}</p>
+            <p
+              v-if="gameDetailsAnalyticsRefreshMessage(gameDetailsTask)"
+              :class="gameDetailsAnalyticsRefreshClass(gameDetailsTask)"
+              data-test="game-details-analytics-refresh"
+            >
+              {{ gameDetailsAnalyticsRefreshMessage(gameDetailsTask) }}
+            </p>
             <button
               v-if="gameDetailsSyncActive"
               type="button"

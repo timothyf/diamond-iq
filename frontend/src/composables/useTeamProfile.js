@@ -42,6 +42,7 @@ function normalizeMembership(membership) {
 }
 
 function normalizeProfile(data) {
+  const drillDown = data.performance_dashboard?.drill_down || {}
   return {
     id: data.id,
     mlbId: data.mlb_id,
@@ -67,7 +68,33 @@ function normalizeProfile(data) {
       lastUpdatedAt: data.source_metadata?.last_updated_at,
       scheduleLastSyncedAt: data.source_metadata?.schedule_last_synced_at,
       rosterLastSyncedAt: data.source_metadata?.roster_last_synced_at,
+      analyticsLastCalculatedAt: data.source_metadata?.analytics_last_calculated_at,
       sources: data.source_metadata?.sources || [],
+    },
+    performanceDashboard: {
+      rankings: data.performance_dashboard?.rankings || { offense: {}, pitching: {}, context: {} },
+      recentForm: data.performance_dashboard?.recent_form || {},
+      homeRoadSplits: data.performance_dashboard?.home_road_splits || { home: {}, road: {} },
+      platoonSplits: data.performance_dashboard?.platoon_splits || { offense: {}, pitching: {} },
+      starterBullpen: data.performance_dashboard?.starter_bullpen || { starters: {}, bullpen: {} },
+      oneRunPerformance: data.performance_dashboard?.one_run_performance || {},
+      strengths: data.performance_dashboard?.strengths || [],
+      concerns: data.performance_dashboard?.concerns || [],
+      drillDown: {
+        games: drillDown.games || [],
+        players: {
+          hitters: drillDown.players?.hitters || [],
+          pitchers: drillDown.players?.pitchers || [],
+        },
+        plateAppearances: {
+          teamTotal: drillDown.plate_appearances?.team_total || 0,
+          leaders: drillDown.plate_appearances?.leaders || [],
+        },
+        pitches: {
+          teamTotal: drillDown.pitches?.team_total || 0,
+          leaders: drillDown.pitches?.leaders || [],
+        },
+      },
     },
   }
 }

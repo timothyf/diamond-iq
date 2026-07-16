@@ -4,6 +4,7 @@ RSpec.describe MlbGameDetailsBatchSync do
   it "continues after an unavailable game and reports the failure" do
     first = create_game(mlb_id: 800_001, official_date: Date.new(2026, 7, 15))
     second = create_game(mlb_id: 800_002, official_date: Date.new(2026, 7, 15))
+    allow(DailyAnalyticsRefresh).to receive(:call).and_return(success: true, message: "ok", data: {})
     allow(MlbGameDetailsSync).to receive(:call).with(game: first).and_return(
       success: true,
       message: "Synchronized",
@@ -22,6 +23,8 @@ RSpec.describe MlbGameDetailsBatchSync do
     expect(result.dig(:data, :failed_game_count)).to eq(1)
     expect(result.dig(:data, :batting_line_count)).to eq(2)
     expect(result.dig(:data, :errors)).to include(hash_including(mlb_id: 800_002, message: "HTTP 404: Not Found"))
+    expect(result.dig(:data, :analytics_refresh, :success)).to be(true)
+    expect(DailyAnalyticsRefresh).to have_received(:call).with(dates: [ Date.new(2026, 7, 15) ])
   end
 
   it "rejects a reversed date range" do
@@ -33,6 +36,7 @@ RSpec.describe MlbGameDetailsBatchSync do
   it "reports progress and stops safely between games when cancellation is requested" do
     first = create_game(mlb_id: 800_011, official_date: Date.new(2026, 7, 15))
     second = create_game(mlb_id: 800_012, official_date: Date.new(2026, 7, 15))
+    allow(DailyAnalyticsRefresh).to receive(:call).and_return(success: true, message: "ok", data: {})
     tracker = instance_double(MlbGameDetailsProgressTracker)
     allow(tracker).to receive(:start!)
     allow(tracker).to receive(:cancel_requested?).and_return(false, true)
@@ -48,5 +52,6 @@ RSpec.describe MlbGameDetailsBatchSync do
     expect(tracker).to have_received(:game_started!).with(first)
     expect(tracker).to have_received(:game_finished!).with(game: first, success: true, message: "Synchronized")
     expect(MlbGameDetailsSync).not_to have_received(:call).with(game: second)
+    expect(DailyAnalyticsRefresh).to have_received(:call).with(dates: [ Date.new(2026, 7, 15) ])
   end
 end

@@ -33,6 +33,8 @@ const recordLabel = computed(() => {
   return [record.wins, record.losses, ...(record.ties ? [record.ties] : [])].join('–')
 })
 
+const dashboard = computed(() => team.value?.performanceDashboard || {})
+
 function formatDate(value, includeYear = false) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('en-US', {
@@ -78,6 +80,25 @@ function resultLabel(game) {
 function probablePitcher(game) {
   return isHome(game) ? game.homeProbablePitcher : game.awayProbablePitcher
 }
+
+function formatDecimal(value, digits = 3) {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  return number.toFixed(digits)
+}
+
+function formatPercent(value, digits = 1) {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  return `${(number * 100).toFixed(digits)}%`
+}
+
+function formatRank(entry) {
+  if (!entry || !entry.rank) return '—'
+  return `#${entry.rank}`
+}
 </script>
 
 <template>
@@ -111,6 +132,140 @@ function probablePitcher(game) {
         <article><span>Run differential</span><strong>{{ (team.record.runs_scored || 0) - (team.record.runs_allowed || 0) }}</strong><small>{{ team.record.runs_scored || 0 }} RS · {{ team.record.runs_allowed || 0 }} RA</small></article>
         <article><span>Current roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
         <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'DiamondIQ' }}</small></article>
+      </section>
+
+      <section class="team-panel performance-panel" data-test="team-performance-dashboard">
+        <header>
+          <div><p>Daily analytics</p><h2>Team performance dashboard</h2></div>
+          <span>Built from precomputed daily tables</span>
+        </header>
+
+        <div class="performance-grid">
+          <article>
+            <h3>Offensive rankings</h3>
+            <dl>
+              <div><dt>OPS</dt><dd>{{ formatRank(dashboard.rankings?.offense?.ops) }} · {{ formatDecimal(dashboard.rankings?.offense?.ops?.value) }}</dd></div>
+              <div><dt>Runs / G</dt><dd>{{ formatRank(dashboard.rankings?.offense?.runs_per_game) }} · {{ formatDecimal(dashboard.rankings?.offense?.runs_per_game?.value) }}</dd></div>
+              <div><dt>K Rate</dt><dd>{{ formatRank(dashboard.rankings?.offense?.strikeout_rate) }} · {{ formatPercent(dashboard.rankings?.offense?.strikeout_rate?.value) }}</dd></div>
+              <div><dt>BB Rate</dt><dd>{{ formatRank(dashboard.rankings?.offense?.walk_rate) }} · {{ formatPercent(dashboard.rankings?.offense?.walk_rate?.value) }}</dd></div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Pitching rankings</h3>
+            <dl>
+              <div><dt>ERA</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.era) }} · {{ formatDecimal(dashboard.rankings?.pitching?.era?.value) }}</dd></div>
+              <div><dt>WHIP</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.whip) }} · {{ formatDecimal(dashboard.rankings?.pitching?.whip?.value) }}</dd></div>
+              <div><dt>K Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.strikeout_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.strikeout_rate?.value) }}</dd></div>
+              <div><dt>BB Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.walk_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.walk_rate?.value) }}</dd></div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Recent form</h3>
+            <dl>
+              <div v-for="window in ['7', '15', '30']" :key="window">
+                <dt>Last {{ window }} games</dt>
+                <dd>
+                  {{ dashboard.recentForm?.[window]?.wins || 0 }}-{{ dashboard.recentForm?.[window]?.losses || 0 }} ·
+                  OPS {{ formatDecimal(dashboard.recentForm?.[window]?.ops) }} ·
+                  ERA {{ formatDecimal(dashboard.recentForm?.[window]?.era) }}
+                </dd>
+              </div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Home / road</h3>
+            <dl>
+              <div><dt>Home</dt><dd>{{ dashboard.homeRoadSplits?.home?.wins || 0 }}-{{ dashboard.homeRoadSplits?.home?.losses || 0 }} · RD {{ dashboard.homeRoadSplits?.home?.run_differential || 0 }}</dd></div>
+              <div><dt>Road</dt><dd>{{ dashboard.homeRoadSplits?.road?.wins || 0 }}-{{ dashboard.homeRoadSplits?.road?.losses || 0 }} · RD {{ dashboard.homeRoadSplits?.road?.run_differential || 0 }}</dd></div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Platoon splits</h3>
+            <dl>
+              <div><dt>Offense vs LHP</dt><dd>K {{ formatPercent(dashboard.platoonSplits?.offense?.vs_left?.strikeout_rate) }} · EV {{ formatDecimal(dashboard.platoonSplits?.offense?.vs_left?.average_exit_velocity, 1) }}</dd></div>
+              <div><dt>Offense vs RHP</dt><dd>K {{ formatPercent(dashboard.platoonSplits?.offense?.vs_right?.strikeout_rate) }} · EV {{ formatDecimal(dashboard.platoonSplits?.offense?.vs_right?.average_exit_velocity, 1) }}</dd></div>
+              <div><dt>Pitching vs LHB</dt><dd>K {{ formatPercent(dashboard.platoonSplits?.pitching?.vs_left?.strikeout_rate) }} · Velo {{ formatDecimal(dashboard.platoonSplits?.pitching?.vs_left?.average_velocity, 1) }}</dd></div>
+              <div><dt>Pitching vs RHB</dt><dd>K {{ formatPercent(dashboard.platoonSplits?.pitching?.vs_right?.strikeout_rate) }} · Velo {{ formatDecimal(dashboard.platoonSplits?.pitching?.vs_right?.average_velocity, 1) }}</dd></div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>Starter / bullpen</h3>
+            <dl>
+              <div><dt>Starters</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.starters?.innings_pitched, 1) }} IP · ERA {{ formatDecimal(dashboard.starterBullpen?.starters?.era) }} · WHIP {{ formatDecimal(dashboard.starterBullpen?.starters?.whip) }}</dd></div>
+              <div><dt>Bullpen</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.bullpen?.innings_pitched, 1) }} IP · ERA {{ formatDecimal(dashboard.starterBullpen?.bullpen?.era) }} · WHIP {{ formatDecimal(dashboard.starterBullpen?.bullpen?.whip) }}</dd></div>
+            </dl>
+          </article>
+
+          <article>
+            <h3>One-run games</h3>
+            <dl>
+              <div><dt>Record</dt><dd>{{ dashboard.oneRunPerformance?.wins || 0 }}-{{ dashboard.oneRunPerformance?.losses || 0 }}</dd></div>
+              <div><dt>Win rate</dt><dd>{{ formatPercent(dashboard.oneRunPerformance?.winning_percentage) }}</dd></div>
+              <div><dt>Games</dt><dd>{{ dashboard.oneRunPerformance?.games || 0 }}</dd></div>
+            </dl>
+          </article>
+        </div>
+
+        <div class="signals-grid">
+          <article>
+            <h3>Current strengths</h3>
+            <ul>
+              <li v-for="entry in dashboard.strengths || []" :key="entry">{{ entry }}</li>
+            </ul>
+          </article>
+          <article>
+            <h3>Areas of concern</h3>
+            <ul>
+              <li v-for="entry in dashboard.concerns || []" :key="entry">{{ entry }}</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="drilldown-grid">
+          <article>
+            <h3>Drill-down: games</h3>
+            <ul>
+              <li v-for="game in dashboard.drillDown?.games || []" :key="game.id">
+                {{ formatDate(game.official_date, true) }} · {{ game.result }} · {{ game.score?.team }}-{{ game.score?.opponent }} vs {{ game.opponent }}
+              </li>
+            </ul>
+          </article>
+          <article>
+            <h3>Drill-down: players</h3>
+            <ul>
+              <li v-for="playerEntry in dashboard.drillDown?.players?.hitters || []" :key="`h-${playerEntry.player?.id}`">
+                <RouterLink v-if="playerEntry.player?.id" :to="{ name: 'player-profile', params: { id: playerEntry.player.id } }">
+                  {{ playerEntry.player?.full_name }}
+                </RouterLink>
+                <template v-else>{{ playerEntry.player?.full_name || 'Unknown player' }}</template>
+                · OPS {{ formatDecimal(playerEntry.ops) }}
+              </li>
+            </ul>
+          </article>
+          <article>
+            <h3>Drill-down: plate appearances</h3>
+            <p>Total tracked PA: {{ dashboard.drillDown?.plateAppearances?.teamTotal || 0 }}</p>
+            <ul>
+              <li v-for="entry in dashboard.drillDown?.plateAppearances?.leaders || []" :key="`pa-${entry.player?.id}`">
+                {{ entry.player?.full_name }} · {{ entry.plate_appearances }} PA
+              </li>
+            </ul>
+          </article>
+          <article>
+            <h3>Drill-down: pitches</h3>
+            <p>Total tracked pitches: {{ dashboard.drillDown?.pitches?.teamTotal || 0 }}</p>
+            <ul>
+              <li v-for="entry in dashboard.drillDown?.pitches?.leaders || []" :key="`pi-${entry.player?.id}`">
+                {{ entry.player?.full_name }} · {{ entry.pitches }} pitches
+              </li>
+            </ul>
+          </article>
+        </div>
       </section>
 
       <div class="team-schedule-grid">
@@ -220,6 +375,15 @@ function probablePitcher(game) {
 .team-summary small { color: #788188; }
 .team-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .team-panel { padding: 1.35rem; }
+.performance-panel h3 { margin: 0 0 .55rem; font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: #5f6c76; }
+.performance-grid { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1rem; }
+.performance-grid article, .signals-grid article, .drilldown-grid article { padding: .75rem; border: 1px solid #e3dfd7; border-radius: 14px; background: rgba(255,255,255,.66); }
+.performance-grid dl { margin: 0; display: grid; gap: .35rem; }
+.performance-grid dt { color: #6f7981; font-size: .72rem; font-weight: 700; }
+.performance-grid dd { margin: 0; color: #1d3448; font-weight: 700; }
+.signals-grid, .drilldown-grid { display: grid; gap: .75rem; margin-top: .85rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.signals-grid ul, .drilldown-grid ul { margin: 0; padding-left: 1rem; color: #445767; }
+.signals-grid li, .drilldown-grid li { margin: .22rem 0; }
 .team-panel > header { display: flex; justify-content: space-between; align-items: end; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e0d8; }
 .team-panel h2 { margin: .12rem 0 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: 2rem; text-transform: uppercase; }
 .team-panel header > span { color: #778087; font-size: .75rem; }
@@ -255,6 +419,6 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state { margin-top: 2rem; padding: 2rem; border-radius: 20px; background: #fffaf0; }
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
-@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .game-list li { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 </style>

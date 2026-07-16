@@ -18,6 +18,7 @@ class MlbGameDetailsBatchSync
     games = selected_games.to_a
     summary = empty_summary.merge(game_count: games.length)
     failures = []
+    refreshed_dates = []
     progress_tracker&.start!(total: games.length)
 
     games.each do |game|
@@ -31,12 +32,15 @@ class MlbGameDetailsBatchSync
       if result[:success]
         accumulate!(summary, result.fetch(:data))
         summary[:synchronized_game_count] += 1
+        refreshed_dates << game.official_date if game.official_date.present?
       else
         summary[:failed_game_count] += 1
         failures << { mlb_id: game.mlb_id, message: result[:message], errors: Array(result.dig(:data, :errors)) }
       end
       progress_tracker&.game_finished!(game: game, success: result[:success], message: result[:message])
     end
+
+    summary[:analytics_refresh] = refresh_daily_analytics_for!(refreshed_dates)
 
     summary[:errors] = failures
     if summary[:cancelled]
@@ -89,12 +93,13 @@ class MlbGameDetailsBatchSync
       plate_appearance_count: 0,
       created_player_count: 0,
       linked_pitch_count: 0,
+      analytics_refresh: nil,
       cancelled: false
     }
   end
 
   def accumulate!(summary, data)
-    empty_summary.except(:game_count, :synchronized_game_count, :failed_game_count, :cancelled).each_key do |key|
+    empty_summary.except(:game_count, :synchronized_game_count, :failed_game_count, :analytics_refresh, :cancelled).each_key do |key|
       summary[key] += data.fetch(key, 0)
     end
   end
@@ -105,6 +110,19 @@ class MlbGameDetailsBatchSync
     Date.iso8601(value.to_s)
   rescue Date::Error
     nil
+  end
+
+  def refresh_daily_analytics_for!(dates)
+    unique_dates = dates.compact.uniq.sort
+    return { success: true, skipped: true, message: "No synchronized games required analytics refresh" } if unique_dates.empty?
+
+    DailyAnalyticsRefresh.call(dates: unique_dates)
+  rescue StandardError => error
+    {
+      success: false,
+      message: "Game details synchronized, but daily analytics refresh failed: #{error.message}",
+      data: { errors: [ error.message ] }
+    }
   end
 
   def success(message, data)

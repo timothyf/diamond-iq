@@ -420,6 +420,33 @@ describe('AdminView', () => {
     expect(cancelGameDetailsSync).toHaveBeenCalledOnce()
   })
 
+  it('shows batch analytics refresh outcome for game detail synchronization', async () => {
+    gameDetailsTask.value = {
+      id: 11,
+      status: 'completed',
+      totalItems: 12,
+      completedItems: 12,
+      failedItems: 0,
+      processedItems: 12,
+      progressPercentage: 100,
+      currentItemLabel: null,
+      cancelRequested: false,
+      elapsedSeconds: 321,
+      estimatedRemainingSeconds: null,
+      errorMessage: null,
+      resultData: {
+        analytics_refresh: {
+          success: true,
+          message: 'Refreshed daily analytics for 4 dates',
+        },
+      },
+    }
+
+    const wrapper = mount(AdminView)
+
+    expect(wrapper.get('[data-test="game-details-analytics-refresh"]').text()).toContain('Refreshed daily analytics for 4 dates')
+  })
+
   it('shows persisted pitch synchronization progress and requests safe cancellation', async () => {
     pitchDataTask.value = {
       id: 12,

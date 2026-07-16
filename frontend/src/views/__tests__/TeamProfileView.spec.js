@@ -83,6 +83,72 @@ const payload = {
       { id: 81, official_date: '2026-07-16', venue_name: 'Comerica Park', home_score: null, away_score: null, home_team: { id: 1, abbreviation: 'DET' }, away_team: { id: 2, abbreviation: 'CLE' }, home_probable_pitcher: { full_name: 'Tarik Skubal' } },
     ],
     source_metadata: { last_updated_at: '2026-07-15T12:00:00Z', schedule_last_synced_at: '2026-07-15T12:00:00Z', roster_last_synced_at: '2026-07-15T11:00:00Z', sources: ['MLB Stats API'] },
+    performance_dashboard: {
+      rankings: {
+        offense: {
+          ops: { rank: 5, value: 0.765 },
+          runs_per_game: { rank: 8, value: 4.5 },
+          strikeout_rate: { rank: 12, value: 0.219 },
+          walk_rate: { rank: 9, value: 0.086 },
+        },
+        pitching: {
+          era: { rank: 7, value: 3.81 },
+          whip: { rank: 10, value: 1.24 },
+          strikeout_rate: { rank: 6, value: 0.251 },
+          walk_rate: { rank: 11, value: 0.082 },
+        },
+        context: { total_teams: 30 },
+      },
+      recent_form: {
+        '7': { wins: 5, losses: 2, ops: 0.791, era: 3.43 },
+        '15': { wins: 9, losses: 6, ops: 0.768, era: 3.76 },
+        '30': { wins: 17, losses: 13, ops: 0.751, era: 3.92 },
+      },
+      home_road_splits: {
+        home: { wins: 27, losses: 19, run_differential: 22 },
+        road: { wins: 25, losses: 24, run_differential: 7 },
+      },
+      platoon_splits: {
+        offense: {
+          vs_left: { strikeout_rate: 0.244, average_exit_velocity: 90.2 },
+          vs_right: { strikeout_rate: 0.211, average_exit_velocity: 91.0 },
+        },
+        pitching: {
+          vs_left: { strikeout_rate: 0.257, average_velocity: 94.1 },
+          vs_right: { strikeout_rate: 0.245, average_velocity: 94.4 },
+        },
+      },
+      starter_bullpen: {
+        starters: { innings_pitched: 520.1, era: 3.61, whip: 1.18 },
+        bullpen: { innings_pitched: 336.2, era: 4.13, whip: 1.31 },
+      },
+      one_run_performance: { wins: 14, losses: 11, games: 25, winning_percentage: 0.56 },
+      strengths: ['Top-10 offense by OPS'],
+      concerns: ['Offense has cooled over the last 30 games'],
+      drill_down: {
+        games: [
+          { id: 80, official_date: '2026-07-14', result: 'W', opponent: 'CLE', score: { team: 5, opponent: 2 } },
+        ],
+        players: {
+          hitters: [
+            { player: { id: 42, full_name: 'Riley Greene' }, ops: 0.842 },
+          ],
+          pitchers: [],
+        },
+        plate_appearances: {
+          team_total: 3812,
+          leaders: [
+            { player: { id: 42, full_name: 'Riley Greene' }, plate_appearances: 421 },
+          ],
+        },
+        pitches: {
+          team_total: 14280,
+          leaders: [
+            { player: { id: 51, full_name: 'Tarik Skubal' }, pitches: 1788 },
+          ],
+        },
+      },
+    },
   },
 }
 
@@ -112,6 +178,10 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="team-roster"]').text()).not.toContain('Spencer Torkelson')
     expect(wrapper.get('[data-test="team-season-select"]').text()).toContain('2025')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Team performance dashboard')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Last 7 games')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
   })
 
   it('renders a retry state when the profile cannot load', async () => {

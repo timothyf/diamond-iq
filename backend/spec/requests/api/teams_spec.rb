@@ -69,6 +69,159 @@ RSpec.describe "Api::Teams", type: :request do
       status: "scheduled",
       venue_name: "Progressive Field"
     )
+    TeamDailyMetric.create!(
+      team: @tigers,
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 1,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        games: 1,
+        wins: 1,
+        losses: 0,
+        ties: 0,
+        runs_scored: 5,
+        runs_allowed: 2,
+        plate_appearances: 34,
+        at_bats: 31,
+        hits: 10,
+        doubles: 2,
+        triples: 0,
+        home_runs: 1,
+        walks: 3,
+        strikeouts: 8,
+        pitching_outs_recorded: 27,
+        pitching_hits_allowed: 6,
+        pitching_earned_runs: 2,
+        pitching_walks: 2,
+        pitching_strikeouts: 9
+      }
+    )
+    TeamDailyMetric.create!(
+      team: @guardians,
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 1,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        games: 1,
+        wins: 0,
+        losses: 1,
+        ties: 0,
+        runs_scored: 2,
+        runs_allowed: 5,
+        plate_appearances: 32,
+        at_bats: 29,
+        hits: 7,
+        doubles: 1,
+        triples: 0,
+        home_runs: 0,
+        walks: 2,
+        strikeouts: 10,
+        pitching_outs_recorded: 24,
+        pitching_hits_allowed: 10,
+        pitching_earned_runs: 5,
+        pitching_walks: 3,
+        pitching_strikeouts: 8
+      }
+    )
+    PlayerBattingDaily.create!(
+      player: player,
+      team: @tigers,
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 4,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        games: 1,
+        plate_appearances: 4,
+        at_bats: 4,
+        hits: 2,
+        doubles: 1,
+        triples: 0,
+        home_runs: 0,
+        walks: 0,
+        strikeouts: 1
+      }
+    )
+    PlayerPitchingDaily.create!(
+      player: player,
+      team: @tigers,
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 24,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        games: 1,
+        games_started: 1,
+        outs_recorded: 15,
+        batters_faced: 24,
+        pitches: 88,
+        hits: 4,
+        earned_runs: 1,
+        walks: 1,
+        strikeouts: 6
+      }
+    )
+    BatterSplitSummary.create!(
+      player: player,
+      team: @tigers,
+      split_type: "pitcher_hand",
+      split_value: "L",
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 20,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        plate_appearances: 8,
+        pitches_seen: 32,
+        hits: 3,
+        walks: 1,
+        strikeouts: 2,
+        batted_balls: 3,
+        hard_hit_percentage: 33.3,
+        exit_velocity_sample_size: 3,
+        average_exit_velocity: 92.1
+      }
+    )
+    PitcherSplitSummary.create!(
+      player: player,
+      team: @tigers,
+      split_type: "batter_hand",
+      split_value: "R",
+      metric_date: Date.current - 1.day,
+      source_start_date: Date.current - 1.day,
+      source_end_date: Date.current - 1.day,
+      sample_size: 20,
+      calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
+      calculated_at: Time.current,
+      source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+      metrics: {
+        batters_faced: 10,
+        pitch_count: 41,
+        strikeouts: 3,
+        walks: 1,
+        whiffs: 4,
+        swings: 8,
+        velocity_sample_size: 20,
+        average_velocity: 95.4
+      }
+    )
 
     get api_team_path(@tigers)
 
@@ -100,6 +253,10 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "recent_games", 0, "id")).to eq(completed_game.id)
     expect(json_body.dig("data", "upcoming_games", 0, "id")).to eq(upcoming_game.id)
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
+    expect(json_body.dig("data", "performance_dashboard", "recent_form", "7", "sampled_games")).to be >= 1
+    expect(json_body.dig("data", "performance_dashboard", "drill_down", "players", "hitters")).not_to be_empty
+    expect(json_body.dig("data", "performance_dashboard", "platoon_splits", "offense", "vs_left", "sample_size")).to eq(8.0)
   end
 
   it "selects a requested season" do
