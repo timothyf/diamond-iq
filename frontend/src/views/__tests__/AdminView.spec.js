@@ -224,6 +224,10 @@ describe('AdminView', () => {
     expect(loadOverview).toHaveBeenCalledTimes(3)
 
     await wrapper.get('[data-test="game-details-sync-form"]').trigger('submit')
+    expect(wrapper.get('[data-test="game-details-confirmation"]').attributes('role')).toBe('dialog')
+    expect(runTask).not.toHaveBeenCalledWith('mlb_game_details_sync', expect.anything())
+    await wrapper.get('[data-test="game-details-continue"]').trigger('click')
+    await flushPromises()
     expect(runTask).toHaveBeenCalledWith(
       'mlb_game_details_sync',
       expect.objectContaining({ start_date: expect.any(String), end_date: expect.any(String), mlb_game_id: null }),
@@ -254,6 +258,37 @@ describe('AdminView', () => {
     )
     expect(loadSnapshots).toHaveBeenCalledWith(
       expect.objectContaining({ teamMlbId: '116', on: expect.any(String) }),
+    )
+  })
+
+  it('warns with a date-span estimate and allows cancellation before synchronizing game details', async () => {
+    const wrapper = mount(AdminView)
+    const form = wrapper.get('[data-test="game-details-sync-form"]')
+    const dateInputs = form.findAll('input[type="date"]')
+    await dateInputs[0].setValue('2026-07-01')
+    await dateInputs[1].setValue('2026-07-07')
+
+    await form.trigger('submit')
+
+    const confirmation = wrapper.get('[data-test="game-details-confirmation"]')
+    expect(confirmation.attributes('aria-modal')).toBe('true')
+    expect(confirmation.text()).toContain('7 calendar days')
+    expect(confirmation.text()).toContain('Jul 1, 2026–Jul 7, 2026')
+    expect(confirmation.text()).toContain('about 6–11 minutes')
+    expect(confirmation.text()).toContain('up to approximately 105 games')
+    expect(confirmation.text()).toContain('Keep the Rails server running')
+    expect(runTask).not.toHaveBeenCalled()
+
+    await wrapper.get('[data-test="game-details-cancel"]').trigger('click')
+    expect(wrapper.find('[data-test="game-details-confirmation"]').exists()).toBe(false)
+    expect(runTask).not.toHaveBeenCalled()
+
+    await form.trigger('submit')
+    await wrapper.get('[data-test="game-details-continue"]').trigger('click')
+    await flushPromises()
+    expect(runTask).toHaveBeenCalledWith(
+      'mlb_game_details_sync',
+      { start_date: '2026-07-01', end_date: '2026-07-07', mlb_game_id: null },
     )
   })
 

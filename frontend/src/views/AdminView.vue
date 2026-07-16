@@ -14,6 +14,10 @@ const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
 const databaseDetailsDialog = ref(null)
 const databaseDetailsButton = ref(null)
+const gameDetailsConfirmationOpen = ref(false)
+const gameDetailsConfirmationDialog = ref(null)
+const gameDetailsSyncButton = ref(null)
+const pendingGameDetailsParameters = ref(null)
 
 const statsOptions = reactive({
   category: 'batting',
@@ -138,6 +142,31 @@ const hasImportedSchedule = computed(
   () => Boolean(scheduleImportRange.value.earliestImportDate && scheduleImportRange.value.latestImportDate),
 )
 
+const gameDetailsEstimate = computed(() => {
+  const parameters = pendingGameDetailsParameters.value
+  if (!parameters) return null
+
+  if (parameters.mlb_game_id) {
+    return {
+      scope: `MLB game ${parameters.mlb_game_id}`,
+      estimatedGames: 1,
+      duration: 'about 1 minute',
+      assumption: 'A single stored game will be downloaded and its daily analytics will be refreshed.',
+    }
+  }
+
+  const spanDays = inclusiveDayCount(parameters.start_date, parameters.end_date)
+  const estimatedGames = spanDays * 15
+  const lowMinutes = Math.max(1, Math.ceil((estimatedGames * 3) / 60))
+  const highMinutes = Math.max(lowMinutes + 1, Math.ceil((estimatedGames * 6) / 60))
+  return {
+    scope: `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
+    estimatedGames,
+    duration: `about ${formatDurationRange(lowMinutes, highMinutes)}`,
+    assumption: 'Estimate assumes approximately 15 stored MLB games per day and 3–6 seconds per game.',
+  }
+})
+
 onMounted(loadOverview)
 
 function normalizeYearRange(options) {
@@ -171,13 +200,32 @@ async function handleScheduleSync() {
   if (result) await loadOverview()
 }
 
-async function handleGameDetailsSync() {
+async function requestGameDetailsSync() {
   normalizeDateRange(gameDetailsOptions)
-  const result = await runTask('mlb_game_details_sync', {
+  pendingGameDetailsParameters.value = {
     start_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.startDate,
     end_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.endDate,
     mlb_game_id: gameDetailsOptions.mlbGameId || null,
-  })
+  }
+  gameDetailsConfirmationOpen.value = true
+  await nextTick()
+  gameDetailsConfirmationDialog.value?.focus()
+}
+
+async function cancelGameDetailsSync() {
+  gameDetailsConfirmationOpen.value = false
+  pendingGameDetailsParameters.value = null
+  await nextTick()
+  gameDetailsSyncButton.value?.focus()
+}
+
+async function confirmGameDetailsSync() {
+  const parameters = pendingGameDetailsParameters.value
+  if (!parameters) return
+
+  gameDetailsConfirmationOpen.value = false
+  pendingGameDetailsParameters.value = null
+  const result = await runTask('mlb_game_details_sync', parameters)
   if (result) await loadOverview()
 }
 
@@ -264,6 +312,25 @@ function formatBytes(value) {
 function formatCount(value) {
   if (!Number.isFinite(value)) return 'Unavailable'
   return new Intl.NumberFormat('en-US').format(value)
+}
+
+function inclusiveDayCount(startDate, endDate) {
+  const start = new Date(`${startDate}T12:00:00Z`)
+  const end = new Date(`${endDate}T12:00:00Z`)
+  return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
+}
+
+function formatDuration(minutes) {
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+
+  const hours = Math.floor(minutes / 60)
+  const remainingMinutes = minutes % 60
+  return `${hours} hr${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
+}
+
+function formatDurationRange(lowMinutes, highMinutes) {
+  if (highMinutes < 60) return `${lowMinutes}–${highMinutes} minutes`
+  return `${formatDuration(lowMinutes)}–${formatDuration(highMinutes)}`
 }
 
 async function openDatabaseDetails() {
@@ -396,6 +463,58 @@ async function closeDatabaseDetails() {
       <footer>
         Row counts come from PostgreSQL statistics and are approximate. Run <code>ANALYZE</code> to refresh estimates after a large import.
       </footer>
+      </section>
+    </div>
+
+    <div
+      v-if="gameDetailsConfirmationOpen"
+      class="confirmation-modal"
+      data-test="game-details-confirmation-modal"
+      @click.self="cancelGameDetailsSync"
+      @keydown.esc="cancelGameDetailsSync"
+    >
+      <section
+        ref="gameDetailsConfirmationDialog"
+        class="confirmation-dialog"
+        data-test="game-details-confirmation"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="game-details-confirmation-title"
+        aria-describedby="game-details-confirmation-description"
+        tabindex="-1"
+      >
+        <div class="confirmation-dialog__icon" aria-hidden="true">!</div>
+        <p class="eyebrow">Before you continue</p>
+        <h2 id="game-details-confirmation-title">Game detail synchronization may take a while</h2>
+        <p id="game-details-confirmation-description">
+          DiamondIQ will process <strong>{{ gameDetailsEstimate.scope }}</strong>. Based on this selection, the operation should take
+          <strong>{{ gameDetailsEstimate.duration }}</strong>.
+        </p>
+        <dl>
+          <div>
+            <dt>Estimated workload</dt>
+            <dd>
+              {{ gameDetailsEstimate.estimatedGames === 1
+                ? '1 game'
+                : `up to approximately ${formatCount(gameDetailsEstimate.estimatedGames)} games` }}
+            </dd>
+          </div>
+          <div>
+            <dt>How this estimate works</dt>
+            <dd>{{ gameDetailsEstimate.assumption }}</dd>
+          </div>
+        </dl>
+        <p class="confirmation-dialog__note">
+          MLB response times and local analytics work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes.
+        </p>
+        <div class="confirmation-dialog__actions">
+          <button type="button" class="admin-button admin-button--secondary" data-test="game-details-cancel" @click="cancelGameDetailsSync">
+            Cancel
+          </button>
+          <button type="button" class="admin-button" data-test="game-details-continue" @click="confirmGameDetailsSync">
+            Continue synchronization
+          </button>
+        </div>
       </section>
     </div>
 
@@ -620,7 +739,7 @@ async function closeDatabaseDetails() {
           </button>
         </form>
 
-        <form class="admin-card" data-test="game-details-sync-form" @submit.prevent="handleGameDetailsSync">
+        <form class="admin-card" data-test="game-details-sync-form" @submit.prevent="requestGameDetailsSync">
           <div class="admin-card__title">
             <div>
               <p>Box scores & live feeds</p>
@@ -654,7 +773,7 @@ async function closeDatabaseDetails() {
             <label><span>End date</span><input v-model="gameDetailsOptions.endDate" type="date" :disabled="Boolean(gameDetailsOptions.mlbGameId)" /></label>
             <label><span>MLB game ID (optional)</span><input v-model="gameDetailsOptions.mlbGameId" type="number" min="1" placeholder="823443" /></label>
           </div>
-          <button class="admin-button" type="submit" :disabled="anyActionRunning">
+          <button ref="gameDetailsSyncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_game_details_sync' ? 'Synchronizing game details…' : 'Synchronize game details' }}
           </button>
         </form>
@@ -927,7 +1046,8 @@ async function closeDatabaseDetails() {
   color: #10263d;
 }
 
-.database-modal {
+.database-modal,
+.confirmation-modal {
   position: fixed;
   z-index: 100;
   inset: 0;
@@ -936,6 +1056,86 @@ async function closeDatabaseDetails() {
   padding: 1rem;
   background: rgba(8, 22, 35, 0.7);
   backdrop-filter: blur(5px);
+}
+
+.confirmation-dialog {
+  width: min(620px, calc(100vw - 2rem));
+  padding: clamp(1.35rem, 4vw, 2rem);
+  outline: none;
+  border: 1px solid rgba(143, 45, 36, 0.2);
+  border-radius: 24px;
+  background: #fffaf0;
+  box-shadow: 0 24px 70px rgba(8, 22, 35, 0.28);
+}
+
+.confirmation-dialog__icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 1rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #fffaf0;
+  background: #8f2d24;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 900;
+}
+
+.confirmation-dialog h2 {
+  margin-top: 0.25rem;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: clamp(1.7rem, 5vw, 2.4rem);
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.confirmation-dialog > p:not(.eyebrow) {
+  margin-top: 0.85rem;
+  color: #53616b;
+  line-height: 1.55;
+}
+
+.confirmation-dialog > p strong {
+  color: #10263d;
+}
+
+.confirmation-dialog dl {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1rem;
+}
+
+.confirmation-dialog dl div {
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  background: rgba(143, 45, 36, 0.055);
+}
+
+.confirmation-dialog dt {
+  color: #8f2d24;
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.confirmation-dialog dd {
+  margin-top: 0.2rem;
+  color: #263e52;
+  font-size: 0.84rem;
+}
+
+.confirmation-dialog .confirmation-dialog__note {
+  font-size: 0.78rem;
+}
+
+.confirmation-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
 }
 
 .database-insights {
