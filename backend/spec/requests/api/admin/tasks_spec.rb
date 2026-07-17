@@ -57,6 +57,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     expect(json_body.dig("meta", "database", "user_table_size_bytes")).to be_positive
     expect(json_body.dig("meta", "database", "estimated_row_count")).to be_a(Integer)
     expect(json_body.dig("meta", "database", "estimated_dead_row_count")).to be_a(Integer)
+    expect(json_body.dig("meta", "database", "statistics_collected_since")).to be_present
     expect(json_body.dig("meta", "database", "measured_at")).to be_present
     expect(json_body.dig("meta", "database", "largest_tables")).not_to be_empty
     expect(json_body.dig("meta", "database", "largest_tables", 0)).to include(
@@ -70,6 +71,18 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     )
     table_sizes = json_body.dig("meta", "database", "largest_tables").pluck("total_size_bytes")
     expect(table_sizes).to eq(table_sizes.sort.reverse)
+    expect(json_body.dig("meta", "database", "most_read_tables")).not_to be_empty
+    expect(json_body.dig("meta", "database", "most_read_tables", 0)).to include(
+      "table_name",
+      "total_scans",
+      "sequential_scans",
+      "index_scans",
+      "rows_read_or_fetched",
+      "last_sequential_scan_at",
+      "last_index_scan_at"
+    )
+    table_scans = json_body.dig("meta", "database", "most_read_tables").pluck("total_scans")
+    expect(table_scans).to eq(table_scans.sort.reverse)
     expect(json_body.dig("meta", "player_season_stats")).to include(
       "earliest_season" => 1901,
       "latest_season" => 2026

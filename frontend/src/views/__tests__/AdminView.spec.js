@@ -51,6 +51,7 @@ vi.mock('../../composables/useAdminTask', () => ({
       tableCount: 20,
       estimatedRowCount: 4779000,
       estimatedDeadRowCount: 1250,
+      statisticsCollectedSince: '2026-07-01T12:00:00Z',
       measuredAt: '2026-07-15T22:00:00Z',
       largestTables: [
         {
@@ -70,6 +71,26 @@ vi.mock('../../composables/useAdminTask', () => ({
           estimatedRowCount: 125000,
           estimatedDeadRowCount: 50,
           databasePercentage: 12.5,
+        },
+      ],
+      mostReadTables: [
+        {
+          tableName: 'games',
+          totalScans: 19000,
+          sequentialScans: 4000,
+          indexScans: 15000,
+          rowsReadOrFetched: 250000,
+          lastSequentialScanAt: '2026-07-15T20:00:00Z',
+          lastIndexScanAt: '2026-07-15T21:59:00Z',
+        },
+        {
+          tableName: 'teams',
+          totalScans: 5000,
+          sequentialScans: 5000,
+          indexScans: 0,
+          rowsReadOrFetched: 150000,
+          lastSequentialScanAt: '2026-07-15T19:00:00Z',
+          lastIndexScanAt: null,
         },
       ],
     })),
@@ -221,6 +242,15 @@ describe('AdminView', () => {
     expect(databaseDetails.text()).toContain('300 MB')
     expect(databaseDetails.text()).toContain('60.0 MB')
     expect(databaseDetails.text()).toContain('58.59%')
+    await wrapper.get('[data-test="database-view-usage-tab"]').trigger('click')
+    const usageView = wrapper.get('[data-test="database-view-usage"]')
+    expect(usageView.text()).toContain('Statistics collected since')
+    expect(usageView.text()).toContain('games')
+    expect(usageView.text()).toContain('19,000')
+    expect(usageView.text()).toContain('4,000')
+    expect(usageView.text()).toContain('15,000')
+    expect(usageView.text()).toContain('250,000')
+    expect(usageView.text()).toContain('Never recorded')
     await wrapper.get('[data-test="database-details-close"]').trigger('click')
     expect(wrapper.find('[data-test="database-details"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('Player season statistics')

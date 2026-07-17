@@ -105,8 +105,22 @@ module Api
           table_count: tables.length,
           estimated_row_count: tables.sum { |table| table[:estimated_row_count] },
           estimated_dead_row_count: tables.sum { |table| table[:estimated_dead_row_count] },
+          statistics_collected_since: database_statistics_reset_at(connection),
           largest_tables: tables.first(10).map do |table|
             table.merge(database_percentage: percentage(table[:total_size_bytes], size_bytes))
+          end,
+          most_read_tables: tables.sort_by do |table|
+            [-table[:total_scans], -table[:rows_read_or_fetched], table[:table_name]]
+          end.first(10).map do |table|
+            table.slice(
+              :table_name,
+              :total_scans,
+              :sequential_scans,
+              :index_scans,
+              :rows_read_or_fetched,
+              :last_sequential_scan_at,
+              :last_index_scan_at
+            )
           end,
           measured_at: Time.current
         }
@@ -130,8 +144,24 @@ module Api
         connection.select_value("SHOW server_version")
       end
 
+      def database_statistics_reset_at(connection)
+        return unless postgres?(connection)
+
+        connection.select_value(<<~SQL.squish)
+          SELECT COALESCE(stats_reset, pg_postmaster_start_time())
+          FROM pg_stat_database
+          WHERE datname = current_database()
+        SQL
+      end
+
       def database_table_metrics(connection)
         return [] unless postgres?(connection)
+
+        last_scan_columns = if connection.select_value("SHOW server_version_num").to_i >= 160_000
+          "s.last_seq_scan, s.last_idx_scan"
+        else
+          "NULL::timestamptz AS last_seq_scan, NULL::timestamptz AS last_idx_scan"
+        end
 
         sql = <<~SQL.squish
           SELECT
@@ -140,7 +170,12 @@ module Api
             pg_relation_size(c.oid)::bigint AS data_size_bytes,
             pg_indexes_size(c.oid)::bigint AS index_size_bytes,
             GREATEST(COALESCE(s.n_live_tup, c.reltuples)::bigint, 0) AS estimated_row_count,
-            GREATEST(COALESCE(s.n_dead_tup, 0)::bigint, 0) AS estimated_dead_row_count
+            GREATEST(COALESCE(s.n_dead_tup, 0)::bigint, 0) AS estimated_dead_row_count,
+            COALESCE(s.seq_scan, 0)::bigint AS sequential_scans,
+            COALESCE(s.idx_scan, 0)::bigint AS index_scans,
+            (COALESCE(s.seq_scan, 0) + COALESCE(s.idx_scan, 0))::bigint AS total_scans,
+            (COALESCE(s.seq_tup_read, 0) + COALESCE(s.idx_tup_fetch, 0))::bigint AS rows_read_or_fetched,
+            #{last_scan_columns}
           FROM pg_class c
           INNER JOIN pg_namespace n ON n.oid = c.relnamespace
           LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
@@ -157,7 +192,13 @@ module Api
             data_size_bytes: row.fetch("data_size_bytes").to_i,
             index_size_bytes: row.fetch("index_size_bytes").to_i,
             estimated_row_count: row.fetch("estimated_row_count").to_i,
-            estimated_dead_row_count: row.fetch("estimated_dead_row_count").to_i
+            estimated_dead_row_count: row.fetch("estimated_dead_row_count").to_i,
+            sequential_scans: row.fetch("sequential_scans").to_i,
+            index_scans: row.fetch("index_scans").to_i,
+            total_scans: row.fetch("total_scans").to_i,
+            rows_read_or_fetched: row.fetch("rows_read_or_fetched").to_i,
+            last_sequential_scan_at: row.fetch("last_seq_scan"),
+            last_index_scan_at: row.fetch("last_idx_scan")
           }
         end
       end

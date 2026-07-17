@@ -13,6 +13,8 @@ import { useRosterSnapshots } from '../composables/useRosterSnapshots'
 const today = new Date().toISOString().slice(0, 10)
 const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
+const databaseDetailsViews = ['storage', 'usage']
+const databaseDetailsView = ref('storage')
 const databaseDetailsDialog = ref(null)
 const databaseDetailsButton = ref(null)
 const gameDetailsConfirmationOpen = ref(false)
@@ -259,6 +261,21 @@ function handleAdminTabKeydown(event, currentIndex) {
   event.preventDefault()
   const tabButtons = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')
   activeAdminTab.value = adminTabs[nextIndex].id
+  nextTick(() => tabButtons?.[nextIndex]?.focus())
+}
+
+function handleDatabaseViewKeydown(event, currentIndex) {
+  let nextIndex
+
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % databaseDetailsViews.length
+  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + databaseDetailsViews.length) % databaseDetailsViews.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = databaseDetailsViews.length - 1
+  if (nextIndex === undefined) return
+
+  event.preventDefault()
+  const tabButtons = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')
+  databaseDetailsView.value = databaseDetailsViews[nextIndex]
   nextTick(() => tabButtons?.[nextIndex]?.focus())
 }
 
@@ -705,42 +722,125 @@ async function closeDatabaseDetails() {
         </article>
       </div>
 
-      <div v-if="databaseMetrics.largestTables.length" class="database-table-wrap">
-        <table class="database-table">
-          <thead>
-            <tr>
-              <th>Largest tables</th>
-              <th>Est. rows</th>
-              <th>Dead rows</th>
-              <th>Data</th>
-              <th>Indexes</th>
-              <th>Total</th>
-              <th>% of DB</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="table in databaseMetrics.largestTables" :key="table.tableName">
-              <th>
-                <code>{{ table.tableName }}</code>
-                <span class="database-table__bar" aria-hidden="true">
-                  <i :style="{ width: `${Math.min(table.databasePercentage, 100)}%` }"></i>
-                </span>
-              </th>
-              <td>{{ formatCount(table.estimatedRowCount) }}</td>
-              <td>{{ formatCount(table.estimatedDeadRowCount) }}</td>
-              <td>{{ formatBytes(table.dataSizeBytes) }}</td>
-              <td>{{ formatBytes(table.indexSizeBytes) }}</td>
-              <td><strong>{{ formatBytes(table.totalSizeBytes) }}</strong></td>
-              <td>{{ table.databasePercentage.toFixed(2) }}%</td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="database-view-tabs" role="tablist" aria-label="Database details views">
+        <button
+          id="database-view-storage-tab"
+          type="button"
+          role="tab"
+          :class="{ 'database-view-tabs__active': databaseDetailsView === 'storage' }"
+          :aria-selected="databaseDetailsView === 'storage'"
+          :tabindex="databaseDetailsView === 'storage' ? 0 : -1"
+          aria-controls="database-view-storage"
+          data-test="database-view-storage-tab"
+          @click="databaseDetailsView = 'storage'"
+          @keydown="handleDatabaseViewKeydown($event, 0)"
+        >
+          Storage
+        </button>
+        <button
+          id="database-view-usage-tab"
+          type="button"
+          role="tab"
+          :class="{ 'database-view-tabs__active': databaseDetailsView === 'usage' }"
+          :aria-selected="databaseDetailsView === 'usage'"
+          :tabindex="databaseDetailsView === 'usage' ? 0 : -1"
+          aria-controls="database-view-usage"
+          data-test="database-view-usage-tab"
+          @click="databaseDetailsView = 'usage'"
+          @keydown="handleDatabaseViewKeydown($event, 1)"
+        >
+          Most Read
+        </button>
       </div>
-      <p v-else class="database-insights__empty">
-        Per-table storage metrics are available when DiamondIQ uses PostgreSQL.
-      </p>
-      <footer>
+
+      <div
+        v-show="databaseDetailsView === 'storage'"
+        id="database-view-storage"
+        role="tabpanel"
+        aria-labelledby="database-view-storage-tab"
+      >
+        <div v-if="databaseMetrics.largestTables.length" class="database-table-wrap">
+          <table class="database-table">
+            <thead>
+              <tr>
+                <th>Largest tables</th>
+                <th>Est. rows</th>
+                <th>Dead rows</th>
+                <th>Data</th>
+                <th>Indexes</th>
+                <th>Total</th>
+                <th>% of DB</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="table in databaseMetrics.largestTables" :key="table.tableName">
+                <th>
+                  <code>{{ table.tableName }}</code>
+                  <span class="database-table__bar" aria-hidden="true">
+                    <i :style="{ width: `${Math.min(table.databasePercentage, 100)}%` }"></i>
+                  </span>
+                </th>
+                <td>{{ formatCount(table.estimatedRowCount) }}</td>
+                <td>{{ formatCount(table.estimatedDeadRowCount) }}</td>
+                <td>{{ formatBytes(table.dataSizeBytes) }}</td>
+                <td>{{ formatBytes(table.indexSizeBytes) }}</td>
+                <td><strong>{{ formatBytes(table.totalSizeBytes) }}</strong></td>
+                <td>{{ table.databasePercentage.toFixed(2) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="database-insights__empty">
+          Per-table storage metrics are available when DiamondIQ uses PostgreSQL.
+        </p>
+      </div>
+
+      <div
+        v-show="databaseDetailsView === 'usage'"
+        id="database-view-usage"
+        role="tabpanel"
+        aria-labelledby="database-view-usage-tab"
+        data-test="database-view-usage"
+      >
+        <p class="database-usage-window">
+          Statistics collected since
+          <strong>{{ databaseMetrics.statisticsCollectedSince ? formatTimestamp(databaseMetrics.statisticsCollectedSince) : 'the last PostgreSQL statistics reset' }}</strong>.
+        </p>
+        <div v-if="databaseMetrics.mostReadTables.length" class="database-table-wrap">
+          <table class="database-table database-table--usage">
+            <thead>
+              <tr>
+                <th>Most-read tables</th>
+                <th>Total scans</th>
+                <th>Sequential scans</th>
+                <th>Index scans</th>
+                <th>Rows read/fetched</th>
+                <th>Last sequential scan</th>
+                <th>Last index scan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="table in databaseMetrics.mostReadTables" :key="table.tableName">
+                <th><code>{{ table.tableName }}</code></th>
+                <td><strong>{{ formatCount(table.totalScans) }}</strong></td>
+                <td>{{ formatCount(table.sequentialScans) }}</td>
+                <td>{{ formatCount(table.indexScans) }}</td>
+                <td>{{ formatCount(table.rowsReadOrFetched) }}</td>
+                <td>{{ table.lastSequentialScanAt ? formatTimestamp(table.lastSequentialScanAt) : 'Never recorded' }}</td>
+                <td>{{ table.lastIndexScanAt ? formatTimestamp(table.lastIndexScanAt) : 'Never recorded' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="database-insights__empty">
+          Per-table usage metrics are available when DiamondIQ uses PostgreSQL.
+        </p>
+      </div>
+      <footer v-if="databaseDetailsView === 'storage'">
         Row counts come from PostgreSQL statistics and are approximate. Run <code>ANALYZE</code> to refresh estimates after a large import.
+      </footer>
+      <footer v-else>
+        These cumulative counters include cached reads and reset when PostgreSQL statistics are reset. A sequential scan is not necessarily inefficient for a small table.
       </footer>
       </section>
     </div>
@@ -1782,6 +1882,46 @@ async function closeDatabaseDetails() {
   display: block;
 }
 
+.database-view-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  padding: 0.25rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 12px;
+  background: rgba(231, 237, 241, 0.58);
+}
+
+.database-view-tabs button {
+  padding: 0.5rem 0.8rem;
+  border: 0;
+  border-radius: 9px;
+  color: #61707b;
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.database-view-tabs button:hover,
+.database-view-tabs button:focus-visible,
+.database-view-tabs__active {
+  color: #fff !important;
+  background: #173652 !important;
+}
+
+.database-usage-window {
+  margin-top: 0.75rem;
+  color: #69747c;
+  font-size: 0.72rem;
+}
+
+.database-usage-window strong {
+  color: #173652;
+}
+
 .database-summary-grid span {
   color: #61707b;
   font-size: 0.62rem;
@@ -1814,6 +1954,10 @@ async function closeDatabaseDetails() {
   min-width: 850px;
   border-collapse: collapse;
   background: rgba(255, 255, 255, 0.62);
+}
+
+.database-table--usage {
+  min-width: 1120px;
 }
 
 .database-table th,

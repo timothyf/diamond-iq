@@ -23,7 +23,9 @@ export function useAdminTask() {
     tableCount: 0,
     estimatedRowCount: 0,
     estimatedDeadRowCount: 0,
+    statisticsCollectedSince: null,
     largestTables: [],
+    mostReadTables: [],
     measuredAt: null,
   })
   const playerSeasonStatsMetrics = ref({ earliestSeason: null, latestSeason: null, approximateRowCount: 0 })
@@ -88,6 +90,7 @@ export function useAdminTask() {
         tableCount: Number(database.table_count || 0),
         estimatedRowCount: Number(database.estimated_row_count || 0),
         estimatedDeadRowCount: Number(database.estimated_dead_row_count || 0),
+        statisticsCollectedSince: database.statistics_collected_since || null,
         largestTables: (database.largest_tables || []).map((table) => ({
           tableName: table.table_name,
           totalSizeBytes: Number(table.total_size_bytes || 0),
@@ -96,6 +99,15 @@ export function useAdminTask() {
           estimatedRowCount: Number(table.estimated_row_count || 0),
           estimatedDeadRowCount: Number(table.estimated_dead_row_count || 0),
           databasePercentage: Number(table.database_percentage || 0),
+        })),
+        mostReadTables: (database.most_read_tables || []).map((table) => ({
+          tableName: table.table_name,
+          totalScans: Number(table.total_scans || 0),
+          sequentialScans: Number(table.sequential_scans || 0),
+          indexScans: Number(table.index_scans || 0),
+          rowsReadOrFetched: Number(table.rows_read_or_fetched || 0),
+          lastSequentialScanAt: table.last_sequential_scan_at || null,
+          lastIndexScanAt: table.last_index_scan_at || null,
         })),
         measuredAt: database.measured_at || null,
       }

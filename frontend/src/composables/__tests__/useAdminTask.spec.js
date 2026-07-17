@@ -39,6 +39,7 @@ describe('useAdminTask', () => {
               table_count: 20,
               estimated_row_count: 4779000,
               estimated_dead_row_count: 1250,
+              statistics_collected_since: '2026-07-01T12:00:00Z',
               measured_at: '2026-07-15T22:00:00Z',
               largest_tables: [
                 {
@@ -49,6 +50,17 @@ describe('useAdminTask', () => {
                   estimated_row_count: 4649481,
                   estimated_dead_row_count: 1200,
                   database_percentage: 58.59,
+                },
+              ],
+              most_read_tables: [
+                {
+                  table_name: 'games',
+                  total_scans: 19000,
+                  sequential_scans: 4000,
+                  index_scans: 15000,
+                  rows_read_or_fetched: 250000,
+                  last_sequential_scan_at: '2026-07-15T20:00:00Z',
+                  last_index_scan_at: '2026-07-15T21:59:00Z',
                 },
               ],
             },
@@ -116,6 +128,7 @@ describe('useAdminTask', () => {
       tableCount: 20,
       estimatedRowCount: 4779000,
       estimatedDeadRowCount: 1250,
+      statisticsCollectedSince: '2026-07-01T12:00:00Z',
       measuredAt: '2026-07-15T22:00:00Z',
       largestTables: [
         {
@@ -126,6 +139,17 @@ describe('useAdminTask', () => {
           estimatedRowCount: 4649481,
           estimatedDeadRowCount: 1200,
           databasePercentage: 58.59,
+        },
+      ],
+      mostReadTables: [
+        {
+          tableName: 'games',
+          totalScans: 19000,
+          sequentialScans: 4000,
+          indexScans: 15000,
+          rowsReadOrFetched: 250000,
+          lastSequentialScanAt: '2026-07-15T20:00:00Z',
+          lastIndexScanAt: '2026-07-15T21:59:00Z',
         },
       ],
     })
