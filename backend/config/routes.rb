@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   namespace :api do
     namespace :admin do
+      resource :data_health, only: :show
       resources :task_runs, only: [ :index, :show, :create ] do
         collection do
           get :estimate

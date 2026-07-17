@@ -9,6 +9,7 @@ const downloadStats = vi.fn()
 const importStatsFile = vi.fn()
 const importPitchFile = vi.fn()
 const loadOverview = vi.fn()
+const loadDataHealth = vi.fn()
 const loadSnapshots = vi.fn()
 const startGameDetailsSync = vi.fn()
 const cancelGameDetailsSync = vi.fn()
@@ -29,6 +30,42 @@ vi.mock('../../composables/useAdminTask', () => ({
     lastResult: ref(null),
     overviewLoading: computed(() => false),
     overviewError: computed(() => ''),
+    dataHealth: computed(() => ({
+      status: 'critical',
+      checkedAt: '2026-07-17T18:00:00Z',
+      calculationVersion: '1.0.0',
+      summary: {
+        checkCount: 11,
+        healthyCount: 8,
+        warningCount: 2,
+        criticalCount: 1,
+        affectedRecordCount: 14,
+      },
+      checks: [
+        {
+          id: 'final_games_missing_details',
+          category: 'Games',
+          name: 'Final games have detailed data',
+          status: 'critical',
+          affectedCount: 2,
+          description: 'Final games need detailed synchronization before analytics are complete.',
+          recommendation: 'Run Synchronize game details for the affected dates.',
+          examples: ['MLB game 700001 · 2026-07-16'],
+        },
+        {
+          id: 'final_games_missing_scores',
+          category: 'Games',
+          name: 'Final games have scores',
+          status: 'healthy',
+          affectedCount: 0,
+          description: 'Final games should contain both home and away scores.',
+          recommendation: 'Synchronize the affected schedule dates from MLB.',
+          examples: [],
+        },
+      ],
+    })),
+    dataHealthLoading: computed(() => false),
+    dataHealthError: computed(() => ''),
     scheduleImportRange: computed(() => ({
       earliestImportDate: '2026-03-26',
       latestImportDate: '2026-05-31',
@@ -114,6 +151,7 @@ vi.mock('../../composables/useAdminTask', () => ({
       linkedPitchCount: 18000,
     })),
     loadOverview,
+    loadDataHealth,
     runTask,
   }),
 }))
@@ -189,6 +227,7 @@ describe('AdminView', () => {
     importStatsFile.mockReset().mockResolvedValue({ success: true })
     importPitchFile.mockReset().mockResolvedValue({ success: true })
     loadOverview.mockReset().mockResolvedValue({ success: true })
+    loadDataHealth.mockReset().mockResolvedValue({ success: true })
     loadSnapshots.mockReset().mockResolvedValue({ data: [] })
     startGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'queued' })
     cancelGameDetailsSync.mockReset().mockResolvedValue({ id: 11, status: 'running', cancelRequested: true })
@@ -228,6 +267,22 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('Development database')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('512 MB')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('PostgreSQL footprint')
+    expect(wrapper.get('[data-test="data-health-summary"]').text()).toContain('Critical')
+    expect(wrapper.get('[data-test="data-health-summary"]').text()).toContain('1 critical · 2 warnings')
+    await wrapper.get('[data-test="data-health-button"]').trigger('click')
+    await flushPromises()
+    expect(loadDataHealth).not.toHaveBeenCalled()
+    const healthDetails = wrapper.get('[data-test="data-health-details"]')
+    expect(healthDetails.attributes('role')).toBe('dialog')
+    expect(healthDetails.text()).toContain('11 checks')
+    expect(healthDetails.text()).toContain('14 total findings')
+    expect(healthDetails.text()).toContain('Final games have detailed data')
+    expect(healthDetails.text()).toContain('MLB game 700001')
+    expect(healthDetails.text()).toContain('Suggested action')
+    await wrapper.get('[data-test="data-health-refresh"]').trigger('click')
+    expect(loadDataHealth).toHaveBeenCalledTimes(1)
+    await wrapper.get('[data-test="data-health-close"]').trigger('click')
+    expect(wrapper.find('[data-test="data-health-details"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="database-details"]').exists()).toBe(false)
     await wrapper.get('[data-test="database-details-button"]').trigger('click')
     const databaseDetails = wrapper.get('[data-test="database-details"]')

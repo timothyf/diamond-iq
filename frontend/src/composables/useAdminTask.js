@@ -10,6 +10,9 @@ export function useAdminTask() {
   const lastResult = ref(null)
   const overviewLoading = ref(false)
   const overviewError = ref('')
+  const dataHealth = ref(null)
+  const dataHealthLoading = ref(false)
+  const dataHealthError = ref('')
   const scheduleImportRange = ref({ earliestImportDate: null, latestImportDate: null })
   const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
   const mlbTeams = ref([])
@@ -174,12 +177,62 @@ export function useAdminTask() {
     }
   }
 
+  async function loadDataHealth() {
+    dataHealthLoading.value = true
+    dataHealthError.value = ''
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/admin/data_health`, {
+        headers: { Accept: 'application/json' },
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload?.message || `Data health check failed with status ${response.status}.`)
+      }
+
+      const report = payload?.data || {}
+      const summary = report.summary || {}
+      dataHealth.value = {
+        status: report.status || 'healthy',
+        checkedAt: report.checked_at || null,
+        calculationVersion: report.calculation_version || '',
+        summary: {
+          checkCount: Number(summary.check_count || 0),
+          healthyCount: Number(summary.healthy_count || 0),
+          warningCount: Number(summary.warning_count || 0),
+          criticalCount: Number(summary.critical_count || 0),
+          affectedRecordCount: Number(summary.affected_record_count || 0),
+        },
+        checks: (report.checks || []).map((check) => ({
+          id: check.id,
+          category: check.category,
+          name: check.name,
+          status: check.status,
+          affectedCount: Number(check.affected_count || 0),
+          description: check.description,
+          recommendation: check.recommendation,
+          examples: check.examples || [],
+        })),
+      }
+      return dataHealth.value
+    } catch (healthError) {
+      dataHealthError.value = healthError.message || 'Unable to run the data health check.'
+      return null
+    } finally {
+      dataHealthLoading.value = false
+    }
+  }
+
   return {
     runningTask: computed(() => runningTask.value),
     error: computed(() => error.value),
     lastResult: computed(() => lastResult.value),
     overviewLoading: computed(() => overviewLoading.value),
     overviewError: computed(() => overviewError.value),
+    dataHealth: computed(() => dataHealth.value),
+    dataHealthLoading: computed(() => dataHealthLoading.value),
+    dataHealthError: computed(() => dataHealthError.value),
     scheduleImportRange: computed(() => scheduleImportRange.value),
     scheduleDateRange: computed(() => scheduleDateRange.value),
     mlbTeams: computed(() => mlbTeams.value),
@@ -188,6 +241,7 @@ export function useAdminTask() {
     pitchDataMetrics: computed(() => pitchDataMetrics.value),
     gameDetailsMetrics: computed(() => gameDetailsMetrics.value),
     loadOverview,
+    loadDataHealth,
     runTask,
   }
 }

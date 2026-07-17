@@ -17,6 +17,9 @@ const databaseDetailsViews = ['storage', 'usage']
 const databaseDetailsView = ref('storage')
 const databaseDetailsDialog = ref(null)
 const databaseDetailsButton = ref(null)
+const dataHealthOpen = ref(false)
+const dataHealthDialog = ref(null)
+const dataHealthButton = ref(null)
 const gameDetailsConfirmationOpen = ref(false)
 const gameDetailsConfirmationDialog = ref(null)
 const gameDetailsSyncButton = ref(null)
@@ -90,6 +93,9 @@ const {
   lastResult,
   overviewLoading,
   overviewError,
+  dataHealth,
+  dataHealthLoading,
+  dataHealthError,
   scheduleImportRange,
   scheduleDateRange,
   mlbTeams,
@@ -98,6 +104,7 @@ const {
   pitchDataMetrics,
   gameDetailsMetrics,
   loadOverview,
+  loadDataHealth,
   runTask,
 } = useAdminTask()
 const {
@@ -159,6 +166,7 @@ const anyActionRunning = computed(
     statsDownloading.value ||
     statsUploading.value ||
     pitchUploading.value ||
+    dataHealthLoading.value ||
     rosterSnapshotsLoading.value,
 )
 
@@ -640,6 +648,19 @@ async function closeDatabaseDetails() {
   await nextTick()
   databaseDetailsButton.value?.focus()
 }
+
+async function openDataHealth() {
+  dataHealthOpen.value = true
+  await nextTick()
+  dataHealthDialog.value?.focus()
+  if (!dataHealth.value) await loadDataHealth()
+}
+
+async function closeDataHealth() {
+  dataHealthOpen.value = false
+  await nextTick()
+  dataHealthButton.value?.focus()
+}
 </script>
 
 <template>
@@ -659,6 +680,21 @@ async function closeDatabaseDetails() {
           <small>{{ databaseMetrics.adapter || 'Database' }} footprint</small>
           <button ref="databaseDetailsButton" type="button" data-test="database-details-button" @click="openDatabaseDetails">
             View details
+          </button>
+        </div>
+        <div
+          class="data-health-summary"
+          :class="dataHealth ? `data-health-summary--${dataHealth.status}` : ''"
+          data-test="data-health-summary"
+        >
+          <span>Data health</span>
+          <strong>{{ dataHealthLoading ? 'Checking…' : dataHealth ? humanize(dataHealth.status) : 'Not checked' }}</strong>
+          <small v-if="dataHealth">
+            {{ dataHealth.summary.criticalCount }} critical · {{ dataHealth.summary.warningCount }} warnings
+          </small>
+          <small v-else>Run contextual completeness checks</small>
+          <button ref="dataHealthButton" type="button" data-test="data-health-button" :disabled="dataHealthLoading" @click="openDataHealth">
+            {{ dataHealth ? 'View report' : 'Run health check' }}
           </button>
         </div>
         <div class="admin-hero__status" :class="{ 'admin-hero__status--busy': anyActionRunning }">
@@ -842,6 +878,96 @@ async function closeDatabaseDetails() {
       <footer v-else>
         These cumulative counters include cached reads and reset when PostgreSQL statistics are reset. A sequential scan is not necessarily inefficient for a small table.
       </footer>
+      </section>
+    </div>
+
+    <div
+      v-if="dataHealthOpen"
+      class="database-modal"
+      data-test="data-health-modal"
+      @click.self="closeDataHealth"
+      @keydown.esc="closeDataHealth"
+    >
+      <section
+        ref="dataHealthDialog"
+        class="database-insights data-health-insights"
+        data-test="data-health-details"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="data-health-title"
+        tabindex="-1"
+      >
+        <header class="database-insights__heading">
+          <div>
+            <p class="eyebrow">Completeness and integrity</p>
+            <h2 id="data-health-title">Data health</h2>
+          </div>
+          <div class="database-insights__heading-actions">
+            <p v-if="dataHealth?.checkedAt">Checked {{ formatTimestamp(dataHealth.checkedAt) }}</p>
+            <button type="button" data-test="data-health-close" aria-label="Close data health details" @click="closeDataHealth">×</button>
+          </div>
+        </header>
+
+        <p v-if="dataHealthError" class="admin-message admin-message--error" role="alert">{{ dataHealthError }}</p>
+        <div v-if="dataHealthLoading && !dataHealth" class="data-health-loading">Checking schedules, games, players, pitches, and analytics…</div>
+
+        <template v-if="dataHealth">
+          <div class="database-summary-grid data-health-totals">
+            <article>
+              <span>Overall status</span>
+              <strong :class="`data-health-text--${dataHealth.status}`">{{ humanize(dataHealth.status) }}</strong>
+              <small>Calculation version {{ dataHealth.calculationVersion }}</small>
+            </article>
+            <article>
+              <span>Healthy checks</span>
+              <strong>{{ formatCount(dataHealth.summary.healthyCount) }}</strong>
+              <small>of {{ formatCount(dataHealth.summary.checkCount) }} checks</small>
+            </article>
+            <article>
+              <span>Warnings</span>
+              <strong class="data-health-text--warning">{{ formatCount(dataHealth.summary.warningCount) }}</strong>
+              <small>Checks needing review</small>
+            </article>
+            <article>
+              <span>Critical</span>
+              <strong class="data-health-text--critical">{{ formatCount(dataHealth.summary.criticalCount) }}</strong>
+              <small>Checks likely affecting accuracy</small>
+            </article>
+          </div>
+
+          <div class="data-health-toolbar">
+            <p>{{ formatCount(dataHealth.summary.affectedRecordCount) }} total findings across all checks</p>
+            <button type="button" :disabled="dataHealthLoading" data-test="data-health-refresh" @click="loadDataHealth">
+              {{ dataHealthLoading ? 'Checking…' : 'Run check again' }}
+            </button>
+          </div>
+
+          <div class="data-health-checks">
+            <article
+              v-for="check in dataHealth.checks"
+              :key="check.id"
+              class="data-health-check"
+              :class="`data-health-check--${check.status}`"
+              :data-test="`data-health-check-${check.id}`"
+            >
+              <header>
+                <div>
+                  <span>{{ check.category }}</span>
+                  <h3>{{ check.name }}</h3>
+                </div>
+                <strong>{{ check.status === 'healthy' ? 'Healthy' : `${formatCount(check.affectedCount)} affected` }}</strong>
+              </header>
+              <p>{{ check.description }}</p>
+              <ul v-if="check.examples.length">
+                <li v-for="example in check.examples" :key="example"><code>{{ example }}</code></li>
+              </ul>
+              <footer v-if="check.status !== 'healthy'">
+                <span>Suggested action</span>
+                {{ check.recommendation }}
+              </footer>
+            </article>
+          </div>
+        </template>
       </section>
     </div>
 
@@ -1669,7 +1795,8 @@ async function closeDatabaseDetails() {
   align-items: flex-end;
 }
 
-.database-footprint {
+.database-footprint,
+.data-health-summary {
   display: grid;
   min-width: 190px;
   padding: 0.8rem 0.95rem;
@@ -1680,7 +1807,9 @@ async function closeDatabaseDetails() {
 }
 
 .database-footprint span,
-.database-footprint small {
+.database-footprint small,
+.data-health-summary span,
+.data-health-summary small {
   color: #61707b;
   font-size: 0.65rem;
   font-weight: 800;
@@ -1688,7 +1817,8 @@ async function closeDatabaseDetails() {
   text-transform: uppercase;
 }
 
-.database-footprint button {
+.database-footprint button,
+.data-health-summary button {
   justify-self: end;
   margin-top: 0.55rem;
   padding: 0;
@@ -1706,8 +1836,25 @@ async function closeDatabaseDetails() {
 }
 
 .database-footprint button:hover,
-.database-footprint button:focus-visible {
+.database-footprint button:focus-visible,
+.data-health-summary button:hover,
+.data-health-summary button:focus-visible {
   color: #10263d;
+}
+
+.data-health-summary--healthy {
+  border-color: rgba(45, 112, 71, 0.35);
+  background: rgba(224, 240, 228, 0.82);
+}
+
+.data-health-summary--warning {
+  border-color: rgba(177, 116, 22, 0.38);
+  background: rgba(249, 235, 202, 0.86);
+}
+
+.data-health-summary--critical {
+  border-color: rgba(143, 45, 36, 0.36);
+  background: rgba(247, 225, 220, 0.88);
 }
 
 .database-modal,
@@ -1960,6 +2107,142 @@ async function closeDatabaseDetails() {
   min-width: 1120px;
 }
 
+.data-health-insights {
+  width: min(1050px, calc(100vw - 2rem));
+}
+
+.data-health-loading {
+  margin-top: 1rem;
+  padding: 1.25rem;
+  border-radius: 14px;
+  color: #53616b;
+  background: rgba(231, 237, 241, 0.58);
+  text-align: center;
+}
+
+.data-health-text--healthy {
+  color: #2d7047 !important;
+}
+
+.data-health-text--warning {
+  color: #a26812 !important;
+}
+
+.data-health-text--critical {
+  color: #8f2d24 !important;
+}
+
+.data-health-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.data-health-toolbar p {
+  color: #61707b;
+  font-size: 0.75rem;
+}
+
+.data-health-toolbar button {
+  padding: 0.55rem 0.8rem;
+  border: 1px solid rgba(16, 38, 61, 0.16);
+  border-radius: 10px;
+  color: #fff;
+  background: #173652;
+  font-size: 0.68rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.data-health-toolbar button:disabled,
+.data-health-summary button:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.data-health-checks {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.data-health-check {
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-left-width: 5px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.data-health-check--healthy {
+  border-left-color: #4e8b64;
+}
+
+.data-health-check--warning {
+  border-left-color: #c1842a;
+}
+
+.data-health-check--critical {
+  border-left-color: #a93627;
+}
+
+.data-health-check > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.data-health-check header span,
+.data-health-check footer span {
+  display: block;
+  color: #71808a;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.data-health-check h3 {
+  margin-top: 0.15rem;
+  color: #173652;
+  font-size: 1rem;
+}
+
+.data-health-check header > strong {
+  color: #53616b;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.data-health-check > p,
+.data-health-check > footer {
+  margin-top: 0.5rem;
+  color: #5d6972;
+  font-size: 0.74rem;
+}
+
+.data-health-check ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-health-check li code {
+  color: #53616b;
+  font-size: 0.67rem;
+}
+
+.data-health-check > footer {
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(16, 38, 61, 0.08);
+  color: #173652;
+}
+
 .database-table th,
 .database-table td {
   padding: 0.7rem 0.8rem;
@@ -2027,14 +2310,16 @@ async function closeDatabaseDetails() {
   font-size: 0.68rem;
 }
 
-.database-footprint strong {
+.database-footprint strong,
+.data-health-summary strong {
   color: #10263d;
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 1.55rem;
   line-height: 1.1;
 }
 
-.database-footprint small {
+.database-footprint small,
+.data-health-summary small {
   font-size: 0.58rem;
   font-weight: 700;
 }
@@ -2806,11 +3091,13 @@ async function closeDatabaseDetails() {
     align-items: stretch;
   }
 
-  .database-footprint {
+  .database-footprint,
+  .data-health-summary {
     text-align: left;
   }
 
-  .database-footprint button {
+  .database-footprint button,
+  .data-health-summary button {
     justify-self: start;
   }
 

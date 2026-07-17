@@ -1,0 +1,47 @@
+require "rails_helper"
+
+RSpec.describe AdminDataHealthCheck do
+  it "reports contextual completeness, linkage, profile, position, and analytics problems" do
+    game = create_game(
+      official_date: Date.current - 1.day,
+      status: "final",
+      home_score: nil,
+      away_score: 3,
+      details_last_synced_at: Time.current
+    )
+    player = create_player
+    PitchDatum.create!(
+      game_pk: game.mlb_id,
+      game_date: game.official_date,
+      at_bat_number: 1,
+      pitch_number: 1,
+      raw_data: { "pitch" => 1 }
+    )
+
+    result = described_class.call
+
+    expect(result).to include(status: "critical", calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
+    expect(result.dig(:summary, :critical_count)).to be >= 3
+    expect(result.dig(:summary, :warning_count)).to be >= 4
+    expect(result[:checked_at]).to be_present
+
+    checks = result.fetch(:checks).index_by { |check| check.fetch(:id) }
+    expect(checks.dig("final_games_missing_scores", :affected_count)).to eq(1)
+    expect(checks.dig("synchronized_games_missing_batting_lines", :affected_count)).to eq(1)
+    expect(checks.dig("synchronized_games_missing_pitching_lines", :affected_count)).to eq(1)
+    expect(checks.dig("synchronized_games_missing_plate_appearances", :affected_count)).to eq(1)
+    expect(checks.dig("pitches_missing_games", :affected_count)).to eq(1)
+    expect(checks.dig("players_missing_profiles", :examples)).to include("#{player.full_name} · MLB #{player.mlb_id}")
+    expect(checks.dig("players_missing_primary_positions", :affected_count)).to be >= 1
+    expect(checks.dig("synchronized_dates_missing_analytics", :affected_count)).to eq(1)
+  end
+
+  it "does not require details or scores for future scheduled games" do
+    create_game(official_date: Date.current + 1.day, status: "scheduled")
+
+    checks = described_class.call.fetch(:checks).index_by { |check| check.fetch(:id) }
+
+    expect(checks.dig("final_games_missing_scores", :affected_count)).to eq(0)
+    expect(checks.dig("final_games_missing_details", :affected_count)).to eq(0)
+  end
+end

@@ -207,6 +207,71 @@ describe('useAdminTask', () => {
     expect(error.value).toBe('')
   })
 
+  it('loads and maps the data health report', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: {
+            status: 'warning',
+            checked_at: '2026-07-17T18:00:00Z',
+            calculation_version: '1.0.0',
+            summary: {
+              check_count: 11,
+              healthy_count: 9,
+              warning_count: 2,
+              critical_count: 0,
+              affected_record_count: 12,
+            },
+            checks: [
+              {
+                id: 'players_missing_profiles',
+                category: 'Players',
+                name: 'Players have profiles',
+                status: 'warning',
+                affected_count: 12,
+                description: 'Players are missing profiles.',
+                recommendation: 'Synchronize player profiles.',
+                examples: ['Test Player · MLB 123'],
+              },
+            ],
+          },
+        }),
+      }),
+    )
+    const { loadDataHealth, dataHealth, dataHealthLoading, dataHealthError } = useAdminTask()
+
+    await loadDataHealth()
+
+    expect(dataHealth.value).toEqual({
+      status: 'warning',
+      checkedAt: '2026-07-17T18:00:00Z',
+      calculationVersion: '1.0.0',
+      summary: {
+        checkCount: 11,
+        healthyCount: 9,
+        warningCount: 2,
+        criticalCount: 0,
+        affectedRecordCount: 12,
+      },
+      checks: [
+        {
+          id: 'players_missing_profiles',
+          category: 'Players',
+          name: 'Players have profiles',
+          status: 'warning',
+          affectedCount: 12,
+          description: 'Players are missing profiles.',
+          recommendation: 'Synchronize player profiles.',
+          examples: ['Test Player · MLB 123'],
+        },
+      ],
+    })
+    expect(dataHealthLoading.value).toBe(false)
+    expect(dataHealthError.value).toBe('')
+  })
+
   it('exposes backend validation errors', async () => {
     vi.stubGlobal(
       'fetch',
