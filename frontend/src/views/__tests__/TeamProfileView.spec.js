@@ -187,10 +187,37 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-season-select"]').text()).toContain('2025')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Team performance dashboard')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Last 7 games')
-    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('#7 · 3.81')
-    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('#10 · 1.23')
+    expect(wrapper.get('[data-test="pitching-ranking-era"]').text()).toContain('3.81')
+    expect(wrapper.get('[data-test="pitching-ranking-era"]').text()).toContain('#7')
+    expect(wrapper.get('[data-test="pitching-ranking-whip"]').text()).toContain('1.23')
+    expect(wrapper.get('[data-test="pitching-ranking-whip"]').text()).toContain('#10')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
+  })
+
+  it('sizes ranking bars from empty to full using the 30-team comparison', async () => {
+    const rankingPayload = structuredClone(payload)
+    rankingPayload.data.performance_dashboard.rankings.offense.ops.rank = 1
+    rankingPayload.data.performance_dashboard.rankings.offense.runs_per_game.rank = 0
+    rankingPayload.data.performance_dashboard.rankings.offense.strikeout_rate.rank = 15
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => rankingPayload }))
+
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const first = wrapper.get('[data-test="offense-ranking-ops"]')
+    const unavailable = wrapper.get('[data-test="offense-ranking-runs-per-game"]')
+    const middle = wrapper.get('[data-test="offense-ranking-strikeout-rate"]')
+
+    expect(first.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')
+    expect(first.get('.ranking-bar__fill').attributes('style')).toContain('width: 100%')
+    expect(unavailable.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('0')
+    expect(unavailable.get('.ranking-bar__fill').attributes('style')).toContain('width: 0%')
+    expect(middle.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
+    expect(middle.get('.ranking-bar__fill').attributes('style')).toContain('width: 50%')
   })
 
   it('renders a retry state when the profile cannot load', async () => {

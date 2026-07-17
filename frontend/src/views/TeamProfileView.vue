@@ -35,6 +35,28 @@ const recordLabel = computed(() => {
 })
 
 const dashboard = computed(() => team.value?.performanceDashboard || {})
+const rankingGroups = computed(() => [
+  {
+    key: 'offense',
+    title: 'Offensive rankings',
+    metrics: [
+      { key: 'ops', label: 'OPS', entry: dashboard.value.rankings?.offense?.ops, value: formatDecimal(dashboard.value.rankings?.offense?.ops?.value) },
+      { key: 'runs-per-game', label: 'Runs / G', entry: dashboard.value.rankings?.offense?.runs_per_game, value: formatDecimal(dashboard.value.rankings?.offense?.runs_per_game?.value, 2) },
+      { key: 'strikeout-rate', label: 'K Rate', entry: dashboard.value.rankings?.offense?.strikeout_rate, value: formatPercent(dashboard.value.rankings?.offense?.strikeout_rate?.value) },
+      { key: 'walk-rate', label: 'BB Rate', entry: dashboard.value.rankings?.offense?.walk_rate, value: formatPercent(dashboard.value.rankings?.offense?.walk_rate?.value) },
+    ],
+  },
+  {
+    key: 'pitching',
+    title: 'Pitching rankings',
+    metrics: [
+      { key: 'era', label: 'ERA', entry: dashboard.value.rankings?.pitching?.era, value: formatTwoDecimalPitchingRate(dashboard.value.rankings?.pitching?.era?.value) },
+      { key: 'whip', label: 'WHIP', entry: dashboard.value.rankings?.pitching?.whip, value: formatTwoDecimalPitchingRate(dashboard.value.rankings?.pitching?.whip?.value) },
+      { key: 'strikeout-rate', label: 'K Rate', entry: dashboard.value.rankings?.pitching?.strikeout_rate, value: formatPercent(dashboard.value.rankings?.pitching?.strikeout_rate?.value) },
+      { key: 'walk-rate', label: 'BB Rate', entry: dashboard.value.rankings?.pitching?.walk_rate, value: formatPercent(dashboard.value.rankings?.pitching?.walk_rate?.value) },
+    ],
+  },
+])
 
 function formatDate(value, includeYear = false) {
   if (!value) return '—'
@@ -100,6 +122,15 @@ function formatRank(entry) {
   if (!entry || !entry.rank) return '—'
   return `#${entry.rank}`
 }
+
+function rankingBarPercent(entry) {
+  const rank = Number(entry?.rank || 0)
+  const totalTeams = Number(dashboard.value.rankings?.context?.total_teams || 30)
+  if (!Number.isFinite(rank) || rank <= 0 || !Number.isFinite(totalTeams) || totalTeams <= 0) return 0
+  if (rank === 1) return 100
+
+  return Math.round(Math.max(0, Math.min(100, ((totalTeams - rank) / totalTeams) * 100)) * 10) / 10
+}
 </script>
 
 <template>
@@ -149,26 +180,41 @@ function formatRank(entry) {
           </span>
         </div>
 
-        <div class="performance-grid">
-          <article>
-            <h3>Offensive rankings</h3>
-            <dl>
-              <div><dt>OPS</dt><dd>{{ formatRank(dashboard.rankings?.offense?.ops) }} · {{ formatDecimal(dashboard.rankings?.offense?.ops?.value) }}</dd></div>
-              <div><dt>Runs / G</dt><dd>{{ formatRank(dashboard.rankings?.offense?.runs_per_game) }} · {{ formatDecimal(dashboard.rankings?.offense?.runs_per_game?.value) }}</dd></div>
-              <div><dt>K Rate</dt><dd>{{ formatRank(dashboard.rankings?.offense?.strikeout_rate) }} · {{ formatPercent(dashboard.rankings?.offense?.strikeout_rate?.value) }}</dd></div>
-              <div><dt>BB Rate</dt><dd>{{ formatRank(dashboard.rankings?.offense?.walk_rate) }} · {{ formatPercent(dashboard.rankings?.offense?.walk_rate?.value) }}</dd></div>
-            </dl>
-          </article>
+        <p class="ranking-scale-note"><i aria-hidden="true"></i> Longer bars indicate a stronger league rank; the #1 team fills the scale.</p>
 
-          <article>
-            <h3>Pitching rankings</h3>
-            <dl>
-              <div><dt>ERA</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.era) }} · {{ formatTwoDecimalPitchingRate(dashboard.rankings?.pitching?.era?.value) }}</dd></div>
-              <div><dt>WHIP</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.whip) }} · {{ formatTwoDecimalPitchingRate(dashboard.rankings?.pitching?.whip?.value) }}</dd></div>
-              <div><dt>K Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.strikeout_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.strikeout_rate?.value) }}</dd></div>
-              <div><dt>BB Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.walk_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.walk_rate?.value) }}</dd></div>
-            </dl>
+        <div class="ranking-grid" data-test="team-ranking-cards">
+          <article v-for="group in rankingGroups" :key="group.key" class="ranking-card" :data-test="`${group.key}-ranking-card`">
+            <header class="ranking-card__heading">
+              <h3>{{ group.title }}</h3>
+              <span>Rank</span>
+            </header>
+            <div class="ranking-card__metrics">
+              <div v-for="metric in group.metrics" :key="metric.key" class="ranking-row" :data-test="`${group.key}-ranking-${metric.key}`">
+                <strong class="ranking-row__label">{{ metric.label }}</strong>
+                <div
+                  class="ranking-bar"
+                  role="progressbar"
+                  :aria-label="`${group.title}: ${metric.label} ${formatRank(metric.entry)} of ${dashboard.rankings?.context?.total_teams || 30}`"
+                  :aria-valuenow="rankingBarPercent(metric.entry)"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                >
+                  <i class="ranking-bar__fill" :style="{ width: `${rankingBarPercent(metric.entry)}%` }"></i>
+                  <span
+                    class="ranking-bar__value"
+                    :class="{ 'ranking-bar__value--outside': rankingBarPercent(metric.entry) < 24 }"
+                    :style="{ left: `${rankingBarPercent(metric.entry)}%` }"
+                  >
+                    {{ metric.value }}
+                  </span>
+                </div>
+                <b class="ranking-row__rank">{{ formatRank(metric.entry) }}</b>
+              </div>
+            </div>
           </article>
+        </div>
+
+        <div class="performance-grid performance-grid--details">
 
           <article>
             <h3>Recent form</h3>
@@ -387,6 +433,21 @@ function formatRank(entry) {
 .performance-panel h3 { margin: 0 0 .55rem; font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: #5f6c76; }
 .analytics-coverage-warning { display: flex; gap: .35rem; flex-direction: column; margin-top: 1rem; padding: .75rem .9rem; border: 1px solid #d89a32; border-radius: 12px; color: #68420d; background: #fff4d8; }
 .analytics-coverage-warning span { font-size: .86rem; }
+.ranking-scale-note { display: flex; gap: .45rem; align-items: center; margin: 1rem 0 0; color: #69757e; font-size: .72rem; }
+.ranking-scale-note i { display: block; width: 34px; height: 7px; border-radius: 999px; background: linear-gradient(90deg, #10263d, #1d4d73); }
+.ranking-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
+.ranking-card { min-width: 0; padding: 1.1rem; border: 1px solid #d9d7ce; border-radius: 20px; background: rgba(255,255,255,.78); box-shadow: 0 10px 28px rgba(16,38,61,.055); }
+.ranking-card__heading { display: flex; justify-content: space-between; gap: 1rem; align-items: end; padding: 0 .15rem .85rem; border-bottom: 1px solid #e4e1d9; }
+.performance-panel .ranking-card__heading h3 { margin: 0; color: #10263d; font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.35rem; letter-spacing: .065em; }
+.ranking-card__heading span { width: 52px; color: #68747e; font-size: .66rem; font-weight: 900; letter-spacing: .08em; text-align: center; text-transform: uppercase; }
+.ranking-card__metrics { display: grid; gap: .9rem; padding-top: 1rem; }
+.ranking-row { display: grid; grid-template-columns: 82px minmax(0, 1fr) 52px; gap: .7rem; align-items: center; }
+.ranking-row__label { color: #253d51; font-size: .83rem; }
+.ranking-bar { position: relative; height: 42px; overflow: hidden; border: 1px solid rgba(16,38,61,.07); border-radius: 10px; background: linear-gradient(180deg, #edf0f2, #e3e7e9); box-shadow: inset 0 1px 4px rgba(16,38,61,.08); }
+.ranking-bar__fill { position: absolute; inset: 0 auto 0 0; display: block; border-radius: 9px; background: linear-gradient(90deg, #10263d, #1d4d73); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); transition: width .35s ease; }
+.ranking-bar__value { position: absolute; z-index: 1; top: 50%; padding: .18rem .42rem; border-radius: 7px; color: #fff; background: rgba(8,25,42,.28); font-family: 'Avenir Next Condensed', sans-serif; font-size: 1rem; font-weight: 900; line-height: 1; white-space: nowrap; transform: translate(-100%, -50%); }
+.ranking-bar__value--outside { color: #10263d; background: transparent; transform: translate(.35rem, -50%); }
+.ranking-row__rank { color: #10263d; font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.35rem; text-align: center; }
 .performance-grid { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1rem; }
 .performance-grid article, .signals-grid article, .drilldown-grid article { padding: .75rem; border: 1px solid #e3dfd7; border-radius: 14px; background: rgba(255,255,255,.66); }
 .performance-grid dl { margin: 0; display: grid; gap: .35rem; }
@@ -430,6 +491,6 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state { margin-top: 2rem; padding: 2rem; border-radius: 20px; background: #fffaf0; }
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
-@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .game-list li { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
+@media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 </style>
