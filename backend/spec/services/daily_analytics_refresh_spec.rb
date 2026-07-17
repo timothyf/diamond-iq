@@ -33,6 +33,41 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       strikeouts: 8, pitches: 90, strikes: 60,
       source_name: "MLB Stats API", last_synced_at: Time.current
     )
+    game.update!(
+      boxscore_raw_data: {
+        "teams" => {
+          "home" => {
+            "teamStats" => {
+              "pitching" => {
+                "inningsPitched" => "6.0",
+                "battersFaced" => 24,
+                "hits" => 4,
+                "earnedRuns" => 1,
+                "baseOnBalls" => 2,
+                "strikeOuts" => 8
+              }
+            }
+          },
+          "away" => {
+            "teamStats" => {
+              "batting" => {
+                "plateAppearances" => 6,
+                "atBats" => 3,
+                "runs" => 1,
+                "hits" => 2,
+                "doubles" => 1,
+                "triples" => 0,
+                "homeRuns" => 1,
+                "baseOnBalls" => 1,
+                "strikeOuts" => 1,
+                "hitByPitch" => 1,
+                "sacFlies" => 1
+              }
+            }
+          }
+        }
+      }
+    )
 
     create_pitch(pitch_number: 1, pitch_type: "FF", description: "called_strike", release_speed: 96.0)
     create_pitch(pitch_number: 2, pitch_type: "FF", description: "swinging_strike", release_speed: 98.0)
@@ -77,7 +112,21 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     )
     expect(BatterSplitSummary.find_by!(player: batter, split_type: "pitcher_hand", split_value: "R").metrics)
       .to include("pitches_seen" => 3, "plate_appearances" => 1)
-    expect(TeamDailyMetric.find_by!(team: home_team).metrics).to include("wins" => 1, "runs_scored" => 4)
+    expect(TeamDailyMetric.find_by!(team: home_team).metrics).to include(
+      "wins" => 1,
+      "runs_scored" => 4,
+      "pitching_batters_faced" => 24,
+      "pitching_earned_runs" => 1,
+      "pitching_strikeouts" => 8,
+      "pitching_walks" => 2
+    )
+    expect(TeamDailyMetric.find_by!(team: away_team).metrics).to include(
+      "hit_by_pitch" => 1,
+      "sacrifice_flies" => 1,
+      "on_base_percentage" => 0.6667,
+      "on_base_percentage_is_approximate" => false,
+      "ops" => 2.6667
+    )
   end
 
   it "replaces the same version idempotently while preserving other calculation versions" do

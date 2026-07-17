@@ -229,11 +229,14 @@ class DailyAnalyticsCalculator
       team_games = games.select { |game| game.home_team_id == team_id || game.away_team_id == team_id }
       batting = batting_lines.select { |line| line.team_id == team_id }
       pitching = pitching_lines.select { |line| line.team_id == team_id }
-      bat = sum_fields(batting, %i[plate_appearances at_bats runs hits doubles triples home_runs walks strikeouts])
-      pit = sum_fields(pitching, %i[outs_recorded hits earned_runs walks strikeouts])
+      bat = team_batting_totals(team_id, team_games, batting)
+      pit = team_pitching_totals(team_id, team_games, pitching)
       total_bases = bat[:hits] + bat[:doubles] + (2 * bat[:triples]) + (3 * bat[:home_runs])
       average_value = ratio(bat[:hits], bat[:at_bats])
-      obp = ratio(bat[:hits] + bat[:walks], bat[:at_bats] + bat[:walks])
+      obp = ratio(
+        bat[:hits] + bat[:walks] + bat[:hit_by_pitch],
+        bat[:at_bats] + bat[:walks] + bat[:hit_by_pitch] + bat[:sacrifice_flies]
+      )
       slugging = ratio(total_bases, bat[:at_bats])
       scores = team_games.filter_map { |game| team_score(game, team_id) }
 
@@ -249,10 +252,11 @@ class DailyAnalyticsCalculator
           run_differential: scores.sum { |scored, allowed| scored - allowed },
           batting_average: average_value,
           on_base_percentage: obp,
-          on_base_percentage_is_approximate: true,
+          on_base_percentage_is_approximate: false,
           slugging_percentage: slugging,
           ops: round(obp + slugging),
           pitching_outs_recorded: pit[:outs_recorded],
+          pitching_batters_faced: pit[:batters_faced],
           pitching_hits_allowed: pit[:hits],
           pitching_earned_runs: pit[:earned_runs],
           pitching_walks: pit[:walks],
@@ -290,7 +294,7 @@ class DailyAnalyticsCalculator
 
   def games
     @games ||= Game.where(official_date: metric_date)
-      .select(:id, :mlb_id, :home_team_id, :away_team_id, :home_score, :away_score).to_a
+      .select(:id, :mlb_id, :home_team_id, :away_team_id, :home_score, :away_score, :boxscore_raw_data).to_a
   end
 
   def pitches
@@ -344,6 +348,84 @@ class DailyAnalyticsCalculator
     return if game.home_score.nil? || game.away_score.nil?
 
     game.home_team_id == team_id ? [ game.home_score, game.away_score ] : [ game.away_score, game.home_score ]
+  end
+
+  def team_pitching_totals(team_id, team_games, pitching_lines_for_team)
+    fields = %i[outs_recorded batters_faced hits earned_runs walks strikeouts]
+    lines_by_game_id = pitching_lines_for_team.group_by(&:game_id)
+
+    team_games.each_with_object(fields.to_h { |field| [ field, 0 ] }) do |game, totals|
+      fallback = sum_fields(lines_by_game_id.fetch(game.id, []), fields)
+      official = official_team_pitching_stats(game, team_id)
+      game_totals = official.present? ? official_pitching_totals(official, fallback) : fallback
+
+      fields.each { |field| totals[field] += game_totals.fetch(field) }
+    end
+  end
+
+  def team_batting_totals(team_id, team_games, batting_lines_for_team)
+    fields = %i[
+      plate_appearances at_bats runs hits doubles triples home_runs walks strikeouts
+      hit_by_pitch sacrifice_flies
+    ]
+    fallback_fields = fields - %i[hit_by_pitch sacrifice_flies]
+    lines_by_game_id = batting_lines_for_team.group_by(&:game_id)
+
+    team_games.each_with_object(fields.to_h { |field| [ field, 0 ] }) do |game, totals|
+      fallback = sum_fields(lines_by_game_id.fetch(game.id, []), fallback_fields)
+        .merge(hit_by_pitch: 0, sacrifice_flies: 0)
+      official = official_team_stats(game, team_id, "batting")
+      game_totals = official.present? ? official_batting_totals(official, fallback) : fallback
+
+      fields.each { |field| totals[field] += game_totals.fetch(field) }
+    end
+  end
+
+  def official_team_pitching_stats(game, team_id)
+    official_team_stats(game, team_id, "pitching")
+  end
+
+  def official_team_stats(game, team_id, group)
+    side = game.home_team_id == team_id ? "home" : "away"
+    game.boxscore_raw_data.to_h.dig("teams", side, "teamStats", group)
+  end
+
+  def official_batting_totals(stats, fallback)
+    {
+      plate_appearances: integer_or_fallback(stats["plateAppearances"], fallback.fetch(:plate_appearances)),
+      at_bats: integer_or_fallback(stats["atBats"], fallback.fetch(:at_bats)),
+      runs: integer_or_fallback(stats["runs"], fallback.fetch(:runs)),
+      hits: integer_or_fallback(stats["hits"], fallback.fetch(:hits)),
+      doubles: integer_or_fallback(stats["doubles"], fallback.fetch(:doubles)),
+      triples: integer_or_fallback(stats["triples"], fallback.fetch(:triples)),
+      home_runs: integer_or_fallback(stats["homeRuns"], fallback.fetch(:home_runs)),
+      walks: integer_or_fallback(stats["baseOnBalls"], fallback.fetch(:walks)),
+      strikeouts: integer_or_fallback(stats["strikeOuts"], fallback.fetch(:strikeouts)),
+      hit_by_pitch: integer_or_fallback(stats["hitByPitch"], fallback.fetch(:hit_by_pitch)),
+      sacrifice_flies: integer_or_fallback(stats["sacFlies"], fallback.fetch(:sacrifice_flies))
+    }
+  end
+
+  def official_pitching_totals(stats, fallback)
+    {
+      outs_recorded: innings_to_outs(stats["inningsPitched"]) || fallback.fetch(:outs_recorded),
+      batters_faced: integer_or_fallback(stats["battersFaced"], fallback.fetch(:batters_faced)),
+      hits: integer_or_fallback(stats["hits"], fallback.fetch(:hits)),
+      earned_runs: integer_or_fallback(stats["earnedRuns"], fallback.fetch(:earned_runs)),
+      walks: integer_or_fallback(stats["baseOnBalls"], fallback.fetch(:walks)),
+      strikeouts: integer_or_fallback(stats["strikeOuts"], fallback.fetch(:strikeouts))
+    }
+  end
+
+  def innings_to_outs(value)
+    match = /\A(\d+)\.(\d)\z/.match(value.to_s)
+    return if match.nil?
+
+    (match[1].to_i * 3) + match[2].to_i.clamp(0, 2)
+  end
+
+  def integer_or_fallback(value, fallback)
+    Integer(value, exception: false) || fallback
   end
 
   def sum_fields(records, fields)

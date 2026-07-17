@@ -78,6 +78,13 @@ function normalizeProfile(data) {
       platoonSplits: data.performance_dashboard?.platoon_splits || { offense: {}, pitching: {} },
       starterBullpen: data.performance_dashboard?.starter_bullpen || { starters: {}, bullpen: {} },
       oneRunPerformance: data.performance_dashboard?.one_run_performance || {},
+      analyticsCoverage: data.performance_dashboard?.analytics_coverage || {
+        complete: true,
+        completed_game_count: 0,
+        complete_pitching_game_count: 0,
+        missing_game_count: 0,
+        missing_games: [],
+      },
       strengths: data.performance_dashboard?.strengths || [],
       concerns: data.performance_dashboard?.concerns || [],
       drillDown: {

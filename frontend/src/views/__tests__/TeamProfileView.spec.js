@@ -92,8 +92,8 @@ const payload = {
           walk_rate: { rank: 9, value: 0.086 },
         },
         pitching: {
-          era: { rank: 7, value: 3.81 },
-          whip: { rank: 10, value: 1.24 },
+          era: { rank: 7, value: 3.8126 },
+          whip: { rank: 10, value: 1.2346 },
           strikeout_rate: { rank: 6, value: 0.251 },
           walk_rate: { rank: 11, value: 0.082 },
         },
@@ -123,6 +123,13 @@ const payload = {
         bullpen: { innings_pitched: 336.2, era: 4.13, whip: 1.31 },
       },
       one_run_performance: { wins: 14, losses: 11, games: 25, winning_percentage: 0.56 },
+      analytics_coverage: {
+        complete: true,
+        completed_game_count: 95,
+        complete_pitching_game_count: 95,
+        missing_game_count: 0,
+        missing_games: [],
+      },
       strengths: ['Top-10 offense by OPS'],
       concerns: ['Offense has cooled over the last 30 games'],
       drill_down: {
@@ -180,6 +187,8 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-season-select"]').text()).toContain('2025')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Team performance dashboard')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Last 7 games')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('#7 · 3.81')
+    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('#10 · 1.23')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
   })
@@ -193,5 +202,25 @@ describe('TeamProfileView', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-test="team-error"]').text()).toContain('Unable to load this team profile')
+  })
+
+  it('warns when completed games are missing pitching details', async () => {
+    const incompletePayload = structuredClone(payload)
+    incompletePayload.data.performance_dashboard.analytics_coverage = {
+      complete: false,
+      completed_game_count: 96,
+      complete_pitching_game_count: 95,
+      missing_game_count: 1,
+      missing_games: [{ mlb_id: 823632, official_date: '2026-05-12', matchup: 'DET at NYM' }],
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => incompletePayload }))
+
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="analytics-coverage-warning"]').text()).toContain('1 of 96 completed games is missing pitching details')
   })
 })

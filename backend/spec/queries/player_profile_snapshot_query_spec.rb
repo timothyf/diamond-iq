@@ -116,7 +116,7 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(career).to include(category: "pitching", season_count: 2)
     expect(stats.fetch("inningsPitched").fetch(:value)).to eq("16.0")
     expect(stats.fetch("ERA").fetch(:value)).to eq("2.81")
-    expect(stats.fetch("whip").fetch(:value)).to eq("0.938")
+    expect(stats.fetch("whip").fetch(:value)).to eq("0.94")
     expect(seasons.fetch(2025).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "10.2"))
     expect(seasons.fetch(2026).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "5.1"))
   end

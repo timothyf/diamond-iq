@@ -366,7 +366,7 @@ class PlayerProfileSnapshotQuery
   def format_career_value(category, key, value)
     return value if value.is_a?(String)
     return format("%.3f", value) if category == "batting" && BATTING_RATE_KEYS.include?(key)
-    return format("%.2f", value) if category == "pitching" && key == "ERA"
+    return format("%.2f", value) if category == "pitching" && %w[ERA whip].include?(key)
     return format("%.3f", value) if category == "pitching" && PITCHING_RATE_KEYS.include?(key)
 
     decimal = value.to_d

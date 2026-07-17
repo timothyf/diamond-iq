@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { useTeamProfile } from '../composables/useTeamProfile'
+import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
 
 const props = defineProps({
   teamId: { type: [String, Number], required: true },
@@ -140,6 +141,14 @@ function formatRank(entry) {
           <span>Built from precomputed daily tables</span>
         </header>
 
+        <div v-if="dashboard.analyticsCoverage?.complete === false" class="analytics-coverage-warning" data-test="analytics-coverage-warning">
+          <strong>Incomplete pitching coverage</strong>
+          <span>
+            {{ dashboard.analyticsCoverage.missing_game_count }} of {{ dashboard.analyticsCoverage.completed_game_count }} completed games
+            {{ dashboard.analyticsCoverage.missing_game_count === 1 ? 'is' : 'are' }} missing pitching details. Season rankings may be incomplete.
+          </span>
+        </div>
+
         <div class="performance-grid">
           <article>
             <h3>Offensive rankings</h3>
@@ -154,8 +163,8 @@ function formatRank(entry) {
           <article>
             <h3>Pitching rankings</h3>
             <dl>
-              <div><dt>ERA</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.era) }} · {{ formatDecimal(dashboard.rankings?.pitching?.era?.value) }}</dd></div>
-              <div><dt>WHIP</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.whip) }} · {{ formatDecimal(dashboard.rankings?.pitching?.whip?.value) }}</dd></div>
+              <div><dt>ERA</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.era) }} · {{ formatTwoDecimalPitchingRate(dashboard.rankings?.pitching?.era?.value) }}</dd></div>
+              <div><dt>WHIP</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.whip) }} · {{ formatTwoDecimalPitchingRate(dashboard.rankings?.pitching?.whip?.value) }}</dd></div>
               <div><dt>K Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.strikeout_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.strikeout_rate?.value) }}</dd></div>
               <div><dt>BB Rate</dt><dd>{{ formatRank(dashboard.rankings?.pitching?.walk_rate) }} · {{ formatPercent(dashboard.rankings?.pitching?.walk_rate?.value) }}</dd></div>
             </dl>
@@ -169,7 +178,7 @@ function formatRank(entry) {
                 <dd>
                   {{ dashboard.recentForm?.[window]?.wins || 0 }}-{{ dashboard.recentForm?.[window]?.losses || 0 }} ·
                   OPS {{ formatDecimal(dashboard.recentForm?.[window]?.ops) }} ·
-                  ERA {{ formatDecimal(dashboard.recentForm?.[window]?.era) }}
+                  ERA {{ formatTwoDecimalPitchingRate(dashboard.recentForm?.[window]?.era) }}
                 </dd>
               </div>
             </dl>
@@ -196,8 +205,8 @@ function formatRank(entry) {
           <article>
             <h3>Starter / bullpen</h3>
             <dl>
-              <div><dt>Starters</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.starters?.innings_pitched, 1) }} IP · ERA {{ formatDecimal(dashboard.starterBullpen?.starters?.era) }} · WHIP {{ formatDecimal(dashboard.starterBullpen?.starters?.whip) }}</dd></div>
-              <div><dt>Bullpen</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.bullpen?.innings_pitched, 1) }} IP · ERA {{ formatDecimal(dashboard.starterBullpen?.bullpen?.era) }} · WHIP {{ formatDecimal(dashboard.starterBullpen?.bullpen?.whip) }}</dd></div>
+              <div><dt>Starters</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.starters?.innings_pitched, 1) }} IP · ERA {{ formatTwoDecimalPitchingRate(dashboard.starterBullpen?.starters?.era) }} · WHIP {{ formatTwoDecimalPitchingRate(dashboard.starterBullpen?.starters?.whip) }}</dd></div>
+              <div><dt>Bullpen</dt><dd>{{ formatDecimal(dashboard.starterBullpen?.bullpen?.innings_pitched, 1) }} IP · ERA {{ formatTwoDecimalPitchingRate(dashboard.starterBullpen?.bullpen?.era) }} · WHIP {{ formatTwoDecimalPitchingRate(dashboard.starterBullpen?.bullpen?.whip) }}</dd></div>
             </dl>
           </article>
 
@@ -376,6 +385,8 @@ function formatRank(entry) {
 .team-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .team-panel { padding: 1.35rem; }
 .performance-panel h3 { margin: 0 0 .55rem; font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: #5f6c76; }
+.analytics-coverage-warning { display: flex; gap: .35rem; flex-direction: column; margin-top: 1rem; padding: .75rem .9rem; border: 1px solid #d89a32; border-radius: 12px; color: #68420d; background: #fff4d8; }
+.analytics-coverage-warning span { font-size: .86rem; }
 .performance-grid { display: grid; gap: .75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 1rem; }
 .performance-grid article, .signals-grid article, .drilldown-grid article { padding: .75rem; border: 1px solid #e3dfd7; border-radius: 14px; background: rgba(255,255,255,.66); }
 .performance-grid dl { margin: 0; display: grid; gap: .35rem; }

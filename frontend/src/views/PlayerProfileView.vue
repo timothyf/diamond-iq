@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
+import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
 const props = defineProps({
   playerId: {
@@ -327,6 +328,49 @@ function formatTimestamp(value) {
         </dl>
       </section>
 
+      <section class="profile-panel profile-career-table">
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Career ledger</p>
+            <h2>{{ titleize(player.careerOverview.category) }} by season</h2>
+          </div>
+          <span>{{ careerRangeLabel }}</span>
+        </header>
+
+        <div v-if="player.careerOverview.seasons.length" class="career-table-wrap" data-test="career-season-table">
+          <table class="career-table">
+            <thead>
+              <tr>
+                <th class="career-table__season">Season</th>
+                <th class="career-table__team">Team</th>
+                <th v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ column.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="seasonRow in player.careerOverview.seasons" :key="seasonRow.season">
+                <th class="career-table__season">{{ seasonRow.season }}</th>
+                <td class="career-table__team">{{ seasonTeamLabel(seasonRow) }}</td>
+                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ formatBaseballStatValue(column.key, seasonRow.statValues[column.key]) }}
+                </td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th class="career-table__season">Career</th>
+                <td class="career-table__team">Total</td>
+                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
+                  {{ formatBaseballStatValue(column.key, player.careerOverview.statValues[column.key]) }}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
+      </section>
+
       <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
         <div>
           <p class="eyebrow">Analysis period</p>
@@ -360,49 +404,6 @@ function formatTimestamp(value) {
             </select>
           </label>
         </div>
-      </section>
-
-      <section class="profile-panel profile-career-table">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Career ledger</p>
-            <h2>{{ titleize(player.careerOverview.category) }} by season</h2>
-          </div>
-          <span>{{ careerRangeLabel }}</span>
-        </header>
-
-        <div v-if="player.careerOverview.seasons.length" class="career-table-wrap" data-test="career-season-table">
-          <table class="career-table">
-            <thead>
-              <tr>
-                <th class="career-table__season">Season</th>
-                <th class="career-table__team">Team</th>
-                <th v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ column.label }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="seasonRow in player.careerOverview.seasons" :key="seasonRow.season">
-                <th class="career-table__season">{{ seasonRow.season }}</th>
-                <td class="career-table__team">{{ seasonTeamLabel(seasonRow) }}</td>
-                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ displayValue(seasonRow.statValues[column.key]) }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <th class="career-table__season">Career</th>
-                <td class="career-table__team">Total</td>
-                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ displayValue(player.careerOverview.statValues[column.key]) }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
       </section>
 
       <section class="profile-panel trend-panel" data-test="player-trends">

@@ -1,6 +1,8 @@
 <script setup>
 import { computed } from 'vue'
 
+import { formatBaseballStatValue, isTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
+
 const props = defineProps({
   rows: {
     type: Array,
@@ -101,6 +103,7 @@ function goToNextPage() {
 
 function formatStatValue(columnKey, value) {
   if (value === null || value === undefined || value === '') return '—'
+  if (isTwoDecimalPitchingRate(columnKey)) return formatBaseballStatValue(columnKey, value)
   if (props.meta.category === 'pitching' && PITCHING_INTEGER_STAT_KEYS.has(columnKey)) {
     const numericValue = Number(value)
     return Number.isFinite(numericValue) ? String(Math.trunc(numericValue)) : value

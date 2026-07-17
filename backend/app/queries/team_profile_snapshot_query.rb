@@ -186,6 +186,7 @@ class TeamProfileSnapshotQuery
       platoon_splits: platoon_splits_payload,
       starter_bullpen: starter_bullpen_payload,
       one_run_performance: one_run_performance_payload,
+      analytics_coverage: analytics_coverage_payload,
       strengths: strengths_payload,
       concerns: concerns_payload,
       drill_down: drill_down_payload
@@ -213,6 +214,38 @@ class TeamProfileSnapshotQuery
         total_teams: team_totals.length,
         games: current[:games] || 0
       }
+    }
+  end
+
+  def analytics_coverage_payload
+    game_ids = completed_games.map(&:id)
+    pitching_team_ids_by_game = GamePlayerPitchingLine
+      .where(game_id: game_ids)
+      .distinct
+      .pluck(:game_id, :team_id)
+      .group_by(&:first)
+      .transform_values { |pairs| pairs.map(&:last) }
+
+    missing_games = completed_games.filter_map do |game|
+      present_team_ids = pitching_team_ids_by_game.fetch(game.id, [])
+      missing_teams = [ game.away_team, game.home_team ].reject { |entry| present_team_ids.include?(entry.id) }
+      next if missing_teams.empty?
+
+      {
+        id: game.id,
+        mlb_id: game.mlb_id,
+        official_date: game.official_date,
+        matchup: "#{game.away_team.abbreviation} at #{game.home_team.abbreviation}",
+        missing_teams: missing_teams.map { |entry| { id: entry.id, abbreviation: entry.abbreviation } }
+      }
+    end
+
+    {
+      complete: missing_games.empty?,
+      completed_game_count: completed_games.length,
+      complete_pitching_game_count: completed_games.length - missing_games.length,
+      missing_game_count: missing_games.length,
+      missing_games: missing_games
     }
   end
 
@@ -498,7 +531,10 @@ class TeamProfileSnapshotQuery
       home_runs: 0,
       walks: 0,
       strikeouts: 0,
+      hit_by_pitch: 0,
+      sacrifice_flies: 0,
       pitching_outs_recorded: 0,
+      pitching_batters_faced: 0,
       pitching_hits_allowed: 0,
       pitching_earned_runs: 0,
       pitching_walks: 0,
@@ -524,8 +560,8 @@ class TeamProfileSnapshotQuery
       whip: whip,
       strikeout_rate: ratio_or_nil(totals[:strikeouts], totals[:plate_appearances]),
       walk_rate: ratio_or_nil(totals[:walks], totals[:plate_appearances]),
-      pitching_strikeout_rate: ratio_or_nil(totals[:pitching_strikeouts], totals[:pitching_outs_recorded])&.*(3),
-      pitching_walk_rate: ratio_or_nil(totals[:pitching_walks], totals[:pitching_outs_recorded])&.*(3)
+      pitching_strikeout_rate: ratio_or_nil(totals[:pitching_strikeouts], totals[:pitching_batters_faced]),
+      pitching_walk_rate: ratio_or_nil(totals[:pitching_walks], totals[:pitching_batters_faced])
     )
   end
 
@@ -775,11 +811,16 @@ class TeamProfileSnapshotQuery
     at_bats = metrics[:at_bats].to_f
     hits = metrics[:hits].to_f
     walks = metrics[:walks].to_f
+    hit_by_pitch = metrics[:hit_by_pitch].to_f
+    sacrifice_flies = metrics[:sacrifice_flies].to_f
     doubles = metrics[:doubles].to_f
     triples = metrics[:triples].to_f
     home_runs = metrics[:home_runs].to_f
     total_bases = hits + doubles + (2 * triples) + (3 * home_runs)
-    obp = ratio_or_nil(hits + walks, at_bats + walks)
+    obp = ratio_or_nil(
+      hits + walks + hit_by_pitch,
+      at_bats + walks + hit_by_pitch + sacrifice_flies
+    )
     slugging = ratio_or_nil(total_bases, at_bats)
     return nil if obp.nil? || slugging.nil?
 

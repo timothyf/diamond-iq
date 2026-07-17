@@ -156,8 +156,8 @@ describe('PlayerSeasonStatsTable', () => {
               W: '5.0',
               strikeOuts: '100.0',
               inningsPitched: '64.0',
-              ERA: '1.83',
-              whip: '0.83',
+              ERA: '1.836',
+              whip: '0.834',
             },
           },
         ],
@@ -180,8 +180,10 @@ describe('PlayerSeasonStatsTable', () => {
     expect(wrapper.text()).toContain('5')
     expect(wrapper.text()).toContain('100')
     expect(wrapper.text()).toContain('64.0')
-    expect(wrapper.text()).toContain('1.83')
+    expect(wrapper.text()).toContain('1.84')
     expect(wrapper.text()).toContain('0.83')
+    expect(wrapper.text()).not.toContain('1.836')
+    expect(wrapper.text()).not.toContain('0.834')
     expect(wrapper.text()).not.toContain('5.0')
     expect(wrapper.text()).not.toContain('100.0')
   })

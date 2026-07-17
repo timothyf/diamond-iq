@@ -93,7 +93,10 @@ RSpec.describe "Api::Teams", type: :request do
         home_runs: 1,
         walks: 3,
         strikeouts: 8,
+        hit_by_pitch: 1,
+        sacrifice_flies: 1,
         pitching_outs_recorded: 27,
+        pitching_batters_faced: 32,
         pitching_hits_allowed: 6,
         pitching_earned_runs: 2,
         pitching_walks: 2,
@@ -124,7 +127,10 @@ RSpec.describe "Api::Teams", type: :request do
         home_runs: 0,
         walks: 2,
         strikeouts: 10,
+        hit_by_pitch: 0,
+        sacrifice_flies: 0,
         pitching_outs_recorded: 24,
+        pitching_batters_faced: 34,
         pitching_hits_allowed: 10,
         pitching_earned_runs: 5,
         pitching_walks: 3,
@@ -254,6 +260,19 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "upcoming_games", 0, "id")).to eq(upcoming_game.id)
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(0.8728)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "strikeout_rate", "value")).to eq(0.2813)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "walk_rate", "value")).to eq(0.0625)
+    expect(json_body.dig("data", "performance_dashboard", "analytics_coverage")).to include(
+      "complete" => false,
+      "completed_game_count" => 1,
+      "complete_pitching_game_count" => 0,
+      "missing_game_count" => 1
+    )
+    expect(json_body.dig("data", "performance_dashboard", "analytics_coverage", "missing_games", 0)).to include(
+      "mlb_id" => completed_game.mlb_id,
+      "matchup" => "CLE at DET"
+    )
     expect(json_body.dig("data", "performance_dashboard", "recent_form", "7", "sampled_games")).to be >= 1
     expect(json_body.dig("data", "performance_dashboard", "drill_down", "players", "hitters")).not_to be_empty
     expect(json_body.dig("data", "performance_dashboard", "platoon_splits", "offense", "vs_left", "sample_size")).to eq(8.0)
