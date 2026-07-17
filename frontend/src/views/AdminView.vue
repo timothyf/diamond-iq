@@ -25,6 +25,12 @@ const pitchDataConfirmationDialog = ref(null)
 const pitchDataSyncButton = ref(null)
 const pendingPitchDataParameters = ref(null)
 const pendingPitchDataEstimate = ref(null)
+const adminTabs = [
+  { id: 'download', label: 'Download & Import' },
+  { id: 'operations', label: 'Operational Tasks' },
+  { id: 'local-imports', label: 'Local File Imports' },
+]
+const activeAdminTab = ref(adminTabs[0].id)
 
 const statsOptions = reactive({
   category: 'batting',
@@ -239,6 +245,21 @@ function normalizeYearRange(options) {
 
 function normalizeDateRange(options) {
   if (options.startDate && options.endDate && options.startDate > options.endDate) options.endDate = options.startDate
+}
+
+function handleAdminTabKeydown(event, currentIndex) {
+  let nextIndex
+
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % adminTabs.length
+  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + adminTabs.length) % adminTabs.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = adminTabs.length - 1
+  if (nextIndex === undefined) return
+
+  event.preventDefault()
+  const tabButtons = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')
+  activeAdminTab.value = adminTabs[nextIndex].id
+  nextTick(() => tabButtons?.[nextIndex]?.focus())
 }
 
 async function handleStatsDownload() {
@@ -830,7 +851,34 @@ async function closeDatabaseDetails() {
       </section>
     </div>
 
-    <section class="admin-section">
+    <nav class="admin-tabs" role="tablist" aria-label="Administration tools">
+      <button
+        v-for="(tab, index) in adminTabs"
+        :id="`admin-tab-${tab.id}`"
+        :key="tab.id"
+        type="button"
+        role="tab"
+        :class="['admin-tabs__tab', { 'admin-tabs__tab--active': activeAdminTab === tab.id }]"
+        :aria-controls="`admin-panel-${tab.id}`"
+        :aria-selected="activeAdminTab === tab.id"
+        :tabindex="activeAdminTab === tab.id ? 0 : -1"
+        :data-test="`admin-tab-${tab.id}`"
+        @click="activeAdminTab = tab.id"
+        @keydown="handleAdminTabKeydown($event, index)"
+      >
+        {{ tab.label }}
+      </button>
+    </nav>
+
+    <section
+      v-show="activeAdminTab === 'download'"
+      id="admin-panel-download"
+      class="admin-section admin-tab-panel"
+      role="tabpanel"
+      aria-labelledby="admin-tab-download"
+      tabindex="0"
+      data-test="admin-panel-download"
+    >
       <header class="admin-section__heading">
         <div>
           <p class="eyebrow">Source retrieval</p>
@@ -1004,7 +1052,15 @@ async function closeDatabaseDetails() {
       </div>
     </section>
 
-    <section class="admin-section">
+    <section
+      v-show="activeAdminTab === 'local-imports'"
+      id="admin-panel-local-imports"
+      class="admin-section admin-tab-panel"
+      role="tabpanel"
+      aria-labelledby="admin-tab-local-imports"
+      tabindex="0"
+      data-test="admin-panel-local-imports"
+    >
       <header class="admin-section__heading">
         <div>
           <p class="eyebrow">CSV intake</p>
@@ -1040,7 +1096,15 @@ async function closeDatabaseDetails() {
       </div>
     </section>
 
-    <section class="admin-section">
+    <section
+      v-show="activeAdminTab === 'operations'"
+      id="admin-panel-operations"
+      class="admin-section admin-tab-panel"
+      role="tabpanel"
+      aria-labelledby="admin-tab-operations"
+      tabindex="0"
+      data-test="admin-panel-operations"
+    >
       <header class="admin-section__heading">
         <div>
           <p class="eyebrow">MLB synchronization</p>
@@ -1464,7 +1528,8 @@ async function closeDatabaseDetails() {
 }
 
 .admin-hero,
-.admin-section {
+.admin-section,
+.admin-tabs {
   width: min(1440px, calc(100vw - 2.5rem));
   margin: 0 auto;
 }
@@ -1862,6 +1927,57 @@ async function closeDatabaseDetails() {
   animation: admin-pulse 1s infinite alternate;
 }
 
+.admin-tabs {
+  display: flex;
+  gap: 0.45rem;
+  margin-top: 1.4rem;
+  padding: 0.45rem;
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 252, 245, 0.68);
+  box-shadow: 0 10px 28px rgba(73, 52, 24, 0.06);
+}
+
+.admin-tabs__tab {
+  flex: 1 0 auto;
+  min-height: 46px;
+  padding: 0.7rem 1.15rem;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: #53616b;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.admin-tabs__tab:hover {
+  color: #10263d;
+  background: rgba(231, 237, 241, 0.7);
+}
+
+.admin-tabs__tab:focus-visible {
+  outline: 3px solid rgba(143, 45, 36, 0.25);
+  outline-offset: 2px;
+}
+
+.admin-tabs__tab--active {
+  color: #fffaf0;
+  border-color: #10263d;
+  background: #10263d;
+  box-shadow: 0 7px 18px rgba(16, 38, 61, 0.18);
+}
+
+.admin-tabs__tab--active:hover {
+  color: #fffaf0;
+  background: #8f2d24;
+}
+
 .admin-section {
   margin-top: 1.4rem;
   padding: 1.6rem;
@@ -1869,6 +1985,10 @@ async function closeDatabaseDetails() {
   border-radius: 28px;
   background: rgba(255, 252, 245, 0.82);
   box-shadow: 0 16px 44px rgba(73, 52, 24, 0.07);
+}
+
+.admin-tab-panel {
+  margin-top: 0.75rem;
 }
 
 .admin-section__heading {
@@ -2514,9 +2634,21 @@ async function closeDatabaseDetails() {
   }
 
   .admin-hero,
-  .admin-section {
+  .admin-section,
+  .admin-tabs {
     width: 100%;
     border-radius: 20px;
+  }
+
+  .admin-tabs {
+    padding: 0.35rem;
+    border-radius: 15px;
+  }
+
+  .admin-tabs__tab {
+    min-height: 42px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.7rem;
   }
 
   .admin-hero,

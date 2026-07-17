@@ -265,6 +265,30 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Sep 22, 2026')
   })
 
+  it('organizes administration tools into accessible tab panels', async () => {
+    const wrapper = mount(AdminView)
+    const downloadTab = wrapper.get('[data-test="admin-tab-download"]')
+    const operationsTab = wrapper.get('[data-test="admin-tab-operations"]')
+    const localImportsTab = wrapper.get('[data-test="admin-tab-local-imports"]')
+
+    expect(downloadTab.attributes('role')).toBe('tab')
+    expect(downloadTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-test="admin-panel-download"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="admin-panel-operations"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="admin-panel-local-imports"]').attributes('style')).toContain('display: none')
+
+    await operationsTab.trigger('click')
+    expect(operationsTab.attributes('aria-selected')).toBe('true')
+    expect(downloadTab.attributes('aria-selected')).toBe('false')
+    expect(wrapper.get('[data-test="admin-panel-download"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="admin-panel-operations"]').attributes('style') || '').not.toContain('display: none')
+
+    await operationsTab.trigger('keydown', { key: 'ArrowRight' })
+    expect(localImportsTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-test="admin-panel-operations"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="admin-panel-local-imports"]').attributes('style') || '').not.toContain('display: none')
+  })
+
   it('submits download and synchronization forms through their existing services', async () => {
     const wrapper = mount(AdminView)
 

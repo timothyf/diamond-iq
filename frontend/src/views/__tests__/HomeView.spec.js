@@ -1,0 +1,88 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import HomeView from '../HomeView.vue'
+
+const dashboardPayload = {
+  data: {
+    as_of: '2026-07-16',
+    season: 2026,
+    games: [
+      {
+        id: 10,
+        scheduled_at: '2026-07-16T17:10:00Z',
+        status: 'preview',
+        detailed_status: 'Pre-Game',
+        venue_name: 'Comerica Park',
+        away_score: null,
+        home_score: null,
+        away_team: { id: 2, abbreviation: 'CLE', name: 'Cleveland Guardians' },
+        home_team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+        away_probable_pitcher: { id: 20, full_name: 'Tanner Bibee' },
+        home_probable_pitcher: { id: 21, full_name: 'Tarik Skubal' },
+      },
+    ],
+    leaders: [
+      {
+        key: 'ops',
+        label: 'OPS',
+        category: 'batting',
+        qualifier: 'Minimum 259 AB',
+        entries: [{ rank: 1, value: '1.025', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
+      },
+      {
+        key: 'ERA',
+        label: 'ERA',
+        category: 'pitching',
+        qualifier: 'Minimum 96 IP',
+        entries: [{ rank: 1, value: '1.75', player: { id: 31, full_name: 'Tarik Skubal' }, team: { abbreviation: 'DET' } }],
+      },
+    ],
+    team_pulse: {
+      best_records: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, wins: 60, losses: 36 }],
+      run_differential: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, run_differential: 105 }],
+      recent_form: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, recent_games: 10, recent_wins: 8, recent_losses: 2 }],
+    },
+    freshness: { analytics: '2026-07-16T20:32:00Z' },
+  },
+}
+
+const RouterLink = {
+  props: ['to'],
+  template: '<a href="#"><slot /></a>',
+}
+
+describe('HomeView', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(dashboardPayload),
+    }))
+  })
+
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('presents the daily slate, league leaders, team pulse, and exploration links', async () => {
+    const wrapper = mount(HomeView, { global: { components: { RouterLink } } })
+    await flushPromises()
+
+    expect(fetch).toHaveBeenCalledWith('/api/home', expect.objectContaining({ headers: { Accept: 'application/json' } }))
+    expect(wrapper.text()).toContain('Baseball intelligence, ready for first pitch')
+    expect(wrapper.get('[data-test="today-games"]').text()).toContain('Detroit Tigers')
+    expect(wrapper.get('[data-test="today-games"]').text()).toContain('Tarik Skubal')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Aaron Judge')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.025')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.75')
+    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('60-36')
+    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
+    expect(wrapper.text()).toContain('Stat Explorer')
+  })
+
+  it('shows a retry state when the briefing cannot be loaded', async () => {
+    fetch.mockResolvedValueOnce({ ok: false, status: 503 })
+    const wrapper = mount(HomeView, { global: { components: { RouterLink } } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="home-error"]').text()).toContain('Unable to load today’s DiamondIQ briefing')
+  })
+})

@@ -552,9 +552,9 @@ function resetFilters() {
     <section class="hero-panel">
       <div class="hero-copy">
         <p class="eyebrow">Front Office Dashboard</p>
-        <h1>Player Season Stat Board</h1>
+        <h1>Stat Explorer</h1>
         <p class="lede">
-          Command center for searching, sorting, and comparing imported player season stats.
+          Search, sort, and compare player season statistics and pitch-level data.
         </p>
       </div>
     </section>

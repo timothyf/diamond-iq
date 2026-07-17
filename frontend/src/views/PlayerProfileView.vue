@@ -270,7 +270,7 @@ function formatTimestamp(value) {
     </div>
 
     <template v-else-if="player">
-      <RouterLink class="profile-back" to="/">← Back to stat board</RouterLink>
+      <RouterLink class="profile-back" :to="{ name: 'stat-explorer' }">← Back to Stat Explorer</RouterLink>
 
       <section class="profile-hero">
         <div

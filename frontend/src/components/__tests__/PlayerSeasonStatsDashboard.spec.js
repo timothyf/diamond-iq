@@ -121,7 +121,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   it('renders the table controls and summary metrics', () => {
     const wrapper = mount(PlayerSeasonStatsDashboard)
 
-    expect(wrapper.text()).toContain('Player Season Stat Board')
+    expect(wrapper.text()).toContain('Stat Explorer')
     expect(wrapper.text()).toContain('Batting Leaderboard')
     expect(wrapper.text()).toContain('Category: batting')
     expect(wrapper.text()).toContain('Data range: 1970-2026 seasons')

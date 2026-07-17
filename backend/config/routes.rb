@@ -18,6 +18,7 @@ Rails.application.routes.draw do
 
     resources :players, only: [:index, :show]
     resources :teams, only: [:index, :show]
+    resource :home, only: [:show], controller: :home
     resources :positions, only: [:index]
     resources :games, only: [:index, :show] do
       collection do

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import PlayerSeasonStatsDashboard from '../components/PlayerSeasonStatsDashboard.vue'
 import AdminView from '../views/AdminView.vue'
+import HomeView from '../views/HomeView.vue'
 import PlayerProfileView from '../views/PlayerProfileView.vue'
 import TeamDirectoryView from '../views/TeamDirectoryView.vue'
 import TeamProfileView from '../views/TeamProfileView.vue'
@@ -11,8 +12,17 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'stat-board',
+      name: 'home',
+      component: HomeView,
+    },
+    {
+      path: '/explore',
+      name: 'stat-explorer',
       component: PlayerSeasonStatsDashboard,
+    },
+    {
+      path: '/stat-board',
+      redirect: { name: 'stat-explorer' },
     },
     {
       path: '/players/:id',

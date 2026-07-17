@@ -16,7 +16,8 @@ import diamondIqLogo from './assets/diamondiq_logo.png'
     </RouterLink>
     <PlayerSearch />
     <nav aria-label="Primary navigation">
-      <RouterLink to="/">Stat board</RouterLink>
+      <RouterLink to="/">Home</RouterLink>
+      <RouterLink to="/explore">Stat Explorer</RouterLink>
       <RouterLink to="/teams">Teams</RouterLink>
       <RouterLink to="/admin">Admin</RouterLink>
     </nav>
