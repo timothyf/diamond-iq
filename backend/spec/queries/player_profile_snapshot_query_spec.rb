@@ -37,12 +37,17 @@ RSpec.describe PlayerProfileSnapshotQuery do
       doubles: create_stat_type(name: "doubles", label: "2B", category: "batting"),
       triples: create_stat_type(name: "triples", label: "3B", category: "batting"),
       homeRuns: create_stat_type(name: "homeRuns", label: "HR", category: "batting"),
+      walks: create_stat_type(name: "baseOnBalls", label: "BB", category: "batting"),
+      hitByPitch: create_stat_type(name: "hitByPitch", label: "HBP", category: "batting"),
+      sacFlies: create_stat_type(name: "sacFlies", label: "SF", category: "batting"),
       avg: create_stat_type(name: "avg", label: "AVG", category: "batting"),
-      slg: create_stat_type(name: "slg", label: "SLG", category: "batting")
+      obp: create_stat_type(name: "obp", label: "OBP", category: "batting"),
+      slg: create_stat_type(name: "slg", label: "SLG", category: "batting"),
+      ops: create_stat_type(name: "ops", label: "OPS", category: "batting")
     }
     season_values = {
-      2025 => { gamesPlayed: 120, atBats: 400, hits: 100, doubles: 20, triples: 2, homeRuns: 10, avg: 0.250, slg: 0.385 },
-      2026 => { gamesPlayed: 60, atBats: 200, hits: 60, doubles: 10, triples: 1, homeRuns: 20, avg: 0.300, slg: 0.660 }
+      2025 => { gamesPlayed: 120, atBats: 400, hits: 100, doubles: 20, triples: 2, homeRuns: 10, walks: 40, hitByPitch: 5, sacFlies: 4, avg: 0.250, obp: 0.323, slg: 0.385, ops: 0.708 },
+      2026 => { gamesPlayed: 60, atBats: 200, hits: 60, doubles: 10, triples: 1, homeRuns: 20, walks: 20, hitByPitch: 2, sacFlies: 2, avg: 0.300, obp: 0.366, slg: 0.660, ops: 1.026 }
     }
 
     season_values.each do |season, values|
@@ -68,17 +73,23 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(stats.fetch("gamesPlayed").fetch(:value)).to eq("180")
     expect(stats.fetch("homeRuns").fetch(:value)).to eq("30")
     expect(stats.fetch("avg").fetch(:value)).to eq("0.267")
+    expect(stats.fetch("obp").fetch(:value)).to eq("0.337")
     expect(stats.fetch("slg").fetch(:value)).to eq("0.477")
+    expect(stats.fetch("ops").fetch(:value)).to eq("0.814")
     expect(career.fetch(:columns).map { |column| column.fetch(:key) }).to include("gamesPlayed", "homeRuns", "avg", "slg")
     expect(seasons.fetch(2025).fetch(:stats)).to include(
       hash_including(key: "gamesPlayed", value: "120"),
       hash_including(key: "homeRuns", value: "10"),
-      hash_including(key: "avg", value: "0.250")
+      hash_including(key: "avg", value: "0.250"),
+      hash_including(key: "obp", value: "0.323"),
+      hash_including(key: "ops", value: "0.708")
     )
     expect(seasons.fetch(2026).fetch(:stats)).to include(
       hash_including(key: "gamesPlayed", value: "60"),
       hash_including(key: "homeRuns", value: "20"),
-      hash_including(key: "avg", value: "0.300")
+      hash_including(key: "avg", value: "0.300"),
+      hash_including(key: "obp", value: "0.366"),
+      hash_including(key: "ops", value: "1.026")
     )
   end
 
@@ -92,11 +103,13 @@ RSpec.describe PlayerProfileSnapshotQuery do
       hits: create_stat_type(name: "hits", label: "H", category: "pitching"),
       walks: create_stat_type(name: "baseOnBalls", label: "BB", category: "pitching"),
       era: create_stat_type(name: "ERA", label: "ERA", category: "pitching"),
-      whip: create_stat_type(name: "whip", label: "WHIP", category: "pitching")
+      whip: create_stat_type(name: "whip", label: "WHIP", category: "pitching"),
+      atBats: create_stat_type(name: "atBats", label: "AB", category: "pitching"),
+      avg: create_stat_type(name: "avg", label: "AVG", category: "pitching")
     }
     season_values = {
-      2025 => { inningsPitched: 10.2, earnedRuns: 3, hits: 8, walks: 2, era: 2.53, whip: 0.94 },
-      2026 => { inningsPitched: 5.1, earnedRuns: 2, hits: 4, walks: 1, era: 3.38, whip: 0.94 }
+      2025 => { inningsPitched: 10.2, earnedRuns: 3, hits: 8, walks: 2, era: 2.53, whip: 0.94, atBats: 40, avg: 0.200 },
+      2026 => { inningsPitched: 5.1, earnedRuns: 2, hits: 4, walks: 1, era: 3.38, whip: 0.94, atBats: 40, avg: 0.100 }
     }
 
     season_values.each do |season, values|
@@ -117,6 +130,7 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(stats.fetch("inningsPitched").fetch(:value)).to eq("16.0")
     expect(stats.fetch("ERA").fetch(:value)).to eq("2.81")
     expect(stats.fetch("whip").fetch(:value)).to eq("0.94")
+    expect(stats.fetch("avg").fetch(:value)).to eq("0.150")
     expect(seasons.fetch(2025).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "10.2"))
     expect(seasons.fetch(2026).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "5.1"))
   end

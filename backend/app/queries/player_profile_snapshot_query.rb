@@ -123,14 +123,12 @@ class PlayerProfileSnapshotQuery
       return innings.nil? ? nil : format_innings(innings_to_outs(innings))
     end
     return season_batting_average(rows) if category == "batting" && key == "avg"
+    return season_batting_obp(rows) if category == "batting" && key == "obp"
     return season_batting_slugging(rows) if category == "batting" && key == "slg"
     return season_batting_ops(rows) if category == "batting" && key == "ops"
-    return season_weighted_rate(rows, aliases, %w[atBats AB]) if category == "batting" && key == "obp"
     return season_pitching_era(rows) if category == "pitching" && key == "ERA"
     return season_pitching_whip(rows) if category == "pitching" && key == "whip"
-    if category == "pitching" && key == "avg"
-      return season_weighted_rate(rows, aliases, %w[inningsPitched IP], innings_weight: true)
-    end
+    return season_pitching_average(rows) if category == "pitching" && key == "avg"
 
     season_additive_value(rows, aliases)
   end
@@ -153,8 +151,20 @@ class PlayerProfileSnapshotQuery
     divide(hits + doubles + (triples * 2) + (home_runs * 3), at_bats)
   end
 
+  def season_batting_obp(rows)
+    hits = season_additive_value(rows, %w[hits H])
+    walks = season_additive_value(rows, %w[baseOnBalls BB])
+    hit_by_pitch = season_additive_value(rows, %w[hitByPitch HBP])
+    sacrifice_flies = season_additive_value(rows, %w[sacFlies SF])
+    at_bats = season_additive_value(rows, %w[atBats AB])
+    components = [ hits, walks, hit_by_pitch, sacrifice_flies, at_bats ]
+    return season_weighted_rate(rows, %w[obp OBP], %w[atBats AB]) if components.any?(&:nil?)
+
+    divide(hits + walks + hit_by_pitch, at_bats + walks + hit_by_pitch + sacrifice_flies)
+  end
+
   def season_batting_ops(rows)
-    obp = season_weighted_rate(rows, %w[obp OBP], %w[atBats AB])
+    obp = season_batting_obp(rows)
     slg = season_batting_slugging(rows)
     return season_weighted_rate(rows, %w[ops OPS], %w[atBats AB]) if obp.nil? || slg.nil?
 
@@ -180,6 +190,14 @@ class PlayerProfileSnapshotQuery
     end
 
     divide(hits + walks, innings)
+  end
+
+  def season_pitching_average(rows)
+    hits = season_additive_value(rows, %w[hits H])
+    at_bats = season_additive_value(rows, %w[atBats AB])
+    return season_weighted_rate(rows, %w[avg AVG], %w[inningsPitched IP], innings_weight: true) if hits.nil? || at_bats.nil?
+
+    divide(hits, at_bats)
   end
 
   def season_weighted_rate(rows, rate_aliases, weight_aliases, innings_weight: false)
@@ -234,12 +252,12 @@ class PlayerProfileSnapshotQuery
 
     return format_innings(career_innings_outs) if category == "pitching" && key == "inningsPitched"
     return batting_average if category == "batting" && key == "avg"
+    return batting_obp if category == "batting" && key == "obp"
     return batting_slugging if category == "batting" && key == "slg"
     return batting_ops if category == "batting" && key == "ops"
-    return weighted_career_rate(category, aliases, %w[atBats AB]) if category == "batting" && key == "obp"
     return pitching_era if category == "pitching" && key == "ERA"
     return pitching_whip if category == "pitching" && key == "whip"
-    return weighted_career_rate(category, aliases, %w[inningsPitched IP], innings_weight: true) if category == "pitching" && key == "avg"
+    return pitching_average if category == "pitching" && key == "avg"
 
     additive_career_value(category, aliases)
   end
@@ -263,8 +281,20 @@ class PlayerProfileSnapshotQuery
     divide(total_bases, at_bats)
   end
 
+  def batting_obp
+    hits = additive_career_value("batting", %w[hits H])
+    walks = additive_career_value("batting", %w[baseOnBalls BB])
+    hit_by_pitch = additive_career_value("batting", %w[hitByPitch HBP])
+    sacrifice_flies = additive_career_value("batting", %w[sacFlies SF])
+    at_bats = additive_career_value("batting", %w[atBats AB])
+    components = [ hits, walks, hit_by_pitch, sacrifice_flies, at_bats ]
+    return weighted_career_rate("batting", %w[obp OBP], %w[atBats AB]) if components.any?(&:nil?)
+
+    divide(hits + walks + hit_by_pitch, at_bats + walks + hit_by_pitch + sacrifice_flies)
+  end
+
   def batting_ops
-    obp = weighted_career_rate("batting", %w[obp OBP], %w[atBats AB])
+    obp = batting_obp
     slg = batting_slugging
     return weighted_career_rate("batting", %w[ops OPS], %w[atBats AB]) if obp.nil? || slg.nil?
 
@@ -288,6 +318,14 @@ class PlayerProfileSnapshotQuery
     end
 
     divide(hits + walks, innings)
+  end
+
+  def pitching_average
+    hits = additive_career_value("pitching", %w[hits H])
+    at_bats = additive_career_value("pitching", %w[atBats AB])
+    return weighted_career_rate("pitching", %w[avg AVG], %w[inningsPitched IP], innings_weight: true) if hits.nil? || at_bats.nil?
+
+    divide(hits, at_bats)
   end
 
   def additive_career_value(category, aliases)
