@@ -246,6 +246,37 @@ const payload = {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('GameSummaryView', () => {
+  it('organizes game details into accessible overview, box score, and pitching tabs', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+    const wrapper = mount(GameSummaryView, {
+      props: { gameId: '80' },
+      global: { components: { RouterLink } },
+    })
+    await flushPromises()
+
+    const overviewTab = wrapper.get('[data-test="game-tab-overview"]')
+    const boxScoreTab = wrapper.get('[data-test="game-tab-box-score"]')
+    const pitchingTab = wrapper.get('[data-test="game-tab-pitching"]')
+    expect(overviewTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="game-panel-box-score"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="game-panel-pitching"]').exists()).toBe(false)
+
+    await boxScoreTab.trigger('click')
+    expect(boxScoreTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-box-score"]').exists()).toBe(true)
+    expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="game-scoreboard"]').isVisible()).toBe(true)
+
+    await pitchingTab.trigger('click')
+    expect(pitchingTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-pitching"]').exists()).toBe(true)
+
+    await pitchingTab.trigger('keydown', { key: 'Home' })
+    expect(overviewTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
+  })
+
   it('renders the final score, inning line, and team batting and pitching box scores', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(GameSummaryView, {
@@ -290,6 +321,7 @@ describe('GameSummaryView', () => {
     expect(scoringTimeline.text()).toContain('DET 3')
     const scoringLinks = scoringTimeline.findAllComponents(RouterLink)
     expect(scoringLinks.map((link) => link.props('to').params.id)).toEqual([20, 24, 21])
+    await wrapper.get('[data-test="game-tab-pitching"]').trigger('click')
     const pitchingAnalysis = wrapper.get('[data-test="pitching-analysis"]')
     expect(pitchingAnalysis.text()).toContain('Pitching analysis')
     expect(pitchingAnalysis.text()).toContain('Tanner Bibee')
@@ -306,6 +338,7 @@ describe('GameSummaryView', () => {
     expect(pitchingAnalysis.text()).toContain('Slider')
     const pitcherLinks = pitchingAnalysis.findAllComponents(RouterLink)
     expect(pitcherLinks.map((link) => link.props('to').params.id)).toEqual([22, 23])
+    await wrapper.get('[data-test="game-tab-box-score"]').trigger('click')
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).toContain('Steven Kwan')
     expect(boxScore).toContain('Riley Greene')
@@ -345,6 +378,7 @@ describe('GameSummaryView', () => {
     })
     await flushPromises()
 
+    await wrapper.get('[data-test="game-tab-box-score"]').trigger('click')
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).not.toContain('0.000')
     expect(boxScore).toContain('—')

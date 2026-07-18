@@ -1,10 +1,18 @@
 <script setup>
-import { computed, toRef } from 'vue'
+import { computed, nextTick, ref, toRef, watch } from 'vue'
 
 import { useGameSummary } from '../composables/useGameSummary'
 
 const props = defineProps({ gameId: { type: [String, Number], required: true } })
 const { game, loading, error, refresh } = useGameSummary(toRef(props, 'gameId'))
+const gameTabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'box-score', label: 'Box Score' },
+  { id: 'pitching', label: 'Pitching Analysis' },
+]
+const activeTab = ref('overview')
+
+watch(() => props.gameId, () => { activeTab.value = 'overview' })
 
 const innings = computed(() => game.value?.details.lineScore.innings || [])
 const awayBatting = computed(() => game.value?.details.battingLines.filter((line) => !line.home) || [])
@@ -117,6 +125,26 @@ function ordinal(value) {
   if (mod100 >= 11 && mod100 <= 13) return `${number}th`
   return `${number}${({ 1: 'st', 2: 'nd', 3: 'rd' })[number % 10] || 'th'}`
 }
+
+function tabAvailable(tabId) {
+  return tabId !== 'pitching' || Boolean(game.value?.details.pitchingAnalysis.length)
+}
+
+async function handleTabKey(event, index) {
+  const availableTabs = gameTabs.filter((tab) => tabAvailable(tab.id))
+  const currentIndex = availableTabs.findIndex((tab) => tab.id === gameTabs[index].id)
+  let targetIndex
+  if (event.key === 'ArrowRight') targetIndex = (currentIndex + 1) % availableTabs.length
+  else if (event.key === 'ArrowLeft') targetIndex = (currentIndex - 1 + availableTabs.length) % availableTabs.length
+  else if (event.key === 'Home') targetIndex = 0
+  else if (event.key === 'End') targetIndex = availableTabs.length - 1
+  else return
+
+  event.preventDefault()
+  activeTab.value = availableTabs[targetIndex].id
+  await nextTick()
+  document.getElementById(`game-tab-${activeTab.value}`)?.focus()
+}
 </script>
 
 <template>
@@ -142,6 +170,35 @@ function ordinal(value) {
           </RouterLink>
         </div>
       </section>
+
+      <nav class="game-tabs" aria-label="Game summary sections">
+        <div role="tablist" aria-label="Game summary views">
+          <button
+            v-for="(tab, index) in gameTabs"
+            :id="`game-tab-${tab.id}`"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.id"
+            :aria-controls="`game-panel-${tab.id}`"
+            :tabindex="activeTab === tab.id ? 0 : -1"
+            :disabled="!tabAvailable(tab.id)"
+            :data-test="`game-tab-${tab.id}`"
+            @click="activeTab = tab.id"
+            @keydown="handleTabKey($event, index)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+      </nav>
+
+      <div
+        id="game-panel-overview"
+        v-if="activeTab === 'overview'"
+        role="tabpanel"
+        aria-labelledby="game-tab-overview"
+        data-test="game-panel-overview"
+      >
 
       <section class="game-insights" data-test="game-insights" aria-label="Game insights summary">
         <article class="game-insight game-insight--decisions">
@@ -288,7 +345,15 @@ function ordinal(value) {
         </div>
         <p v-if="!innings.length" class="game-panel__note">Inning-by-inning data has not been synchronized; available game totals are shown.</p>
       </section>
+      </div>
 
+      <div
+        id="game-panel-pitching"
+        v-if="activeTab === 'pitching'"
+        role="tabpanel"
+        aria-labelledby="game-tab-pitching"
+        data-test="game-panel-pitching"
+      >
       <section v-if="game.details.pitchingAnalysis.length" class="game-panel pitching-analysis" data-test="pitching-analysis">
         <header class="game-panel__heading">
           <div><p>Pitch-level performance</p><h2>Pitching analysis</h2></div>
@@ -336,7 +401,15 @@ function ordinal(value) {
           </div>
         </div>
       </section>
+      </div>
 
+      <div
+        id="game-panel-box-score"
+        v-if="activeTab === 'box-score'"
+        role="tabpanel"
+        aria-labelledby="game-tab-box-score"
+        data-test="game-panel-box-score"
+      >
       <section class="game-panel" data-test="box-score">
         <header class="game-panel__heading"><div><p>Player results</p><h2>Box score</h2></div><span>Synced {{ formatTimestamp(game.details.lastSyncedAt) }}</span></header>
         <template v-if="game.details.synchronized && (game.details.battingLines.length || game.details.pitchingLines.length)">
@@ -375,6 +448,7 @@ function ordinal(value) {
           <p>Run the game-details synchronization from Admin to retrieve player batting and pitching lines.</p>
         </div>
       </section>
+      </div>
     </template>
   </main>
 </template>
@@ -397,6 +471,13 @@ function ordinal(value) {
 .scoreboard__team small { color: #c6d2d9; font-weight: 800; }
 .scoreboard__score { display: flex; gap: clamp(.5rem,2vw,1.2rem); align-items: center; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.8rem,7vw,6rem); line-height: 1; }
 .scoreboard__score span { color: #7890a1; font-size: .5em; }
+.game-tabs { position: sticky; z-index: 8; top: .5rem; margin-top: 1rem; padding: .35rem; border: 1px solid rgba(16,38,61,.1); border-radius: 15px; background: rgba(247,246,241,.94); box-shadow: 0 8px 24px rgba(16,38,61,.08); backdrop-filter: blur(10px); }
+.game-tabs [role='tablist'] { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .35rem; }
+.game-tabs button { min-height: 42px; padding: .65rem .85rem; border: 0; border-radius: 11px; color: #65747e; background: transparent; font-size: .72rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.game-tabs button[aria-selected='true'] { color: #fffaf0; background: #173652; box-shadow: 0 5px 14px rgba(16,38,61,.18); }
+.game-tabs button:focus-visible { outline: 3px solid rgba(169,54,39,.32); outline-offset: 2px; }
+.game-tabs button:disabled { opacity: .42; cursor: not-allowed; }
+[role='tabpanel'] { scroll-margin-top: 5rem; }
 .game-insights { display: grid; grid-template-columns: minmax(230px,1.5fr) repeat(6,minmax(145px,1fr)); gap: .65rem; margin-top: .8rem; overflow-x: auto; padding-bottom: .2rem; }
 .game-insight { min-width: 145px; padding: .8rem .85rem; border: 1px solid rgba(16,38,61,.1); border-radius: 15px; background: rgba(255,252,245,.88); box-shadow: 0 8px 22px rgba(73,52,24,.05); }
 .game-insight > span { display: block; margin-bottom: .45rem; color: #78838b; font-size: .58rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
@@ -477,6 +558,8 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .scoreboard__matchup { grid-template-columns: 1fr auto 1fr; gap: .6rem; padding: 1.3rem .9rem; }
   .scoreboard__team strong { font-size: 1.35rem; }
   .scoreboard__score { font-size: 2.4rem; }
+  .game-tabs { top: .25rem; }
+  .game-tabs button { padding-inline: .35rem; font-size: .62rem; letter-spacing: .03em; }
   .performer-grid { grid-template-columns: 1fr; }
   .performer-card--wide { grid-column: auto; }
   .scoring-timeline__list li { grid-template-columns: 18px minmax(0,1fr); }
