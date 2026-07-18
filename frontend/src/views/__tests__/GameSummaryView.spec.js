@@ -202,6 +202,82 @@ const payload = {
           },
         },
       ],
+      batted_ball_analysis: [
+        {
+          team: { id: 2, abbreviation: 'CLE', name: 'Cleveland Guardians' },
+          home: false,
+          batted_balls: 21,
+          average_exit_velocity: 87.8,
+          maximum_exit_velocity: 103.2,
+          hard_hit_count: 7,
+          hard_hit_percentage: 33.3,
+          average_launch_angle: 9.4,
+          estimated_woba: 0.286,
+          barrel_count: 1,
+          barrel_percentage: 4.8,
+          distribution: {
+            ground_ball: { count: 10, percentage: 47.6 },
+            line_drive: { count: 5, percentage: 23.8 },
+            fly_ball: { count: 6, percentage: 28.6 },
+          },
+          leaders: [
+            {
+              player: { id: 20, full_name: 'Steven Kwan' },
+              batted_balls: 4,
+              average_exit_velocity: 91.3,
+              maximum_exit_velocity: 103.2,
+              hard_hit_count: 2,
+              hard_hit_percentage: 50.0,
+              average_launch_angle: 12.5,
+              estimated_woba: 0.412,
+              barrel_count: 1,
+              barrel_percentage: 25.0,
+              distribution: {
+                ground_ball: { count: 1, percentage: 25.0 },
+                line_drive: { count: 2, percentage: 50.0 },
+                fly_ball: { count: 1, percentage: 25.0 },
+              },
+            },
+          ],
+        },
+        {
+          team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+          home: true,
+          batted_balls: 24,
+          average_exit_velocity: 92.1,
+          maximum_exit_velocity: 108.7,
+          hard_hit_count: 12,
+          hard_hit_percentage: 50.0,
+          average_launch_angle: 15.8,
+          estimated_woba: 0.387,
+          barrel_count: 3,
+          barrel_percentage: 12.5,
+          distribution: {
+            ground_ball: { count: 8, percentage: 33.3 },
+            line_drive: { count: 7, percentage: 29.2 },
+            fly_ball: { count: 9, percentage: 37.5 },
+          },
+          leaders: [
+            {
+              player: { id: 21, full_name: 'Riley Greene' },
+              batted_balls: 4,
+              average_exit_velocity: 99.2,
+              maximum_exit_velocity: 108.7,
+              hard_hit_count: 3,
+              hard_hit_percentage: 75.0,
+              average_launch_angle: 21.4,
+              estimated_woba: 0.621,
+              barrel_count: 2,
+              barrel_percentage: 50.0,
+              distribution: {
+                ground_ball: { count: 1, percentage: 25.0 },
+                line_drive: { count: 1, percentage: 25.0 },
+                fly_ball: { count: 2, percentage: 50.0 },
+              },
+            },
+          ],
+        },
+      ],
       line_score: {
         current_inning: 9,
         current_inning_ordinal: '9th',
@@ -246,7 +322,7 @@ const payload = {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('GameSummaryView', () => {
-  it('organizes game details into accessible overview, box score, and pitching tabs', async () => {
+  it('organizes game details into accessible overview, box score, pitching, and batted-ball tabs', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(GameSummaryView, {
       props: { gameId: '80' },
@@ -257,10 +333,12 @@ describe('GameSummaryView', () => {
     const overviewTab = wrapper.get('[data-test="game-tab-overview"]')
     const boxScoreTab = wrapper.get('[data-test="game-tab-box-score"]')
     const pitchingTab = wrapper.get('[data-test="game-tab-pitching"]')
+    const battedBallTab = wrapper.get('[data-test="game-tab-batted-ball"]')
     expect(overviewTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="game-panel-box-score"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="game-panel-pitching"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="game-panel-batted-ball"]').exists()).toBe(false)
 
     await boxScoreTab.trigger('click')
     expect(boxScoreTab.attributes('aria-selected')).toBe('true')
@@ -272,7 +350,11 @@ describe('GameSummaryView', () => {
     expect(pitchingTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-pitching"]').exists()).toBe(true)
 
-    await pitchingTab.trigger('keydown', { key: 'Home' })
+    await battedBallTab.trigger('click')
+    expect(battedBallTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-batted-ball"]').exists()).toBe(true)
+
+    await battedBallTab.trigger('keydown', { key: 'Home' })
     expect(overviewTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
   })
@@ -338,6 +420,21 @@ describe('GameSummaryView', () => {
     expect(pitchingAnalysis.text()).toContain('Slider')
     const pitcherLinks = pitchingAnalysis.findAllComponents(RouterLink)
     expect(pitcherLinks.map((link) => link.props('to').params.id)).toEqual([22, 23])
+    await wrapper.get('[data-test="game-tab-batted-ball"]').trigger('click')
+    const battedBallAnalysis = wrapper.get('[data-test="batted-ball-analysis"]')
+    expect(battedBallAnalysis.text()).toContain('Batted-ball analysis')
+    expect(battedBallAnalysis.text()).toContain('Cleveland Guardians')
+    expect(battedBallAnalysis.text()).toContain('Detroit Tigers')
+    expect(battedBallAnalysis.text()).toContain('87.8 mph')
+    expect(battedBallAnalysis.text()).toContain('108.7 mph')
+    expect(battedBallAnalysis.text()).toContain('50.0%')
+    expect(battedBallAnalysis.text()).toContain('15.8°')
+    expect(battedBallAnalysis.text()).toContain('.387')
+    expect(battedBallAnalysis.text()).toContain('Ground balls')
+    expect(battedBallAnalysis.text()).toContain('Line drives')
+    expect(battedBallAnalysis.text()).toContain('Fly balls')
+    const battedBallLinks = battedBallAnalysis.findAllComponents(RouterLink)
+    expect(battedBallLinks.map((link) => link.props('to').params.id)).toEqual([20, 21])
     await wrapper.get('[data-test="game-tab-box-score"]').trigger('click')
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).toContain('Steven Kwan')

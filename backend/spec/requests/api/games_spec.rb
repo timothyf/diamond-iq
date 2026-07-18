@@ -498,6 +498,9 @@ RSpec.describe "Api::Games", type: :request do
     expect(pitching_analysis.map { |entry| entry.dig("player", "full_name") }).to contain_exactly(
       "Tanner Bibee", "Tarik Skubal", "Will Vest"
     )
+    batted_ball_analysis = json_body.dig("data", "details", "batted_ball_analysis")
+    expect(batted_ball_analysis.map { |entry| entry.dig("team", "abbreviation") }).to eq([ "CLE", "DET" ])
+    expect(batted_ball_analysis).to all(include("batted_balls" => 0, "leaders" => []))
     expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
       "event_type" => "single",
       "plate_appearance_number" => 1

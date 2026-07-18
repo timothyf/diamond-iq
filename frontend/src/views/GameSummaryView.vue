@@ -9,6 +9,7 @@ const gameTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'box-score', label: 'Box Score' },
   { id: 'pitching', label: 'Pitching Analysis' },
+  { id: 'batted-ball', label: 'Batted Ball' },
 ]
 const activeTab = ref('overview')
 
@@ -113,6 +114,19 @@ function velocity(value) {
   return value === null || value === undefined ? '—' : `${Number(value).toFixed(1)} mph`
 }
 
+function angle(value) {
+  return value === null || value === undefined ? '—' : `${Number(value).toFixed(1)}°`
+}
+
+function distribution(value) {
+  if (!value || value.percentage === null || value.percentage === undefined) return '—'
+  return `${value.count} (${Number(value.percentage).toFixed(1)}%)`
+}
+
+function teamRuns(entry) {
+  return entry.home ? game.value?.homeScore : game.value?.awayScore
+}
+
 function timesThroughOrder(value) {
   const turns = value?.plateAppearances || []
   if (!turns.length) return '—'
@@ -127,7 +141,9 @@ function ordinal(value) {
 }
 
 function tabAvailable(tabId) {
-  return tabId !== 'pitching' || Boolean(game.value?.details.pitchingAnalysis.length)
+  if (tabId === 'pitching') return Boolean(game.value?.details.pitchingAnalysis.length)
+  if (tabId === 'batted-ball') return Boolean(game.value?.details.battedBallAnalysis.some((entry) => entry.battedBalls > 0))
+  return true
 }
 
 async function handleTabKey(event, index) {
@@ -404,6 +420,73 @@ async function handleTabKey(event, index) {
       </div>
 
       <div
+        id="game-panel-batted-ball"
+        v-if="activeTab === 'batted-ball'"
+        role="tabpanel"
+        aria-labelledby="game-tab-batted-ball"
+        data-test="game-panel-batted-ball"
+      >
+        <section class="game-panel batted-ball-analysis" data-test="batted-ball-analysis">
+          <header class="game-panel__heading">
+            <div><p>Quality of contact</p><h2>Batted-ball analysis</h2></div>
+            <span>Top three hitters by tracked balls in play</span>
+          </header>
+          <p class="batted-ball-analysis__note">
+            Contact metrics help compare the game’s final score with the underlying quality of contact. Popups are included with fly balls.
+          </p>
+
+          <article
+            v-for="entry in game.details.battedBallAnalysis"
+            :key="entry.team.id"
+            class="batted-ball-team"
+          >
+            <header>
+              <div><span>{{ entry.home ? 'Home' : 'Away' }}</span><h3>{{ entry.team.name }}</h3></div>
+              <strong>{{ display(teamRuns(entry)) }} runs · {{ entry.battedBalls }} tracked BBE</strong>
+            </header>
+            <dl class="contact-metrics">
+              <div><dt>Average exit velocity</dt><dd>{{ velocity(entry.averageExitVelocity) }}</dd></div>
+              <div><dt>Maximum exit velocity</dt><dd>{{ velocity(entry.maximumExitVelocity) }}</dd></div>
+              <div><dt>Hard-hit rate</dt><dd>{{ percent(entry.hardHitPercentage) }}<small>{{ entry.hardHitCount }}/{{ entry.battedBalls }}</small></dd></div>
+              <div><dt>Launch angle</dt><dd>{{ angle(entry.averageLaunchAngle) }}</dd></div>
+              <div><dt>Expected wOBA</dt><dd>{{ rate(entry.estimatedWoba, 3, true) }}</dd></div>
+              <div><dt>Barrels</dt><dd>{{ entry.barrelCount }}<small>{{ percent(entry.barrelPercentage) }}</small></dd></div>
+            </dl>
+            <div class="contact-distribution" aria-label="Batted-ball distribution">
+              <div><span>Ground balls</span><strong>{{ distribution(entry.distribution.groundBall) }}</strong><i :style="{ width: `${entry.distribution.groundBall.percentage || 0}%` }"></i></div>
+              <div><span>Line drives</span><strong>{{ distribution(entry.distribution.lineDrive) }}</strong><i :style="{ width: `${entry.distribution.lineDrive.percentage || 0}%` }"></i></div>
+              <div><span>Fly balls</span><strong>{{ distribution(entry.distribution.flyBall) }}</strong><i :style="{ width: `${entry.distribution.flyBall.percentage || 0}%` }"></i></div>
+            </div>
+
+            <div class="batted-ball-leaders">
+              <h4>Leading hitters</h4>
+              <div class="box-table-wrap">
+                <table>
+                  <thead><tr><th>Hitter</th><th>BBE</th><th>Avg EV</th><th>Max EV</th><th>Hard-hit</th><th>Launch angle</th><th>xwOBA</th><th>Barrels</th><th>GB</th><th>LD</th><th>FB</th></tr></thead>
+                  <tbody>
+                    <tr v-for="leader in entry.leaders" :key="leader.player.id">
+                      <th><RouterLink :to="{ name: 'player-profile', params: { id: leader.player.id } }">{{ leader.player.full_name }}</RouterLink></th>
+                      <td>{{ leader.battedBalls }}</td>
+                      <td>{{ velocity(leader.averageExitVelocity) }}</td>
+                      <td>{{ velocity(leader.maximumExitVelocity) }}</td>
+                      <td>{{ percent(leader.hardHitPercentage) }}</td>
+                      <td>{{ angle(leader.averageLaunchAngle) }}</td>
+                      <td>{{ rate(leader.estimatedWoba, 3, true) }}</td>
+                      <td>{{ leader.barrelCount }}</td>
+                      <td>{{ distribution(leader.distribution.groundBall) }}</td>
+                      <td>{{ distribution(leader.distribution.lineDrive) }}</td>
+                      <td>{{ distribution(leader.distribution.flyBall) }}</td>
+                    </tr>
+                    <tr v-if="!entry.leaders.length"><td colspan="11">No hitter-level contact data is available.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <div
         id="game-panel-box-score"
         v-if="activeTab === 'box-score'"
         role="tabpanel"
@@ -472,7 +555,7 @@ async function handleTabKey(event, index) {
 .scoreboard__score { display: flex; gap: clamp(.5rem,2vw,1.2rem); align-items: center; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.8rem,7vw,6rem); line-height: 1; }
 .scoreboard__score span { color: #7890a1; font-size: .5em; }
 .game-tabs { position: sticky; z-index: 8; top: .5rem; margin-top: 1rem; padding: .35rem; border: 1px solid rgba(16,38,61,.1); border-radius: 15px; background: rgba(247,246,241,.94); box-shadow: 0 8px 24px rgba(16,38,61,.08); backdrop-filter: blur(10px); }
-.game-tabs [role='tablist'] { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .35rem; }
+.game-tabs [role='tablist'] { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .35rem; }
 .game-tabs button { min-height: 42px; padding: .65rem .85rem; border: 0; border-radius: 11px; color: #65747e; background: transparent; font-size: .72rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .game-tabs button[aria-selected='true'] { color: #fffaf0; background: #173652; box-shadow: 0 5px 14px rgba(16,38,61,.18); }
 .game-tabs button:focus-visible { outline: 3px solid rgba(169,54,39,.32); outline-offset: 2px; }
@@ -532,6 +615,27 @@ async function handleTabKey(event, index) {
 .pitch-usage table { min-width: 560px; }
 .pitch-usage tbody th small { display: block; margin-top: .1rem; color: #7b858c; font-size: .58rem; }
 .pitch-usage > p { color: #7b858c; font-size: .7rem; }
+.batted-ball-analysis__note { margin: -.25rem 0 1rem; color: #6f7a82; font-size: .72rem; line-height: 1.5; }
+.batted-ball-team { padding: 1rem; border: 1px solid rgba(16,38,61,.09); border-radius: 18px; background: rgba(255,255,255,.55); }
+.batted-ball-team + .batted-ball-team { margin-top: 1rem; }
+.batted-ball-team > header { display: flex; justify-content: space-between; gap: 1rem; align-items: end; margin-bottom: .8rem; }
+.batted-ball-team > header span { color: #a93627; font-size: .58rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.batted-ball-team > header h3 { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.8rem; line-height: 1; text-transform: uppercase; }
+.batted-ball-team > header strong { color: #65747e; font-size: .68rem; }
+.contact-metrics { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: .55rem; margin: 0; }
+.contact-metrics > div { min-width: 0; padding: .7rem; border-radius: 11px; background: rgba(16,38,61,.045); }
+.contact-metrics dt { color: #7b858c; font-size: .56rem; font-weight: 900; letter-spacing: .055em; text-transform: uppercase; }
+.contact-metrics dd { margin: .25rem 0 0; color: #173652; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .75rem; font-weight: 900; }
+.contact-metrics dd small { display: block; margin-top: .12rem; color: #84919a; font-size: .57rem; }
+.contact-distribution { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .55rem; margin-top: .65rem; }
+.contact-distribution > div { position: relative; overflow: hidden; display: flex; justify-content: space-between; gap: .5rem; padding: .65rem .7rem; border-radius: 10px; background: rgba(16,38,61,.045); }
+.contact-distribution span,.contact-distribution strong { position: relative; z-index: 1; font-size: .63rem; }
+.contact-distribution span { color: #687781; font-weight: 800; }
+.contact-distribution strong { color: #173652; font-family: 'SFMono-Regular',Menlo,monospace; }
+.contact-distribution i { position: absolute; inset: auto auto 0 0; height: 3px; background: #a93627; }
+.batted-ball-leaders { margin-top: .9rem; }
+.batted-ball-leaders h4 { margin-bottom: .4rem; color: #a93627; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
+.batted-ball-leaders table { min-width: 1040px; }
 .box-table-wrap { overflow-x: auto; border: 1px solid rgba(16,38,61,.09); border-radius: 14px; }
 table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.6); }
 th,td { padding: .65rem .72rem; border-bottom: 1px solid rgba(16,38,61,.075); text-align: right; white-space: nowrap; }
@@ -559,6 +663,7 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .scoreboard__team strong { font-size: 1.35rem; }
   .scoreboard__score { font-size: 2.4rem; }
   .game-tabs { top: .25rem; }
+  .game-tabs [role='tablist'] { grid-template-columns: repeat(4,minmax(120px,1fr)); overflow-x: auto; }
   .game-tabs button { padding-inline: .35rem; font-size: .62rem; letter-spacing: .03em; }
   .performer-grid { grid-template-columns: 1fr; }
   .performer-card--wide { grid-column: auto; }
@@ -566,5 +671,8 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .scoring-timeline__score { grid-column: 2; justify-self: start; margin-bottom: .65rem; }
   .pitcher-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .pitcher-metrics__wide { grid-column: span 2; }
+  .batted-ball-team > header { align-items: flex-start; flex-direction: column; }
+  .contact-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .contact-distribution { grid-template-columns: 1fr; }
 }
 </style>
