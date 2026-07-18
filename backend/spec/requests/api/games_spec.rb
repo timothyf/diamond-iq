@@ -161,6 +161,7 @@ RSpec.describe "Api::Games", type: :request do
       appearance_order: 1,
       innings_pitched: "7.0",
       outs_recorded: 21,
+      batters_faced: 25,
       hits: 4,
       runs: 1,
       earned_runs: 1,
@@ -181,6 +182,7 @@ RSpec.describe "Api::Games", type: :request do
       appearance_order: 1,
       innings_pitched: "6.0",
       outs_recorded: 18,
+      batters_faced: 24,
       hits: 5,
       runs: 3,
       earned_runs: 3,
@@ -206,6 +208,7 @@ RSpec.describe "Api::Games", type: :request do
       appearance_order: 2,
       innings_pitched: "1.0",
       outs_recorded: 3,
+      batters_faced: 3,
       hits: 0,
       runs: 0,
       earned_runs: 0,
@@ -215,7 +218,7 @@ RSpec.describe "Api::Games", type: :request do
       source_name: "MLB Stats API",
       last_synced_at: Time.current
     )
-    PlateAppearance.create!(
+    away_scoring_appearance = PlateAppearance.create!(
       game: @game,
       batter: @bibee,
       pitcher: @skubal,
@@ -235,7 +238,7 @@ RSpec.describe "Api::Games", type: :request do
       source_name: "MLB Stats API",
       last_synced_at: Time.current
     )
-    PlateAppearance.create!(
+    home_first_scoring_appearance = PlateAppearance.create!(
       game: @game,
       batter: reliever,
       pitcher: @bibee,
@@ -280,12 +283,67 @@ RSpec.describe "Api::Games", type: :request do
       game: @game,
       plate_appearance: appearance,
       game_pk: @game.mlb_id,
-      at_bat_number: 1,
+      at_bat_number: appearance.plate_appearance_number,
       pitch_number: 1,
+      pitcher: @bibee.mlb_id,
+      batter: @skubal.mlb_id,
       pitch_type: "FF",
+      pitch_name: "4-Seam Fastball",
+      description: "called_strike",
       release_speed: 96.4,
+      zone: 5,
+      n_thruorder_pitcher: 2,
       raw_data: { "pitch_type" => "FF" }
     )
+    [
+      { pitch_number: 2, pitch_type: "FF", pitch_name: "4-Seam Fastball", description: "swinging_strike", release_speed: 97.0, zone: 11 },
+      { pitch_number: 3, pitch_type: "SL", pitch_name: "Slider", description: "foul", release_speed: 86.0, zone: 12 },
+      { pitch_number: 4, pitch_type: "SL", pitch_name: "Slider", description: "ball", release_speed: 85.0, zone: 12 }
+    ].each do |attributes|
+      PitchDatum.create!(
+        game: @game,
+        plate_appearance: appearance,
+        game_pk: @game.mlb_id,
+        at_bat_number: appearance.plate_appearance_number,
+        pitcher: @bibee.mlb_id,
+        batter: @skubal.mlb_id,
+        n_thruorder_pitcher: 2,
+        raw_data: attributes,
+        **attributes
+      )
+    end
+    PitchDatum.create!(
+      game: @game,
+      plate_appearance: home_first_scoring_appearance,
+      game_pk: @game.mlb_id,
+      at_bat_number: home_first_scoring_appearance.plate_appearance_number,
+      pitch_number: 1,
+      pitcher: @bibee.mlb_id,
+      batter: reliever.mlb_id,
+      pitch_type: "CH",
+      pitch_name: "Changeup",
+      description: "called_strike",
+      release_speed: 88.0,
+      zone: 4,
+      n_thruorder_pitcher: 1,
+      raw_data: { "pitch_type" => "CH" }
+    )
+    [
+      { pitch_number: 1, description: "called_strike", pitch_type: "FF", pitch_name: "4-Seam Fastball", release_speed: 95.0, zone: 5 },
+      { pitch_number: 2, description: "ball", pitch_type: "CH", pitch_name: "Changeup", release_speed: 86.0, zone: 13 }
+    ].each do |attributes|
+      PitchDatum.create!(
+        game: @game,
+        plate_appearance: away_scoring_appearance,
+        game_pk: @game.mlb_id,
+        at_bat_number: away_scoring_appearance.plate_appearance_number,
+        pitcher: @skubal.mlb_id,
+        batter: @bibee.mlb_id,
+        n_thruorder_pitcher: 1,
+        raw_data: attributes,
+        **attributes
+      )
+    end
 
     get api_game_path(@game)
 
@@ -400,14 +458,54 @@ RSpec.describe "Api::Games", type: :request do
         )
       ]
     )
+    pitching_analysis = json_body.dig("data", "details", "pitching_analysis")
+    bibee_analysis = pitching_analysis.find { |entry| entry.dig("player", "full_name") == "Tanner Bibee" }
+    expect(bibee_analysis).to include(
+      "pitch_count" => 5,
+      "analyzed_pitch_count" => 5,
+      "strike_count" => 4,
+      "strike_percentage" => 80.0,
+      "first_pitch_strikes" => 2,
+      "first_pitch_opportunities" => 2,
+      "first_pitch_strike_percentage" => 100.0,
+      "swings" => 2,
+      "whiffs" => 1,
+      "whiff_percentage" => 50.0,
+      "called_strikes" => 2,
+      "csw_count" => 3,
+      "csw_percentage" => 60.0,
+      "average_velocity" => 90.5,
+      "maximum_velocity" => 97.0,
+      "chase_opportunities" => 3,
+      "chases" => 2,
+      "chase_percentage" => 66.7,
+      "batters_faced" => 24
+    )
+    expect(bibee_analysis.fetch("pitch_usage")).to match(
+      [
+        hash_including("pitch_type" => "FF", "count" => 2, "percentage" => 40.0, "average_velocity" => 96.7),
+        hash_including("pitch_type" => "SL", "count" => 2, "percentage" => 40.0, "average_velocity" => 85.5),
+        hash_including("pitch_type" => "CH", "count" => 1, "percentage" => 20.0, "average_velocity" => 88.0)
+      ]
+    )
+    expect(bibee_analysis.fetch("times_through_order")).to eq(
+      "maximum" => 2,
+      "plate_appearances" => [
+        { "time" => 1, "batters_faced" => 1 },
+        { "time" => 2, "batters_faced" => 1 }
+      ]
+    )
+    expect(pitching_analysis.map { |entry| entry.dig("player", "full_name") }).to contain_exactly(
+      "Tanner Bibee", "Tarik Skubal", "Will Vest"
+    )
     expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
       "event_type" => "single",
       "plate_appearance_number" => 1
     )
-    appearance_with_pitch = json_body.dig("data", "details", "plate_appearances").find do |plate_appearance|
-      plate_appearance.fetch("pitches").any?
-    end
-    expect(appearance_with_pitch.fetch("pitches").first).to include(
+    serialized_pitch = json_body.dig("data", "details", "plate_appearances")
+      .flat_map { |plate_appearance| plate_appearance.fetch("pitches") }
+      .find { |pitch| pitch["release_speed"] == 96.4 }
+    expect(serialized_pitch).to include(
       "pitch_type" => "FF",
       "release_speed" => 96.4
     )

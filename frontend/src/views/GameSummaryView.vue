@@ -15,6 +15,10 @@ const topHitterEntries = computed(() => [
   { side: 'away', entry: game.value?.details.keyPerformers.topHitters.away },
   { side: 'home', entry: game.value?.details.keyPerformers.topHitters.home },
 ])
+const pitchingAnalysisTeams = computed(() => [
+  { team: game.value?.awayTeam, pitchers: game.value?.details.pitchingAnalysis.filter((entry) => !entry.home) || [] },
+  { team: game.value?.homeTeam, pitchers: game.value?.details.pitchingAnalysis.filter((entry) => entry.home) || [] },
+])
 const hasKeyPerformers = computed(() => {
   const performers = game.value?.details.keyPerformers
   return Boolean(
@@ -91,6 +95,27 @@ function scoringPlayText(play) {
   if (!playerName || !description.toLowerCase().startsWith(playerName.toLowerCase())) return description
 
   return description.slice(playerName.length).replace(/^\s*[-—,:]?\s*/, '')
+}
+
+function percent(value) {
+  return value === null || value === undefined ? '—' : `${Number(value).toFixed(1)}%`
+}
+
+function velocity(value) {
+  return value === null || value === undefined ? '—' : `${Number(value).toFixed(1)} mph`
+}
+
+function timesThroughOrder(value) {
+  const turns = value?.plateAppearances || []
+  if (!turns.length) return '—'
+  return turns.map((turn) => `${ordinal(turn.time)}: ${turn.battersFaced}`).join(' · ')
+}
+
+function ordinal(value) {
+  const number = Number(value)
+  const mod100 = number % 100
+  if (mod100 >= 11 && mod100 <= 13) return `${number}th`
+  return `${number}${({ 1: 'st', 2: 'nd', 3: 'rd' })[number % 10] || 'th'}`
 }
 </script>
 
@@ -264,6 +289,54 @@ function scoringPlayText(play) {
         <p v-if="!innings.length" class="game-panel__note">Inning-by-inning data has not been synchronized; available game totals are shown.</p>
       </section>
 
+      <section v-if="game.details.pitchingAnalysis.length" class="game-panel pitching-analysis" data-test="pitching-analysis">
+        <header class="game-panel__heading">
+          <div><p>Pitch-level performance</p><h2>Pitching analysis</h2></div>
+          <span>{{ game.details.pitchingAnalysis.length }} pitchers used</span>
+        </header>
+        <div v-for="section in pitchingAnalysisTeams" :key="section.team.id" class="pitching-analysis__team">
+          <h3>{{ section.team.name }}</h3>
+          <div class="pitcher-analysis-list">
+            <article v-for="pitcher in section.pitchers" :key="pitcher.player.id" class="pitcher-analysis-card">
+              <header>
+                <div>
+                  <RouterLink :to="{ name: 'player-profile', params: { id: pitcher.player.id } }">{{ pitcher.player.full_name }}</RouterLink>
+                  <span>{{ pitcher.starter ? 'Starter' : 'Reliever' }} · {{ display(pitcher.inningsPitched) }} IP<span v-if="pitcher.decision"> · {{ pitcher.decision }}</span></span>
+                </div>
+                <small v-if="!pitcher.pitchDataAvailable">Pitch-level data unavailable</small>
+              </header>
+              <dl class="pitcher-metrics">
+                <div><dt>Pitches</dt><dd>{{ display(pitcher.pitchCount) }}<small v-if="pitcher.analyzedPitchCount !== pitcher.pitchCount">{{ pitcher.analyzedPitchCount }} linked</small></dd></div>
+                <div><dt>Strike%</dt><dd>{{ percent(pitcher.strikePercentage) }}<small v-if="pitcher.strikeCount !== null">{{ pitcher.strikeCount }}/{{ pitcher.pitchCount }}</small></dd></div>
+                <div><dt>First-pitch strike%</dt><dd>{{ percent(pitcher.firstPitchStrikePercentage) }}<small>{{ pitcher.firstPitchStrikes }}/{{ pitcher.firstPitchOpportunities }}</small></dd></div>
+                <div><dt>Whiff%</dt><dd>{{ percent(pitcher.whiffPercentage) }}<small>{{ pitcher.whiffs }}/{{ pitcher.swings }} swings</small></dd></div>
+                <div><dt>CSW%</dt><dd>{{ percent(pitcher.cswPercentage) }}<small>{{ pitcher.cswCount }}/{{ pitcher.analyzedPitchCount }}</small></dd></div>
+                <div><dt>Average velocity</dt><dd>{{ velocity(pitcher.averageVelocity) }}</dd></div>
+                <div><dt>Maximum velocity</dt><dd>{{ velocity(pitcher.maximumVelocity) }}</dd></div>
+                <div><dt>Chase%</dt><dd>{{ percent(pitcher.chasePercentage) }}<small>{{ pitcher.chases }}/{{ pitcher.chaseOpportunities }}</small></dd></div>
+                <div><dt>Batters faced</dt><dd>{{ display(pitcher.battersFaced) }}</dd></div>
+                <div class="pitcher-metrics__wide"><dt>Times through order</dt><dd>{{ timesThroughOrder(pitcher.timesThroughOrder) }}</dd></div>
+              </dl>
+              <div class="pitch-usage">
+                <h4>Pitch usage</h4>
+                <div v-if="pitcher.pitchUsage.length" class="box-table-wrap">
+                  <table>
+                    <thead><tr><th>Pitch</th><th>Count</th><th>Usage</th><th>Avg velo</th><th>Max velo</th></tr></thead>
+                    <tbody>
+                      <tr v-for="usage in pitcher.pitchUsage" :key="usage.pitchType">
+                        <th><strong>{{ usage.pitchType }}</strong><small>{{ usage.pitchName }}</small></th>
+                        <td>{{ usage.count }}</td><td>{{ percent(usage.percentage) }}</td><td>{{ velocity(usage.averageVelocity) }}</td><td>{{ velocity(usage.maximumVelocity) }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p v-else>No linked pitches are available for usage analysis.</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="game-panel" data-test="box-score">
         <header class="game-panel__heading"><div><p>Player results</p><h2>Box score</h2></div><span>Synced {{ formatTimestamp(game.details.lastSyncedAt) }}</span></header>
         <template v-if="game.details.synchronized && (game.details.battingLines.length || game.details.pitchingLines.length)">
@@ -360,6 +433,24 @@ function scoringPlayText(play) {
 .scoring-timeline__play a { color: #173652; font-weight: 900; text-decoration: none; }
 .scoring-timeline__score { display: flex; gap: .45rem; padding: .45rem .55rem; border-radius: 10px; background: rgba(16,38,61,.055); color: #667680; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .68rem; font-weight: 800; }
 .scoring-timeline__score strong { color: #173652; }
+.pitching-analysis__team + .pitching-analysis__team { margin-top: 1.5rem; padding-top: 1.3rem; border-top: 2px solid rgba(16,38,61,.08); }
+.pitching-analysis__team > h3 { margin-bottom: .7rem; font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.65rem; text-transform: uppercase; }
+.pitcher-analysis-list { display: grid; gap: .8rem; }
+.pitcher-analysis-card { padding: 1rem; border: 1px solid rgba(16,38,61,.09); border-radius: 17px; background: rgba(255,255,255,.56); }
+.pitcher-analysis-card > header { display: flex; justify-content: space-between; gap: 1rem; align-items: start; margin-bottom: .85rem; }
+.pitcher-analysis-card > header a { display: block; color: #173652; font-size: 1rem; font-weight: 900; text-decoration: none; }
+.pitcher-analysis-card > header span,.pitcher-analysis-card > header small { color: #748089; font-size: .68rem; }
+.pitcher-metrics { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: .55rem; margin: 0; }
+.pitcher-metrics > div { min-width: 0; padding: .65rem; border-radius: 11px; background: rgba(16,38,61,.045); }
+.pitcher-metrics dt { color: #7b858c; font-size: .57rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.pitcher-metrics dd { margin: .25rem 0 0; color: #173652; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .75rem; font-weight: 900; }
+.pitcher-metrics dd small { display: block; margin-top: .15rem; color: #81909a; font-family: inherit; font-size: .58rem; font-weight: 700; }
+.pitcher-metrics__wide { grid-column: span 2; }
+.pitch-usage { margin-top: .8rem; }
+.pitch-usage h4 { margin-bottom: .4rem; color: #a93627; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
+.pitch-usage table { min-width: 560px; }
+.pitch-usage tbody th small { display: block; margin-top: .1rem; color: #7b858c; font-size: .58rem; }
+.pitch-usage > p { color: #7b858c; font-size: .7rem; }
 .box-table-wrap { overflow-x: auto; border: 1px solid rgba(16,38,61,.09); border-radius: 14px; }
 table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.6); }
 th,td { padding: .65rem .72rem; border-bottom: 1px solid rgba(16,38,61,.075); text-align: right; white-space: nowrap; }
@@ -390,5 +481,7 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .performer-card--wide { grid-column: auto; }
   .scoring-timeline__list li { grid-template-columns: 18px minmax(0,1fr); }
   .scoring-timeline__score { grid-column: 2; justify-self: start; margin-bottom: .65rem; }
+  .pitcher-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pitcher-metrics__wide { grid-column: span 2; }
 }
 </style>

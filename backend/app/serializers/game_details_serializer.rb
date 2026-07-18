@@ -16,6 +16,7 @@ class GameDetailsSerializer
       insights: insights,
       key_performers: key_performers,
       scoring_plays: scoring_plays,
+      pitching_analysis: GamePitchingAnalysis.call(game),
       batting_lines: batting_lines,
       pitching_lines: pitching_lines,
       lineups: lineups,

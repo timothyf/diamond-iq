@@ -119,6 +119,89 @@ const payload = {
           batting_team: { id: 1, abbreviation: 'DET' },
         },
       ],
+      pitching_analysis: [
+        {
+          player: { id: 22, full_name: 'Tanner Bibee' },
+          team: { id: 2, abbreviation: 'CLE', name: 'Cleveland Guardians' },
+          home: false,
+          starter: true,
+          appearance_order: 1,
+          innings_pitched: '6.1',
+          decision: 'L (7-5)',
+          pitch_data_available: true,
+          pitch_count: 91,
+          analyzed_pitch_count: 91,
+          strike_count: 62,
+          strike_percentage: 68.1,
+          first_pitch_strikes: 17,
+          first_pitch_opportunities: 24,
+          first_pitch_strike_percentage: 70.8,
+          swings: 45,
+          whiffs: 12,
+          whiff_percentage: 26.7,
+          called_strikes: 15,
+          csw_count: 27,
+          csw_percentage: 29.7,
+          average_velocity: 92.8,
+          maximum_velocity: 97.1,
+          chase_opportunities: 34,
+          chases: 10,
+          chase_percentage: 29.4,
+          batters_faced: 24,
+          pitch_usage: [
+            { pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 45, percentage: 49.5, average_velocity: 94.8, maximum_velocity: 97.1 },
+            { pitch_type: 'SL', pitch_name: 'Slider', count: 28, percentage: 30.8, average_velocity: 86.2, maximum_velocity: 88.4 },
+          ],
+          times_through_order: {
+            maximum: 3,
+            plate_appearances: [
+              { time: 1, batters_faced: 9 },
+              { time: 2, batters_faced: 9 },
+              { time: 3, batters_faced: 6 },
+            ],
+          },
+        },
+        {
+          player: { id: 23, full_name: 'Tarik Skubal' },
+          team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+          home: true,
+          starter: true,
+          appearance_order: 1,
+          innings_pitched: '7.0',
+          decision: 'W (11-2)',
+          pitch_data_available: true,
+          pitch_count: 98,
+          analyzed_pitch_count: 98,
+          strike_count: 67,
+          strike_percentage: 68.4,
+          first_pitch_strikes: 18,
+          first_pitch_opportunities: 25,
+          first_pitch_strike_percentage: 72.0,
+          swings: 48,
+          whiffs: 16,
+          whiff_percentage: 33.3,
+          called_strikes: 14,
+          csw_count: 30,
+          csw_percentage: 30.6,
+          average_velocity: 95.1,
+          maximum_velocity: 99.2,
+          chase_opportunities: 36,
+          chases: 12,
+          chase_percentage: 33.3,
+          batters_faced: 25,
+          pitch_usage: [
+            { pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 52, percentage: 53.1, average_velocity: 96.4, maximum_velocity: 99.2 },
+          ],
+          times_through_order: {
+            maximum: 3,
+            plate_appearances: [
+              { time: 1, batters_faced: 9 },
+              { time: 2, batters_faced: 9 },
+              { time: 3, batters_faced: 7 },
+            ],
+          },
+        },
+      ],
       line_score: {
         current_inning: 9,
         current_inning_ordinal: '9th',
@@ -207,6 +290,22 @@ describe('GameSummaryView', () => {
     expect(scoringTimeline.text()).toContain('DET 3')
     const scoringLinks = scoringTimeline.findAllComponents(RouterLink)
     expect(scoringLinks.map((link) => link.props('to').params.id)).toEqual([20, 24, 21])
+    const pitchingAnalysis = wrapper.get('[data-test="pitching-analysis"]')
+    expect(pitchingAnalysis.text()).toContain('Pitching analysis')
+    expect(pitchingAnalysis.text()).toContain('Tanner Bibee')
+    expect(pitchingAnalysis.text()).toContain('Tarik Skubal')
+    expect(pitchingAnalysis.text()).toContain('68.1%')
+    expect(pitchingAnalysis.text()).toContain('70.8%')
+    expect(pitchingAnalysis.text()).toContain('26.7%')
+    expect(pitchingAnalysis.text()).toContain('29.7%')
+    expect(pitchingAnalysis.text()).toContain('92.8 mph')
+    expect(pitchingAnalysis.text()).toContain('97.1 mph')
+    expect(pitchingAnalysis.text()).toContain('29.4%')
+    expect(pitchingAnalysis.text()).toContain('1st: 9 · 2nd: 9 · 3rd: 6')
+    expect(pitchingAnalysis.text()).toContain('4-Seam Fastball')
+    expect(pitchingAnalysis.text()).toContain('Slider')
+    const pitcherLinks = pitchingAnalysis.findAllComponents(RouterLink)
+    expect(pitcherLinks.map((link) => link.props('to').params.id)).toEqual([22, 23])
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).toContain('Steven Kwan')
     expect(boxScore).toContain('Riley Greene')
