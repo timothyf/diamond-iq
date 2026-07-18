@@ -10,6 +10,8 @@ const gameTabs = [
   { id: 'box-score', label: 'Box Score' },
   { id: 'pitching', label: 'Pitching Analysis' },
   { id: 'batted-ball', label: 'Batted Ball' },
+  { id: 'situational', label: 'Situational' },
+  { id: 'play-by-play', label: 'Play-by-Play' },
 ]
 const activeTab = ref('overview')
 
@@ -28,6 +30,16 @@ const pitchingAnalysisTeams = computed(() => [
   { team: game.value?.awayTeam, pitchers: game.value?.details.pitchingAnalysis.filter((entry) => !entry.home) || [] },
   { team: game.value?.homeTeam, pitchers: game.value?.details.pitchingAnalysis.filter((entry) => entry.home) || [] },
 ])
+const playByPlayInnings = computed(() => {
+  const groups = new Map()
+  for (const appearance of game.value?.details.plateAppearances || []) {
+    const half = String(appearance.halfInning || '').toLowerCase() === 'top' ? 'Top' : 'Bottom'
+    const key = `${appearance.inning || 0}-${half}`
+    if (!groups.has(key)) groups.set(key, { key, label: `${half} ${ordinal(appearance.inning)}`, appearances: [] })
+    groups.get(key).appearances.push(appearance)
+  }
+  return [...groups.values()]
+})
 const hasKeyPerformers = computed(() => {
   const performers = game.value?.details.keyPerformers
   return Boolean(
@@ -127,6 +139,30 @@ function teamRuns(entry) {
   return entry.home ? game.value?.homeScore : game.value?.awayScore
 }
 
+function situationRows(entry) {
+  return [
+    { label: 'Runners in scoring position', metrics: entry.situations.runnersInScoringPosition },
+    { label: 'Two outs', metrics: entry.situations.twoOuts },
+    { label: 'Bases loaded', metrics: entry.situations.basesLoaded },
+    { label: 'Leadoff hitters', metrics: entry.situations.leadoffHitters },
+    { label: 'Pinch hitters', metrics: entry.situations.pinchHitters },
+    { label: 'High leverage', metrics: entry.situations.highLeverage },
+  ]
+}
+
+function wpaPoints(value) {
+  return value === null || value === undefined ? null : Math.abs(Number(value) * 100).toFixed(1)
+}
+
+function countLabel(pitch) {
+  if (pitch.balls === null || pitch.balls === undefined || pitch.strikes === null || pitch.strikes === undefined) return '—'
+  return `${pitch.balls}-${pitch.strikes}`
+}
+
+function distance(value) {
+  return value === null || value === undefined ? '—' : `${Math.round(Number(value))} ft`
+}
+
 function timesThroughOrder(value) {
   const turns = value?.plateAppearances || []
   if (!turns.length) return '—'
@@ -143,6 +179,11 @@ function ordinal(value) {
 function tabAvailable(tabId) {
   if (tabId === 'pitching') return Boolean(game.value?.details.pitchingAnalysis.length)
   if (tabId === 'batted-ball') return Boolean(game.value?.details.battedBallAnalysis.some((entry) => entry.battedBalls > 0))
+  if (tabId === 'situational') {
+    return Boolean(game.value?.details.situationalAnalysis.teams.some((entry) =>
+      entry.battingOrderTrips.some((trip) => trip.plateAppearances > 0)))
+  }
+  if (tabId === 'play-by-play') return Boolean(game.value?.details.plateAppearances.length)
   return true
 }
 
@@ -399,14 +440,19 @@ async function handleTabKey(event, index) {
                 <div class="pitcher-metrics__wide"><dt>Times through order</dt><dd>{{ timesThroughOrder(pitcher.timesThroughOrder) }}</dd></div>
               </dl>
               <div class="pitch-usage">
-                <h4>Pitch usage</h4>
+                <h4>Pitch arsenal</h4>
                 <div v-if="pitcher.pitchUsage.length" class="box-table-wrap">
                   <table>
-                    <thead><tr><th>Pitch</th><th>Count</th><th>Usage</th><th>Avg velo</th><th>Max velo</th></tr></thead>
+                    <thead><tr><th>Pitch</th><th>Usage</th><th>Avg velo</th><th>Max velo</th><th>Whiff%</th><th>CSW%</th><th>Avg EV</th></tr></thead>
                     <tbody>
                       <tr v-for="usage in pitcher.pitchUsage" :key="usage.pitchType">
                         <th><strong>{{ usage.pitchType }}</strong><small>{{ usage.pitchName }}</small></th>
-                        <td>{{ usage.count }}</td><td>{{ percent(usage.percentage) }}</td><td>{{ velocity(usage.averageVelocity) }}</td><td>{{ velocity(usage.maximumVelocity) }}</td>
+                        <td>{{ percent(usage.percentage) }}<small>{{ usage.count }} pitches</small></td>
+                        <td>{{ velocity(usage.averageVelocity) }}</td>
+                        <td>{{ velocity(usage.maximumVelocity) }}</td>
+                        <td>{{ percent(usage.whiffPercentage) }}<small>{{ usage.whiffs }}/{{ usage.swings }} swings</small></td>
+                        <td>{{ percent(usage.cswPercentage) }}<small>{{ usage.cswCount }}/{{ usage.count }} pitches</small></td>
+                        <td>{{ velocity(usage.averageExitVelocity) }}<small>{{ usage.battedBalls }} tracked BBE</small></td>
                       </tr>
                     </tbody>
                   </table>
@@ -487,6 +533,154 @@ async function handleTabKey(event, index) {
       </div>
 
       <div
+        id="game-panel-situational"
+        v-if="activeTab === 'situational'"
+        role="tabpanel"
+        aria-labelledby="game-tab-situational"
+        data-test="game-panel-situational"
+      >
+        <section class="game-panel situational-analysis" data-test="situational-analysis">
+          <header class="game-panel__heading">
+            <div><p>Pressure and game context</p><h2>Situational performance</h2></div>
+            <span>Results from completed plate appearances</span>
+          </header>
+
+          <article v-if="game.details.situationalAnalysis.turningPoint" class="turning-point" data-test="turning-point">
+            <div>
+              <span>Turning point · {{ game.details.situationalAnalysis.turningPoint.inningLabel }}</span>
+              <p>
+                <RouterLink
+                  v-if="game.details.situationalAnalysis.turningPoint.batter"
+                  :to="{ name: 'player-profile', params: { id: game.details.situationalAnalysis.turningPoint.batter.id } }"
+                >{{ game.details.situationalAnalysis.turningPoint.batter.full_name }}</RouterLink>
+                <span v-if="game.details.situationalAnalysis.turningPoint.batter"> — </span>
+                {{ scoringPlayText(game.details.situationalAnalysis.turningPoint) }}
+              </p>
+            </div>
+            <div class="turning-point__impact">
+              <strong>{{ game.awayTeam.abbreviation }} {{ display(game.details.situationalAnalysis.turningPoint.awayScore) }} · {{ game.homeTeam.abbreviation }} {{ display(game.details.situationalAnalysis.turningPoint.homeScore) }}</strong>
+              <small v-if="wpaPoints(game.details.situationalAnalysis.turningPoint.homeWinProbabilityChange)">
+                {{ wpaPoints(game.details.situationalAnalysis.turningPoint.homeWinProbabilityChange) }} WPA points toward {{ game.details.situationalAnalysis.turningPoint.benefitingTeam?.abbreviation }}
+              </small>
+              <small v-else>{{ game.details.situationalAnalysis.turningPoint.runsScored }}-run scoring play</small>
+            </div>
+          </article>
+
+          <p class="situational-analysis__note">{{ game.details.situationalAnalysis.highLeverageDefinition }}</p>
+
+          <article
+            v-for="entry in game.details.situationalAnalysis.teams"
+            :key="entry.team.id"
+            class="situational-team"
+          >
+            <header><span>{{ entry.home ? 'Home' : 'Away' }}</span><h3>{{ entry.team.name }}</h3></header>
+            <div class="box-table-wrap">
+              <table class="situational-table">
+                <thead><tr><th>Situation</th><th>PA</th><th>H-AB</th><th>AVG</th><th>OBP</th><th>BB</th><th>SO</th><th>RBI</th></tr></thead>
+                <tbody>
+                  <tr v-for="row in situationRows(entry)" :key="row.label">
+                    <th>{{ row.label }}</th>
+                    <td>{{ row.metrics.plateAppearances }}</td>
+                    <td>{{ row.metrics.hits }}-{{ row.metrics.atBats }}</td>
+                    <td>{{ rate(row.metrics.battingAverage, 3, true) }}</td>
+                    <td>{{ rate(row.metrics.onBasePercentage, 3, true) }}</td>
+                    <td>{{ row.metrics.walks }}</td>
+                    <td>{{ row.metrics.strikeouts }}</td>
+                    <td>{{ row.metrics.runsBattedIn }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h4>Performance by batting-order trip</h4>
+            <div class="box-table-wrap">
+              <table class="situational-table situational-table--trips">
+                <thead><tr><th>Trip</th><th>PA</th><th>H-AB</th><th>AVG</th><th>OBP</th><th>BB</th><th>SO</th><th>RBI</th></tr></thead>
+                <tbody>
+                  <tr v-for="trip in entry.battingOrderTrips" :key="trip.trip">
+                    <th>{{ ordinal(trip.trip) }} trip</th>
+                    <td>{{ trip.plateAppearances }}</td>
+                    <td>{{ trip.hits }}-{{ trip.atBats }}</td>
+                    <td>{{ rate(trip.battingAverage, 3, true) }}</td>
+                    <td>{{ rate(trip.onBasePercentage, 3, true) }}</td>
+                    <td>{{ trip.walks }}</td>
+                    <td>{{ trip.strikeouts }}</td>
+                    <td>{{ trip.runsBattedIn }}</td>
+                  </tr>
+                  <tr v-if="!entry.battingOrderTrips.length"><td colspan="8">No plate-appearance data is available.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </section>
+      </div>
+
+      <div
+        id="game-panel-play-by-play"
+        v-if="activeTab === 'play-by-play'"
+        role="tabpanel"
+        aria-labelledby="game-tab-play-by-play"
+        data-test="game-panel-play-by-play"
+      >
+        <section class="game-panel play-by-play" data-test="play-by-play">
+          <header class="game-panel__heading">
+            <div><p>Every plate appearance</p><h2>Play-by-play</h2></div>
+            <span>{{ game.details.plateAppearances.length }} plate appearances</span>
+          </header>
+          <p class="play-by-play__note">Select a plate appearance to view every pitch. The count is shown before each pitch.</p>
+
+          <section v-for="inning in playByPlayInnings" :key="inning.key" class="play-inning">
+            <header><h3>{{ inning.label }}</h3><span>{{ inning.appearances.length }} {{ inning.appearances.length === 1 ? 'plate appearance' : 'plate appearances' }}</span></header>
+            <div class="play-inning__appearances">
+              <details v-for="appearance in inning.appearances" :key="appearance.id" class="plate-appearance" data-test="plate-appearance">
+                <summary>
+                  <div class="plate-appearance__matchup">
+                    <span>#{{ appearance.plateAppearanceNumber }}</span>
+                    <strong>
+                      <RouterLink v-if="appearance.batter" :to="{ name: 'player-profile', params: { id: appearance.batter.id } }">{{ appearance.batter.full_name }}</RouterLink>
+                      <span v-else>Unknown batter</span>
+                    </strong>
+                    <small v-if="appearance.pitcher">
+                      vs. <RouterLink :to="{ name: 'player-profile', params: { id: appearance.pitcher.id } }">{{ appearance.pitcher.full_name }}</RouterLink>
+                    </small>
+                  </div>
+                  <div class="plate-appearance__result">
+                    <strong>{{ appearance.event || humanize(appearance.eventType) || 'Result unavailable' }}</strong>
+                    <small>{{ appearance.description }}</small>
+                  </div>
+                  <div class="plate-appearance__score">
+                    <span>{{ game.awayTeam.abbreviation }} <strong>{{ display(appearance.awayScore) }}</strong></span>
+                    <span>{{ game.homeTeam.abbreviation }} <strong>{{ display(appearance.homeScore) }}</strong></span>
+                  </div>
+                </summary>
+                <div class="plate-appearance__pitches">
+                  <div v-if="appearance.pitches.length" class="box-table-wrap">
+                    <table class="pitch-sequence-table">
+                      <thead><tr><th>#</th><th>Count</th><th>Pitch</th><th>Velocity</th><th>Result</th><th>Exit velo</th><th>Launch</th><th>Distance</th><th>xwOBA</th></tr></thead>
+                      <tbody>
+                        <tr v-for="pitch in appearance.pitches" :key="pitch.id || pitch.pitchNumber">
+                          <td>{{ pitch.pitchNumber }}</td>
+                          <td>{{ countLabel(pitch) }}</td>
+                          <th><strong>{{ pitch.pitchName || pitch.pitchType || 'Unknown' }}</strong><small v-if="pitch.pitchName && pitch.pitchType">{{ pitch.pitchType }}</small></th>
+                          <td>{{ velocity(pitch.releaseSpeed) }}</td>
+                          <td>{{ humanize(pitch.description) }}</td>
+                          <td>{{ velocity(pitch.launchSpeed) }}</td>
+                          <td>{{ angle(pitch.launchAngle) }}</td>
+                          <td>{{ distance(pitch.hitDistance) }}</td>
+                          <td>{{ rate(pitch.estimatedWoba, 3, true) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p v-else>Pitch details are not available for this plate appearance.</p>
+                </div>
+              </details>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <div
         id="game-panel-box-score"
         v-if="activeTab === 'box-score'"
         role="tabpanel"
@@ -555,7 +749,7 @@ async function handleTabKey(event, index) {
 .scoreboard__score { display: flex; gap: clamp(.5rem,2vw,1.2rem); align-items: center; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.8rem,7vw,6rem); line-height: 1; }
 .scoreboard__score span { color: #7890a1; font-size: .5em; }
 .game-tabs { position: sticky; z-index: 8; top: .5rem; margin-top: 1rem; padding: .35rem; border: 1px solid rgba(16,38,61,.1); border-radius: 15px; background: rgba(247,246,241,.94); box-shadow: 0 8px 24px rgba(16,38,61,.08); backdrop-filter: blur(10px); }
-.game-tabs [role='tablist'] { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .35rem; }
+.game-tabs [role='tablist'] { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: .35rem; }
 .game-tabs button { min-height: 42px; padding: .65rem .85rem; border: 0; border-radius: 11px; color: #65747e; background: transparent; font-size: .72rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .game-tabs button[aria-selected='true'] { color: #fffaf0; background: #173652; box-shadow: 0 5px 14px rgba(16,38,61,.18); }
 .game-tabs button:focus-visible { outline: 3px solid rgba(169,54,39,.32); outline-offset: 2px; }
@@ -612,8 +806,9 @@ async function handleTabKey(event, index) {
 .pitcher-metrics__wide { grid-column: span 2; }
 .pitch-usage { margin-top: .8rem; }
 .pitch-usage h4 { margin-bottom: .4rem; color: #a93627; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
-.pitch-usage table { min-width: 560px; }
+.pitch-usage table { min-width: 780px; }
 .pitch-usage tbody th small { display: block; margin-top: .1rem; color: #7b858c; font-size: .58rem; }
+.pitch-usage tbody td small { display: block; margin-top: .1rem; color: #84919a; font-family: inherit; font-size: .56rem; }
 .pitch-usage > p { color: #7b858c; font-size: .7rem; }
 .batted-ball-analysis__note { margin: -.25rem 0 1rem; color: #6f7a82; font-size: .72rem; line-height: 1.5; }
 .batted-ball-team { padding: 1rem; border: 1px solid rgba(16,38,61,.09); border-radius: 18px; background: rgba(255,255,255,.55); }
@@ -636,6 +831,47 @@ async function handleTabKey(event, index) {
 .batted-ball-leaders { margin-top: .9rem; }
 .batted-ball-leaders h4 { margin-bottom: .4rem; color: #a93627; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
 .batted-ball-leaders table { min-width: 1040px; }
+.turning-point { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 1rem; border: 1px solid rgba(169,54,39,.2); border-radius: 17px; background: linear-gradient(120deg,rgba(169,54,39,.09),rgba(232,178,118,.13)); }
+.turning-point > div > span { color: #a93627; font-size: .62rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.turning-point p { margin-top: .25rem; color: #52616c; font-size: .8rem; }
+.turning-point a { color: #173652; font-weight: 900; text-decoration: none; }
+.turning-point__impact { flex: 0 0 auto; text-align: right; }
+.turning-point__impact strong,.turning-point__impact small { display: block; }
+.turning-point__impact strong { color: #173652; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .76rem; }
+.turning-point__impact small { margin-top: .2rem; color: #a93627; font-size: .62rem; font-weight: 800; }
+.situational-analysis__note { margin: .7rem 0 1rem; color: #6f7a82; font-size: .68rem; }
+.situational-team { padding: 1rem; border: 1px solid rgba(16,38,61,.09); border-radius: 18px; background: rgba(255,255,255,.55); }
+.situational-team + .situational-team { margin-top: 1rem; }
+.situational-team > header { margin-bottom: .6rem; }
+.situational-team > header span { color: #a93627; font-size: .58rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.situational-team > header h3 { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.8rem; line-height: 1; text-transform: uppercase; }
+.situational-team h4 { margin: .9rem 0 .4rem; color: #a93627; font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; }
+.situational-table { min-width: 680px; }
+.situational-table tbody th { color: #173652; }
+.play-by-play__note { margin: -.25rem 0 1rem; color: #6f7a82; font-size: .7rem; }
+.play-inning + .play-inning { margin-top: 1.2rem; }
+.play-inning > header { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .45rem; padding: 0 .2rem; }
+.play-inning > header h3 { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.55rem; text-transform: uppercase; }
+.play-inning > header span { color: #78838b; font-size: .65rem; }
+.play-inning__appearances { display: grid; gap: .45rem; }
+.plate-appearance { overflow: hidden; border: 1px solid rgba(16,38,61,.1); border-radius: 14px; background: rgba(255,255,255,.58); }
+.plate-appearance summary { display: grid; grid-template-columns: minmax(190px,.8fr) minmax(260px,1.5fr) auto; gap: 1rem; align-items: center; padding: .8rem 1rem; cursor: pointer; list-style-position: inside; }
+.plate-appearance summary::marker { color: #a93627; }
+.plate-appearance[open] summary { border-bottom: 1px solid rgba(16,38,61,.09); background: rgba(16,38,61,.035); }
+.plate-appearance__matchup { display: grid; min-width: 0; }
+.plate-appearance__matchup > span { color: #a93627; font-size: .56rem; font-weight: 900; }
+.plate-appearance__matchup a { color: #173652; text-decoration: none; }
+.plate-appearance__matchup small { overflow: hidden; color: #78838b; font-size: .62rem; text-overflow: ellipsis; white-space: nowrap; }
+.plate-appearance__result { min-width: 0; }
+.plate-appearance__result strong,.plate-appearance__result small { display: block; }
+.plate-appearance__result strong { color: #173652; font-size: .76rem; }
+.plate-appearance__result small { overflow: hidden; margin-top: .1rem; color: #6e7a83; font-size: .63rem; text-overflow: ellipsis; white-space: nowrap; }
+.plate-appearance__score { display: flex; gap: .45rem; color: #687781; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .67rem; }
+.plate-appearance__score strong { color: #173652; }
+.plate-appearance__pitches { padding: .75rem; }
+.plate-appearance__pitches > p { color: #78838b; font-size: .68rem; text-align: center; }
+.pitch-sequence-table { min-width: 900px; }
+.pitch-sequence-table tbody th small { display: block; color: #84919a; font-size: .56rem; }
 .box-table-wrap { overflow-x: auto; border: 1px solid rgba(16,38,61,.09); border-radius: 14px; }
 table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.6); }
 th,td { padding: .65rem .72rem; border-bottom: 1px solid rgba(16,38,61,.075); text-align: right; white-space: nowrap; }
@@ -663,7 +899,7 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .scoreboard__team strong { font-size: 1.35rem; }
   .scoreboard__score { font-size: 2.4rem; }
   .game-tabs { top: .25rem; }
-  .game-tabs [role='tablist'] { grid-template-columns: repeat(4,minmax(120px,1fr)); overflow-x: auto; }
+  .game-tabs [role='tablist'] { grid-template-columns: repeat(6,minmax(120px,1fr)); overflow-x: auto; }
   .game-tabs button { padding-inline: .35rem; font-size: .62rem; letter-spacing: .03em; }
   .performer-grid { grid-template-columns: 1fr; }
   .performer-card--wide { grid-column: auto; }
@@ -674,5 +910,9 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .batted-ball-team > header { align-items: flex-start; flex-direction: column; }
   .contact-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .contact-distribution { grid-template-columns: 1fr; }
+  .turning-point { align-items: flex-start; flex-direction: column; }
+  .turning-point__impact { text-align: left; }
+  .plate-appearance summary { grid-template-columns: 1fr auto; gap: .55rem; }
+  .plate-appearance__result { grid-column: 1 / -1; grid-row: 2; }
 }
 </style>

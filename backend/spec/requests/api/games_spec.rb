@@ -290,6 +290,8 @@ RSpec.describe "Api::Games", type: :request do
       pitch_type: "FF",
       pitch_name: "4-Seam Fastball",
       description: "called_strike",
+      balls: 0,
+      strikes: 0,
       release_speed: 96.4,
       zone: 5,
       n_thruorder_pitcher: 2,
@@ -297,7 +299,11 @@ RSpec.describe "Api::Games", type: :request do
     )
     [
       { pitch_number: 2, pitch_type: "FF", pitch_name: "4-Seam Fastball", description: "swinging_strike", release_speed: 97.0, zone: 11 },
-      { pitch_number: 3, pitch_type: "SL", pitch_name: "Slider", description: "foul", release_speed: 86.0, zone: 12 },
+      {
+        pitch_number: 3, pitch_type: "SL", pitch_name: "Slider", description: "hit_into_play",
+        balls: 0, strikes: 2, release_speed: 86.0, launch_speed: 99.0, launch_angle: 14.0,
+        hit_distance_sc: 242.0, bb_type: "line_drive", estimated_woba_using_speedangle: 0.611, zone: 12
+      },
       { pitch_number: 4, pitch_type: "SL", pitch_name: "Slider", description: "ball", release_speed: 85.0, zone: 12 }
     ].each do |attributes|
       PitchDatum.create!(
@@ -483,9 +489,18 @@ RSpec.describe "Api::Games", type: :request do
     )
     expect(bibee_analysis.fetch("pitch_usage")).to match(
       [
-        hash_including("pitch_type" => "FF", "count" => 2, "percentage" => 40.0, "average_velocity" => 96.7),
-        hash_including("pitch_type" => "SL", "count" => 2, "percentage" => 40.0, "average_velocity" => 85.5),
-        hash_including("pitch_type" => "CH", "count" => 1, "percentage" => 20.0, "average_velocity" => 88.0)
+        hash_including(
+          "pitch_type" => "FF", "count" => 2, "percentage" => 40.0, "average_velocity" => 96.7,
+          "whiff_percentage" => 100.0, "csw_percentage" => 100.0, "average_exit_velocity" => nil
+        ),
+        hash_including(
+          "pitch_type" => "SL", "count" => 2, "percentage" => 40.0, "average_velocity" => 85.5,
+          "whiff_percentage" => 0.0, "csw_percentage" => 0.0, "average_exit_velocity" => 99.0
+        ),
+        hash_including(
+          "pitch_type" => "CH", "count" => 1, "percentage" => 20.0, "average_velocity" => 88.0,
+          "whiff_percentage" => nil, "csw_percentage" => 100.0, "average_exit_velocity" => nil
+        )
       ]
     )
     expect(bibee_analysis.fetch("times_through_order")).to eq(
@@ -500,7 +515,13 @@ RSpec.describe "Api::Games", type: :request do
     )
     batted_ball_analysis = json_body.dig("data", "details", "batted_ball_analysis")
     expect(batted_ball_analysis.map { |entry| entry.dig("team", "abbreviation") }).to eq([ "CLE", "DET" ])
-    expect(batted_ball_analysis).to all(include("batted_balls" => 0, "leaders" => []))
+    expect(batted_ball_analysis.first).to include("batted_balls" => 0, "leaders" => [])
+    expect(batted_ball_analysis.second).to include("batted_balls" => 1)
+    situational_analysis = json_body.dig("data", "details", "situational_analysis")
+    expect(situational_analysis.fetch("teams").map { |entry| entry.dig("team", "abbreviation") }).to eq([ "CLE", "DET" ])
+    expect(situational_analysis.dig("turning_point")).to include(
+      "type" => "scoring_play", "inning_label" => "Bottom 4th", "runs_scored" => 2
+    )
     expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
       "event_type" => "single",
       "plate_appearance_number" => 1
@@ -510,7 +531,16 @@ RSpec.describe "Api::Games", type: :request do
       .find { |pitch| pitch["release_speed"] == 96.4 }
     expect(serialized_pitch).to include(
       "pitch_type" => "FF",
-      "release_speed" => 96.4
+      "release_speed" => 96.4,
+      "balls" => 0,
+      "strikes" => 0
+    )
+    contact_pitch = json_body.dig("data", "details", "plate_appearances")
+      .flat_map { |plate_appearance| plate_appearance.fetch("pitches") }
+      .find { |pitch| pitch["launch_speed"] == 99.0 }
+    expect(contact_pitch).to include(
+      "launch_angle" => 14.0, "hit_distance_sc" => 242.0,
+      "bb_type" => "line_drive", "estimated_woba_using_speedangle" => 0.611
     )
   end
 

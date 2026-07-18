@@ -8,6 +8,11 @@ const RouterLink = {
   template: '<a href="#"><slot /></a>',
 }
 
+const situation = (overrides = {}) => ({
+  plate_appearances: 0, at_bats: 0, hits: 0, walks: 0, strikeouts: 0,
+  runs_batted_in: 0, batting_average: null, on_base_percentage: null, ...overrides,
+})
+
 const payload = {
   data: {
     id: 80,
@@ -149,8 +154,18 @@ const payload = {
           chase_percentage: 29.4,
           batters_faced: 24,
           pitch_usage: [
-            { pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 45, percentage: 49.5, average_velocity: 94.8, maximum_velocity: 97.1 },
-            { pitch_type: 'SL', pitch_name: 'Slider', count: 28, percentage: 30.8, average_velocity: 86.2, maximum_velocity: 88.4 },
+            {
+              pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 45, percentage: 49.5,
+              average_velocity: 94.8, maximum_velocity: 97.1, swings: 24, whiffs: 8,
+              whiff_percentage: 33.3, called_strikes: 7, csw_count: 15, csw_percentage: 33.3,
+              batted_balls: 6, average_exit_velocity: 88.7,
+            },
+            {
+              pitch_type: 'SL', pitch_name: 'Slider', count: 28, percentage: 30.8,
+              average_velocity: 86.2, maximum_velocity: 88.4, swings: 18, whiffs: 6,
+              whiff_percentage: 33.3, called_strikes: 4, csw_count: 10, csw_percentage: 35.7,
+              batted_balls: 3, average_exit_velocity: 91.4,
+            },
           ],
           times_through_order: {
             maximum: 3,
@@ -190,7 +205,12 @@ const payload = {
           chase_percentage: 33.3,
           batters_faced: 25,
           pitch_usage: [
-            { pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 52, percentage: 53.1, average_velocity: 96.4, maximum_velocity: 99.2 },
+            {
+              pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 52, percentage: 53.1,
+              average_velocity: 96.4, maximum_velocity: 99.2, swings: 27, whiffs: 9,
+              whiff_percentage: 33.3, called_strikes: 8, csw_count: 17, csw_percentage: 32.7,
+              batted_balls: 7, average_exit_velocity: 84.6,
+            },
           ],
           times_through_order: {
             maximum: 3,
@@ -278,6 +298,75 @@ const payload = {
           ],
         },
       ],
+      situational_analysis: {
+        high_leverage_definition: 'Plate appearances with an absolute win-probability change of at least 10 percentage points.',
+        teams: [
+          {
+            team: { id: 2, abbreviation: 'CLE', name: 'Cleveland Guardians' },
+            home: false,
+            situations: {
+              runners_in_scoring_position: situation({ plate_appearances: 5, at_bats: 5, hits: 1, strikeouts: 2, runs_batted_in: 1, batting_average: 0.2, on_base_percentage: 0.2 }),
+              two_outs: situation({ plate_appearances: 12, at_bats: 10, hits: 2, walks: 2, strikeouts: 4, batting_average: 0.2, on_base_percentage: 0.333 }),
+              bases_loaded: situation(),
+              leadoff_hitters: situation({ plate_appearances: 5, at_bats: 4, hits: 2, walks: 1, strikeouts: 1, batting_average: 0.5, on_base_percentage: 0.6 }),
+              pinch_hitters: situation({ plate_appearances: 1, at_bats: 1, strikeouts: 1, batting_average: 0.0, on_base_percentage: 0.0 }),
+              high_leverage: situation({ plate_appearances: 2, at_bats: 2, hits: 1, runs_batted_in: 1, batting_average: 0.5, on_base_percentage: 0.5 }),
+            },
+            batting_order_trips: [
+              { trip: 1, ...situation({ plate_appearances: 9, at_bats: 8, hits: 3, walks: 1, strikeouts: 2, batting_average: 0.375, on_base_percentage: 0.444 }) },
+              { trip: 2, ...situation({ plate_appearances: 9, at_bats: 9, hits: 1, strikeouts: 3, batting_average: 0.111, on_base_percentage: 0.111 }) },
+            ],
+          },
+          {
+            team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+            home: true,
+            situations: {
+              runners_in_scoring_position: situation({ plate_appearances: 6, at_bats: 6, hits: 2, strikeouts: 1, runs_batted_in: 3, batting_average: 0.333, on_base_percentage: 0.333 }),
+              two_outs: situation({ plate_appearances: 11, at_bats: 9, hits: 3, walks: 2, strikeouts: 2, runs_batted_in: 2, batting_average: 0.333, on_base_percentage: 0.455 }),
+              bases_loaded: situation({ plate_appearances: 1, at_bats: 1, hits: 1, runs_batted_in: 2, batting_average: 1.0, on_base_percentage: 1.0 }),
+              leadoff_hitters: situation({ plate_appearances: 4, at_bats: 4, hits: 1, strikeouts: 1, batting_average: 0.25, on_base_percentage: 0.25 }),
+              pinch_hitters: situation({ plate_appearances: 1, walks: 1, on_base_percentage: 1.0 }),
+              high_leverage: situation({ plate_appearances: 2, at_bats: 2, hits: 1, runs_batted_in: 2, batting_average: 0.5, on_base_percentage: 0.5 }),
+            },
+            batting_order_trips: [
+              { trip: 1, ...situation({ plate_appearances: 9, at_bats: 8, hits: 2, walks: 1, strikeouts: 2, batting_average: 0.25, on_base_percentage: 0.333 }) },
+              { trip: 2, ...situation({ plate_appearances: 9, at_bats: 8, hits: 4, walks: 1, strikeouts: 1, runs_batted_in: 3, batting_average: 0.5, on_base_percentage: 0.556 }) },
+            ],
+          },
+        ],
+        turning_point: {
+          type: 'win_probability', inning_label: 'Bottom 4th',
+          description: 'Riley Greene homered, scoring two runs.',
+          batter: { id: 21, full_name: 'Riley Greene' },
+          batting_team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+          away_score: 1, home_score: 3, runs_scored: 2,
+          home_win_probability_change: 0.287,
+          benefiting_team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+        },
+      },
+      plate_appearances: [
+        {
+          id: 101, at_bat_index: 0, plate_appearance_number: 1, inning: 1, half_inning: 'top',
+          event: 'Single', event_type: 'single', description: 'Steven Kwan singles, scoring a run.',
+          runs_batted_in: 1, away_score: 1, home_score: 0, outs_after: 0, complete: true,
+          batter: { id: 20, full_name: 'Steven Kwan' }, pitcher: { id: 23, full_name: 'Tarik Skubal' },
+          batting_team: { id: 2, abbreviation: 'CLE' }, fielding_team: { id: 1, abbreviation: 'DET' },
+          pitches: [
+            { id: 1001, pitch_number: 1, balls: 0, strikes: 0, pitch_type: 'FF', pitch_name: '4-Seam Fastball', description: 'called_strike', release_speed: 96.8 },
+            { id: 1002, pitch_number: 2, balls: 0, strikes: 1, pitch_type: 'SL', pitch_name: 'Slider', description: 'hit_into_play', release_speed: 87.2, launch_speed: 101.4, launch_angle: 18.2, hit_distance_sc: 287, bb_type: 'line_drive', estimated_woba_using_speedangle: 0.642 },
+          ],
+        },
+        {
+          id: 102, at_bat_index: 1, plate_appearance_number: 2, inning: 1, half_inning: 'bottom',
+          event: 'Strikeout', event_type: 'strikeout', description: 'Riley Greene strikes out swinging.',
+          runs_batted_in: 0, away_score: 1, home_score: 0, outs_after: 1, complete: true,
+          batter: { id: 21, full_name: 'Riley Greene' }, pitcher: { id: 22, full_name: 'Tanner Bibee' },
+          batting_team: { id: 1, abbreviation: 'DET' }, fielding_team: { id: 2, abbreviation: 'CLE' },
+          pitches: [
+            { id: 1003, pitch_number: 1, balls: 0, strikes: 0, pitch_type: 'SL', pitch_name: 'Slider', description: 'swinging_strike', release_speed: 86.7 },
+          ],
+        },
+      ],
       line_score: {
         current_inning: 9,
         current_inning_ordinal: '9th',
@@ -322,7 +411,7 @@ const payload = {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('GameSummaryView', () => {
-  it('organizes game details into accessible overview, box score, pitching, and batted-ball tabs', async () => {
+  it('organizes game details into accessible analytical tabs', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(GameSummaryView, {
       props: { gameId: '80' },
@@ -334,11 +423,15 @@ describe('GameSummaryView', () => {
     const boxScoreTab = wrapper.get('[data-test="game-tab-box-score"]')
     const pitchingTab = wrapper.get('[data-test="game-tab-pitching"]')
     const battedBallTab = wrapper.get('[data-test="game-tab-batted-ball"]')
+    const situationalTab = wrapper.get('[data-test="game-tab-situational"]')
+    const playByPlayTab = wrapper.get('[data-test="game-tab-play-by-play"]')
     expect(overviewTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="game-panel-box-score"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="game-panel-pitching"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="game-panel-batted-ball"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="game-panel-situational"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="game-panel-play-by-play"]').exists()).toBe(false)
 
     await boxScoreTab.trigger('click')
     expect(boxScoreTab.attributes('aria-selected')).toBe('true')
@@ -354,7 +447,15 @@ describe('GameSummaryView', () => {
     expect(battedBallTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-batted-ball"]').exists()).toBe(true)
 
-    await battedBallTab.trigger('keydown', { key: 'Home' })
+    await situationalTab.trigger('click')
+    expect(situationalTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-situational"]').exists()).toBe(true)
+
+    await playByPlayTab.trigger('click')
+    expect(playByPlayTab.attributes('aria-selected')).toBe('true')
+    expect(wrapper.find('[data-test="game-panel-play-by-play"]').exists()).toBe(true)
+
+    await playByPlayTab.trigger('keydown', { key: 'Home' })
     expect(overviewTab.attributes('aria-selected')).toBe('true')
     expect(wrapper.find('[data-test="game-panel-overview"]').exists()).toBe(true)
   })
@@ -418,6 +519,13 @@ describe('GameSummaryView', () => {
     expect(pitchingAnalysis.text()).toContain('1st: 9 · 2nd: 9 · 3rd: 6')
     expect(pitchingAnalysis.text()).toContain('4-Seam Fastball')
     expect(pitchingAnalysis.text()).toContain('Slider')
+    expect(pitchingAnalysis.text()).toContain('Pitch arsenal')
+    expect(pitchingAnalysis.text()).toContain('Whiff%')
+    expect(pitchingAnalysis.text()).toContain('CSW%')
+    expect(pitchingAnalysis.text()).toContain('Avg EV')
+    expect(pitchingAnalysis.text()).toContain('88.7 mph')
+    expect(pitchingAnalysis.text()).toContain('8/24 swings')
+    expect(pitchingAnalysis.text()).toContain('15/45 pitches')
     const pitcherLinks = pitchingAnalysis.findAllComponents(RouterLink)
     expect(pitcherLinks.map((link) => link.props('to').params.id)).toEqual([22, 23])
     await wrapper.get('[data-test="game-tab-batted-ball"]').trigger('click')
@@ -435,6 +543,44 @@ describe('GameSummaryView', () => {
     expect(battedBallAnalysis.text()).toContain('Fly balls')
     const battedBallLinks = battedBallAnalysis.findAllComponents(RouterLink)
     expect(battedBallLinks.map((link) => link.props('to').params.id)).toEqual([20, 21])
+    await wrapper.get('[data-test="game-tab-situational"]').trigger('click')
+    const situationalAnalysis = wrapper.get('[data-test="situational-analysis"]')
+    expect(situationalAnalysis.text()).toContain('Situational performance')
+    expect(situationalAnalysis.text()).toContain('Runners in scoring position')
+    expect(situationalAnalysis.text()).toContain('Two outs')
+    expect(situationalAnalysis.text()).toContain('Bases loaded')
+    expect(situationalAnalysis.text()).toContain('Leadoff hitters')
+    expect(situationalAnalysis.text()).toContain('Pinch hitters')
+    expect(situationalAnalysis.text()).toContain('High leverage')
+    expect(situationalAnalysis.text()).toContain('Performance by batting-order trip')
+    expect(situationalAnalysis.text()).toContain('1st trip')
+    expect(situationalAnalysis.text()).toContain('Turning point · Bottom 4th')
+    expect(situationalAnalysis.text()).toContain('28.7 WPA points toward DET')
+    expect(situationalAnalysis.text()).toContain('Riley Greene')
+    const turningPointLinks = wrapper.get('[data-test="turning-point"]').findAllComponents(RouterLink)
+    expect(turningPointLinks.map((link) => link.props('to').params.id)).toEqual([21])
+    await wrapper.get('[data-test="game-tab-play-by-play"]').trigger('click')
+    const playByPlay = wrapper.get('[data-test="play-by-play"]')
+    expect(playByPlay.text()).toContain('Play-by-play')
+    expect(playByPlay.text()).toContain('Top 1st')
+    expect(playByPlay.text()).toContain('Bottom 1st')
+    expect(playByPlay.text()).toContain('Steven Kwan')
+    expect(playByPlay.text()).toContain('Tarik Skubal')
+    expect(playByPlay.text()).toContain('CLE 1')
+    expect(playByPlay.text()).toContain('DET 0')
+    expect(playByPlay.text()).toContain('0-0')
+    expect(playByPlay.text()).toContain('0-1')
+    expect(playByPlay.text()).toContain('4-Seam Fastball')
+    expect(playByPlay.text()).toContain('96.8 mph')
+    expect(playByPlay.text()).toContain('Hit Into Play')
+    expect(playByPlay.text()).toContain('101.4 mph')
+    expect(playByPlay.text()).toContain('18.2°')
+    expect(playByPlay.text()).toContain('287 ft')
+    expect(playByPlay.text()).toContain('.642')
+    expect(playByPlay.findAll('details')).toHaveLength(2)
+    expect(playByPlay.findAll('summary')).toHaveLength(2)
+    const playLinks = playByPlay.findAllComponents(RouterLink)
+    expect(playLinks.map((link) => link.props('to').params.id)).toEqual([20, 23, 21, 22])
     await wrapper.get('[data-test="game-tab-box-score"]').trigger('click')
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).toContain('Steven Kwan')

@@ -20,11 +20,25 @@ function normalizePerformer(performer) {
   }
 }
 
+function normalizeSituation(metrics = {}) {
+  return {
+    plateAppearances: metrics.plate_appearances ?? 0,
+    atBats: metrics.at_bats ?? 0,
+    hits: metrics.hits ?? 0,
+    walks: metrics.walks ?? 0,
+    strikeouts: metrics.strikeouts ?? 0,
+    runsBattedIn: metrics.runs_batted_in ?? 0,
+    battingAverage: metrics.batting_average ?? null,
+    onBasePercentage: metrics.on_base_percentage ?? null,
+  }
+}
+
 function normalizeGame(data) {
   const details = data.details || {}
   const lineScore = details.line_score || {}
   const keyPerformers = details.key_performers || {}
   const topHitters = keyPerformers.top_hitters || {}
+  const situationalAnalysis = details.situational_analysis || {}
 
   return {
     id: data.id,
@@ -109,6 +123,14 @@ function normalizeGame(data) {
           percentage: usage.percentage,
           averageVelocity: usage.average_velocity,
           maximumVelocity: usage.maximum_velocity,
+          swings: usage.swings,
+          whiffs: usage.whiffs,
+          whiffPercentage: usage.whiff_percentage,
+          calledStrikes: usage.called_strikes,
+          cswCount: usage.csw_count,
+          cswPercentage: usage.csw_percentage,
+          battedBalls: usage.batted_balls,
+          averageExitVelocity: usage.average_exit_velocity,
         })),
         timesThroughOrder: {
           maximum: entry.times_through_order?.maximum ?? null,
@@ -151,6 +173,75 @@ function normalizeGame(data) {
             lineDrive: leader.distribution?.line_drive || { count: 0, percentage: null },
             flyBall: leader.distribution?.fly_ball || { count: 0, percentage: null },
           },
+        })),
+      })),
+      situationalAnalysis: {
+        highLeverageDefinition: situationalAnalysis.high_leverage_definition || '',
+        teams: (situationalAnalysis.teams || []).map((entry) => ({
+          team: entry.team || null,
+          home: Boolean(entry.home),
+          situations: {
+            runnersInScoringPosition: normalizeSituation(entry.situations?.runners_in_scoring_position),
+            twoOuts: normalizeSituation(entry.situations?.two_outs),
+            basesLoaded: normalizeSituation(entry.situations?.bases_loaded),
+            leadoffHitters: normalizeSituation(entry.situations?.leadoff_hitters),
+            pinchHitters: normalizeSituation(entry.situations?.pinch_hitters),
+            highLeverage: normalizeSituation(entry.situations?.high_leverage),
+          },
+          battingOrderTrips: (entry.batting_order_trips || []).map((trip) => ({
+            ...normalizeSituation(trip),
+            trip: trip.trip,
+          })),
+        })),
+        turningPoint: situationalAnalysis.turning_point ? {
+          type: situationalAnalysis.turning_point.type,
+          inningLabel: situationalAnalysis.turning_point.inning_label,
+          description: situationalAnalysis.turning_point.description,
+          batter: situationalAnalysis.turning_point.batter || null,
+          battingTeam: situationalAnalysis.turning_point.batting_team || null,
+          awayScore: situationalAnalysis.turning_point.away_score,
+          homeScore: situationalAnalysis.turning_point.home_score,
+          runsScored: situationalAnalysis.turning_point.runs_scored,
+          homeWinProbabilityChange: situationalAnalysis.turning_point.home_win_probability_change,
+          benefitingTeam: situationalAnalysis.turning_point.benefiting_team || null,
+        } : null,
+      },
+      plateAppearances: (details.plate_appearances || []).map((appearance) => ({
+        id: appearance.id,
+        atBatIndex: appearance.at_bat_index,
+        plateAppearanceNumber: appearance.plate_appearance_number,
+        inning: appearance.inning,
+        halfInning: appearance.half_inning,
+        event: appearance.event,
+        eventType: appearance.event_type,
+        description: appearance.description,
+        runsBattedIn: appearance.runs_batted_in,
+        awayScore: appearance.away_score,
+        homeScore: appearance.home_score,
+        outsAfter: appearance.outs_after,
+        complete: Boolean(appearance.complete),
+        batter: appearance.batter || null,
+        pitcher: appearance.pitcher || null,
+        battingTeam: appearance.batting_team || null,
+        fieldingTeam: appearance.fielding_team || null,
+        pitches: (appearance.pitches || []).map((pitch) => ({
+          id: pitch.id,
+          pitchNumber: pitch.pitch_number,
+          balls: pitch.balls,
+          strikes: pitch.strikes,
+          outsWhenUp: pitch.outs_when_up,
+          pitchType: pitch.pitch_type,
+          pitchName: pitch.pitch_name,
+          description: pitch.description,
+          events: pitch.events,
+          releaseSpeed: pitch.release_speed,
+          releaseSpinRate: pitch.release_spin_rate,
+          launchSpeed: pitch.launch_speed,
+          launchAngle: pitch.launch_angle,
+          hitDistance: pitch.hit_distance_sc,
+          battedBallType: pitch.bb_type,
+          launchSpeedAngle: pitch.launch_speed_angle,
+          estimatedWoba: pitch.estimated_woba_using_speedangle,
         })),
       })),
       lineScore: {

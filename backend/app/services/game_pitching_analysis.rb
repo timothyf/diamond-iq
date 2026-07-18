@@ -73,13 +73,25 @@ class GamePitchingAnalysis
   def pitch_usage(pitches)
     pitches.group_by { |pitch| pitch.pitch_type.presence || "UN" }.map do |pitch_type, rows|
       velocities = rows.filter_map { |pitch| pitch.release_speed&.to_f }
+      exit_velocities = rows.filter_map { |pitch| pitch.launch_speed&.to_f }
+      swings = rows.count { |pitch| swing?(pitch) }
+      whiffs = rows.count { |pitch| whiff?(pitch) }
+      called_strikes = rows.count { |pitch| called_strike?(pitch) }
       {
         pitch_type: pitch_type,
         pitch_name: rows.filter_map(&:pitch_name).first || (pitch_type == "UN" ? "Unknown" : pitch_type),
         count: rows.length,
         percentage: percentage(rows.length, pitches.length),
         average_velocity: average(velocities),
-        maximum_velocity: velocities.max&.round(1)
+        maximum_velocity: velocities.max&.round(1),
+        swings: swings,
+        whiffs: whiffs,
+        whiff_percentage: percentage(whiffs, swings),
+        called_strikes: called_strikes,
+        csw_count: called_strikes + whiffs,
+        csw_percentage: percentage(called_strikes + whiffs, rows.length),
+        batted_balls: exit_velocities.length,
+        average_exit_velocity: average(exit_velocities)
       }
     end.sort_by { |usage| [-usage.fetch(:count), usage.fetch(:pitch_type)] }
   end

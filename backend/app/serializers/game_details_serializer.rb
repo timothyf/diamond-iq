@@ -18,6 +18,7 @@ class GameDetailsSerializer
       scoring_plays: scoring_plays,
       pitching_analysis: GamePitchingAnalysis.call(game),
       batted_ball_analysis: GameBattedBallAnalysis.call(game),
+      situational_analysis: GameSituationalAnalysis.call(game),
       batting_lines: batting_lines,
       pitching_lines: pitching_lines,
       lineups: lineups,
@@ -423,8 +424,9 @@ class GameDetailsSerializer
     pitch.attributes.slice(
       "id", "game_id", "plate_appearance_id", "at_bat_number", "pitch_number",
       "pitcher", "batter", "pitch_type", "pitch_name", "description", "events",
-      "release_speed", "release_spin_rate", "plate_x", "plate_z", "zone",
-      "launch_speed", "launch_angle", "estimated_woba_using_speedangle"
+      "balls", "strikes", "outs_when_up", "release_speed", "release_spin_rate",
+      "plate_x", "plate_z", "zone", "launch_speed", "launch_angle", "hit_distance_sc",
+      "bb_type", "launch_speed_angle", "estimated_woba_using_speedangle"
     )
   end
 
