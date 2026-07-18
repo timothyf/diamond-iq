@@ -4,17 +4,26 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 
 ## Current Features
 
-### Stat Board
+### Home Dashboard
+
+- A daily MLB briefing built from the application's stored data, using the local `America/Detroit` date.
+- Today's games with status, scores, venue, probable pitchers, and links to Game Summary and Team Profile pages.
+- Current-season batting and pitching leaders with direct links to Player Profiles and Stat Explorer.
+- League pulse cards for the best records, run differential, and recent team form.
+- Dataset freshness metadata so users can see when the briefing was last updated.
+
+### Stat Explorer
 
 - Batting and pitching leaderboards with season, team, player, category, sorting, and pagination controls.
 - A sortable season column and shareable filter state stored in the URL.
 - Player name autocomplete and robust player search that links directly to profiles.
 - A separate pitch-data mode so large Statcast queries are loaded only when requested.
+- The legacy `/stat-board` URL redirects to `/explore`.
 
 ### Player Profiles
 
 - MLB biography, handedness, primary and secondary positions, jersey number, headshot, and current roster status.
-- Current and historical team memberships with source and freshness information.
+- Transaction-aware current and historical organization tenures, with adjacent same-team membership windows consolidated into one timeline entry.
 - Career batting or pitching table with one row per season and a career-total row.
 - Recent batter and pitcher Statcast indicators.
 - Full-season, trailing 7-, 14-, and 30-day, and custom date-range analysis.
@@ -26,16 +35,27 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 ### Team Profiles
 
 - MLB team directory with logos and dedicated team pages.
-- Season record, runs scored and allowed, recent results, and upcoming games.
+- Season selector, record, runs scored and allowed, run differential, recent results, and upcoming games.
+- A Team Performance Dashboard with rank-scaled offensive and pitching cards across all 30 teams.
+- Recent-form windows, home/road performance, platoon splits, starter/bullpen results, one-run games, strengths, and concerns.
+- Drill-down links to relevant games and players plus tracked plate-appearance and pitch totals.
 - Current 40-man and active roster views with links to player profiles.
-- Roster, schedule, and synchronization freshness metadata.
+- Analytics-coverage warnings and roster, schedule, and synchronization freshness metadata.
 
-### Games and Schedules
+### Game Summary and Schedules
 
 - Idempotent MLB schedule synchronization with canonical games, teams, venues, probable pitchers, raw responses, and synchronization timestamps.
 - Filters for team, date range, season, status, and game type.
 - Box-score and live-feed synchronization for batting lines, pitching lines, lineups, substitutions, and plate appearances.
 - Statcast pitch linkage by MLB game and at-bat identifiers.
+- Clickable game results throughout the application that open a tabbed Game Summary page.
+- A persistent scoreboard plus six analytical views:
+  - **Overview** — game insights, pitcher decisions, key performers, scoring timeline, and line score.
+  - **Box Score** — team batting and pitching lines with links to Player Profiles.
+  - **Pitching Analysis** — strike, first-pitch strike, whiff, CSW, chase, velocity, batters faced, times-through-order, and pitch-arsenal metrics for every pitcher.
+  - **Batted Ball** — team and leading-hitter exit velocity, hard-hit rate, launch angle, expected wOBA, barrels, and contact distribution.
+  - **Situational** — RISP, two-out, bases-loaded, leadoff, pinch-hit, high-leverage, batting-order-trip, and turning-point results.
+  - **Play-by-Play** — every plate appearance grouped by inning, with expandable pitch counts, pitch type, velocity, outcome, contact measurements, and score progression.
 - Game detail responses supporting the drill-down from game to player line to plate appearance to pitch.
 - Support for incomplete, postponed, suspended, and doubleheader schedule data.
 
@@ -57,13 +77,17 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 
 The `/admin` page centralizes the application's data operations:
 
-- Download and import player season statistics and Statcast pitches.
+- A keyboard-accessible tabbed interface for **Download & Import**, **Operational Tasks**, and **Local File Imports**.
+- Download or import player season statistics and Statcast pitches.
 - Synchronize MLB schedules, game details, player profiles, and 40-man rosters.
+- Synchronize MLB transaction histories used to reconstruct Player Profile team tenures.
 - Track game-detail progress in real time, recover active progress after a page reload, and cancel safely between games.
 - Capture dated active and 40-man roster snapshots.
 - Rebuild normalized current player positions.
 - Inspect currently stored date or season coverage for each major dataset.
-- View the current environment's PostgreSQL size, largest tables, data/index footprints, estimated live and dead rows, server version, and measurement time.
+- Run or reopen the latest Data Health report for missing schedules, incomplete games, player/profile gaps, pitch-linkage issues, and analytics coverage.
+- View PostgreSQL storage details: total size, largest tables, data/index footprints, estimated live/dead rows, server version, and measurement time.
+- View PostgreSQL table-read activity: total, sequential, and index scans; rows read/fetched; last scan timestamps; and the statistics collection start time.
 
 ## Architecture
 
@@ -83,8 +107,8 @@ flowchart LR
 
 ## Tech Stack
 
-- Backend: Ruby 3.2.3, Rails 7.1, PostgreSQL, Solid Queue, RSpec, and SeedFu
-- Frontend: Vue 3, Vue Router, Vite, and Vitest
+- Backend: Ruby 3.2.3, Rails 7.1.6, PostgreSQL, Solid Queue, RSpec 6.1, and SeedFu
+- Frontend: Vue 3.5, Vue Router 4.6, Vite 8, Vitest 4, and Vue Test Utils
 - Sources:
   - MLB Stats API for schedules, games, box scores, live feeds, teams, rosters, profiles, and season statistics
   - Baseball Savant for Statcast pitch-by-pitch data
@@ -94,6 +118,7 @@ flowchart LR
 - `backend/` — Rails API, data models, synchronization/import services, queries, jobs, Rake tasks, migrations, and specs
 - `frontend/` — Vue routes, views, components, composables, styles, and tests
 - `docs/` — project requirements and expansion plans
+- `output/pdf/` — generated printable reports, including the current codebase overview
 
 ## Local Setup
 
@@ -138,11 +163,14 @@ VITE_API_BASE_URL=http://127.0.0.1:3000 npm run dev
 
 The main frontend routes are:
 
-- `/` — Player Season Stat Board
-- `/players/:id` — unified player profile
-- `/teams` — MLB team directory
-- `/teams/:id` — team profile
-- `/admin` — imports, synchronization, analytics, and database information
+- `/` — daily MLB Home dashboard
+- `/explore` — Stat Explorer for season and Statcast leaderboards
+- `/stat-board` — legacy redirect to Stat Explorer
+- `/games/:id` — tabbed Game Summary and pitch-level analysis
+- `/players/:id` — unified Player Profile
+- `/teams` — MLB Team Directory
+- `/teams/:id` — analytical Team Profile
+- `/admin` — imports, synchronization, data health, analytics, and database information
 
 ## Recommended Data Workflow
 
@@ -151,7 +179,7 @@ Source imports and MLB synchronization are available from the Admin page. The co
 1. Synchronize schedules and canonical games.
 2. Synchronize game details and plate appearances.
 3. Download season statistics and Statcast pitches.
-4. Synchronize 40-man rosters and player profiles.
+4. Synchronize 40-man rosters, player profiles, and MLB transaction histories.
 5. Refresh daily analytics and contextual benchmarks.
 
 All synchronization tasks are designed to be repeatable and idempotent.
@@ -294,10 +322,11 @@ VERSION=1.1.0 bin/rails 'daily_analytics:refresh[2026-04-01,2026-04-30]'
 
 ### Players and Teams
 
+- `GET /api/home` — current daily briefing, games, league leaders, team pulse, and freshness metadata
 - `GET /api/players` — searchable, paginated player directory data
 - `GET /api/players/:id` — unified profile, career history, roster history, analysis, trends, and benchmarks
 - `GET /api/teams`
-- `GET /api/teams/:id` — team profile, record, games, and active/40-man rosters
+- `GET /api/teams/:id` — team profile, performance dashboard, schedule, freshness, and active/40-man rosters
 - `GET /api/positions`
 
 Player analysis parameters include `range=season|7|14|30|custom`, `start_date`, `end_date`, `pa_window`, and `pitch_window`.
@@ -305,7 +334,7 @@ Player analysis parameters include `range=season|7|14|30|custom`, `start_date`, 
 ### Games, Schedules, and Rosters
 
 - `GET /api/games`
-- `GET /api/games/:id`
+- `GET /api/games/:id` — scoreboard, insights, key performers, line/box scores, pitching and batted-ball analysis, situational results, and pitch-level play-by-play
 - `GET /api/games/upcoming`
 - `GET /api/schedules/:id`
 - `GET /api/roster_snapshots`
@@ -328,6 +357,12 @@ Game filters include team, start/end date, season, status, and game type. Collec
 
 - `GET /api/admin/tasks` — task catalog plus dataset coverage and database metrics
 - `POST /api/admin/tasks/:task_name/run` — run an allowed synchronization or analytics task
+- `GET /api/admin/task_runs` — recent tracked task executions
+- `GET /api/admin/task_runs/:id` — current task progress and result details
+- `GET /api/admin/task_runs/estimate` — estimate a supported task before starting it
+- `POST /api/admin/task_runs` — start a tracked background task
+- `POST /api/admin/task_runs/:id/cancel` — request safe cancellation
+- `GET /api/admin/data_health` — run the data-health evaluation; the Admin page retains the current report until the user explicitly refreshes it
 
 ## Admin API Token
 
@@ -370,10 +405,15 @@ cd frontend
 npm run build
 ```
 
+The request, service, query, model, composable, component, and view suites cover both normal workflows and important incomplete-data/error states. A printable repository and coverage snapshot is available at `output/pdf/diamondiq-codebase-overview.pdf`.
+
 ## Data Model Notes
 
 - `TeamMembership` is the historical source of truth for a player's team and roster status over time.
 - `RosterSnapshot` preserves a source roster exactly as observed on a date and does not replace membership history.
 - `players.team_id` represents the current team cache and should agree with the active membership when one exists.
 - `games.mlb_id` and `pitch_data.game_pk` identify the same MLB game; `pitch_data.game_id` provides the canonical database relationship.
+- `PlateAppearance` is the game-level event boundary; linked `PitchDatum` records provide count, pitch, movement, velocity, contact, and win-probability context.
+- Game batting and pitching lines retain upstream season-rate context for accurate AVG, OPS, ERA, and WHIP display.
+- Derived daily summaries are calculation-versioned and feed team dashboards, player trends, and contextual benchmarks.
 - Raw upstream responses, source names or URLs, and synchronization timestamps are retained by synchronization models where available.
