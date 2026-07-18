@@ -1,0 +1,88 @@
+require "json"
+require "net/http"
+
+class MlbPlayerTransactionsDownloader
+  BASE_URL = "https://statsapi.mlb.com/api/v1/transactions"
+  DEFAULT_START_DATE = Date.new(1900, 1, 1)
+  DEFAULT_TIMEOUT_SECONDS = 60
+  USER_AGENT = "DiamondIQ/1.0 (MLB player transaction synchronization)"
+
+  def self.call(player_mlb_id:, start_date: DEFAULT_START_DATE, end_date: Date.current)
+    new(player_mlb_id: player_mlb_id, start_date: start_date, end_date: end_date).call
+  end
+
+  def initialize(player_mlb_id:, start_date: DEFAULT_START_DATE, end_date: Date.current)
+    @player_mlb_id = Integer(player_mlb_id, exception: false)
+    @start_date = parse_date(start_date)
+    @end_date = parse_date(end_date)
+  end
+
+  def call
+    return failure("Player MLB id must be a positive integer") unless player_mlb_id&.positive?
+    return failure("Start date and end date are required") if start_date.nil? || end_date.nil?
+    return failure("End date must be on or after start date") if end_date < start_date
+
+    source_url = build_url
+    payload = fetch_json(source_url)
+    return failure("MLB transactions response must be a JSON object") unless payload.is_a?(Hash)
+    return failure("MLB transactions response must include a transactions array") unless payload["transactions"].is_a?(Array)
+
+    success(
+      "Downloaded #{payload['transactions'].length} MLB player transactions",
+      payload: payload,
+      transaction_count: payload["transactions"].length,
+      source_url: source_url,
+      fetched_at: Time.current.utc.iso8601
+    )
+  rescue JSON::ParserError => error
+    failure("Failed to parse MLB transactions response: #{error.message}")
+  rescue StandardError => error
+    failure("Failed to download MLB player transactions: #{error.message}")
+  end
+
+  private
+
+  attr_reader :player_mlb_id, :start_date, :end_date
+
+  def build_url
+    query = {
+      playerId: player_mlb_id,
+      startDate: start_date.strftime("%m/%d/%Y"),
+      endDate: end_date.strftime("%m/%d/%Y")
+    }.to_query
+    "#{BASE_URL}?#{query}"
+  end
+
+  def fetch_json(url)
+    uri = URI(url)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme == "https"
+    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request["User-Agent"] = USER_AGENT
+    request["Accept"] = "application/json"
+
+    response = http.request(request)
+    raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+    JSON.parse(response.body)
+  end
+
+  def parse_date(value)
+    return value if value.is_a?(Date)
+
+    Date.iso8601(value.to_s)
+  rescue Date::Error
+    nil
+  end
+
+  def success(message, data = {})
+    { success: true, message: message, data: data }
+  end
+
+  def failure(message)
+    { success: false, message: message, data: {} }
+  end
+end

@@ -95,7 +95,26 @@ RSpec.describe "Api::Games", type: :request do
   it "returns normalized box-score and plate-appearance drill-down data" do
     @game.update!(
       details_source_url: "https://statsapi.mlb.com/api/v1.1/game/823443/feed/live",
-      details_last_synced_at: Time.zone.parse("2026-07-14T23:00:00Z")
+      details_last_synced_at: Time.zone.parse("2026-07-14T23:00:00Z"),
+      home_score: 3,
+      away_score: 1,
+      live_feed_raw_data: {
+        "liveData" => {
+          "linescore" => {
+            "currentInning" => 9,
+            "currentInningOrdinal" => "9th",
+            "inningState" => "End",
+            "innings" => [
+              { "num" => 1, "ordinalNum" => "1st", "away" => { "runs" => 1 }, "home" => { "runs" => 0 } },
+              { "num" => 2, "ordinalNum" => "2nd", "away" => { "runs" => 0 }, "home" => { "runs" => 3 } }
+            ],
+            "teams" => {
+              "away" => { "runs" => 1, "hits" => 5, "errors" => 0, "leftOnBase" => 6 },
+              "home" => { "runs" => 3, "hits" => 8, "errors" => 1, "leftOnBase" => 7 }
+            }
+          }
+        }
+      }
     )
     GamePlayerBattingLine.create!(
       game: @game,
@@ -107,6 +126,51 @@ RSpec.describe "Api::Games", type: :request do
       batting_order: 900,
       at_bats: 3,
       hits: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current,
+      raw_data: { "seasonStats" => { "batting" => { "avg" => ".287", "ops" => ".842" } } }
+    )
+    GamePlayerPitchingLine.create!(
+      game: @game,
+      player: @skubal,
+      team: @tigers,
+      opponent_team: @guardians,
+      home: true,
+      starter: true,
+      appearance_order: 1,
+      innings_pitched: "7.0",
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current,
+      raw_data: { "seasonStats" => { "pitching" => { "era" => "2.01", "whip" => "0.99" } } }
+    )
+    GamePlayerPitchingLine.create!(
+      game: @game,
+      player: @bibee,
+      team: @guardians,
+      opponent_team: @tigers,
+      home: false,
+      starter: true,
+      appearance_order: 1,
+      innings_pitched: "6.0",
+      decision: "(L, 7-5)",
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+    @game.game_player_pitching_lines.find_by!(player: @skubal).update!(decision: "(W, 11-2)")
+    reliever = create_player(
+      team: @tigers,
+      attributes: { mlb_id: 700_111, first_name: "Will", last_name: "Vest" }
+    )
+    GamePlayerPitchingLine.create!(
+      game: @game,
+      player: reliever,
+      team: @tigers,
+      opponent_team: @guardians,
+      home: true,
+      starter: false,
+      appearance_order: 2,
+      innings_pitched: "1.0",
+      decision: "(S, 1)",
       source_name: "MLB Stats API",
       last_synced_at: Time.current
     )
@@ -124,7 +188,8 @@ RSpec.describe "Api::Games", type: :request do
       event_type: "single",
       complete: true,
       source_name: "MLB Stats API",
-      last_synced_at: Time.current
+      last_synced_at: Time.current,
+      raw_data: { "matchup" => { "splits" => { "menOnBase" => "RISP" } } }
     )
     PitchDatum.create!(
       game: @game,
@@ -143,7 +208,59 @@ RSpec.describe "Api::Games", type: :request do
       "synchronized" => true,
       "last_synced_at" => "2026-07-14T23:00:00.000Z"
     )
+    expect(json_body.dig("data", "details", "line_score", "innings")).to eq(
+      [
+        {
+          "number" => 1,
+          "ordinal" => "1st",
+          "away" => { "runs" => 1, "hits" => nil, "errors" => nil, "left_on_base" => nil },
+          "home" => { "runs" => 0, "hits" => nil, "errors" => nil, "left_on_base" => nil }
+        },
+        {
+          "number" => 2,
+          "ordinal" => "2nd",
+          "away" => { "runs" => 0, "hits" => nil, "errors" => nil, "left_on_base" => nil },
+          "home" => { "runs" => 3, "hits" => nil, "errors" => nil, "left_on_base" => nil }
+        }
+      ]
+    )
+    expect(json_body.dig("data", "details", "line_score", "totals", "home")).to eq(
+      "runs" => 3,
+      "hits" => 8,
+      "errors" => 1,
+      "left_on_base" => 7
+    )
     expect(json_body.dig("data", "details", "batting_lines", 0, "player", "full_name")).to eq("Tarik Skubal")
+    expect(json_body.dig("data", "details", "batting_lines", 0)).to include(
+      "batting_average" => "0.287",
+      "ops" => "0.842"
+    )
+    expect(json_body.dig("data", "details", "pitching_lines", 0)).to include(
+      "decision" => "(L, 7-5)"
+    )
+    expect(json_body.dig("data", "details", "pitching_lines", 1)).to include(
+      "era" => "2.01",
+      "whip" => "0.99",
+      "decision" => "(W, 11-2)"
+    )
+    expect(json_body.dig("data", "details", "insights", "decisions", "winning_pitcher")).to include(
+      "player" => include("full_name" => "Tarik Skubal"),
+      "decision" => "(W, 11-2)"
+    )
+    expect(json_body.dig("data", "details", "insights", "decisions", "losing_pitcher")).to include(
+      "player" => include("full_name" => "Tanner Bibee"),
+      "decision" => "(L, 7-5)"
+    )
+    expect(json_body.dig("data", "details", "insights", "decisions", "save")).to include(
+      "player" => include("full_name" => "Will Vest"),
+      "decision" => "(S, 1)"
+    )
+    expect(json_body.dig("data", "details", "insights", "teams", "home")).to include(
+      "run_differential" => 2,
+      "hits" => 8,
+      "errors" => 1,
+      "runners_in_scoring_position" => { "hits" => 1, "at_bats" => 1 }
+    )
     expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
       "event_type" => "single",
       "plate_appearance_number" => 1

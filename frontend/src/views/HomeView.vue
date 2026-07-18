@@ -97,6 +97,12 @@ function signed(value) {
         </header>
         <div v-if="dashboard.games.length" class="game-grid">
           <article v-for="game in dashboard.games" :key="game.id" class="game-card">
+            <RouterLink
+              class="game-card__summary-link"
+              :to="{ name: 'game-summary', params: { id: game.id } }"
+              :aria-label="`View ${game.away_team.name} at ${game.home_team.name} game summary`"
+              data-test="game-summary-link"
+            ></RouterLink>
             <header><span>{{ gameState(game) }}</span><small>{{ game.venue_name || 'Venue TBD' }}</small></header>
             <RouterLink :to="{ name: 'team-profile', params: { id: game.away_team.id } }" class="game-team">
               <b>{{ game.away_team.abbreviation }}</b><strong>{{ game.away_team.name }}</strong><em>{{ score(game, 'away') }}</em>
@@ -213,11 +219,13 @@ function signed(value) {
 .home-heading > span, .home-heading > a { color: #62707a; font-size: .77rem; font-weight: 800; text-decoration: none; }
 .home-heading > a:hover { color: #a93627; }
 .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: .8rem; }
-.game-card { min-width: 0; padding: 1rem; border: 1px solid rgba(16,38,61,.11); border-radius: 18px; background: rgba(255,255,255,.72); }
+.game-card { position: relative; min-width: 0; padding: 1rem; border: 1px solid rgba(16,38,61,.11); border-radius: 18px; background: rgba(255,255,255,.72); transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.game-card:hover,.game-card:focus-within { border-color: rgba(169,54,39,.35); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(16,38,61,.09); }
+.game-card__summary-link { position: absolute; z-index: 1; inset: 0; border-radius: inherit; }
 .game-card > header { display: flex; justify-content: space-between; gap: .5rem; padding-bottom: .65rem; border-bottom: 1px solid rgba(16,38,61,.08); }
 .game-card > header span { color: #a93627; font-size: .73rem; font-weight: 900; text-transform: uppercase; }
 .game-card > header small { overflow: hidden; color: #78838b; text-overflow: ellipsis; white-space: nowrap; }
-.game-team { display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: .65rem; align-items: center; padding-top: .75rem; color: #10263d; text-decoration: none; }
+.game-team { position: relative; z-index: 2; display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: .65rem; align-items: center; padding-top: .75rem; color: #10263d; text-decoration: none; }
 .game-team b { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: white; background: #183e5b; font-size: .7rem; }
 .game-team strong { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; white-space: nowrap; }
 .game-team em { font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.7rem; font-style: normal; font-weight: 900; }

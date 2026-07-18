@@ -8,6 +8,13 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     create_game(schedule: late_schedule, official_date: Date.new(2026, 9, 22))
     tigers = create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
     player = create_player(team: tigers)
+    create_team_membership(
+      player: player,
+      team: tigers,
+      starts_on: Date.new(2024, 12, 31),
+      ends_on: Date.new(2025, 12, 30)
+    )
+    create_team_membership(player: player, team: tigers, starts_on: Date.new(2025, 12, 31))
     stat_type = create_stat_type
     create_player_season_stat(player: player, stat_type: stat_type, attributes: { season: 1901 })
     create_player_season_stat(player: player, stat_type: stat_type, attributes: { season: 2026 })
@@ -21,6 +28,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       "mlb_schedule_sync",
       "mlb_game_details_sync",
       "mlb_player_profiles_sync",
+      "mlb_player_team_histories_sync",
       "mlb_roster_sync",
       "mlb_roster_snapshots_sync",
       "player_positions_backfill",
@@ -34,6 +42,10 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     expect(json_body.dig("meta", "schedule_import_range")).to eq(
       "earliest_import_date" => "2026-03-26",
       "latest_import_date" => "2026-05-31"
+    )
+    expect(json_body.dig("meta", "roster_coverage")).to eq(
+      "earliest_date" => "2024-12-31",
+      "latest_date" => Date.current.iso8601
     )
     expect(json_body.dig("meta", "mlb_teams")).to eq(
       [
@@ -123,6 +135,10 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     expect(json_body.dig("meta", "schedule_import_range")).to eq(
       "earliest_import_date" => nil,
       "latest_import_date" => nil
+    )
+    expect(json_body.dig("meta", "roster_coverage")).to eq(
+      "earliest_date" => nil,
+      "latest_date" => nil
     )
   end
 

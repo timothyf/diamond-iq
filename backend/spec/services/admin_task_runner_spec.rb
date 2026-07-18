@@ -44,6 +44,21 @@ RSpec.describe AdminTaskRunner do
     )
   end
 
+  it "runs player organization history synchronization with optional filters" do
+    allow(MlbPlayerTeamHistoriesSync).to receive(:call).and_return(
+      success: true,
+      message: "Synchronized MLB organization history for 1 of 1 players",
+      data: { tenure_count: 5 }
+    )
+
+    described_class.call(
+      task_name: "mlb_player_team_histories_sync",
+      params: { limit: "2", mlb_ids: "656427" }
+    )
+
+    expect(MlbPlayerTeamHistoriesSync).to have_received(:call).with(limit: 2, mlb_ids: "656427")
+  end
+
   it "runs game-detail synchronization for a stored date range" do
     allow(MlbGameDetailsBatchSync).to receive(:call).and_return(
       success: true,

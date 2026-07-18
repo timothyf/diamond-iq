@@ -1,6 +1,101 @@
 require "rails_helper"
 
 RSpec.describe PlayerProfileSnapshotQuery do
+  it "coalesces adjacent same-team roster windows into one organization tenure" do
+    player = create_player
+    team = player.team
+    first = create_team_membership(
+      player: player,
+      team: team,
+      starts_on: Date.new(2024, 12, 31),
+      ends_on: Date.new(2025, 12, 30),
+      roster_status: "active"
+    )
+    create_team_membership(
+      player: player,
+      team: team,
+      starts_on: Date.new(2025, 12, 31),
+      ends_on: Date.new(2026, 7, 13),
+      roster_status: "active"
+    )
+    latest = create_team_membership(
+      player: player,
+      team: team,
+      starts_on: Date.new(2026, 7, 14),
+      roster_status: "active",
+      source_status_description: "Active"
+    )
+
+    history = described_class.new(player: player, on: Date.new(2026, 7, 17)).result.fetch(:team_history)
+
+    expect(history).to contain_exactly(
+      hash_including(
+        id: latest.id,
+        starts_on: first.starts_on,
+        ends_on: nil,
+        current: true,
+        roster_status: "active",
+        source_status_description: "Active",
+        team: hash_including(id: team.id)
+      )
+    )
+  end
+
+  it "keeps separate tenures when a player leaves and later returns to a team" do
+    player = create_player
+    original_team = player.team
+    other_team = create_team
+    create_team_membership(player: player, team: original_team, starts_on: Date.new(2024, 1, 1), ends_on: Date.new(2024, 6, 30))
+    create_team_membership(player: player, team: other_team, starts_on: Date.new(2024, 7, 1), ends_on: Date.new(2024, 12, 31))
+    create_team_membership(player: player, team: original_team, starts_on: Date.new(2025, 1, 1))
+
+    history = described_class.new(player: player, on: Date.new(2025, 6, 1)).result.fetch(:team_history)
+
+    expect(history.map { |tenure| tenure.dig(:team, :id) }).to eq([ original_team.id, other_team.id, original_team.id ])
+    expect(history.first).to include(current: true, roster_status: "active")
+    expect(history.drop(1)).to all(
+      include(current: false, roster_status: "organization", source_status_description: "Organization tenure")
+    )
+  end
+
+  it "does not let a stale roster snapshot extend a transaction-derived tenure" do
+    former_team = create_team
+    current_team = create_team
+    player = create_player(team: current_team)
+    create_team_membership(
+      player: player,
+      team: former_team,
+      starts_on: Date.new(2022, 8, 7),
+      ends_on: Date.new(2025, 7, 30),
+      roster_status: "organization",
+      source_name: "MLB Stats API transactions"
+    )
+    create_team_membership(
+      player: player,
+      team: former_team,
+      starts_on: Date.new(2024, 12, 31),
+      ends_on: Date.new(2025, 12, 30),
+      roster_status: "active"
+    )
+    create_team_membership(
+      player: player,
+      team: current_team,
+      starts_on: Date.new(2025, 7, 31),
+      roster_status: "organization",
+      source_name: "MLB Stats API transactions"
+    )
+
+    history = described_class.new(player: player, on: Date.new(2026, 7, 17)).result.fetch(:team_history)
+    former_tenure = history.find { |tenure| tenure.dig(:team, :id) == former_team.id }
+
+    expect(former_tenure).to include(
+      starts_on: Date.new(2022, 8, 7),
+      ends_on: Date.new(2025, 7, 30),
+      current: false,
+      source_status_description: "Organization tenure"
+    )
+  end
+
   it "prefers a pitching overview for a player whose primary position is pitcher" do
     player = create_player
     pitcher = create_position(mlb_code: "1", abbreviation: "P", name: "Pitcher", position_type: "pitcher")

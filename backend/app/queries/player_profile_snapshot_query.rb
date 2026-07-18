@@ -3,6 +3,7 @@ class PlayerProfileSnapshotQuery
   SEASON_CATEGORIES = %w[batting pitching].freeze
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
+  TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
 
   def initialize(player:, on: Date.current, analysis_range: nil)
     @player = player
@@ -15,7 +16,7 @@ class PlayerProfileSnapshotQuery
       season_overview: season_overview,
       career_overview: career_overview,
       current_membership: serialize_membership(current_membership),
-      team_history: memberships.map { |membership| serialize_membership(membership) },
+      team_history: organization_tenures,
       recent_pitch_indicators: recent_pitch_indicators,
       contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(
         player: player,
@@ -492,6 +493,64 @@ class PlayerProfileSnapshotQuery
       .includes(:team)
       .order(starts_on: :desc, id: :desc)
       .to_a
+  end
+
+  def organization_tenures
+    groups = memberships.sort_by { |membership| [ membership.starts_on, membership.id ] }.each_with_object([]) do |membership, output|
+      previous = output.last
+      if mergeable_organization_window?(previous, membership)
+        if transaction_history_membership?(membership)
+          previous[:starts_on] = membership.starts_on
+          previous[:ends_on] = membership.ends_on
+          previous[:transaction_history] = true
+        elsif !previous[:transaction_history]
+          previous[:starts_on] = [ previous[:starts_on], membership.starts_on ].min
+          previous[:ends_on] = merged_membership_end(previous[:ends_on], membership.ends_on)
+        end
+        previous[:latest_membership] = membership
+        previous[:current] ||= membership == current_membership
+      else
+        output << {
+          starts_on: membership.starts_on,
+          ends_on: membership.ends_on,
+          latest_membership: membership,
+          current: membership == current_membership,
+          transaction_history: transaction_history_membership?(membership)
+        }
+      end
+    end
+
+    groups.reverse.map do |group|
+      serialized = serialize_membership(group[:latest_membership]).merge(
+        starts_on: group[:starts_on],
+        ends_on: group[:ends_on],
+        current: group[:current]
+      )
+      next serialized if group[:current]
+
+      serialized.merge(
+        roster_status: "organization",
+        injured: false,
+        source_status_description: "Organization tenure"
+      )
+    end
+  end
+
+  def mergeable_organization_window?(group, membership)
+    return false if group.nil? || group[:latest_membership].team_id != membership.team_id
+    return true if group[:ends_on].nil?
+
+    membership.starts_on <= group[:ends_on] + 1.day
+  end
+
+  def merged_membership_end(first, second)
+    return nil if first.nil? || second.nil?
+
+    [ first, second ].max
+  end
+
+  def transaction_history_membership?(membership)
+    membership.source_name == TRANSACTION_HISTORY_SOURCE_NAME
   end
 
   def current_membership

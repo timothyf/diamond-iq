@@ -87,6 +87,7 @@ function apiPayload() {
           id: 8,
           team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
           starts_on: '2026-03-26',
+          current: true,
           roster_status: 'active',
           source_status_description: 'Active',
         },
@@ -185,6 +186,32 @@ function apiPayloadWith(mutator) {
 }
 
 describe('PlayerProfileView', () => {
+  it('labels completed team-history windows as organization tenures instead of active', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.team_history.push({
+        id: 7,
+        team: { id: 2, mlb_id: 120, name: 'Washington Nationals', abbreviation: 'WSH' },
+        starts_on: '2022-08-07',
+        ends_on: '2025-07-30',
+        current: false,
+        roster_status: 'active',
+        source_status_description: 'Active',
+      })
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll('.team-timeline small').map((status) => status.text())).toEqual([
+      'Active',
+      'Organization tenure',
+    ])
+  })
+
   it('renders the unified player workflow', async () => {
     vi.stubGlobal(
       'fetch',

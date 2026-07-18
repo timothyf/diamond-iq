@@ -47,8 +47,12 @@ RSpec.describe MlbGameDetailsImporter do
       batting_order: 100,
       hits: 2,
       home_runs: 1,
-      runs_batted_in: 3
+      runs_batted_in: 3,
+      batting_average: BigDecimal("0.287"),
+      ops: BigDecimal("0.842")
     )
+    pitching_line = GamePlayerPitchingLine.find_by!(game: game, player: Player.find_by!(mlb_id: 669_373))
+    expect(pitching_line).to have_attributes(era: BigDecimal("2.01"), whip: BigDecimal("0.99"))
     expect(LineupEntry.find_by!(game: game, player: greene).substitutions).to include(
       hash_including("details" => hash_including("eventType" => "offensive_substitution"))
     )
@@ -130,12 +134,12 @@ RSpec.describe MlbGameDetailsImporter do
     @boxscore ||= {
       "teams" => {
         "away" => team_boxscore(
-          batter: person_payload(682_177, "Steven Kwan", batting_order: "100", batting: { "plateAppearances" => 4, "atBats" => 4, "hits" => 1 }),
-          pitcher: person_payload(676_440, "Tanner Bibee", pitching: { "inningsPitched" => "6.1", "battersFaced" => 24, "hits" => 5, "earnedRuns" => 2, "strikeOuts" => 7, "numberOfPitches" => 91, "strikes" => 62 })
+          batter: person_payload(682_177, "Steven Kwan", batting_order: "100", batting: { "plateAppearances" => 4, "atBats" => 4, "hits" => 1 }, season_batting: { "avg" => ".301", "obp" => ".372", "slg" => ".420", "ops" => ".792" }),
+          pitcher: person_payload(676_440, "Tanner Bibee", pitching: { "inningsPitched" => "6.1", "battersFaced" => 24, "hits" => 5, "earnedRuns" => 2, "strikeOuts" => 7, "numberOfPitches" => 91, "strikes" => 62 }, season_pitching: { "era" => "3.45", "whip" => "1.23" })
         ),
         "home" => team_boxscore(
-          batter: person_payload(680_776, "Riley Greene", batting_order: "100", batting: { "plateAppearances" => 4, "atBats" => 4, "runs" => 1, "hits" => 2, "homeRuns" => 1, "rbi" => 3 }),
-          pitcher: person_payload(669_373, "Tarik Skubal", pitching: { "inningsPitched" => "7.0", "battersFaced" => 25, "hits" => 4, "earnedRuns" => 1, "strikeOuts" => 9, "numberOfPitches" => 98, "strikes" => 67 })
+          batter: person_payload(680_776, "Riley Greene", batting_order: "100", batting: { "plateAppearances" => 4, "atBats" => 4, "runs" => 1, "hits" => 2, "homeRuns" => 1, "rbi" => 3 }, season_batting: { "avg" => ".287", "obp" => ".361", "slg" => ".481", "ops" => ".842" }),
+          pitcher: person_payload(669_373, "Tarik Skubal", pitching: { "inningsPitched" => "7.0", "battersFaced" => 25, "hits" => 4, "earnedRuns" => 1, "strikeOuts" => 9, "numberOfPitches" => 98, "strikes" => 67 }, season_pitching: { "era" => "2.01", "whip" => "0.99" })
         )
       }
     }
@@ -153,13 +157,14 @@ RSpec.describe MlbGameDetailsImporter do
     }
   end
 
-  def person_payload(id, name, batting_order: nil, batting: {}, pitching: {})
+  def person_payload(id, name, batting_order: nil, batting: {}, pitching: {}, season_batting: {}, season_pitching: {})
     {
       "person" => { "id" => id, "fullName" => name },
       "battingOrder" => batting_order,
       "position" => { "abbreviation" => pitching.present? ? "P" : "OF" },
       "allPositions" => [ { "abbreviation" => pitching.present? ? "P" : "OF" } ],
-      "stats" => { "batting" => batting, "pitching" => pitching }
+      "stats" => { "batting" => batting, "pitching" => pitching },
+      "seasonStats" => { "batting" => season_batting, "pitching" => season_pitching }
     }.compact
   end
 

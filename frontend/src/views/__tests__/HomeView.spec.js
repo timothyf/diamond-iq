@@ -70,6 +70,7 @@ describe('HomeView', () => {
     expect(wrapper.text()).toContain('Baseball intelligence, ready for first pitch')
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Detroit Tigers')
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Tarik Skubal')
+    expect(wrapper.get('[data-test="game-summary-link"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Aaron Judge')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.025')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.75')

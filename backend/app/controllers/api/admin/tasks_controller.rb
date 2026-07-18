@@ -7,6 +7,7 @@ module Api
           meta: {
             schedule_import_range: schedule_import_range,
             schedule_date_range: schedule_date_range,
+            roster_coverage: roster_coverage,
             mlb_teams: mlb_teams,
             database: database_metrics,
             player_season_stats: player_season_stats_metrics,
@@ -75,6 +76,22 @@ module Api
         {
           earliest_import_date: earliest_date&.iso8601,
           latest_import_date: latest_date&.iso8601
+        }
+      end
+
+      def roster_coverage
+        memberships = TeamMembership.arel_table
+        earliest_date, latest_start_date, latest_end_date = TeamMembership.pick(
+          memberships[:starts_on].minimum,
+          memberships[:starts_on].maximum,
+          memberships[:ends_on].maximum
+        )
+        latest_date_candidates = [latest_start_date, latest_end_date]
+        latest_date_candidates << Date.current if TeamMembership.where(ends_on: nil).exists?
+
+        {
+          earliest_date: earliest_date&.iso8601,
+          latest_date: latest_date_candidates.compact.max&.iso8601
         }
       end
 

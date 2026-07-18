@@ -71,6 +71,11 @@ const profileOptions = reactive({
   mlbIds: '',
 })
 
+const teamHistoryOptions = reactive({
+  limit: '',
+  mlbIds: '',
+})
+
 const rosterOptions = reactive({
   teamScope: 'team',
   teamMlbId: '',
@@ -98,6 +103,7 @@ const {
   dataHealthError,
   scheduleImportRange,
   scheduleDateRange,
+  rosterCoverage,
   mlbTeams,
   databaseMetrics,
   playerSeasonStatsMetrics,
@@ -381,6 +387,13 @@ async function handleProfileSync() {
     batch_size: profileOptions.batchSize,
     limit: profileOptions.limit || null,
     mlb_ids: profileOptions.mlbIds || null,
+  })
+}
+
+async function handleTeamHistorySync() {
+  await runTask('mlb_player_team_histories_sync', {
+    limit: teamHistoryOptions.limit || null,
+    mlb_ids: teamHistoryOptions.mlbIds || null,
   })
 }
 
@@ -1569,6 +1582,26 @@ async function closeDataHealth() {
           </button>
         </form>
 
+        <form class="admin-card" data-test="team-history-sync-form" @submit.prevent="handleTeamHistorySync">
+          <div class="admin-card__title">
+            <div>
+              <p>Player organization trail</p>
+              <h3>MLB transaction history synchronization</h3>
+            </div>
+            <code>mlb_player_team_histories:sync</code>
+          </div>
+          <p class="admin-card__description">
+            Downloads official MLB transactions and rebuilds dated major-league organization tenures for Player Profile Team History cards.
+          </p>
+          <div class="admin-fields admin-fields--two">
+            <label><span>Limit (optional)</span><input v-model="teamHistoryOptions.limit" type="number" min="1" /></label>
+            <label><span>MLB IDs (optional)</span><input v-model="teamHistoryOptions.mlbIds" type="text" placeholder="656427, 669360" /></label>
+          </div>
+          <button class="admin-button" type="submit" :disabled="anyActionRunning">
+            {{ runningTask === 'mlb_player_team_histories_sync' ? 'Synchronizing team histories…' : 'Synchronize team histories' }}
+          </button>
+        </form>
+
         <form class="admin-card" data-test="roster-sync-form" @submit.prevent="handleRosterSync">
           <div class="admin-card__title">
             <div>
@@ -1579,6 +1612,13 @@ async function closeDataHealth() {
           </div>
           <p class="admin-card__description">
             Downloads MLB 40-man rosters and updates player profiles, roster status, and dated team memberships for the selected season.
+          </p>
+          <p class="admin-card__coverage" data-test="roster-database-coverage">
+            <strong>Database coverage:</strong>
+            <template v-if="rosterCoverage.earliestDate && rosterCoverage.latestDate">
+              {{ formatDate(rosterCoverage.earliestDate) }}–{{ formatDate(rosterCoverage.latestDate) }}
+            </template>
+            <template v-else>No dated roster memberships stored</template>
           </p>
           <div class="admin-fields admin-fields--three">
             <label>
@@ -2800,6 +2840,12 @@ async function closeDataHealth() {
   color: #61707b;
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.admin-card__coverage {
+  margin: 0.75rem 0 1rem;
+  color: #33495d;
+  font-size: 0.82rem;
 }
 
 .roster-snapshot-workspace {

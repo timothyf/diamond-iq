@@ -20,6 +20,10 @@ describe('useAdminTask', () => {
               earliest_game_date: '2026-03-26',
               latest_game_date: '2026-09-22',
             },
+            roster_coverage: {
+              earliest_date: '2024-12-31',
+              latest_date: '2026-07-17',
+            },
             mlb_teams: [
               {
                 id: 1,
@@ -91,6 +95,7 @@ describe('useAdminTask', () => {
       loadOverview,
       scheduleImportRange,
       scheduleDateRange,
+      rosterCoverage,
       mlbTeams,
       databaseMetrics,
       playerSeasonStatsMetrics,
@@ -108,6 +113,10 @@ describe('useAdminTask', () => {
     expect(scheduleDateRange.value).toEqual({
       earliestGameDate: '2026-03-26',
       latestGameDate: '2026-09-22',
+    })
+    expect(rosterCoverage.value).toEqual({
+      earliestDate: '2024-12-31',
+      latestDate: '2026-07-17',
     })
     expect(mlbTeams.value).toEqual([
       {

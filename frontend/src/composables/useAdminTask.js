@@ -15,6 +15,7 @@ export function useAdminTask() {
   const dataHealthError = ref('')
   const scheduleImportRange = ref({ earliestImportDate: null, latestImportDate: null })
   const scheduleDateRange = ref({ earliestGameDate: null, latestGameDate: null })
+  const rosterCoverage = ref({ earliestDate: null, latestDate: null })
   const mlbTeams = ref([])
   const databaseMetrics = ref({
     environment: '',
@@ -59,6 +60,7 @@ export function useAdminTask() {
 
       const range = payload?.meta?.schedule_date_range || {}
       const importRange = payload?.meta?.schedule_import_range || {}
+      const rosterRange = payload?.meta?.roster_coverage || {}
       scheduleImportRange.value = {
         earliestImportDate: importRange.earliest_import_date || null,
         latestImportDate: importRange.latest_import_date || null,
@@ -66,6 +68,10 @@ export function useAdminTask() {
       scheduleDateRange.value = {
         earliestGameDate: range.earliest_game_date || null,
         latestGameDate: range.latest_game_date || null,
+      }
+      rosterCoverage.value = {
+        earliestDate: rosterRange.earliest_date || null,
+        latestDate: rosterRange.latest_date || null,
       }
       mlbTeams.value = (payload?.meta?.mlb_teams || []).map((team) => ({
         id: team.id,
@@ -235,6 +241,7 @@ export function useAdminTask() {
     dataHealthError: computed(() => dataHealthError.value),
     scheduleImportRange: computed(() => scheduleImportRange.value),
     scheduleDateRange: computed(() => scheduleDateRange.value),
+    rosterCoverage: computed(() => rosterCoverage.value),
     mlbTeams: computed(() => mlbTeams.value),
     databaseMetrics: computed(() => databaseMetrics.value),
     playerSeasonStatsMetrics: computed(() => playerSeasonStatsMetrics.value),

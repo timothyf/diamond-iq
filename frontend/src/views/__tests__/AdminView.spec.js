@@ -74,6 +74,10 @@ vi.mock('../../composables/useAdminTask', () => ({
       earliestGameDate: '2026-03-26',
       latestGameDate: '2026-09-22',
     })),
+    rosterCoverage: computed(() => ({
+      earliestDate: '2024-12-31',
+      latestDate: '2026-07-17',
+    })),
     mlbTeams: computed(() => [
       { id: 1, mlbId: 116, name: 'Detroit Tigers', abbreviation: 'DET', league: 'american' },
       { id: 2, mlbId: 119, name: 'Los Angeles Dodgers', abbreviation: 'LAD', league: 'national' },
@@ -327,8 +331,10 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="game-details-coverage"]').text()).toContain('18,000 linked pitches')
     expect(wrapper.text()).toContain('MLB profile synchronization')
     expect(wrapper.get('[data-test="profile-sync-form"]').text()).toContain('biographical, handedness, position, and headshot information')
+    expect(wrapper.get('[data-test="team-history-sync-form"]').text()).toContain('official MLB transactions')
     expect(wrapper.text()).toContain('MLB 40-man roster synchronization')
     expect(wrapper.get('[data-test="roster-sync-form"]').text()).toContain('player profiles, roster status, and dated team memberships')
+    expect(wrapper.get('[data-test="roster-database-coverage"]').text()).toContain('Dec 31, 2024–Jul 17, 2026')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('All MLB teams')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('American League')
     expect(wrapper.get('[data-test="roster-team-scope"]').text()).toContain('National League')
@@ -414,6 +420,12 @@ describe('AdminView', () => {
     expect(runTask).toHaveBeenCalledWith(
       'mlb_player_profiles_sync',
       expect.objectContaining({ only_missing: true, batch_size: 50 }),
+    )
+
+    await wrapper.get('[data-test="team-history-sync-form"]').trigger('submit')
+    expect(runTask).toHaveBeenCalledWith(
+      'mlb_player_team_histories_sync',
+      expect.objectContaining({ limit: null, mlb_ids: null }),
     )
 
     await wrapper.get('[data-test="roster-team-scope"]').setValue('national')

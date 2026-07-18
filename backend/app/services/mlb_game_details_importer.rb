@@ -129,14 +129,32 @@ class MlbGameDetailsImporter
       player, created = resolve_player(player_payload["person"], team)
       counts[:created_player_count] += 1 if created
       stats = player_payload.fetch("stats", {})
+      season_stats = player_payload.fetch("seasonStats", {})
 
       if batter_ids.include?(mlb_id) || stats.fetch("batting", {}).present?
-        upsert_batting_line!(player, player_payload, stats.fetch("batting", {}), team, opponent, home)
+        upsert_batting_line!(
+          player,
+          player_payload,
+          stats.fetch("batting", {}),
+          season_stats.fetch("batting", {}),
+          team,
+          opponent,
+          home
+        )
         counts[:batting_line_count] += 1
       end
 
       if pitcher_ids.include?(mlb_id) || stats.fetch("pitching", {}).present?
-        upsert_pitching_line!(player, player_payload, stats.fetch("pitching", {}), team, opponent, home, pitcher_ids)
+        upsert_pitching_line!(
+          player,
+          player_payload,
+          stats.fetch("pitching", {}),
+          season_stats.fetch("pitching", {}),
+          team,
+          opponent,
+          home,
+          pitcher_ids
+        )
         counts[:pitching_line_count] += 1
       end
 
@@ -147,7 +165,7 @@ class MlbGameDetailsImporter
     end
   end
 
-  def upsert_batting_line!(player, player_payload, stats, team, opponent, home)
+  def upsert_batting_line!(player, player_payload, stats, season_stats, team, opponent, home)
     batting_order = parse_integer(player_payload["battingOrder"])
     line = game.game_player_batting_lines.find_or_initialize_by(player: player)
     line.assign_attributes(
@@ -169,10 +187,10 @@ class MlbGameDetailsImporter
       strikeouts: integer_stat(stats, "strikeOuts"),
       stolen_bases: integer_stat(stats, "stolenBases"),
       caught_stealing: integer_stat(stats, "caughtStealing"),
-      batting_average: decimal_stat(stats, "avg"),
-      on_base_percentage: decimal_stat(stats, "obp"),
-      slugging_percentage: decimal_stat(stats, "slg"),
-      ops: decimal_stat(stats, "ops"),
+      batting_average: decimal_stat(season_stats, "avg") || decimal_stat(stats, "avg"),
+      on_base_percentage: decimal_stat(season_stats, "obp") || decimal_stat(stats, "obp"),
+      slugging_percentage: decimal_stat(season_stats, "slg") || decimal_stat(stats, "slg"),
+      ops: decimal_stat(season_stats, "ops") || decimal_stat(stats, "ops"),
       source_name: SOURCE_NAME,
       source_url: boxscore_source_url,
       last_synced_at: fetched_at,
@@ -181,7 +199,7 @@ class MlbGameDetailsImporter
     line.save!
   end
 
-  def upsert_pitching_line!(player, player_payload, stats, team, opponent, home, pitcher_ids)
+  def upsert_pitching_line!(player, player_payload, stats, season_stats, team, opponent, home, pitcher_ids)
     innings = stats["inningsPitched"]
     line = game.game_player_pitching_lines.find_or_initialize_by(player: player)
     line.assign_attributes(
@@ -201,8 +219,8 @@ class MlbGameDetailsImporter
       strikeouts: integer_stat(stats, "strikeOuts"),
       pitches: integer_stat(stats, "numberOfPitches"),
       strikes: integer_stat(stats, "strikes"),
-      era: decimal_stat(stats, "era"),
-      whip: decimal_stat(stats, "whip"),
+      era: decimal_stat(season_stats, "era") || decimal_stat(stats, "era"),
+      whip: decimal_stat(season_stats, "whip") || decimal_stat(stats, "whip"),
       decision: stats["note"],
       holds: integer_stat(stats, "holds"),
       saves: integer_stat(stats, "saves"),

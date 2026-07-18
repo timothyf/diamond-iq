@@ -286,7 +286,9 @@ function rankingBarPercent(entry) {
             <h3>Drill-down: games</h3>
             <ul>
               <li v-for="game in dashboard.drillDown?.games || []" :key="game.id">
-                {{ formatDate(game.official_date, true) }} · {{ game.result }} · {{ game.score?.team }}-{{ game.score?.opponent }} vs {{ game.opponent }}
+                <RouterLink :to="{ name: 'game-summary', params: { id: game.id } }">
+                  {{ formatDate(game.official_date, true) }} · {{ game.result }} · {{ game.score?.team }}-{{ game.score?.opponent }} vs {{ game.opponent }}
+                </RouterLink>
               </li>
             </ul>
           </article>
@@ -339,10 +341,12 @@ function rankingBarPercent(entry) {
         <section class="team-panel">
           <header><div><p>Latest finals</p><h2>Recent results</h2></div><span>{{ team.recentGames.length }} shown</span></header>
           <ol v-if="team.recentGames.length" class="game-list" data-test="recent-games">
-            <li v-for="game in team.recentGames" :key="game.id">
-              <time>{{ formatDate(game.officialDate) }}</time>
-              <div><strong>{{ isHome(game) ? 'vs' : '@' }} {{ opponent(game).abbreviation }}</strong><span>{{ teamScore(game) }}–{{ opponentScore(game) }}</span></div>
-              <b :class="`result result--${resultLabel(game).toLowerCase()}`">{{ resultLabel(game) }}</b>
+            <li v-for="game in team.recentGames" :key="game.id" class="game-list__linked">
+              <RouterLink class="game-result-link" :to="{ name: 'game-summary', params: { id: game.id } }">
+                <time>{{ formatDate(game.officialDate) }}</time>
+                <div><strong>{{ isHome(game) ? 'vs' : '@' }} {{ opponent(game).abbreviation }}</strong><span>{{ teamScore(game) }}–{{ opponentScore(game) }}</span></div>
+                <b :class="`result result--${resultLabel(game).toLowerCase()}`">{{ resultLabel(game) }}</b>
+              </RouterLink>
             </li>
           </ol>
           <p v-else class="team-empty">No completed games are stored for this season.</p>
@@ -456,12 +460,16 @@ function rankingBarPercent(entry) {
 .signals-grid, .drilldown-grid { display: grid; gap: .75rem; margin-top: .85rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .signals-grid ul, .drilldown-grid ul { margin: 0; padding-left: 1rem; color: #445767; }
 .signals-grid li, .drilldown-grid li { margin: .22rem 0; }
+.drilldown-grid a { color: #173652; font-weight: 750; text-decoration-color: rgba(23,54,82,.3); text-underline-offset: .15em; }
 .team-panel > header { display: flex; justify-content: space-between; align-items: end; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e0d8; }
 .team-panel h2 { margin: .12rem 0 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: 2rem; text-transform: uppercase; }
 .team-panel header > span { color: #778087; font-size: .75rem; }
 .game-list { margin: 0; padding: 0; list-style: none; }
 .game-list li { display: grid; grid-template-columns: 82px 1fr auto; gap: .9rem; align-items: center; padding: .85rem 0; border-bottom: 1px solid #ece9e1; }
 .game-list li:last-child { border-bottom: 0; }
+.game-list li.game-list__linked { display: block; padding: 0; }
+.game-result-link { display: grid; grid-template-columns: 82px 1fr auto; gap: .9rem; align-items: center; padding: .85rem 0; color: inherit; text-decoration: none; }
+.game-result-link:hover strong,.game-result-link:focus-visible strong { color: #a93627; }
 .game-list time, .game-list small { color: #69747c; font-size: .76rem; }
 .game-list strong, .game-list span { display: block; }
 .game-list span { margin-top: .15rem; color: #758088; font-size: .75rem; }
@@ -492,5 +500,5 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
 @media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 </style>

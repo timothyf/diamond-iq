@@ -39,6 +39,12 @@ const rosterLabel = computed(() => {
   return membership.sourceStatusDescription || titleize(membership.rosterStatus)
 })
 
+function teamHistoryLabel(membership) {
+  if (!membership.current) return 'Organization tenure'
+
+  return membership.sourceStatusDescription || titleize(membership.rosterStatus)
+}
+
 const positionLabel = computed(() => {
   const position = player.value?.positions?.primary
   return position ? `${position.abbreviation} · ${position.name}` : 'Position unavailable'
@@ -539,7 +545,7 @@ function formatTimestamp(value) {
               <p class="eyebrow">Organization trail</p>
               <h2>Team history</h2>
             </div>
-            <span>{{ player.teamHistory.length }} membership windows</span>
+            <span>{{ player.teamHistory.length }} {{ player.teamHistory.length === 1 ? 'organization tenure' : 'organization tenures' }}</span>
           </header>
 
           <ol v-if="player.teamHistory.length" class="team-timeline">
@@ -553,7 +559,7 @@ function formatTimestamp(value) {
                 </strong>
                 <span>{{ formatDate(membership.startsOn) }} — {{ membership.endsOn ? formatDate(membership.endsOn) : 'Present' }}</span>
               </div>
-              <small>{{ membership.sourceStatusDescription || titleize(membership.rosterStatus) }}</small>
+              <small>{{ teamHistoryLabel(membership) }}</small>
             </li>
           </ol>
           <p v-else class="profile-empty">No dated team history has been synchronized.</p>

@@ -12,6 +12,10 @@ class AdminTaskRunner
       name: "MLB player profile sync",
       description: "Download MLB profiles for existing players, including bio, handedness, and position data."
     },
+    "mlb_player_team_histories_sync" => {
+      name: "MLB player organization history sync",
+      description: "Download official MLB transactions and rebuild dated major-league organization tenures."
+    },
     "mlb_roster_sync" => {
       name: "MLB 40-man roster sync",
       description: "Download one or more 40-man rosters and update the current roster state and player profiles."
@@ -91,6 +95,13 @@ class AdminTaskRunner
     MlbPlayerProfilesSync.call(
       only_missing: params.key?(:only_missing) ? params[:only_missing] : true,
       batch_size: positive_integer(:batch_size, default: MlbPlayerProfilesSync::DEFAULT_BATCH_SIZE),
+      limit: optional_positive_integer(:limit),
+      mlb_ids: params[:mlb_ids].presence
+    )
+  end
+
+  def mlb_player_team_histories_sync
+    MlbPlayerTeamHistoriesSync.call(
       limit: optional_positive_integer(:limit),
       mlb_ids: params[:mlb_ids].presence
     )

@@ -172,6 +172,7 @@ describe('TeamProfileView', () => {
     expect(wrapper.text()).toContain('52–43')
     expect(wrapper.get('[data-test="upcoming-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="recent-games"]').text()).toContain('5–2')
+    expect(wrapper.get('[data-test="recent-games"] .game-result-link').exists()).toBe(true)
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('CF')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Spencer Torkelson')
