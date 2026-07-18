@@ -10,9 +10,21 @@ function normalizeLine(line) {
   }
 }
 
+function normalizePerformer(performer) {
+  if (!performer) return null
+  return {
+    ...performer,
+    player: performer.player || null,
+    team: performer.team || null,
+    metrics: performer.metrics || {},
+  }
+}
+
 function normalizeGame(data) {
   const details = data.details || {}
   const lineScore = details.line_score || {}
+  const keyPerformers = details.key_performers || {}
+  const topHitters = keyPerformers.top_hitters || {}
 
   return {
     id: data.id,
@@ -36,6 +48,32 @@ function normalizeGame(data) {
         decisions: { winning_pitcher: null, losing_pitcher: null, save: null },
         teams: { away: {}, home: {} },
       },
+      keyPerformers: {
+        topHitters: {
+          away: normalizePerformer(topHitters.away),
+          home: normalizePerformer(topHitters.home),
+        },
+        mostImpactfulPitcher: normalizePerformer(keyPerformers.most_impactful_pitcher),
+        powerHitters: (keyPerformers.power_hitters || []).map(normalizePerformer),
+        scorelessRelievers: (keyPerformers.scoreless_relievers || []).map(normalizePerformer),
+        topRunProducers: (keyPerformers.top_run_producers || []).map(normalizePerformer),
+      },
+      scoringPlays: (details.scoring_plays || []).map((play) => ({
+        id: play.id,
+        plateAppearanceNumber: play.plate_appearance_number,
+        inning: play.inning,
+        halfInning: play.half_inning,
+        inningLabel: play.inning_label,
+        event: play.event,
+        eventType: play.event_type,
+        description: play.description,
+        runsScored: play.runs_scored,
+        runsBattedIn: play.runs_batted_in,
+        awayScore: play.away_score,
+        homeScore: play.home_score,
+        batter: play.batter || null,
+        battingTeam: play.batting_team || null,
+      })),
       lineScore: {
         currentInning: lineScore.current_inning ?? null,
         currentInningOrdinal: lineScore.current_inning_ordinal || null,

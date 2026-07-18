@@ -14,6 +14,8 @@ class GameDetailsSerializer
       last_synced_at: game.details_last_synced_at,
       line_score: line_score,
       insights: insights,
+      key_performers: key_performers,
+      scoring_plays: scoring_plays,
       batting_lines: batting_lines,
       pitching_lines: pitching_lines,
       lineups: lineups,
@@ -65,6 +67,50 @@ class GameDetailsSerializer
     }
   end
 
+  def scoring_plays
+    previous_away_score = 0
+    previous_home_score = 0
+
+    plate_appearance_records.filter_map do |appearance|
+      away_score = appearance.away_score.nil? ? previous_away_score : appearance.away_score
+      home_score = appearance.home_score.nil? ? previous_home_score : appearance.home_score
+      runs_scored = [away_score - previous_away_score, 0].max + [home_score - previous_home_score, 0].max
+      previous_away_score = away_score
+      previous_home_score = home_score
+      next unless runs_scored.positive?
+
+      {
+        id: appearance.id,
+        plate_appearance_number: appearance.plate_appearance_number,
+        inning: appearance.inning,
+        half_inning: appearance.half_inning,
+        inning_label: scoring_inning_label(appearance),
+        event: appearance.event,
+        event_type: appearance.event_type,
+        description: scoring_play_description(appearance, runs_scored),
+        runs_scored: runs_scored,
+        runs_batted_in: appearance.runs_batted_in,
+        away_score: away_score,
+        home_score: home_score,
+        batter: player_json(appearance.batter),
+        batting_team: team_json(appearance.batting_team)
+      }
+    end
+  end
+
+  def scoring_inning_label(appearance)
+    half = appearance.half_inning.to_s.downcase == "top" ? "Top" : "Bottom"
+    inning = appearance.inning
+    inning.present? ? "#{half} #{inning.ordinalize}" : half
+  end
+
+  def scoring_play_description(appearance, runs_scored)
+    return appearance.description if appearance.description.present?
+
+    player_name = appearance.batter&.full_name || "A batter"
+    "#{player_name} scored #{runs_scored} #{'run'.pluralize(runs_scored)}."
+  end
+
   def batting_lines
     @batting_lines ||= game.game_player_batting_lines.sort_by { |line| [ line.home ? 1 : 0, line.batting_order || 9999 ] }.map do |line|
       rates = line.raw_data.dig("seasonStats", "batting") || {}
@@ -107,6 +153,182 @@ class GameDetailsSerializer
         home: team_insights("home", home: true, score: game.home_score, opponent_score: game.away_score)
       }
     }
+  end
+
+  def key_performers
+    {
+      top_hitters: {
+        away: top_hitter(home: false),
+        home: top_hitter(home: true)
+      },
+      most_impactful_pitcher: most_impactful_pitcher,
+      power_hitters: power_hitters,
+      scoreless_relievers: scoreless_relievers,
+      top_run_producers: top_run_producers
+    }
+  end
+
+  def top_hitter(home:)
+    line = batting_line_records.select { |candidate| candidate.home == home }
+      .max_by { |candidate| batting_impact_key(candidate) }
+    batting_performer(line)
+  end
+
+  def batting_impact_key(line)
+    [
+      batting_impact_score(line),
+      total_bases(line),
+      line.hits.to_i,
+      line.walks.to_i,
+      -line.strikeouts.to_i,
+      -(line.batting_order || 9999)
+    ]
+  end
+
+  def batting_impact_score(line)
+    total_bases(line) + line.walks.to_i + (line.runs_batted_in.to_i * 2) + line.runs.to_i
+  end
+
+  def total_bases(line)
+    singles = line.hits.to_i - line.doubles.to_i - line.triples.to_i - line.home_runs.to_i
+    singles + (line.doubles.to_i * 2) + (line.triples.to_i * 3) + (line.home_runs.to_i * 4)
+  end
+
+  def most_impactful_pitcher
+    line = pitching_line_records.max_by do |candidate|
+      [pitching_impact_score(candidate), candidate.outs_recorded.to_i, candidate.strikeouts.to_i]
+    end
+    pitching_performer(line)
+  end
+
+  def pitching_impact_score(line)
+    decision_bonus = case decision_code(line.decision)
+    when "W" then 6
+    when "S" then 5
+    when "H" then 2
+    else 0
+    end
+
+    line.outs_recorded.to_i + (line.strikeouts.to_i * 2) + decision_bonus -
+      (line.earned_runs.to_i * 4) - line.hits.to_i - line.walks.to_i - (line.home_runs.to_i * 2)
+  end
+
+  def power_hitters
+    batting_line_records.select do |line|
+      line.home_runs.to_i.positive? || extra_base_hits(line) >= 2
+    end.sort_by do |line|
+      [-line.home_runs.to_i, -extra_base_hits(line), -total_bases(line), line.player.full_name]
+    end.map { |line| batting_performer(line, highlight: power_summary(line)) }
+  end
+
+  def scoreless_relievers
+    pitching_line_records.select do |line|
+      !line.starter && line.outs_recorded.to_i.positive? && line.runs.to_i.zero?
+    end.sort_by do |line|
+      [-line.outs_recorded.to_i, -line.strikeouts.to_i, line.player.full_name]
+    end.map { |line| pitching_performer(line, highlight: scoreless_relief_summary(line)) }
+  end
+
+  def top_run_producers
+    eligible = batting_line_records.select { |line| runs_responsible_for(line).positive? }
+    maximum = eligible.map { |line| runs_responsible_for(line) }.max
+    return [] if maximum.nil?
+
+    eligible.select { |line| runs_responsible_for(line) == maximum }
+      .sort_by { |line| [line.home ? 1 : 0, line.player.full_name] }
+      .map do |line|
+        batting_performer(
+          line,
+          highlight: "#{runs_responsible_for(line)} #{'run'.pluralize(runs_responsible_for(line))} produced · #{line.runs.to_i} R, #{line.runs_batted_in.to_i} RBI"
+        )
+      end
+  end
+
+  def runs_responsible_for(line)
+    line.runs.to_i + line.runs_batted_in.to_i - line.home_runs.to_i
+  end
+
+  def extra_base_hits(line)
+    line.doubles.to_i + line.triples.to_i + line.home_runs.to_i
+  end
+
+  def batting_performer(line, highlight: nil)
+    return if line.nil?
+
+    {
+      player: player_json(line.player),
+      team: team_json(line.team),
+      home: line.home,
+      summary: highlight || batting_summary(line),
+      metrics: {
+        at_bats: line.at_bats,
+        runs: line.runs,
+        hits: line.hits,
+        doubles: line.doubles,
+        triples: line.triples,
+        home_runs: line.home_runs,
+        runs_batted_in: line.runs_batted_in,
+        walks: line.walks,
+        total_bases: total_bases(line),
+        runs_responsible_for: runs_responsible_for(line)
+      }
+    }
+  end
+
+  def pitching_performer(line, highlight: nil)
+    return if line.nil?
+
+    {
+      player: player_json(line.player),
+      team: team_json(line.team),
+      home: line.home,
+      summary: highlight || pitching_summary(line),
+      metrics: {
+        starter: line.starter,
+        innings_pitched: line.innings_pitched,
+        outs_recorded: line.outs_recorded,
+        runs: line.runs,
+        earned_runs: line.earned_runs,
+        hits: line.hits,
+        walks: line.walks,
+        strikeouts: line.strikeouts,
+        home_runs: line.home_runs,
+        decision: line.decision
+      }
+    }
+  end
+
+  def batting_summary(line)
+    parts = ["#{line.hits.to_i}-for-#{line.at_bats.to_i}"]
+    parts << "#{line.home_runs.to_i} HR" if line.home_runs.to_i.positive?
+    parts << "#{line.runs_batted_in.to_i} RBI" if line.runs_batted_in.to_i.positive?
+    parts << "#{line.runs.to_i} R" if line.runs.to_i.positive?
+    parts.join(", ")
+  end
+
+  def pitching_summary(line)
+    parts = ["#{line.innings_pitched.presence || '0.0'} IP", "#{line.earned_runs.to_i} ER", "#{line.strikeouts.to_i} K"]
+    parts << decision_code(line.decision) if decision_code(line.decision).present?
+    parts.join(", ")
+  end
+
+  def power_summary(line)
+    parts = []
+    parts << "#{line.home_runs.to_i} HR" if line.home_runs.to_i.positive?
+    parts << "#{extra_base_hits(line)} XBH" if extra_base_hits(line) >= 2
+    parts.join(" · ")
+  end
+
+  def scoreless_relief_summary(line)
+    "#{line.innings_pitched.presence || '0.0'} scoreless IP · #{line.strikeouts.to_i} K"
+  end
+
+  def batting_line_records
+    @batting_line_records ||= game.game_player_batting_lines.includes(:player, :team).to_a
+  end
+
+  def pitching_line_records
+    @pitching_line_records ||= game.game_player_pitching_lines.includes(:player, :team).to_a
   end
 
   def pitching_decision(code)
@@ -178,7 +400,7 @@ class GameDetailsSerializer
   end
 
   def plate_appearances
-    game.plate_appearances.sort_by(&:at_bat_index).map do |appearance|
+    plate_appearance_records.map do |appearance|
       appearance.attributes.except("raw_data").merge(
         "batter" => player_json(appearance.batter),
         "pitcher" => player_json(appearance.pitcher),
@@ -187,6 +409,12 @@ class GameDetailsSerializer
         "pitches" => appearance.pitches.sort_by(&:pitch_number).map { |pitch| pitch_json(pitch) }
       )
     end
+  end
+
+  def plate_appearance_records
+    @plate_appearance_records ||= game.plate_appearances
+      .includes(:batter, :pitcher, :batting_team, :fielding_team, :pitches)
+      .sort_by(&:at_bat_index)
   end
 
   def pitch_json(pitch)

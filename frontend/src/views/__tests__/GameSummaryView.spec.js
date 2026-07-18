@@ -35,6 +35,90 @@ const payload = {
           home: { run_differential: 2, hits: 8, errors: 1, walks: 3, strikeouts: 7, home_runs: 1, left_on_base: 7, runners_in_scoring_position: { hits: 2, at_bats: 6 } },
         },
       },
+      key_performers: {
+        top_hitters: {
+          away: {
+            player: { id: 20, full_name: 'Steven Kwan' }, team: { id: 2, abbreviation: 'CLE' },
+            summary: '2-for-4, 1 RBI, 1 R', metrics: { hits: 2, total_bases: 3 },
+          },
+          home: {
+            player: { id: 21, full_name: 'Riley Greene' }, team: { id: 1, abbreviation: 'DET' },
+            summary: '2-for-4, 1 HR, 3 RBI, 1 R', metrics: { hits: 2, home_runs: 1, total_bases: 5 },
+          },
+        },
+        most_impactful_pitcher: {
+          player: { id: 23, full_name: 'Tarik Skubal' }, team: { id: 1, abbreviation: 'DET' },
+          summary: '7.0 IP, 1 ER, 9 K, W', metrics: { innings_pitched: '7.0', strikeouts: 9 },
+        },
+        power_hitters: [
+          {
+            player: { id: 21, full_name: 'Riley Greene' }, team: { id: 1, abbreviation: 'DET' },
+            summary: '1 HR', metrics: { home_runs: 1 },
+          },
+        ],
+        scoreless_relievers: [
+          {
+            player: { id: 24, full_name: 'Will Vest' }, team: { id: 1, abbreviation: 'DET' },
+            summary: '1.0 scoreless IP · 2 K', metrics: { innings_pitched: '1.0', strikeouts: 2 },
+          },
+        ],
+        top_run_producers: [
+          {
+            player: { id: 21, full_name: 'Riley Greene' }, team: { id: 1, abbreviation: 'DET' },
+            summary: '3 runs produced · 1 R, 3 RBI', metrics: { runs_responsible_for: 3 },
+          },
+        ],
+      },
+      scoring_plays: [
+        {
+          id: 101,
+          plate_appearance_number: 12,
+          inning: 1,
+          half_inning: 'top',
+          inning_label: 'Top 1st',
+          event: 'Single',
+          event_type: 'single',
+          description: 'Steven Kwan singles, scoring a run.',
+          runs_scored: 1,
+          runs_batted_in: 1,
+          away_score: 1,
+          home_score: 0,
+          batter: { id: 20, full_name: 'Steven Kwan' },
+          batting_team: { id: 2, abbreviation: 'CLE' },
+        },
+        {
+          id: 102,
+          plate_appearance_number: 24,
+          inning: 2,
+          half_inning: 'bottom',
+          inning_label: 'Bottom 2nd',
+          event: 'Double',
+          event_type: 'double',
+          description: 'Will Vest doubled, scoring a run.',
+          runs_scored: 1,
+          runs_batted_in: 1,
+          away_score: 1,
+          home_score: 1,
+          batter: { id: 24, full_name: 'Will Vest' },
+          batting_team: { id: 1, abbreviation: 'DET' },
+        },
+        {
+          id: 103,
+          plate_appearance_number: 38,
+          inning: 4,
+          half_inning: 'bottom',
+          inning_label: 'Bottom 4th',
+          event: 'Home Run',
+          event_type: 'home_run',
+          description: 'Riley Greene homered, scoring two runs.',
+          runs_scored: 2,
+          runs_batted_in: 2,
+          away_score: 1,
+          home_score: 3,
+          batter: { id: 21, full_name: 'Riley Greene' },
+          batting_team: { id: 1, abbreviation: 'DET' },
+        },
+      ],
       line_score: {
         current_inning: 9,
         current_inning_ordinal: '9th',
@@ -101,6 +185,28 @@ describe('GameSummaryView', () => {
     expect(insights).toContain('Walks · Strikeouts')
     expect(insights).toContain('1-5')
     expect(insights).toContain('2-6')
+    const performers = wrapper.get('[data-test="key-performers"]').text()
+    expect(performers).toContain('Key performers')
+    expect(performers).toContain('Steven Kwan')
+    expect(performers).toContain('Riley Greene')
+    expect(performers).toContain('Tarik Skubal')
+    expect(performers).toContain('Will Vest')
+    expect(performers).toContain('1 HR')
+    expect(performers).toContain('1.0 scoreless IP · 2 K')
+    expect(performers).toContain('3 runs produced')
+    const performerLinks = wrapper.findAllComponents(RouterLink).filter((link) => link.props('to')?.name === 'player-profile')
+    expect(performerLinks.map((link) => link.props('to').params.id)).toEqual(expect.arrayContaining([20, 21, 23, 24]))
+    const scoringTimeline = wrapper.get('[data-test="scoring-play-timeline"]')
+    expect(scoringTimeline.text()).toContain('Top 1st')
+    expect(scoringTimeline.text()).toContain('Steven Kwan — singles, scoring a run.')
+    expect(scoringTimeline.text()).toContain('CLE 1')
+    expect(scoringTimeline.text()).toContain('DET 0')
+    expect(scoringTimeline.text()).toContain('Bottom 4th')
+    expect(scoringTimeline.text()).toContain('Riley Greene — homered, scoring two runs.')
+    expect(scoringTimeline.text()).toContain('CLE 1')
+    expect(scoringTimeline.text()).toContain('DET 3')
+    const scoringLinks = scoringTimeline.findAllComponents(RouterLink)
+    expect(scoringLinks.map((link) => link.props('to').params.id)).toEqual([20, 24, 21])
     const boxScore = wrapper.get('[data-test="box-score"]').text()
     expect(boxScore).toContain('Steven Kwan')
     expect(boxScore).toContain('Riley Greene')

@@ -124,11 +124,32 @@ RSpec.describe "Api::Games", type: :request do
       home: true,
       starter: true,
       batting_order: 900,
-      at_bats: 3,
-      hits: 1,
+      at_bats: 4,
+      runs: 1,
+      hits: 2,
+      doubles: 1,
+      home_runs: 1,
+      runs_batted_in: 3,
       source_name: "MLB Stats API",
       last_synced_at: Time.current,
       raw_data: { "seasonStats" => { "batting" => { "avg" => ".287", "ops" => ".842" } } }
+    )
+    GamePlayerBattingLine.create!(
+      game: @game,
+      player: @bibee,
+      team: @guardians,
+      opponent_team: @tigers,
+      home: false,
+      starter: true,
+      batting_order: 900,
+      at_bats: 4,
+      runs: 1,
+      hits: 2,
+      doubles: 1,
+      runs_batted_in: 1,
+      strikeouts: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
     )
     GamePlayerPitchingLine.create!(
       game: @game,
@@ -139,6 +160,13 @@ RSpec.describe "Api::Games", type: :request do
       starter: true,
       appearance_order: 1,
       innings_pitched: "7.0",
+      outs_recorded: 21,
+      hits: 4,
+      runs: 1,
+      earned_runs: 1,
+      walks: 1,
+      strikeouts: 9,
+      home_runs: 0,
       source_name: "MLB Stats API",
       last_synced_at: Time.current,
       raw_data: { "seasonStats" => { "pitching" => { "era" => "2.01", "whip" => "0.99" } } }
@@ -152,6 +180,13 @@ RSpec.describe "Api::Games", type: :request do
       starter: true,
       appearance_order: 1,
       innings_pitched: "6.0",
+      outs_recorded: 18,
+      hits: 5,
+      runs: 3,
+      earned_runs: 3,
+      walks: 2,
+      strikeouts: 7,
+      home_runs: 1,
       decision: "(L, 7-5)",
       source_name: "MLB Stats API",
       last_synced_at: Time.current
@@ -170,7 +205,53 @@ RSpec.describe "Api::Games", type: :request do
       starter: false,
       appearance_order: 2,
       innings_pitched: "1.0",
+      outs_recorded: 3,
+      hits: 0,
+      runs: 0,
+      earned_runs: 0,
+      walks: 0,
+      strikeouts: 2,
       decision: "(S, 1)",
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+    PlateAppearance.create!(
+      game: @game,
+      batter: @bibee,
+      pitcher: @skubal,
+      batting_team: @guardians,
+      fielding_team: @tigers,
+      at_bat_index: 0,
+      plate_appearance_number: 1,
+      inning: 1,
+      half_inning: "top",
+      event: "Single",
+      event_type: "single",
+      description: "Tanner Bibee singles, scoring Steven Kwan.",
+      runs_batted_in: 1,
+      away_score: 1,
+      home_score: 0,
+      complete: true,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+    PlateAppearance.create!(
+      game: @game,
+      batter: reliever,
+      pitcher: @bibee,
+      batting_team: @tigers,
+      fielding_team: @guardians,
+      at_bat_index: 1,
+      plate_appearance_number: 2,
+      inning: 2,
+      half_inning: "bottom",
+      event: "Double",
+      event_type: "double",
+      description: "Will Vest doubles, scoring a run.",
+      runs_batted_in: 1,
+      away_score: 1,
+      home_score: 1,
+      complete: true,
       source_name: "MLB Stats API",
       last_synced_at: Time.current
     )
@@ -180,12 +261,16 @@ RSpec.describe "Api::Games", type: :request do
       pitcher: @bibee,
       batting_team: @tigers,
       fielding_team: @guardians,
-      at_bat_index: 0,
-      plate_appearance_number: 1,
-      inning: 1,
+      at_bat_index: 2,
+      plate_appearance_number: 3,
+      inning: 4,
       half_inning: "bottom",
-      event: "Single",
-      event_type: "single",
+      event: "Home Run",
+      event_type: "home_run",
+      description: "Tarik Skubal homers, scoring two runs.",
+      runs_batted_in: 2,
+      away_score: 1,
+      home_score: 3,
       complete: true,
       source_name: "MLB Stats API",
       last_synced_at: Time.current,
@@ -230,8 +315,10 @@ RSpec.describe "Api::Games", type: :request do
       "errors" => 1,
       "left_on_base" => 7
     )
-    expect(json_body.dig("data", "details", "batting_lines", 0, "player", "full_name")).to eq("Tarik Skubal")
-    expect(json_body.dig("data", "details", "batting_lines", 0)).to include(
+    skubal_batting = json_body.dig("data", "details", "batting_lines").find do |line|
+      line.dig("player", "full_name") == "Tarik Skubal"
+    end
+    expect(skubal_batting).to include(
       "batting_average" => "0.287",
       "ops" => "0.842"
     )
@@ -261,11 +348,66 @@ RSpec.describe "Api::Games", type: :request do
       "errors" => 1,
       "runners_in_scoring_position" => { "hits" => 1, "at_bats" => 1 }
     )
+    expect(json_body.dig("data", "details", "key_performers", "top_hitters", "away")).to include(
+      "player" => include("full_name" => "Tanner Bibee"),
+      "summary" => "2-for-4, 1 RBI, 1 R"
+    )
+    expect(json_body.dig("data", "details", "key_performers", "top_hitters", "home")).to include(
+      "player" => include("full_name" => "Tarik Skubal"),
+      "summary" => "2-for-4, 1 HR, 3 RBI, 1 R"
+    )
+    expect(json_body.dig("data", "details", "key_performers", "most_impactful_pitcher")).to include(
+      "player" => include("full_name" => "Tarik Skubal"),
+      "summary" => "7.0 IP, 1 ER, 9 K, W"
+    )
+    expect(json_body.dig("data", "details", "key_performers", "power_hitters")).to contain_exactly(
+      include("player" => include("full_name" => "Tarik Skubal"), "summary" => "1 HR · 2 XBH")
+    )
+    expect(json_body.dig("data", "details", "key_performers", "scoreless_relievers")).to contain_exactly(
+      include("player" => include("full_name" => "Will Vest"), "summary" => "1.0 scoreless IP · 2 K")
+    )
+    expect(json_body.dig("data", "details", "key_performers", "top_run_producers")).to contain_exactly(
+      include("player" => include("full_name" => "Tarik Skubal"), "summary" => "3 runs produced · 1 R, 3 RBI")
+    )
+    expect(json_body.dig("data", "details", "scoring_plays")).to match(
+      [
+        hash_including(
+          "inning_label" => "Top 1st",
+          "description" => "Tanner Bibee singles, scoring Steven Kwan.",
+          "runs_scored" => 1,
+          "away_score" => 1,
+          "home_score" => 0,
+          "batter" => include("full_name" => "Tanner Bibee"),
+          "batting_team" => include("abbreviation" => "CLE")
+        ),
+        hash_including(
+          "inning_label" => "Bottom 2nd",
+          "description" => "Will Vest doubles, scoring a run.",
+          "runs_scored" => 1,
+          "away_score" => 1,
+          "home_score" => 1,
+          "batter" => include("full_name" => "Will Vest"),
+          "batting_team" => include("abbreviation" => "DET")
+        ),
+        hash_including(
+          "inning_label" => "Bottom 4th",
+          "description" => "Tarik Skubal homers, scoring two runs.",
+          "runs_scored" => 2,
+          "away_score" => 1,
+          "home_score" => 3,
+          "batter" => include("full_name" => "Tarik Skubal"),
+          "batting_team" => include("abbreviation" => "DET")
+        )
+      ]
+    )
     expect(json_body.dig("data", "details", "plate_appearances", 0)).to include(
       "event_type" => "single",
       "plate_appearance_number" => 1
     )
-    expect(json_body.dig("data", "details", "plate_appearances", 0, "pitches", 0)).to include(
+    appearance_with_pitch = json_body.dig("data", "details", "plate_appearances").find do |plate_appearance|
+      plate_appearance.fetch("pitches").any?
+    end
+    expect(appearance_with_pitch.fetch("pitches").first).to include(
       "pitch_type" => "FF",
       "release_speed" => 96.4
     )

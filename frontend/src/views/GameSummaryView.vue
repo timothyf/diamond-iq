@@ -11,6 +11,21 @@ const awayBatting = computed(() => game.value?.details.battingLines.filter((line
 const homeBatting = computed(() => game.value?.details.battingLines.filter((line) => line.home) || [])
 const awayPitching = computed(() => game.value?.details.pitchingLines.filter((line) => !line.home) || [])
 const homePitching = computed(() => game.value?.details.pitchingLines.filter((line) => line.home) || [])
+const topHitterEntries = computed(() => [
+  { side: 'away', entry: game.value?.details.keyPerformers.topHitters.away },
+  { side: 'home', entry: game.value?.details.keyPerformers.topHitters.home },
+])
+const hasKeyPerformers = computed(() => {
+  const performers = game.value?.details.keyPerformers
+  return Boolean(
+    performers?.topHitters.away ||
+    performers?.topHitters.home ||
+    performers?.mostImpactfulPitcher ||
+    performers?.powerHitters.length ||
+    performers?.scorelessRelievers.length ||
+    performers?.topRunProducers.length
+  )
+})
 
 function formatDate(value) {
   if (!value) return 'Date unavailable'
@@ -68,6 +83,14 @@ function decision(entry) {
 function risp(value) {
   if (!value) return '—'
   return `${value.hits ?? 0}-${value.at_bats ?? 0}`
+}
+
+function scoringPlayText(play) {
+  const description = String(play.description || '')
+  const playerName = String(play.batter?.full_name || '')
+  if (!playerName || !description.toLowerCase().startsWith(playerName.toLowerCase())) return description
+
+  return description.slice(playerName.length).replace(/^\s*[-—,:]?\s*/, '')
 }
 </script>
 
@@ -128,6 +151,95 @@ function risp(value) {
           <span>RISP</span>
           <dl><div><dt>{{ game.awayTeam.abbreviation }}</dt><dd>{{ risp(game.details.insights.teams.away.runners_in_scoring_position) }}</dd></div><div><dt>{{ game.homeTeam.abbreviation }}</dt><dd>{{ risp(game.details.insights.teams.home.runners_in_scoring_position) }}</dd></div></dl>
         </article>
+      </section>
+
+      <section v-if="hasKeyPerformers" class="game-panel key-performers" data-test="key-performers">
+        <header class="game-panel__heading">
+          <div><p>Game impact</p><h2>Key performers</h2></div>
+          <span>Automatically selected from the box score</span>
+        </header>
+        <div class="performer-grid">
+          <article class="performer-card performer-card--wide">
+            <span>Top hitter by team</span>
+            <div class="performer-card__team-list">
+              <div v-for="item in topHitterEntries" :key="item.side">
+                <small>{{ item.entry?.team?.abbreviation || '—' }}</small>
+                <template v-if="item.entry?.player">
+                  <RouterLink :to="{ name: 'player-profile', params: { id: item.entry.player.id } }">{{ item.entry.player.full_name }}</RouterLink>
+                  <p>{{ item.entry.summary }}</p>
+                </template>
+                <strong v-else>Not available</strong>
+              </div>
+            </div>
+          </article>
+
+          <article class="performer-card">
+            <span>Most impactful pitcher</span>
+            <template v-if="game.details.keyPerformers.mostImpactfulPitcher?.player">
+              <RouterLink :to="{ name: 'player-profile', params: { id: game.details.keyPerformers.mostImpactfulPitcher.player.id } }">
+                {{ game.details.keyPerformers.mostImpactfulPitcher.player.full_name }}
+              </RouterLink>
+              <p>{{ game.details.keyPerformers.mostImpactfulPitcher.summary }}</p>
+            </template>
+            <strong v-else>Not available</strong>
+          </article>
+
+          <article class="performer-card">
+            <span>Home runs & multiple XBH</span>
+            <ul v-if="game.details.keyPerformers.powerHitters.length">
+              <li v-for="entry in game.details.keyPerformers.powerHitters" :key="entry.player.id">
+                <RouterLink :to="{ name: 'player-profile', params: { id: entry.player.id } }">{{ entry.player.full_name }}</RouterLink>
+                <small>{{ entry.summary }}</small>
+              </li>
+            </ul>
+            <strong v-else>None</strong>
+          </article>
+
+          <article class="performer-card">
+            <span>Scoreless relief</span>
+            <ul v-if="game.details.keyPerformers.scorelessRelievers.length">
+              <li v-for="entry in game.details.keyPerformers.scorelessRelievers" :key="entry.player.id">
+                <RouterLink :to="{ name: 'player-profile', params: { id: entry.player.id } }">{{ entry.player.full_name }}</RouterLink>
+                <small>{{ entry.summary }}</small>
+              </li>
+            </ul>
+            <strong v-else>None</strong>
+          </article>
+
+          <article class="performer-card">
+            <span>Most runs produced</span>
+            <ul v-if="game.details.keyPerformers.topRunProducers.length">
+              <li v-for="entry in game.details.keyPerformers.topRunProducers" :key="entry.player.id">
+                <RouterLink :to="{ name: 'player-profile', params: { id: entry.player.id } }">{{ entry.player.full_name }}</RouterLink>
+                <small>{{ entry.summary }}</small>
+              </li>
+            </ul>
+            <strong v-else>None</strong>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="game.details.scoringPlays.length" class="game-panel scoring-timeline" data-test="scoring-play-timeline">
+        <header class="game-panel__heading">
+          <div><p>How the game unfolded</p><h2>Scoring plays</h2></div>
+          <span>{{ game.details.scoringPlays.length }} {{ game.details.scoringPlays.length === 1 ? 'scoring play' : 'scoring plays' }}</span>
+        </header>
+        <ol class="scoring-timeline__list">
+          <li v-for="play in game.details.scoringPlays" :key="play.id">
+            <div class="scoring-timeline__marker"><span></span></div>
+            <div class="scoring-timeline__play">
+              <span>{{ play.inningLabel }}</span>
+              <p>
+                <RouterLink v-if="play.batter" :to="{ name: 'player-profile', params: { id: play.batter.id } }">{{ play.batter.full_name }}</RouterLink>
+                <span v-if="play.batter"> — </span>{{ scoringPlayText(play) }}
+              </p>
+            </div>
+            <div class="scoring-timeline__score" :aria-label="`${game.awayTeam.name} ${play.awayScore}, ${game.homeTeam.name} ${play.homeScore}`">
+              <span>{{ game.awayTeam.abbreviation }} <strong>{{ play.awayScore }}</strong></span>
+              <span>{{ game.homeTeam.abbreviation }} <strong>{{ play.homeScore }}</strong></span>
+            </div>
+          </li>
+        </ol>
       </section>
 
       <section class="game-panel" data-test="line-score">
@@ -225,6 +337,29 @@ function risp(value) {
 .game-panel__heading p { color: #a93627; font-size: .67rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
 .game-panel__heading h2 { margin-top: .15rem; font-family: 'Avenir Next Condensed',sans-serif; font-size: 2.4rem; line-height: 1; text-transform: uppercase; }
 .game-panel__heading > span { color: #6e7a83; font-size: .72rem; }
+.performer-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .75rem; }
+.performer-card { min-width: 0; padding: 1rem; border: 1px solid rgba(16,38,61,.09); border-radius: 16px; background: rgba(255,255,255,.58); }
+.performer-card--wide { grid-column: span 2; }
+.performer-card > span { display: block; margin-bottom: .7rem; color: #a93627; font-size: .62rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+.performer-card a { color: #173652; font-weight: 900; text-decoration: none; }
+.performer-card p,.performer-card li small { display: block; margin-top: .18rem; color: #6d7880; font-size: .68rem; }
+.performer-card > strong { color: #7b858c; font-size: .78rem; }
+.performer-card ul { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
+.performer-card__team-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .75rem; }
+.performer-card__team-list > div { min-width: 0; }
+.performer-card__team-list small { display: block; margin-bottom: .2rem; color: #7b858c; font-size: .61rem; font-weight: 900; }
+.scoring-timeline__list { margin: 0; padding: 0; list-style: none; }
+.scoring-timeline__list li { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: .8rem; align-items: center; }
+.scoring-timeline__list li + li { margin-top: .15rem; }
+.scoring-timeline__marker { align-self: stretch; position: relative; display: grid; place-items: center; }
+.scoring-timeline__marker::before { position: absolute; inset: 0 auto; width: 2px; content: ''; background: rgba(169,54,39,.22); }
+.scoring-timeline__marker span { position: relative; z-index: 1; width: 11px; height: 11px; border: 3px solid #fffaf0; border-radius: 50%; background: #a93627; box-shadow: 0 0 0 1px #a93627; }
+.scoring-timeline__play { padding: .8rem 0; }
+.scoring-timeline__play > span { color: #a93627; font-size: .62rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.scoring-timeline__play p { margin-top: .2rem; color: #53636e; font-size: .8rem; line-height: 1.4; }
+.scoring-timeline__play a { color: #173652; font-weight: 900; text-decoration: none; }
+.scoring-timeline__score { display: flex; gap: .45rem; padding: .45rem .55rem; border-radius: 10px; background: rgba(16,38,61,.055); color: #667680; font-family: 'SFMono-Regular',Menlo,monospace; font-size: .68rem; font-weight: 800; }
+.scoring-timeline__score strong { color: #173652; }
 .box-table-wrap { overflow-x: auto; border: 1px solid rgba(16,38,61,.09); border-radius: 14px; }
 table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.6); }
 th,td { padding: .65rem .72rem; border-bottom: 1px solid rgba(16,38,61,.075); text-align: right; white-space: nowrap; }
@@ -251,5 +386,9 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .scoreboard__matchup { grid-template-columns: 1fr auto 1fr; gap: .6rem; padding: 1.3rem .9rem; }
   .scoreboard__team strong { font-size: 1.35rem; }
   .scoreboard__score { font-size: 2.4rem; }
+  .performer-grid { grid-template-columns: 1fr; }
+  .performer-card--wide { grid-column: auto; }
+  .scoring-timeline__list li { grid-template-columns: 18px minmax(0,1fr); }
+  .scoring-timeline__score { grid-column: 2; justify-self: start; margin-bottom: .65rem; }
 }
 </style>
