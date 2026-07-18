@@ -9,7 +9,7 @@ class HomeSnapshotQuery
   ].freeze
 
   def initialize(on: nil)
-    @on = parse_date(on) || Date.current
+    @on = parse_date(on) || ApplicationCalendar.current_date
   end
 
   def result

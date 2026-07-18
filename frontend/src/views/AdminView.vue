@@ -10,7 +10,12 @@ import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStat
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 import { useRosterSnapshots } from '../composables/useRosterSnapshots'
 
-const today = new Date().toISOString().slice(0, 10)
+const now = new Date()
+const today = [
+  now.getFullYear(),
+  String(now.getMonth() + 1).padStart(2, '0'),
+  String(now.getDate()).padStart(2, '0'),
+].join('-')
 const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
 const databaseDetailsViews = ['storage', 'usage']

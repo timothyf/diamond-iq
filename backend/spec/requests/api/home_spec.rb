@@ -1,6 +1,37 @@
 require "rails_helper"
 
 RSpec.describe "Api::Home", type: :request do
+  it "uses the Eastern calendar date during the UTC rollover window" do
+    allow(Time).to receive(:current).and_return(Time.utc(2026, 7, 18, 3, 22))
+    tigers = create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
+    guardians = create_team(mlb_id: 114, name: "Cleveland Guardians", abbreviation: "CLE")
+    schedule = create_schedule(
+      season: 2026,
+      start_date: Date.new(2026, 3, 25),
+      end_date: Date.new(2026, 9, 27)
+    )
+    eastern_today = create_game(
+      schedule: schedule,
+      official_date: Date.new(2026, 7, 17),
+      scheduled_at: Time.utc(2026, 7, 17, 23, 10),
+      home_team: tigers,
+      away_team: guardians
+    )
+    create_game(
+      schedule: schedule,
+      official_date: Date.new(2026, 7, 18),
+      scheduled_at: Time.utc(2026, 7, 18, 23, 10),
+      home_team: guardians,
+      away_team: tigers
+    )
+
+    get api_home_path
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "as_of")).to eq("2026-07-17")
+    expect(json_body.dig("data", "games").pluck("id")).to eq([ eastern_today.id ])
+  end
+
   it "returns the daily slate, qualified leaders, team pulse, and freshness metadata" do
     tigers = create_team(
       mlb_id: 116,
