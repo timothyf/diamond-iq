@@ -4,6 +4,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
 import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetailsDialog.vue'
+import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCard.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import { useAdminTask } from '../composables/useAdminTask'
 import { useGameDetailsSync } from '../composables/useGameDetailsSync'
@@ -24,7 +25,7 @@ const databaseDetailsOpen = ref(false)
 const databaseDetailsButton = ref(null)
 const gameDetailsConfirmationOpen = ref(false)
 const gameDetailsConfirmationDialog = ref(null)
-const gameDetailsSyncButton = ref(null)
+const gameDetailsSyncCard = ref(null)
 const pendingGameDetailsParameters = ref(null)
 const pendingGameDetailsEstimate = ref(null)
 const pitchDataConfirmationOpen = ref(false)
@@ -355,7 +356,7 @@ async function cancelGameDetailsSync() {
   pendingGameDetailsParameters.value = null
   pendingGameDetailsEstimate.value = null
   await nextTick()
-  gameDetailsSyncButton.value?.focus()
+  gameDetailsSyncCard.value?.focusSyncButton()
 }
 
 async function confirmGameDetailsSync() {
@@ -519,97 +520,6 @@ function formatElapsed(seconds) {
   return `${minutes}m${remainingSeconds ? ` ${remainingSeconds}s` : ''}`
 }
 
-function gameDetailsStatusLabel(status) {
-  return {
-    queued: 'Queued',
-    running: 'Synchronizing',
-    completed: 'Completed',
-    failed: 'Completed with an error',
-    cancelled: 'Cancelled',
-  }[status] || humanize(status)
-}
-
-function gameDetailsAnalyticsRefresh(task) {
-  return task?.resultData?.analytics_refresh || null
-}
-
-function gameDetailsAnalyticsRefreshMessage(task) {
-  const refresh = gameDetailsAnalyticsRefresh(task)
-  if (!refresh) return ''
-  if (refresh.skipped) return refresh.message || 'Daily analytics refresh was skipped.'
-  if (refresh.success) return refresh.message || 'Daily analytics refresh completed.'
-  return refresh.message || 'Daily analytics refresh failed.'
-}
-
-function gameDetailsAnalyticsRefreshClass(task) {
-  const refresh = gameDetailsAnalyticsRefresh(task)
-  if (!refresh) return ''
-  return refresh.success || refresh.skipped ? 'sync-progress__notice' : 'sync-progress__error'
-}
-
-function gameDetailsWorkerPoolSummary(task) {
-  return task?.resultData?.worker_pool_summary || null
-}
-
-function gameDetailsWorkerPoolMessage(task) {
-  const summary = gameDetailsWorkerPoolSummary(task)
-  if (!summary) return ''
-
-  return [
-    `Worker pool: ${summary.active_workers || 0}/${summary.configured_workers || 0}`,
-    `dequeued ${summary.games_dequeued || 0}`,
-    `finalized ${summary.games_finalized || 0}`,
-    `errors ${summary.worker_error_count || 0}`,
-  ].join(' · ')
-}
-
-function gameDetailsFailureRows(task) {
-  if (!task?.resultData) return []
-
-  const normalized = []
-  const pushFailure = (failure) => {
-    if (!failure || typeof failure !== 'object') return
-    const message = String(failure.message || '').trim()
-    if (!message) return
-
-    const mlbId = failure.mlb_id ?? failure.mlbId ?? null
-    const errorList = Array.isArray(failure.errors) ? failure.errors.filter(Boolean).map(String) : []
-    normalized.push({ mlbId, message, errors: errorList })
-  }
-
-  Array.isArray(task.resultData.errors) && task.resultData.errors.forEach(pushFailure)
-  Array.isArray(task.resultData.failures) && task.resultData.failures.forEach(pushFailure)
-
-  const seen = new Set()
-  return normalized.filter((entry) => {
-    const key = `${entry.mlbId || 'none'}|${entry.message}|${entry.errors.join(',')}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-}
-
-function gameDetailsFailureText(entry) {
-  const gameLabel = entry.mlbId ? `Game ${entry.mlbId}` : 'Worker pool'
-  const errorSuffix = entry.errors.length ? ` (${entry.errors.join(', ')})` : ''
-  return `${gameLabel}: ${entry.message}${errorSuffix}`
-}
-
-function gameDetailsWorkerErrorRows(task) {
-  const summary = gameDetailsWorkerPoolSummary(task)
-  if (!summary) return []
-
-  return Array.isArray(summary.worker_errors)
-    ? summary.worker_errors.filter(Boolean).map((message) => String(message))
-    : []
-}
-
-function gameDetailsAnalyticsRefreshProcessing(task) {
-  if (!task) return false
-  const allGamesProcessed = Number(task.processedItems || 0) >= Number(task.totalItems || 0)
-  return task.status === 'running' && allGamesProcessed && !gameDetailsAnalyticsRefresh(task)
-}
-
 function gameDetailsRefreshParameters(task) {
   if (!task?.taskParameters) return null
   const startDate = task.taskParameters.start_date
@@ -620,11 +530,6 @@ function gameDetailsRefreshParameters(task) {
     start_date: startDate,
     end_date: endDate,
   }
-}
-
-function gameDetailsDeferredAnalyticsRefreshAvailable(task) {
-  const refresh = gameDetailsAnalyticsRefresh(task)
-  return Boolean(refresh?.deferred && gameDetailsRefreshParameters(task))
 }
 
 function pitchDataStatusLabel(status) {
@@ -1104,153 +1009,20 @@ async function closeDatabaseDetails() {
           </button>
         </AdminTaskCard>
 
-        <AdminTaskCard
-          source="Box scores & live feeds"
-          title="MLB game detail synchronization"
-          command="mlb_game_details:sync"
-          description="Downloads player game lines, batting orders, substitutions, plate appearances, and links matching Statcast pitches."
-          data-test="game-details-sync-form"
-          @submit.prevent="requestGameDetailsSync"
-        >
-          <div class="data-coverage" data-test="game-details-coverage">
-            <span>Currently stored</span>
-            <dl v-if="gameDetailsMetrics.synchronizedGameCount">
-              <div>
-                <dt>Games synchronized</dt>
-                <dd>{{ formatCount(gameDetailsMetrics.synchronizedGameCount) }}</dd>
-              </div>
-              <div>
-                <dt>Game-date span</dt>
-                <dd>{{ formatDate(gameDetailsMetrics.earliestGameDate) }}–{{ formatDate(gameDetailsMetrics.latestGameDate) }}</dd>
-              </div>
-            </dl>
-            <p v-else>No game box scores or live feeds have been synchronized.</p>
-            <small>
-              {{ formatCount(gameDetailsMetrics.plateAppearanceCount) }} plate appearances ·
-              {{ formatCount(gameDetailsMetrics.linkedPitchCount) }} linked pitches
-            </small>
-          </div>
-          <div class="admin-fields admin-fields--three">
-            <label><span>Start date</span><input v-model="gameDetailsOptions.startDate" type="date" :disabled="Boolean(gameDetailsOptions.mlbGameId)" /></label>
-            <label><span>End date</span><input v-model="gameDetailsOptions.endDate" type="date" :disabled="Boolean(gameDetailsOptions.mlbGameId)" /></label>
-            <label><span>MLB game ID (optional)</span><input v-model="gameDetailsOptions.mlbGameId" type="number" min="1" placeholder="823443" /></label>
-          </div>
-          <button ref="gameDetailsSyncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ gameDetailsSyncStarting ? 'Starting synchronization…' : gameDetailsSyncActive ? 'Synchronization in progress…' : 'Synchronize game details' }}
-          </button>
-          <section v-if="gameDetailsTask" class="sync-progress" data-test="game-details-progress" aria-live="polite">
-            <header>
-              <div>
-                <span>{{ gameDetailsStatusLabel(gameDetailsTask.status) }}</span>
-                <strong>
-                  {{ formatCount(gameDetailsTask.processedItems) }} of {{ formatCount(gameDetailsTask.totalItems) }} games
-                </strong>
-              </div>
-              <b>{{ gameDetailsTask.progressPercentage.toFixed(1) }}%</b>
-            </header>
-            <div
-              class="sync-progress__track"
-              role="progressbar"
-              :aria-valuenow="gameDetailsTask.progressPercentage"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="`Game detail synchronization ${gameDetailsTask.progressPercentage}% complete`"
-            >
-              <i :style="{ width: `${gameDetailsTask.progressPercentage}%` }"></i>
-            </div>
-            <dl>
-              <div>
-                <dt>Completed</dt>
-                <dd>{{ formatCount(gameDetailsTask.completedItems) }}</dd>
-              </div>
-              <div>
-                <dt>Failed</dt>
-                <dd>{{ formatCount(gameDetailsTask.failedItems) }}</dd>
-              </div>
-              <div>
-                <dt>Elapsed</dt>
-                <dd>{{ formatElapsed(gameDetailsTask.elapsedSeconds) }}</dd>
-              </div>
-              <div>
-                <dt>Remaining</dt>
-                <dd>{{ gameDetailsSyncActive ? formatElapsed(gameDetailsTask.estimatedRemainingSeconds) : '—' }}</dd>
-              </div>
-            </dl>
-            <p v-if="gameDetailsTask.currentItemLabel" class="sync-progress__current">
-              <span>Current game</span>{{ gameDetailsTask.currentItemLabel }}
-            </p>
-            <p v-if="gameDetailsTask.cancelRequested && gameDetailsSyncActive" class="sync-progress__notice">
-              Cancellation requested. The current game will finish safely before the task stops.
-            </p>
-            <p v-else-if="gameDetailsTask.errorMessage" class="sync-progress__error">{{ gameDetailsTask.errorMessage }}</p>
-            <p
-              v-if="gameDetailsAnalyticsRefreshProcessing(gameDetailsTask)"
-              class="sync-progress__notice"
-              data-test="game-details-analytics-refresh-processing"
-            >
-              Game detail synchronization is complete. Daily analytics refresh is now processing.
-            </p>
-            <p
-              v-if="gameDetailsAnalyticsRefreshMessage(gameDetailsTask)"
-              :class="gameDetailsAnalyticsRefreshClass(gameDetailsTask)"
-              data-test="game-details-analytics-refresh"
-            >
-              {{ gameDetailsAnalyticsRefreshMessage(gameDetailsTask) }}
-            </p>
-            <button
-              v-if="gameDetailsDeferredAnalyticsRefreshAvailable(gameDetailsTask)"
-              type="button"
-              class="admin-button admin-button--secondary"
-              data-test="game-details-run-deferred-analytics-refresh"
-              :disabled="anyActionRunning"
-              @click="handleGameDetailsDeferredAnalyticsRefresh"
-            >
-              {{ runningTask === 'daily_analytics_refresh' ? 'Refreshing daily analytics…' : 'Run daily analytics refresh for this range' }}
-            </button>
-            <p
-              v-if="gameDetailsWorkerPoolMessage(gameDetailsTask)"
-              class="sync-progress__notice"
-              data-test="game-details-worker-pool-summary"
-            >
-              {{ gameDetailsWorkerPoolMessage(gameDetailsTask) }}
-            </p>
-            <div
-              v-if="gameDetailsFailureRows(gameDetailsTask).length"
-              class="sync-progress__failure-block"
-              data-test="game-details-failure-details"
-            >
-              <p class="sync-progress__error">Failure details</p>
-              <ul class="sync-progress__failure-list">
-                <li v-for="(entry, index) in gameDetailsFailureRows(gameDetailsTask)" :key="`${entry.mlbId || 'worker'}-${index}`">
-                  {{ gameDetailsFailureText(entry) }}
-                </li>
-              </ul>
-            </div>
-            <div
-              v-if="gameDetailsWorkerErrorRows(gameDetailsTask).length"
-              class="sync-progress__failure-block"
-              data-test="game-details-worker-errors"
-            >
-              <p class="sync-progress__error">Worker errors</p>
-              <ul class="sync-progress__failure-list">
-                <li v-for="(message, index) in gameDetailsWorkerErrorRows(gameDetailsTask)" :key="`worker-error-${index}`">
-                  {{ message }}
-                </li>
-              </ul>
-            </div>
-            <button
-              v-if="gameDetailsSyncActive"
-              type="button"
-              class="admin-button admin-button--danger"
-              data-test="game-details-cancel-active"
-              :disabled="gameDetailsTask.cancelRequested"
-              @click="cancelActiveGameDetailsSync"
-            >
-              {{ gameDetailsTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
-            </button>
-          </section>
-          <p v-if="gameDetailsSyncError" class="admin-message admin-message--error" role="alert">{{ gameDetailsSyncError }}</p>
-        </AdminTaskCard>
+        <AdminGameDetailsSyncCard
+          ref="gameDetailsSyncCard"
+          :options="gameDetailsOptions"
+          :metrics="gameDetailsMetrics"
+          :task="gameDetailsTask"
+          :active="gameDetailsSyncActive"
+          :starting="gameDetailsSyncStarting"
+          :any-action-running="anyActionRunning"
+          :running-task="runningTask"
+          :error="gameDetailsSyncError"
+          @submit="requestGameDetailsSync"
+          @cancel-active="cancelActiveGameDetailsSync"
+          @refresh-analytics="handleGameDetailsDeferredAnalyticsRefresh"
+        />
 
         <AdminTaskCard
           data-test="profile-sync-form"
