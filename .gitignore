@@ -65,4 +65,5 @@ scratch.txt
 backend/config/master.key
 ingest_data_from_postgres*
 /docs/
+.cloudflare-dev/logs
 

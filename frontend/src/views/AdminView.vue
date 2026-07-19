@@ -2,6 +2,9 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
+import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
+import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetailsDialog.vue'
+import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import { useAdminTask } from '../composables/useAdminTask'
 import { useGameDetailsSync } from '../composables/useGameDetailsSync'
 import { usePitchDataSync } from '../composables/usePitchDataSync'
@@ -18,13 +21,7 @@ const today = [
 ].join('-')
 const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
-const databaseDetailsViews = ['storage', 'usage']
-const databaseDetailsView = ref('storage')
-const databaseDetailsDialog = ref(null)
 const databaseDetailsButton = ref(null)
-const dataHealthOpen = ref(false)
-const dataHealthDialog = ref(null)
-const dataHealthButton = ref(null)
 const gameDetailsConfirmationOpen = ref(false)
 const gameDetailsConfirmationDialog = ref(null)
 const gameDetailsSyncButton = ref(null)
@@ -280,21 +277,6 @@ function handleAdminTabKeydown(event, currentIndex) {
   event.preventDefault()
   const tabButtons = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')
   activeAdminTab.value = adminTabs[nextIndex].id
-  nextTick(() => tabButtons?.[nextIndex]?.focus())
-}
-
-function handleDatabaseViewKeydown(event, currentIndex) {
-  let nextIndex
-
-  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % databaseDetailsViews.length
-  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + databaseDetailsViews.length) % databaseDetailsViews.length
-  if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = databaseDetailsViews.length - 1
-  if (nextIndex === undefined) return
-
-  event.preventDefault()
-  const tabButtons = event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')
-  databaseDetailsView.value = databaseDetailsViews[nextIndex]
   nextTick(() => tabButtons?.[nextIndex]?.focus())
 }
 
@@ -657,8 +639,6 @@ function pitchDataStatusLabel(status) {
 
 async function openDatabaseDetails() {
   databaseDetailsOpen.value = true
-  await nextTick()
-  databaseDetailsDialog.value?.focus()
 }
 
 async function closeDatabaseDetails() {
@@ -667,18 +647,6 @@ async function closeDatabaseDetails() {
   databaseDetailsButton.value?.focus()
 }
 
-async function openDataHealth() {
-  dataHealthOpen.value = true
-  await nextTick()
-  dataHealthDialog.value?.focus()
-  if (!dataHealth.value) await loadDataHealth()
-}
-
-async function closeDataHealth() {
-  dataHealthOpen.value = false
-  await nextTick()
-  dataHealthButton.value?.focus()
-}
 </script>
 
 <template>
@@ -700,21 +668,12 @@ async function closeDataHealth() {
             View details
           </button>
         </div>
-        <div
-          class="data-health-summary"
-          :class="dataHealth ? `data-health-summary--${dataHealth.status}` : ''"
-          data-test="data-health-summary"
-        >
-          <span>Data health</span>
-          <strong>{{ dataHealthLoading ? 'Checking…' : dataHealth ? humanize(dataHealth.status) : 'Not checked' }}</strong>
-          <small v-if="dataHealth">
-            {{ dataHealth.summary.criticalCount }} critical · {{ dataHealth.summary.warningCount }} warnings
-          </small>
-          <small v-else>Run contextual completeness checks</small>
-          <button ref="dataHealthButton" type="button" data-test="data-health-button" :disabled="dataHealthLoading" @click="openDataHealth">
-            {{ dataHealth ? 'View report' : 'Run health check' }}
-          </button>
-        </div>
+        <AdminDataHealthPanel
+          :report="dataHealth"
+          :loading="dataHealthLoading"
+          :error="dataHealthError"
+          @refresh="loadDataHealth"
+        />
         <div class="admin-hero__status" :class="{ 'admin-hero__status--busy': anyActionRunning }">
           <span aria-hidden="true"></span>
           {{ anyActionRunning ? 'Data operation in progress' : 'Admin tools ready' }}
@@ -722,272 +681,12 @@ async function closeDataHealth() {
       </div>
     </section>
 
-    <div
-      v-if="databaseDetailsOpen"
-      class="database-modal"
-      data-test="database-details-modal"
-      @click.self="closeDatabaseDetails"
-      @keydown.esc="closeDatabaseDetails"
-    >
-      <section
-        ref="databaseDetailsDialog"
-        class="database-insights"
-        data-test="database-details"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="database-details-title"
-        tabindex="-1"
-      >
-      <header class="database-insights__heading">
-        <div>
-          <p class="eyebrow">Storage health</p>
-          <h2 id="database-details-title">Database footprint</h2>
-        </div>
-        <div class="database-insights__heading-actions">
-          <p>
-            {{ databaseMetrics.databaseName || 'Current database' }}
-            <span v-if="databaseMetrics.serverVersion">· PostgreSQL {{ databaseMetrics.serverVersion }}</span>
-            <span v-if="databaseMetrics.measuredAt">· Measured {{ formatTimestamp(databaseMetrics.measuredAt) }}</span>
-          </p>
-          <button type="button" data-test="database-details-close" aria-label="Close database details" @click="closeDatabaseDetails">×</button>
-        </div>
-      </header>
-
-      <div class="database-summary-grid">
-        <article>
-          <span>Total database</span>
-          <strong>{{ overviewLoading ? 'Measuring…' : formatBytes(databaseMetrics.sizeBytes) }}</strong>
-          <small>Entire PostgreSQL database</small>
-        </article>
-        <article>
-          <span>Application tables</span>
-          <strong>{{ formatBytes(databaseMetrics.userTableSizeBytes) }}</strong>
-          <small>Table data, TOAST, and indexes</small>
-        </article>
-        <article>
-          <span>Tables</span>
-          <strong>{{ formatCount(databaseMetrics.tableCount) }}</strong>
-          <small>DiamondIQ application tables</small>
-        </article>
-        <article>
-          <span>Estimated rows</span>
-          <strong>{{ formatCount(databaseMetrics.estimatedRowCount) }}</strong>
-          <small>{{ formatCount(databaseMetrics.estimatedDeadRowCount) }} dead rows awaiting cleanup</small>
-        </article>
-      </div>
-
-      <div class="database-view-tabs" role="tablist" aria-label="Database details views">
-        <button
-          id="database-view-storage-tab"
-          type="button"
-          role="tab"
-          :class="{ 'database-view-tabs__active': databaseDetailsView === 'storage' }"
-          :aria-selected="databaseDetailsView === 'storage'"
-          :tabindex="databaseDetailsView === 'storage' ? 0 : -1"
-          aria-controls="database-view-storage"
-          data-test="database-view-storage-tab"
-          @click="databaseDetailsView = 'storage'"
-          @keydown="handleDatabaseViewKeydown($event, 0)"
-        >
-          Storage
-        </button>
-        <button
-          id="database-view-usage-tab"
-          type="button"
-          role="tab"
-          :class="{ 'database-view-tabs__active': databaseDetailsView === 'usage' }"
-          :aria-selected="databaseDetailsView === 'usage'"
-          :tabindex="databaseDetailsView === 'usage' ? 0 : -1"
-          aria-controls="database-view-usage"
-          data-test="database-view-usage-tab"
-          @click="databaseDetailsView = 'usage'"
-          @keydown="handleDatabaseViewKeydown($event, 1)"
-        >
-          Most Read
-        </button>
-      </div>
-
-      <div
-        v-show="databaseDetailsView === 'storage'"
-        id="database-view-storage"
-        role="tabpanel"
-        aria-labelledby="database-view-storage-tab"
-      >
-        <div v-if="databaseMetrics.largestTables.length" class="database-table-wrap">
-          <table class="database-table">
-            <thead>
-              <tr>
-                <th>Largest tables</th>
-                <th>Est. rows</th>
-                <th>Dead rows</th>
-                <th>Data</th>
-                <th>Indexes</th>
-                <th>Total</th>
-                <th>% of DB</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="table in databaseMetrics.largestTables" :key="table.tableName">
-                <th>
-                  <code>{{ table.tableName }}</code>
-                  <span class="database-table__bar" aria-hidden="true">
-                    <i :style="{ width: `${Math.min(table.databasePercentage, 100)}%` }"></i>
-                  </span>
-                </th>
-                <td>{{ formatCount(table.estimatedRowCount) }}</td>
-                <td>{{ formatCount(table.estimatedDeadRowCount) }}</td>
-                <td>{{ formatBytes(table.dataSizeBytes) }}</td>
-                <td>{{ formatBytes(table.indexSizeBytes) }}</td>
-                <td><strong>{{ formatBytes(table.totalSizeBytes) }}</strong></td>
-                <td>{{ table.databasePercentage.toFixed(2) }}%</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="database-insights__empty">
-          Per-table storage metrics are available when DiamondIQ uses PostgreSQL.
-        </p>
-      </div>
-
-      <div
-        v-show="databaseDetailsView === 'usage'"
-        id="database-view-usage"
-        role="tabpanel"
-        aria-labelledby="database-view-usage-tab"
-        data-test="database-view-usage"
-      >
-        <p class="database-usage-window">
-          Statistics collected since
-          <strong>{{ databaseMetrics.statisticsCollectedSince ? formatTimestamp(databaseMetrics.statisticsCollectedSince) : 'the last PostgreSQL statistics reset' }}</strong>.
-        </p>
-        <div v-if="databaseMetrics.mostReadTables.length" class="database-table-wrap">
-          <table class="database-table database-table--usage">
-            <thead>
-              <tr>
-                <th>Most-read tables</th>
-                <th>Total scans</th>
-                <th>Sequential scans</th>
-                <th>Index scans</th>
-                <th>Rows read/fetched</th>
-                <th>Last sequential scan</th>
-                <th>Last index scan</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="table in databaseMetrics.mostReadTables" :key="table.tableName">
-                <th><code>{{ table.tableName }}</code></th>
-                <td><strong>{{ formatCount(table.totalScans) }}</strong></td>
-                <td>{{ formatCount(table.sequentialScans) }}</td>
-                <td>{{ formatCount(table.indexScans) }}</td>
-                <td>{{ formatCount(table.rowsReadOrFetched) }}</td>
-                <td>{{ table.lastSequentialScanAt ? formatTimestamp(table.lastSequentialScanAt) : 'Never recorded' }}</td>
-                <td>{{ table.lastIndexScanAt ? formatTimestamp(table.lastIndexScanAt) : 'Never recorded' }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="database-insights__empty">
-          Per-table usage metrics are available when DiamondIQ uses PostgreSQL.
-        </p>
-      </div>
-      <footer v-if="databaseDetailsView === 'storage'">
-        Row counts come from PostgreSQL statistics and are approximate. Run <code>ANALYZE</code> to refresh estimates after a large import.
-      </footer>
-      <footer v-else>
-        These cumulative counters include cached reads and reset when PostgreSQL statistics are reset. A sequential scan is not necessarily inefficient for a small table.
-      </footer>
-      </section>
-    </div>
-
-    <div
-      v-if="dataHealthOpen"
-      class="database-modal"
-      data-test="data-health-modal"
-      @click.self="closeDataHealth"
-      @keydown.esc="closeDataHealth"
-    >
-      <section
-        ref="dataHealthDialog"
-        class="database-insights data-health-insights"
-        data-test="data-health-details"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="data-health-title"
-        tabindex="-1"
-      >
-        <header class="database-insights__heading">
-          <div>
-            <p class="eyebrow">Completeness and integrity</p>
-            <h2 id="data-health-title">Data health</h2>
-          </div>
-          <div class="database-insights__heading-actions">
-            <p v-if="dataHealth?.checkedAt">Checked {{ formatTimestamp(dataHealth.checkedAt) }}</p>
-            <button type="button" data-test="data-health-close" aria-label="Close data health details" @click="closeDataHealth">×</button>
-          </div>
-        </header>
-
-        <p v-if="dataHealthError" class="admin-message admin-message--error" role="alert">{{ dataHealthError }}</p>
-        <div v-if="dataHealthLoading && !dataHealth" class="data-health-loading">Checking schedules, games, players, pitches, and analytics…</div>
-
-        <template v-if="dataHealth">
-          <div class="database-summary-grid data-health-totals">
-            <article>
-              <span>Overall status</span>
-              <strong :class="`data-health-text--${dataHealth.status}`">{{ humanize(dataHealth.status) }}</strong>
-              <small>Calculation version {{ dataHealth.calculationVersion }}</small>
-            </article>
-            <article>
-              <span>Healthy checks</span>
-              <strong>{{ formatCount(dataHealth.summary.healthyCount) }}</strong>
-              <small>of {{ formatCount(dataHealth.summary.checkCount) }} checks</small>
-            </article>
-            <article>
-              <span>Warnings</span>
-              <strong class="data-health-text--warning">{{ formatCount(dataHealth.summary.warningCount) }}</strong>
-              <small>Checks needing review</small>
-            </article>
-            <article>
-              <span>Critical</span>
-              <strong class="data-health-text--critical">{{ formatCount(dataHealth.summary.criticalCount) }}</strong>
-              <small>Checks likely affecting accuracy</small>
-            </article>
-          </div>
-
-          <div class="data-health-toolbar">
-            <p>{{ formatCount(dataHealth.summary.affectedRecordCount) }} total findings across all checks</p>
-            <button type="button" :disabled="dataHealthLoading" data-test="data-health-refresh" @click="loadDataHealth">
-              {{ dataHealthLoading ? 'Checking…' : 'Run check again' }}
-            </button>
-          </div>
-
-          <div class="data-health-checks">
-            <article
-              v-for="check in dataHealth.checks"
-              :key="check.id"
-              class="data-health-check"
-              :class="`data-health-check--${check.status}`"
-              :data-test="`data-health-check-${check.id}`"
-            >
-              <header>
-                <div>
-                  <span>{{ check.category }}</span>
-                  <h3>{{ check.name }}</h3>
-                </div>
-                <strong>{{ check.status === 'healthy' ? 'Healthy' : `${formatCount(check.affectedCount)} affected` }}</strong>
-              </header>
-              <p>{{ check.description }}</p>
-              <ul v-if="check.examples.length">
-                <li v-for="example in check.examples" :key="example"><code>{{ example }}</code></li>
-              </ul>
-              <footer v-if="check.status !== 'healthy'">
-                <span>Suggested action</span>
-                {{ check.recommendation }}
-              </footer>
-            </article>
-          </div>
-        </template>
-      </section>
-    </div>
+    <AdminDatabaseDetailsDialog
+      :open="databaseDetailsOpen"
+      :metrics="databaseMetrics"
+      :loading="overviewLoading"
+      @close="closeDatabaseDetails"
+    />
 
     <div
       v-if="pitchDataConfirmationOpen"
@@ -1132,18 +831,15 @@ async function closeDataHealth() {
       </header>
 
       <div class="admin-grid admin-grid--two">
-        <form class="admin-card" data-test="stats-download-form" @submit.prevent="handleStatsDownload">
-          <div class="admin-card__number">01</div>
-          <div class="admin-card__title">
-            <div>
-              <p>MLB Stats API</p>
-              <h3>Player season statistics</h3>
-            </div>
-            <span class="admin-chip">Download + import</span>
-          </div>
-          <p class="admin-card__description">
-            Downloads and imports season-level batting or pitching statistics for the selected year range.
-          </p>
+        <AdminTaskCard
+          number="01"
+          source="MLB Stats API"
+          title="Player season statistics"
+          chip="Download + import"
+          description="Downloads and imports season-level batting or pitching statistics for the selected year range."
+          data-test="stats-download-form"
+          @submit.prevent="handleStatsDownload"
+        >
           <div class="data-coverage" data-test="player-season-stats-coverage">
             <span>Currently stored</span>
             <dl v-if="playerSeasonStatsMetrics.earliestSeason && playerSeasonStatsMetrics.latestSeason">
@@ -1185,20 +881,17 @@ async function closeDataHealth() {
           </button>
           <p v-if="statsDownloadError" class="admin-message admin-message--error">{{ statsDownloadError }}</p>
           <p v-else-if="statsDownloadSummary" class="admin-message admin-message--success">{{ statsDownloadSummary }}</p>
-        </form>
+        </AdminTaskCard>
 
-        <form class="admin-card" data-test="pitch-download-form" @submit.prevent="requestPitchDataSync">
-          <div class="admin-card__number">02</div>
-          <div class="admin-card__title">
-            <div>
-              <p>Baseball Savant</p>
-              <h3>Statcast pitch data</h3>
-            </div>
-            <span class="admin-chip">Download + import</span>
-          </div>
-          <p class="admin-card__description">
-            Downloads pitch-by-pitch Statcast data from Baseball Savant for the selected games and date range.
-          </p>
+        <AdminTaskCard
+          number="02"
+          source="Baseball Savant"
+          title="Statcast pitch data"
+          chip="Download + import"
+          description="Downloads pitch-by-pitch Statcast data from Baseball Savant for the selected games and date range."
+          data-test="pitch-download-form"
+          @submit.prevent="requestPitchDataSync"
+        >
           <div class="data-coverage" data-test="pitch-data-coverage">
             <span>Currently stored</span>
             <dl v-if="pitchDataMetrics.earliestGameDate && pitchDataMetrics.latestGameDate">
@@ -1292,7 +985,7 @@ async function closeDataHealth() {
             </button>
           </section>
           <p v-if="pitchDataSyncError" class="admin-message admin-message--error">{{ pitchDataSyncError }}</p>
-        </form>
+        </AdminTaskCard>
       </div>
     </section>
 
@@ -1358,17 +1051,14 @@ async function closeDataHealth() {
       </header>
 
       <div class="admin-grid admin-grid--two">
-        <form class="admin-card" data-test="schedule-sync-form" @submit.prevent="handleScheduleSync">
-          <div class="admin-card__title">
-            <div>
-              <p>Games & schedules</p>
-              <h3>MLB schedule synchronization</h3>
-            </div>
-            <code>mlb_schedule:sync</code>
-          </div>
-          <p class="admin-card__description">
-            Downloads MLB schedules and updates games, teams, venues, statuses, and probable pitchers for the selected dates.
-          </p>
+        <AdminTaskCard
+          source="Games & schedules"
+          title="MLB schedule synchronization"
+          command="mlb_schedule:sync"
+          description="Downloads MLB schedules and updates games, teams, venues, statuses, and probable pitchers for the selected dates."
+          data-test="schedule-sync-form"
+          @submit.prevent="handleScheduleSync"
+        >
           <div class="schedule-coverage" data-test="schedule-date-range">
             <p v-if="overviewLoading">Loading stored dates…</p>
             <p v-else-if="overviewError" class="schedule-coverage__error">{{ overviewError }}</p>
@@ -1412,19 +1102,16 @@ async function closeDataHealth() {
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_schedule_sync' ? 'Synchronizing schedule…' : 'Synchronize schedule' }}
           </button>
-        </form>
+        </AdminTaskCard>
 
-        <form class="admin-card" data-test="game-details-sync-form" @submit.prevent="requestGameDetailsSync">
-          <div class="admin-card__title">
-            <div>
-              <p>Box scores & live feeds</p>
-              <h3>MLB game detail synchronization</h3>
-            </div>
-            <code>mlb_game_details:sync</code>
-          </div>
-          <p class="admin-card__description">
-            Downloads player game lines, batting orders, substitutions, plate appearances, and links matching Statcast pitches.
-          </p>
+        <AdminTaskCard
+          source="Box scores & live feeds"
+          title="MLB game detail synchronization"
+          command="mlb_game_details:sync"
+          description="Downloads player game lines, batting orders, substitutions, plate appearances, and links matching Statcast pitches."
+          data-test="game-details-sync-form"
+          @submit.prevent="requestGameDetailsSync"
+        >
           <div class="data-coverage" data-test="game-details-coverage">
             <span>Currently stored</span>
             <dl v-if="gameDetailsMetrics.synchronizedGameCount">
@@ -1563,19 +1250,16 @@ async function closeDataHealth() {
             </button>
           </section>
           <p v-if="gameDetailsSyncError" class="admin-message admin-message--error" role="alert">{{ gameDetailsSyncError }}</p>
-        </form>
+        </AdminTaskCard>
 
-        <form class="admin-card" data-test="profile-sync-form" @submit.prevent="handleProfileSync">
-          <div class="admin-card__title">
-            <div>
-              <p>Player identity</p>
-              <h3>MLB profile synchronization</h3>
-            </div>
-            <code>mlb_player_profiles:sync</code>
-          </div>
-          <p class="admin-card__description">
-            Downloads MLB biographical, handedness, position, and headshot information for players already stored in DiamondIQ.
-          </p>
+        <AdminTaskCard
+          data-test="profile-sync-form"
+          source="Player identity"
+          title="MLB profile synchronization"
+          command="mlb_player_profiles:sync"
+          description="Downloads MLB biographical, handedness, position, and headshot information for players already stored in DiamondIQ."
+          @submit.prevent="handleProfileSync"
+        >
           <div class="admin-fields admin-fields--four">
             <label><span>Batch size</span><input v-model.number="profileOptions.batchSize" type="number" min="1" max="100" required /></label>
             <label><span>Limit (optional)</span><input v-model="profileOptions.limit" type="number" min="1" /></label>
@@ -1585,19 +1269,16 @@ async function closeDataHealth() {
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_player_profiles_sync' ? 'Synchronizing profiles…' : 'Synchronize player profiles' }}
           </button>
-        </form>
+        </AdminTaskCard>
 
-        <form class="admin-card" data-test="team-history-sync-form" @submit.prevent="handleTeamHistorySync">
-          <div class="admin-card__title">
-            <div>
-              <p>Player organization trail</p>
-              <h3>MLB transaction history synchronization</h3>
-            </div>
-            <code>mlb_player_team_histories:sync</code>
-          </div>
-          <p class="admin-card__description">
-            Downloads official MLB transactions and rebuilds dated major-league organization tenures for Player Profile Team History cards.
-          </p>
+        <AdminTaskCard
+          data-test="team-history-sync-form"
+          source="Player organization trail"
+          title="MLB transaction history synchronization"
+          command="mlb_player_team_histories:sync"
+          description="Downloads official MLB transactions and rebuilds dated major-league organization tenures for Player Profile Team History cards."
+          @submit.prevent="handleTeamHistorySync"
+        >
           <div class="admin-fields admin-fields--two">
             <label><span>Limit (optional)</span><input v-model="teamHistoryOptions.limit" type="number" min="1" /></label>
             <label><span>MLB IDs (optional)</span><input v-model="teamHistoryOptions.mlbIds" type="text" placeholder="656427, 669360" /></label>
@@ -1605,19 +1286,16 @@ async function closeDataHealth() {
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_player_team_histories_sync' ? 'Synchronizing team histories…' : 'Synchronize team histories' }}
           </button>
-        </form>
+        </AdminTaskCard>
 
-        <form class="admin-card" data-test="roster-sync-form" @submit.prevent="handleRosterSync">
-          <div class="admin-card__title">
-            <div>
-              <p>Current roster state</p>
-              <h3>MLB 40-man roster synchronization</h3>
-            </div>
-            <code>mlb_roster:sync</code>
-          </div>
-          <p class="admin-card__description">
-            Downloads MLB 40-man rosters and updates player profiles, roster status, and dated team memberships for the selected season.
-          </p>
+        <AdminTaskCard
+          data-test="roster-sync-form"
+          source="Current roster state"
+          title="MLB 40-man roster synchronization"
+          command="mlb_roster:sync"
+          description="Downloads MLB 40-man rosters and updates player profiles, roster status, and dated team memberships for the selected season."
+          @submit.prevent="handleRosterSync"
+        >
           <p class="admin-card__coverage" data-test="roster-database-coverage">
             <strong>Database coverage:</strong>
             <template v-if="rosterCoverage.earliestDate && rosterCoverage.latestDate">
@@ -1647,22 +1325,21 @@ async function closeDataHealth() {
             <label><span>Season</span><input v-model.number="rosterOptions.season" type="number" min="1876" :max="currentSeason" required /></label>
           </div>
           <p class="admin-card__hint" data-test="roster-coverage-policy">
-            Synchronizes MLB's 40-man roster only. Completed seasons use December 31; the current season uses today.
+            Synchronizes MLB's 40-man roster only. Completed seasons use the final stored regular-season game date; the current season uses today.
             Historical roster construction will be handled as a separate transaction-based workflow.
           </p>
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'mlb_roster_sync' ? 'Synchronizing roster…' : 'Synchronize team roster' }}
           </button>
-        </form>
+        </AdminTaskCard>
 
-        <article class="admin-card admin-card--maintenance">
-          <div class="admin-card__title">
-            <div>
-              <p>Data maintenance</p>
-              <h3>Rebuild current player positions</h3>
-            </div>
-            <code>player_positions:backfill</code>
-          </div>
+        <AdminTaskCard
+          as="article"
+          source="Data maintenance"
+          title="Rebuild current player positions"
+          command="player_positions:backfill"
+          maintenance
+        >
           <p>Reconcile current position assignments from the latest active team membership for every player.</p>
           <button
             class="admin-button"
@@ -1672,19 +1349,17 @@ async function closeDataHealth() {
           >
             {{ runningTask === 'player_positions_backfill' ? 'Rebuilding positions…' : 'Rebuild player positions' }}
           </button>
-        </article>
+        </AdminTaskCard>
 
-        <form class="admin-card admin-card--maintenance" data-test="contextual-benchmarks-refresh-form" @submit.prevent="handleContextualBenchmarksRefresh">
-          <div class="admin-card__title">
-            <div>
-              <p>Advanced analytics</p>
-              <h3>Refresh contextual benchmarks</h3>
-            </div>
-            <code>contextual_benchmarks:refresh</code>
-          </div>
-          <p class="admin-card__description">
-            Rebuild MLB, position, and player-percentile benchmark context for a selected date range.
-          </p>
+        <AdminTaskCard
+          data-test="contextual-benchmarks-refresh-form"
+          source="Advanced analytics"
+          title="Refresh contextual benchmarks"
+          command="contextual_benchmarks:refresh"
+          description="Rebuild MLB, position, and player-percentile benchmark context for a selected date range."
+          maintenance
+          @submit.prevent="handleContextualBenchmarksRefresh"
+        >
           <div class="admin-fields admin-fields--two">
             <label><span>Start date</span><input v-model="contextualBenchmarkOptions.startDate" type="date" required /></label>
             <label><span>End date</span><input v-model="contextualBenchmarkOptions.endDate" type="date" required /></label>
@@ -1692,7 +1367,7 @@ async function closeDataHealth() {
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'contextual_benchmarks_refresh' ? 'Refreshing contextual benchmarks…' : 'Refresh contextual benchmarks' }}
           </button>
-        </form>
+        </AdminTaskCard>
       </div>
 
       <section class="roster-snapshot-workspace" data-test="roster-snapshot-workspace">
@@ -1788,7 +1463,7 @@ async function closeDataHealth() {
   </main>
 </template>
 
-<style scoped>
+<style>
 .admin-shell {
   min-height: 100vh;
   padding: 2.5rem 1.25rem 5rem;
@@ -2497,7 +2172,7 @@ async function closeDataHealth() {
 }
 
 .admin-card,
-.admin-imports > :deep(section) {
+.admin-imports > section {
   position: relative;
   min-width: 0;
   padding: 1.25rem;
@@ -3020,7 +2695,7 @@ async function closeDataHealth() {
   color: #992e26;
 }
 
-.admin-imports > :deep(section) {
+.admin-imports > section {
   margin: 0;
 }
 
