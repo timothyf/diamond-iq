@@ -6,6 +6,7 @@ import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
 import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetailsDialog.vue'
 import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCard.vue'
 import AdminPitchDataSyncCard from '../components/admin/AdminPitchDataSyncCard.vue'
+import AdminPlayerStatsDownloadCard from '../components/admin/AdminPlayerStatsDownloadCard.vue'
 import AdminRosterSnapshotWorkspace from '../components/admin/AdminRosterSnapshotWorkspace.vue'
 import AdminScheduleSyncCard from '../components/admin/AdminScheduleSyncCard.vue'
 import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
@@ -615,57 +616,15 @@ async function closeDatabaseDetails() {
       </header>
 
       <div class="admin-grid admin-grid--two">
-        <AdminTaskCard
-          number="01"
-          source="MLB Stats API"
-          title="Player season statistics"
-          chip="Download + import"
-          description="Downloads and imports season-level batting or pitching statistics for the selected year range."
-          data-test="stats-download-form"
-          @submit.prevent="handleStatsDownload"
-        >
-          <div class="data-coverage" data-test="player-season-stats-coverage">
-            <span>Currently stored</span>
-            <dl v-if="playerSeasonStatsMetrics.earliestSeason && playerSeasonStatsMetrics.latestSeason">
-              <div>
-                <dt>From season</dt>
-                <dd>{{ playerSeasonStatsMetrics.earliestSeason }}</dd>
-              </div>
-              <div>
-                <dt>Through season</dt>
-                <dd>{{ playerSeasonStatsMetrics.latestSeason }}</dd>
-              </div>
-            </dl>
-            <p v-else>No player season statistics are currently stored.</p>
-            <small>Approximately {{ formatCount(playerSeasonStatsMetrics.approximateRowCount) }} stat rows</small>
-          </div>
-          <div class="admin-fields admin-fields--four">
-            <label>
-              <span>Category</span>
-              <select v-model="statsOptions.category">
-                <option value="batting">Batting</option>
-                <option value="pitching">Pitching</option>
-              </select>
-            </label>
-            <label>
-              <span>Start year</span>
-              <input v-model.number="statsOptions.startYear" type="number" min="1876" :max="currentSeason + 1" required />
-            </label>
-            <label>
-              <span>End year</span>
-              <input v-model.number="statsOptions.endYear" type="number" min="1876" :max="currentSeason + 1" required />
-            </label>
-            <label class="admin-check">
-              <input v-model="statsOptions.replaceSeason" type="checkbox" />
-              <span>Replace season</span>
-            </label>
-          </div>
-          <button class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ statsDownloading ? 'Downloading statistics…' : 'Retrieve player statistics' }}
-          </button>
-          <p v-if="statsDownloadError" class="admin-message admin-message--error">{{ statsDownloadError }}</p>
-          <p v-else-if="statsDownloadSummary" class="admin-message admin-message--success">{{ statsDownloadSummary }}</p>
-        </AdminTaskCard>
+        <AdminPlayerStatsDownloadCard
+          :options="statsOptions"
+          :metrics="playerSeasonStatsMetrics"
+          :downloading="statsDownloading"
+          :any-action-running="anyActionRunning"
+          :error="statsDownloadError"
+          :summary="statsDownloadSummary"
+          @submit="handleStatsDownload"
+        />
 
         <AdminPitchDataSyncCard
           ref="pitchDataSyncCard"
