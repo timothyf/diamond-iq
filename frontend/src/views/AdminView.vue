@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
@@ -13,9 +13,8 @@ import AdminScheduleSyncCard from '../components/admin/AdminScheduleSyncCard.vue
 import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import AdminTaskResult from '../components/admin/AdminTaskResult.vue'
+import { useAdminSyncWorkflows } from '../composables/useAdminSyncWorkflows'
 import { useAdminTask } from '../composables/useAdminTask'
-import { useGameDetailsSync } from '../composables/useGameDetailsSync'
-import { usePitchDataSync } from '../composables/usePitchDataSync'
 import { usePitchDataImport } from '../composables/usePitchDataImport'
 import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
@@ -30,14 +29,6 @@ const today = [
 const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
 const databaseDetailsButton = ref(null)
-const gameDetailsConfirmationOpen = ref(false)
-const gameDetailsSyncCard = ref(null)
-const pendingGameDetailsParameters = ref(null)
-const pendingGameDetailsEstimate = ref(null)
-const pitchDataConfirmationOpen = ref(false)
-const pitchDataSyncCard = ref(null)
-const pendingPitchDataParameters = ref(null)
-const pendingPitchDataEstimate = ref(null)
 const adminTabs = [
   { id: 'download', label: 'Download & Import' },
   { id: 'operations', label: 'Operational Tasks' },
@@ -122,33 +113,38 @@ const {
   runTask,
 } = useAdminTask()
 const {
-  task: gameDetailsTask,
-  active: gameDetailsSyncActive,
-  starting: gameDetailsSyncStarting,
-  estimating: gameDetailsSyncEstimating,
-  error: gameDetailsSyncError,
-  start: startGameDetailsSync,
-  estimate: estimateGameDetailsSync,
-  cancel: cancelActiveGameDetailsSync,
-  loadActiveTask: loadActiveGameDetailsSync,
-} = useGameDetailsSync()
+  gameDetailsConfirmationOpen,
+  gameDetailsSyncCard,
+  gameDetailsEstimate,
+  gameDetailsTask,
+  gameDetailsSyncActive,
+  gameDetailsSyncStarting,
+  gameDetailsSyncEstimating,
+  gameDetailsSyncError,
+  cancelActiveGameDetailsSync,
+  requestGameDetailsSync,
+  cancelGameDetailsSync,
+  confirmGameDetailsSync,
+  refreshGameDetailsAnalytics,
+  pitchDataConfirmationOpen,
+  pitchDataSyncCard,
+  pitchDataEstimate,
+  pitchDataTask,
+  pitchDataSyncActive,
+  pitchDataSyncStarting,
+  pitchDataSyncEstimating,
+  pitchDataSyncError,
+  cancelActivePitchDataSync,
+  requestPitchDataSync,
+  cancelPitchDataSync,
+  confirmPitchDataSync,
+} = useAdminSyncWorkflows({ gameDetailsOptions, pitchOptions, loadOverview, runTask })
 const {
   downloading: statsDownloading,
   error: statsDownloadError,
   summary: statsDownloadSummary,
   downloadStats,
 } = usePlayerSeasonStatsDownload()
-const {
-  task: pitchDataTask,
-  active: pitchDataSyncActive,
-  starting: pitchDataSyncStarting,
-  estimating: pitchDataSyncEstimating,
-  error: pitchDataSyncError,
-  start: startPitchDataSync,
-  estimate: estimatePitchDataSync,
-  cancel: cancelActivePitchDataSync,
-  loadActiveTask: loadActivePitchDataSync,
-} = usePitchDataSync()
 const {
   uploading: statsUploading,
   error: statsImportError,
@@ -184,63 +180,7 @@ const anyActionRunning = computed(
     rosterSnapshotsLoading.value,
 )
 
-const gameDetailsEstimate = computed(() => {
-  const parameters = pendingGameDetailsParameters.value
-  const estimate = pendingGameDetailsEstimate.value
-  if (!parameters) return null
-
-  const spanDays = parameters.mlb_game_id ? null : inclusiveDayCount(parameters.start_date, parameters.end_date)
-  const historicalTiming = estimate?.estimateSource === 'historical'
-  return {
-    scope: parameters.mlb_game_id
-      ? `MLB game ${parameters.mlb_game_id}`
-      : `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
-    estimatedGames: estimate?.gameCount ?? 0,
-    duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
-    range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
-    assumption: historicalTiming
-      ? `Based on ${formatCount(estimate.timingSampleGameCount)} completed game${estimate.timingSampleGameCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerGame)} per game).`
-      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerGame ?? 50)} per stored game. It will improve as completed sync timings are recorded.`,
-  }
-})
-
-const pitchDataEstimate = computed(() => {
-  const parameters = pendingPitchDataParameters.value
-  const estimate = pendingPitchDataEstimate.value
-  if (!parameters) return null
-
-  const spanDays = inclusiveDayCount(parameters.start_date, parameters.end_date)
-  const historicalTiming = estimate?.estimateSource === 'historical'
-  return {
-    scope: `${spanDays} calendar ${spanDays === 1 ? 'day' : 'days'} · ${formatDate(parameters.start_date)}–${formatDate(parameters.end_date)}`,
-    estimatedGames: estimate?.gameCount ?? 0,
-    duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
-    range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
-    assumption: historicalTiming
-      ? `Based on ${formatCount(estimate.timingSampleGameCount)} completed game${estimate.timingSampleGameCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerGame)} per game).`
-      : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerGame ?? 45)} per stored game. It will improve as completed sync timings are recorded.`,
-  }
-})
-
-onMounted(() => Promise.all([loadOverview(), loadActiveGameDetailsSync(), loadActivePitchDataSync()]))
-
-watch(
-  () => gameDetailsTask.value?.status,
-  (status, previousStatus) => {
-    if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
-      loadOverview()
-    }
-  },
-)
-
-watch(
-  () => pitchDataTask.value?.status,
-  (status, previousStatus) => {
-    if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
-      loadOverview()
-    }
-  },
-)
+onMounted(loadOverview)
 
 function normalizeYearRange(options) {
   if (Number(options.startYear) > Number(options.endYear)) options.endYear = options.startYear
@@ -271,40 +211,6 @@ async function handleStatsDownload() {
   if (result) await loadOverview()
 }
 
-async function requestPitchDataSync() {
-  normalizeDateRange(pitchOptions)
-  const parameters = {
-    start_date: pitchOptions.startDate,
-    end_date: pitchOptions.endDate,
-    game_types: pitchOptions.gameTypes,
-    chunk_days: pitchOptions.chunkDays,
-  }
-  const estimate = await estimatePitchDataSync(parameters)
-  if (!estimate) return
-
-  pendingPitchDataParameters.value = parameters
-  pendingPitchDataEstimate.value = estimate
-  pitchDataConfirmationOpen.value = true
-}
-
-async function cancelPitchDataSync() {
-  pitchDataConfirmationOpen.value = false
-  pendingPitchDataParameters.value = null
-  pendingPitchDataEstimate.value = null
-  await nextTick()
-  pitchDataSyncCard.value?.focusSyncButton()
-}
-
-async function confirmPitchDataSync() {
-  const parameters = pendingPitchDataParameters.value
-  if (!parameters) return
-
-  pitchDataConfirmationOpen.value = false
-  pendingPitchDataParameters.value = null
-  pendingPitchDataEstimate.value = null
-  await startPitchDataSync(parameters)
-}
-
 async function handleScheduleSync() {
   normalizeDateRange(scheduleOptions)
   const result = await runTask('mlb_schedule_sync', {
@@ -314,39 +220,6 @@ async function handleScheduleSync() {
     sport_id: scheduleOptions.sportId,
   })
   if (result) await loadOverview()
-}
-
-async function requestGameDetailsSync() {
-  normalizeDateRange(gameDetailsOptions)
-  const parameters = {
-    start_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.startDate,
-    end_date: gameDetailsOptions.mlbGameId ? null : gameDetailsOptions.endDate,
-    mlb_game_id: gameDetailsOptions.mlbGameId || null,
-  }
-  const estimate = await estimateGameDetailsSync(parameters)
-  if (!estimate) return
-
-  pendingGameDetailsParameters.value = parameters
-  pendingGameDetailsEstimate.value = estimate
-  gameDetailsConfirmationOpen.value = true
-}
-
-async function cancelGameDetailsSync() {
-  gameDetailsConfirmationOpen.value = false
-  pendingGameDetailsParameters.value = null
-  pendingGameDetailsEstimate.value = null
-  await nextTick()
-  gameDetailsSyncCard.value?.focusSyncButton()
-}
-
-async function confirmGameDetailsSync() {
-  const parameters = pendingGameDetailsParameters.value
-  if (!parameters) return
-
-  gameDetailsConfirmationOpen.value = false
-  pendingGameDetailsParameters.value = null
-  pendingGameDetailsEstimate.value = null
-  await startGameDetailsSync(parameters)
 }
 
 async function handleProfileSync() {
@@ -397,17 +270,6 @@ async function handleContextualBenchmarksRefresh() {
   if (result) await loadOverview()
 }
 
-async function handleGameDetailsDeferredAnalyticsRefresh() {
-  const parameters = gameDetailsRefreshParameters(gameDetailsTask.value)
-  if (!parameters) return
-
-  const result = await runTask('daily_analytics_refresh', parameters)
-  if (result) {
-    await loadOverview()
-    await loadActiveGameDetailsSync()
-  }
-}
-
 async function handleStatsImport({ file, replaceSeason }) {
   const result = await importStatsFile(file, { replaceSeason })
   if (result) await loadOverview()
@@ -444,53 +306,6 @@ function formatBytes(value) {
 
   const precision = unitIndex < 2 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2
   return `${amount.toFixed(precision)} ${units[unitIndex]}`
-}
-
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function inclusiveDayCount(startDate, endDate) {
-  const start = new Date(`${startDate}T12:00:00Z`)
-  const end = new Date(`${endDate}T12:00:00Z`)
-  return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
-}
-
-function formatDuration(minutes) {
-  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
-
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  return `${hours} hr${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
-}
-
-function formatDurationRange(lowMinutes, highMinutes) {
-  if (highMinutes < 60) return `${lowMinutes}–${highMinutes} minutes`
-  return `${formatDuration(lowMinutes)}–${formatDuration(highMinutes)}`
-}
-
-function formatDurationSeconds(seconds) {
-  const roundedMinutes = Math.max(1, Math.round(seconds / 60))
-  return formatDuration(roundedMinutes)
-}
-
-function formatDurationRangeSeconds(lowSeconds, highSeconds) {
-  const lowMinutes = Math.max(1, Math.round(lowSeconds / 60))
-  const highMinutes = Math.max(lowMinutes, Math.round(highSeconds / 60))
-  return formatDurationRange(lowMinutes, highMinutes)
-}
-
-function gameDetailsRefreshParameters(task) {
-  if (!task?.taskParameters) return null
-  const startDate = task.taskParameters.start_date
-  const endDate = task.taskParameters.end_date || startDate
-  if (!startDate || !endDate) return null
-
-  return {
-    start_date: startDate,
-    end_date: endDate,
-  }
 }
 
 async function openDatabaseDetails() {
@@ -711,7 +526,7 @@ async function closeDatabaseDetails() {
           :error="gameDetailsSyncError"
           @submit="requestGameDetailsSync"
           @cancel-active="cancelActiveGameDetailsSync"
-          @refresh-analytics="handleGameDetailsDeferredAnalyticsRefresh"
+          @refresh-analytics="refreshGameDetailsAnalytics"
         />
 
         <AdminPlayerMaintenanceCards
