@@ -6,6 +6,7 @@ import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
 import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetailsDialog.vue'
 import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCard.vue'
 import AdminPitchDataSyncCard from '../components/admin/AdminPitchDataSyncCard.vue'
+import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import { useAdminTask } from '../composables/useAdminTask'
 import { useGameDetailsSync } from '../composables/useGameDetailsSync'
@@ -25,12 +26,10 @@ const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
 const databaseDetailsButton = ref(null)
 const gameDetailsConfirmationOpen = ref(false)
-const gameDetailsConfirmationDialog = ref(null)
 const gameDetailsSyncCard = ref(null)
 const pendingGameDetailsParameters = ref(null)
 const pendingGameDetailsEstimate = ref(null)
 const pitchDataConfirmationOpen = ref(false)
-const pitchDataConfirmationDialog = ref(null)
 const pitchDataSyncCard = ref(null)
 const pendingPitchDataParameters = ref(null)
 const pendingPitchDataEstimate = ref(null)
@@ -302,8 +301,6 @@ async function requestPitchDataSync() {
   pendingPitchDataParameters.value = parameters
   pendingPitchDataEstimate.value = estimate
   pitchDataConfirmationOpen.value = true
-  await nextTick()
-  pitchDataConfirmationDialog.value?.focus()
 }
 
 async function cancelPitchDataSync() {
@@ -348,8 +345,6 @@ async function requestGameDetailsSync() {
   pendingGameDetailsParameters.value = parameters
   pendingGameDetailsEstimate.value = estimate
   gameDetailsConfirmationOpen.value = true
-  await nextTick()
-  gameDetailsConfirmationDialog.value?.focus()
 }
 
 async function cancelGameDetailsSync() {
@@ -575,111 +570,25 @@ async function closeDatabaseDetails() {
       @close="closeDatabaseDetails"
     />
 
-    <div
-      v-if="pitchDataConfirmationOpen"
-      class="confirmation-modal"
-      data-test="pitch-data-confirmation-modal"
-      @click.self="cancelPitchDataSync"
-      @keydown.esc="cancelPitchDataSync"
-    >
-      <section
-        ref="pitchDataConfirmationDialog"
-        class="confirmation-dialog"
-        data-test="pitch-data-confirmation"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="pitch-data-confirmation-title"
-        aria-describedby="pitch-data-confirmation-description"
-        tabindex="-1"
-      >
-        <div class="confirmation-dialog__icon" aria-hidden="true">!</div>
-        <p class="eyebrow">Before you continue</p>
-        <h2 id="pitch-data-confirmation-title">Statcast pitch synchronization may take a while</h2>
-        <p id="pitch-data-confirmation-description">
-          DiamondIQ found <strong>{{ formatCount(pitchDataEstimate.estimatedGames) }} stored {{ pitchDataEstimate.estimatedGames === 1 ? 'game' : 'games' }}</strong>
-          in <strong>{{ pitchDataEstimate.scope }}</strong>. Based on this selection, the operation should take
-          <strong>{{ pitchDataEstimate.duration }}</strong> (typically {{ pitchDataEstimate.range }}).
-        </p>
-        <dl>
-          <div>
-            <dt>Estimated workload</dt>
-            <dd>
-              {{ pitchDataEstimate.estimatedGames === 1
-                ? '1 stored game'
-                : `${formatCount(pitchDataEstimate.estimatedGames)} stored games` }}
-            </dd>
-          </div>
-          <div>
-            <dt>How this estimate works</dt>
-            <dd>{{ pitchDataEstimate.assumption }}</dd>
-          </div>
-        </dl>
-        <p class="confirmation-dialog__note">
-          Baseball Savant response times and local CSV import work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes.
-        </p>
-        <div class="confirmation-dialog__actions">
-          <button type="button" class="admin-button admin-button--secondary" data-test="pitch-data-cancel" @click="cancelPitchDataSync">
-            Cancel
-          </button>
-          <button type="button" class="admin-button" data-test="pitch-data-continue" @click="confirmPitchDataSync">
-            Continue synchronization
-          </button>
-        </div>
-      </section>
-    </div>
+    <AdminSyncConfirmationDialog
+      :open="pitchDataConfirmationOpen"
+      test-prefix="pitch-data"
+      title="Statcast pitch synchronization may take a while"
+      :estimate="pitchDataEstimate"
+      note="Baseball Savant response times and local CSV import work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes."
+      @cancel="cancelPitchDataSync"
+      @confirm="confirmPitchDataSync"
+    />
 
-    <div
-      v-if="gameDetailsConfirmationOpen"
-      class="confirmation-modal"
-      data-test="game-details-confirmation-modal"
-      @click.self="cancelGameDetailsSync"
-      @keydown.esc="cancelGameDetailsSync"
-    >
-      <section
-        ref="gameDetailsConfirmationDialog"
-        class="confirmation-dialog"
-        data-test="game-details-confirmation"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="game-details-confirmation-title"
-        aria-describedby="game-details-confirmation-description"
-        tabindex="-1"
-      >
-        <div class="confirmation-dialog__icon" aria-hidden="true">!</div>
-        <p class="eyebrow">Before you continue</p>
-        <h2 id="game-details-confirmation-title">Game detail synchronization may take a while</h2>
-        <p id="game-details-confirmation-description">
-          DiamondIQ found <strong>{{ formatCount(gameDetailsEstimate.estimatedGames) }} stored {{ gameDetailsEstimate.estimatedGames === 1 ? 'game' : 'games' }}</strong>
-          in <strong>{{ gameDetailsEstimate.scope }}</strong>. Based on this selection, the operation should take
-          <strong>{{ gameDetailsEstimate.duration }}</strong> (typically {{ gameDetailsEstimate.range }}).
-        </p>
-        <dl>
-          <div>
-            <dt>Estimated workload</dt>
-            <dd>
-              {{ gameDetailsEstimate.estimatedGames === 1
-                ? '1 stored game'
-                : `${formatCount(gameDetailsEstimate.estimatedGames)} stored games` }}
-            </dd>
-          </div>
-          <div>
-            <dt>How this estimate works</dt>
-            <dd>{{ gameDetailsEstimate.assumption }}</dd>
-          </div>
-        </dl>
-        <p class="confirmation-dialog__note">
-          MLB response times and local analytics work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes.
-        </p>
-        <div class="confirmation-dialog__actions">
-          <button type="button" class="admin-button admin-button--secondary" data-test="game-details-cancel" @click="cancelGameDetailsSync">
-            Cancel
-          </button>
-          <button type="button" class="admin-button" data-test="game-details-continue" @click="confirmGameDetailsSync">
-            Continue synchronization
-          </button>
-        </div>
-      </section>
-    </div>
+    <AdminSyncConfirmationDialog
+      :open="gameDetailsConfirmationOpen"
+      test-prefix="game-details"
+      title="Game detail synchronization may take a while"
+      :estimate="gameDetailsEstimate"
+      note="MLB response times and local analytics work can make the actual duration shorter or longer. Keep the Rails server running until the task finishes."
+      @cancel="cancelGameDetailsSync"
+      @confirm="confirmGameDetailsSync"
+    />
 
     <nav class="admin-tabs" role="tablist" aria-label="Administration tools">
       <button
@@ -1240,8 +1149,7 @@ async function closeDatabaseDetails() {
   background: rgba(247, 225, 220, 0.88);
 }
 
-.database-modal,
-.confirmation-modal {
+.database-modal {
   position: fixed;
   z-index: 100;
   inset: 0;
@@ -1250,86 +1158,6 @@ async function closeDatabaseDetails() {
   padding: 1rem;
   background: rgba(8, 22, 35, 0.7);
   backdrop-filter: blur(5px);
-}
-
-.confirmation-dialog {
-  width: min(620px, calc(100vw - 2rem));
-  padding: clamp(1.35rem, 4vw, 2rem);
-  outline: none;
-  border: 1px solid rgba(143, 45, 36, 0.2);
-  border-radius: 24px;
-  background: #fffaf0;
-  box-shadow: 0 24px 70px rgba(8, 22, 35, 0.28);
-}
-
-.confirmation-dialog__icon {
-  display: grid;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 1rem;
-  place-items: center;
-  border-radius: 50%;
-  color: #fffaf0;
-  background: #8f2d24;
-  font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: 1.7rem;
-  font-weight: 900;
-}
-
-.confirmation-dialog h2 {
-  margin-top: 0.25rem;
-  color: #10263d;
-  font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: clamp(1.7rem, 5vw, 2.4rem);
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.confirmation-dialog > p:not(.eyebrow) {
-  margin-top: 0.85rem;
-  color: #53616b;
-  line-height: 1.55;
-}
-
-.confirmation-dialog > p strong {
-  color: #10263d;
-}
-
-.confirmation-dialog dl {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 1rem;
-}
-
-.confirmation-dialog dl div {
-  padding: 0.75rem 0.85rem;
-  border-radius: 12px;
-  background: rgba(143, 45, 36, 0.055);
-}
-
-.confirmation-dialog dt {
-  color: #8f2d24;
-  font-size: 0.65rem;
-  font-weight: 900;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.confirmation-dialog dd {
-  margin-top: 0.2rem;
-  color: #263e52;
-  font-size: 0.84rem;
-}
-
-.confirmation-dialog .confirmation-dialog__note {
-  font-size: 0.78rem;
-}
-
-.confirmation-dialog__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.65rem;
-  margin-top: 1.25rem;
 }
 
 .database-insights {
