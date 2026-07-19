@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 
+import AdminSyncProgress from './AdminSyncProgress.vue'
 import AdminTaskCard from './AdminTaskCard.vue'
 
 const props = defineProps({
@@ -20,10 +21,6 @@ defineExpose({
   focusSyncButton: () => syncButton.value?.focus(),
 })
 
-function humanize(value) {
-  return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
 function formatCount(value) {
   if (!Number.isFinite(value)) return 'Unavailable'
   return new Intl.NumberFormat('en-US').format(value)
@@ -33,24 +30,6 @@ function formatDate(value) {
   if (!value) return 'Unavailable'
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     .format(new Date(`${value}T12:00:00`))
-}
-
-function formatElapsed(seconds) {
-  if (!Number.isFinite(seconds)) return 'Calculating…'
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return `${minutes}m${remainingSeconds ? ` ${remainingSeconds}s` : ''}`
-}
-
-function statusLabel(status) {
-  return {
-    queued: 'Queued',
-    running: 'Synchronizing',
-    completed: 'Completed',
-    failed: 'Completed with an error',
-    cancelled: 'Cancelled',
-  }[status] || humanize(status)
 }
 
 function analyticsRefresh(task) {
@@ -160,18 +139,14 @@ function deferredAnalyticsRefreshAvailable(task) {
       {{ starting ? 'Starting synchronization…' : active ? 'Synchronization in progress…' : 'Synchronize game details' }}
     </button>
 
-    <section v-if="task" class="sync-progress" data-test="game-details-progress" aria-live="polite">
-      <header><div><span>{{ statusLabel(task.status) }}</span><strong>{{ formatCount(task.processedItems) }} of {{ formatCount(task.totalItems) }} games</strong></div><b>{{ task.progressPercentage.toFixed(1) }}%</b></header>
-      <div class="sync-progress__track" role="progressbar" :aria-valuenow="task.progressPercentage" aria-valuemin="0" aria-valuemax="100" :aria-label="`Game detail synchronization ${task.progressPercentage}% complete`"><i :style="{ width: `${task.progressPercentage}%` }"></i></div>
-      <dl>
-        <div><dt>Completed</dt><dd>{{ formatCount(task.completedItems) }}</dd></div>
-        <div><dt>Failed</dt><dd>{{ formatCount(task.failedItems) }}</dd></div>
-        <div><dt>Elapsed</dt><dd>{{ formatElapsed(task.elapsedSeconds) }}</dd></div>
-        <div><dt>Remaining</dt><dd>{{ active ? formatElapsed(task.estimatedRemainingSeconds) : '—' }}</dd></div>
-      </dl>
-      <p v-if="task.currentItemLabel" class="sync-progress__current"><span>Current game</span>{{ task.currentItemLabel }}</p>
-      <p v-if="task.cancelRequested && active" class="sync-progress__notice">Cancellation requested. The current game will finish safely before the task stops.</p>
-      <p v-else-if="task.errorMessage" class="sync-progress__error">{{ task.errorMessage }}</p>
+    <AdminSyncProgress
+      v-if="task"
+      :task="task"
+      :active="active"
+      test-id="game-details-progress"
+      aria-label="Game detail synchronization"
+      @cancel="emit('cancel-active')"
+    >
       <p v-if="analyticsRefreshProcessing(task)" class="sync-progress__notice" data-test="game-details-analytics-refresh-processing">Game detail synchronization is complete. Daily analytics refresh is now processing.</p>
       <p v-if="analyticsRefreshMessage(task)" :class="analyticsRefreshClass(task)" data-test="game-details-analytics-refresh">{{ analyticsRefreshMessage(task) }}</p>
       <button v-if="deferredAnalyticsRefreshAvailable(task)" type="button" class="admin-button admin-button--secondary" data-test="game-details-run-deferred-analytics-refresh" :disabled="anyActionRunning" @click="emit('refresh-analytics')">
@@ -186,10 +161,7 @@ function deferredAnalyticsRefreshAvailable(task) {
         <p class="sync-progress__error">Worker errors</p>
         <ul class="sync-progress__failure-list"><li v-for="(message, index) in workerErrorRows(task)" :key="`worker-error-${index}`">{{ message }}</li></ul>
       </div>
-      <button v-if="active" type="button" class="admin-button admin-button--danger" data-test="game-details-cancel-active" :disabled="task.cancelRequested" @click="emit('cancel-active')">
-        {{ task.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
-      </button>
-    </section>
+    </AdminSyncProgress>
     <p v-if="error" class="admin-message admin-message--error" role="alert">{{ error }}</p>
   </AdminTaskCard>
 </template>

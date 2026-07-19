@@ -1934,126 +1934,6 @@ async function closeDatabaseDetails() {
   color: #6b7780;
 }
 
-.sync-progress {
-  margin-top: 1rem;
-  padding: 0.9rem;
-  border: 1px solid rgba(23, 96, 135, 0.2);
-  border-radius: 14px;
-  background: rgba(231, 237, 241, 0.72);
-}
-
-.sync-progress header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-end;
-}
-
-.sync-progress header div {
-  display: grid;
-  gap: 0.15rem;
-}
-
-.sync-progress header span,
-.sync-progress dt,
-.sync-progress__current span {
-  color: #61707b;
-  font-size: 0.64rem;
-  font-weight: 850;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.sync-progress header strong,
-.sync-progress header b {
-  color: #10263d;
-}
-
-.sync-progress header b {
-  font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: 1.4rem;
-}
-
-.sync-progress__track {
-  height: 10px;
-  margin-top: 0.65rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(16, 38, 61, 0.12);
-}
-
-.sync-progress__track i {
-  display: block;
-  width: 0;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #176087, #2f7d32);
-  transition: width 240ms ease;
-}
-
-.sync-progress dl {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
-  margin-top: 0.75rem;
-}
-
-.sync-progress dl div {
-  display: grid;
-  gap: 0.1rem;
-}
-
-.sync-progress dd {
-  color: #263e52;
-  font-size: 0.84rem;
-  font-weight: 800;
-}
-
-.sync-progress__current,
-.sync-progress__notice,
-.sync-progress__error {
-  margin-top: 0.7rem;
-  color: #405362;
-  font-size: 0.78rem;
-}
-
-.sync-progress__current span {
-  display: block;
-  margin-bottom: 0.12rem;
-}
-
-.sync-progress__notice {
-  color: #8a5a12;
-}
-
-.sync-progress__error {
-  color: #992e26;
-}
-
-.sync-progress__failure-block {
-  margin-top: 0.55rem;
-}
-
-.sync-progress__failure-list {
-  margin: 0.35rem 0 0;
-  padding-left: 1rem;
-  color: #992e26;
-  font-size: 0.76rem;
-  line-height: 1.35;
-}
-
-.sync-progress__failure-list li + li {
-  margin-top: 0.18rem;
-}
-
-.sync-progress .admin-button {
-  margin-top: 0.75rem;
-}
-
-.admin-button--danger {
-  background: #8f2d24;
-}
-
 .schedule-coverage {
   margin-top: 1rem;
   padding: 0.8rem 0.9rem;
@@ -2516,10 +2396,6 @@ async function closeDatabaseDetails() {
   .admin-fields--three,
   .admin-result dl {
     grid-template-columns: 1fr;
-  }
-
-  .sync-progress dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .roster-snapshot-controls,
