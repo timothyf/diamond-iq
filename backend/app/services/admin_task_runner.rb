@@ -116,7 +116,10 @@ class AdminTaskRunner
       team_mlb_id: optional_positive_integer(:team_mlb_id),
       season: season,
       roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE,
-      as_of: MlbRosterSyncBoundary.call(season: season)
+      as_of: MlbRosterSyncBoundary.call(
+        season: season,
+        team_mlb_id: optional_positive_integer(:team_mlb_id)
+      )
     )
   end
 

@@ -21,6 +21,7 @@ watch(
 )
 
 watch(teamId, () => {
+  selectedSeason.value = null
   selectedRosterView.value = 'fortyMan'
 })
 
@@ -134,7 +135,7 @@ function rankingBarPercent(entry) {
 </script>
 
 <template>
-  <main class="team-profile-shell">
+  <main class="team-profile-shell" :aria-busy="loading">
     <div v-if="loading && !team" class="team-state" data-test="team-loading">Building team profile…</div>
     <div v-else-if="error" class="team-state team-state--error" data-test="team-error">
       <p>{{ error }}</p>
@@ -152,17 +153,21 @@ function rankingBarPercent(entry) {
           <span>{{ team.abbreviation }} · {{ team.locationName }}</span>
         </div>
         <label class="season-picker">
-          <span>Profile season</span>
-          <select v-model.number="selectedSeason" data-test="team-season-select">
+          <span class="season-picker__label">Profile season</span>
+          <select v-model.number="selectedSeason" :disabled="loading" data-test="team-season-select">
             <option v-for="season in team.availableSeasons" :key="season" :value="season">{{ season }}</option>
           </select>
+          <span v-if="loading" class="season-loading" role="status" aria-live="polite" data-test="season-loading">
+            <i aria-hidden="true"></i>
+            Loading {{ selectedSeason }} season…
+          </span>
         </label>
       </section>
 
       <section class="team-summary" aria-label="Season summary">
         <article><span>{{ team.season }} record</span><strong>{{ recordLabel }}</strong><small>{{ team.record.games_played || 0 }} games</small></article>
         <article><span>Run differential</span><strong>{{ (team.record.runs_scored || 0) - (team.record.runs_allowed || 0) }}</strong><small>{{ team.record.runs_scored || 0 }} RS · {{ team.record.runs_allowed || 0 }} RA</small></article>
-        <article><span>Current roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
+        <article><span>{{ team.season }} roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
         <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'DiamondIQ' }}</small></article>
       </section>
 
@@ -355,7 +360,7 @@ function rankingBarPercent(entry) {
 
       <section class="team-panel roster-panel">
         <header>
-          <div><p>Dated roster state</p><h2>Current roster</h2></div>
+          <div><p>Dated roster state</p><h2>{{ team.season }} roster</h2></div>
           <div class="roster-view-controls">
             <div role="group" aria-label="Roster view">
               <button
@@ -422,8 +427,13 @@ function rankingBarPercent(entry) {
 .team-identity p, .team-panel header p { margin: 0; color: #a93627; font-size: .72rem; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
 .team-identity h1 { margin: .2rem 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: clamp(3.5rem, 7vw, 7rem); line-height: .9; text-transform: uppercase; }
 .team-identity span { color: #53616c; font-size: 1.05rem; }
-.season-picker span { display: block; margin-bottom: .35rem; color: #68737b; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.season-picker__label { display: block; margin-bottom: .35rem; color: #68737b; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
 .season-picker select { min-width: 120px; padding: .7rem .9rem; border: 1px solid #c9c8c0; border-radius: 12px; color: #10263d; background: white; font: inherit; font-weight: 800; }
+.season-picker select:disabled { cursor: wait; opacity: .65; }
+.season-loading { display: flex; gap: .45rem; align-items: center; margin-top: .55rem; color: #435767; font-size: .72rem; font-weight: 750; white-space: nowrap; }
+.season-loading i { display: block; width: 14px; height: 14px; border: 2px solid rgba(16,38,61,.2); border-top-color: #a93627; border-radius: 50%; animation: team-season-spin .7s linear infinite; }
+@keyframes team-season-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .season-loading i { animation-duration: 1.6s; } }
 .team-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin: 1rem 0; }
 .team-summary article, .team-panel { border: 1px solid #d9d7ce; border-radius: 24px; background: rgba(255,255,255,.72); }
 .team-summary article { padding: 1.2rem; }

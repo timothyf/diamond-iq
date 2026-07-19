@@ -221,6 +221,74 @@ describe('TeamProfileView', () => {
     expect(middle.get('.ranking-bar__fill').attributes('style')).toContain('width: 50%')
   })
 
+  it('reloads the profile for the selected season', async () => {
+    const historicalPayload = structuredClone(payload)
+    historicalPayload.data.season = 2025
+    historicalPayload.data.record = {
+      wins: 82,
+      losses: 80,
+      ties: 0,
+      games_played: 162,
+      runs_scored: 682,
+      runs_allowed: 667,
+    }
+    historicalPayload.data.performance_dashboard.rankings.offense.ops.value = 0.699
+
+    const fetchMock = vi.fn().mockImplementation(async (url) => ({
+      ok: true,
+      json: async () => (String(url).includes('season=2025') ? historicalPayload : payload),
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="team-season-select"]').setValue('2025')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/teams/1?season=2025'),
+      expect.any(Object),
+    )
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('2025 record')
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('82–80')
+    expect(wrapper.get('[data-test="offense-ranking-ops"]').text()).toContain('0.699')
+  })
+
+  it('shows a loading indicator while a different season is loading', async () => {
+    let resolveHistoricalRequest
+    const historicalRequest = new Promise((resolve) => {
+      resolveHistoricalRequest = resolve
+    })
+    const fetchMock = vi.fn().mockImplementation((url) => {
+      if (String(url).includes('season=2025')) return historicalRequest
+
+      return Promise.resolve({ ok: true, json: async () => payload })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="team-season-select"]').setValue('2025')
+
+    expect(wrapper.get('[data-test="season-loading"]').text()).toContain('Loading 2025 season')
+    expect(wrapper.get('[data-test="team-season-select"]').attributes()).toHaveProperty('disabled')
+    expect(wrapper.get('.team-profile-shell').attributes('aria-busy')).toBe('true')
+
+    resolveHistoricalRequest({ ok: true, json: async () => payload })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="season-loading"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="team-season-select"]').attributes()).not.toHaveProperty('disabled')
+  })
+
   it('renders a retry state when the profile cannot load', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
     const wrapper = mount(TeamProfileView, {

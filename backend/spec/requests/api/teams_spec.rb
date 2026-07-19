@@ -52,6 +52,21 @@ RSpec.describe "Api::Teams", type: :request do
       primary_position: "1B",
       source_status_description: "Minors"
     )
+    stale_player = create_player(team: @tigers, attributes: { mlb_id: 592_701, first_name: "Former", last_name: "Tiger" })
+    create_team_membership(
+      player: stale_player,
+      team: @tigers,
+      starts_on: Date.new(Date.current.year - 2, 12, 31),
+      roster_status: "active"
+    )
+    current_roster = @tigers.rosters.create!(
+      season: Date.current.year,
+      roster_type: "40Man",
+      snapshot_on: Date.current,
+      source_name: MlbRosterImporter::SOURCE_NAME,
+      last_synced_at: Time.current
+    )
+    current_roster.player_ids = [ player.id, optioned_player.id ]
     completed_game = create_game(
       schedule: @schedule,
       home_team: @tigers,
@@ -250,6 +265,7 @@ RSpec.describe "Api::Teams", type: :request do
     expect(serialized_membership.dig("player", "full_name")).to eq("Riley Greene")
     expect(json_body.dig("data", "roster_as_of")).to eq(Date.current.iso8601)
     expect(json_body.dig("data", "rosters", "forty_man").pluck("id")).to contain_exactly(membership.id, optioned_membership.id)
+    expect(json_body.dig("data", "rosters", "forty_man").filter_map { |entry| entry.dig("player", "full_name") }).not_to include("Former Tiger")
     expect(json_body.dig("data", "rosters", "active").pluck("id")).to eq([ membership.id ])
     expect(json_body.dig("data", "roster_summary")).to include(
       "total" => 2,
@@ -294,11 +310,82 @@ RSpec.describe "Api::Teams", type: :request do
       home_score: 1,
       away_score: 3
     )
+    historical_player = create_player(team: @tigers, attributes: { mlb_id: 605_141, first_name: "Historical", last_name: "Tiger" })
+    historical_membership = create_team_membership(
+      player: historical_player,
+      team: @tigers,
+      starts_on: Date.new(2025, 3, 27),
+      ends_on: Date.new(2025, 12, 31),
+      roster_status: "active"
+    )
+    historical_roster = @tigers.rosters.create!(
+      season: 2025,
+      roster_type: "40Man",
+      snapshot_on: Date.new(2025, 12, 31),
+      source_name: MlbRosterImporter::SOURCE_NAME,
+      last_synced_at: Time.zone.parse("2026-07-18 00:54:38")
+    )
+    historical_roster.player_ids = [ historical_player.id ]
+    season_end_snapshot = RosterSnapshot.create!(
+      team: @tigers,
+      season: 2025,
+      roster_type: "40Man",
+      snapshot_on: Date.new(2025, 7, 1),
+      source_name: MlbRosterImporter::SOURCE_NAME,
+      last_synced_at: Time.zone.parse("2026-07-18 01:00:00")
+    )
+    season_end_snapshot.roster_snapshot_players.create!(
+      player: historical_player,
+      mlb_id: historical_player.mlb_id,
+      full_name: historical_player.full_name,
+      first_name: historical_player.first_name,
+      last_name: historical_player.last_name,
+      jersey_number: "25",
+      position_code: "CF",
+      status_code: "A",
+      status_description: "Active"
+    )
+    historical_metric_attributes = {
+      games: 1,
+      plate_appearances: 4,
+      at_bats: 4,
+      hits: 1,
+      doubles: 0,
+      triples: 0,
+      home_runs: 1,
+      walks: 0,
+      hit_by_pitch: 0,
+      sacrifice_flies: 0
+    }
+    [
+      [ Date.new(2025, 7, 1), historical_metric_attributes ],
+      [ Date.current, historical_metric_attributes.merge(hits: 0, home_runs: 0) ]
+    ].each do |metric_date, metrics|
+      TeamDailyMetric.create!(
+        team: @tigers,
+        metric_date: metric_date,
+        source_start_date: metric_date,
+        source_end_date: metric_date,
+        sample_size: 1,
+        calculation_version: metric_date.year == 2025 ? DailyAnalyticsRefresh::CALCULATION_VERSION : "9.0.0",
+        calculated_at: Time.current,
+        source_name: DailyAnalyticsRefresh::SOURCE_NAME,
+        metrics: metrics
+      )
+    end
 
     get api_team_path(@tigers), params: { season: 2025 }
 
     expect(json_body.dig("data", "season")).to eq(2025)
     expect(json_body.dig("data", "record", "losses")).to eq(1)
     expect(json_body.dig("data", "available_seasons")).to include(2025)
+    expect(json_body.dig("data", "roster_as_of")).to eq("2025-07-01")
+    expect(json_body.dig("data", "rosters", "forty_man", 0, "player", "full_name")).to eq("Historical Tiger")
+    expect(json_body.dig("data", "rosters", "forty_man", 0)).to include(
+      "roster_status" => "active",
+      "jersey_number" => "25",
+      "primary_position" => "CF"
+    )
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(1.25)
   end
 end

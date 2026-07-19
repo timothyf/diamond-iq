@@ -10,17 +10,20 @@ class TeamProfileSnapshotQuery
   end
 
   def result
+    forty_man_roster = serialized_forty_man_roster
+    active_roster = serialized_active_roster
+
     {
       season: season,
       available_seasons: available_seasons,
       record: record,
-      roster: roster_memberships.map { |membership| serialize_membership(membership) },
+      roster: forty_man_roster,
       rosters: {
-        forty_man: roster_memberships.map { |membership| serialize_membership(membership) },
-        active: active_roster_memberships.map { |membership| serialize_membership(membership) }
+        forty_man: forty_man_roster,
+        active: active_roster
       },
-      roster_as_of: on,
-      roster_summary: roster_summary,
+      roster_as_of: roster_reference_date,
+      roster_summary: roster_summary(forty_man_roster, active_roster),
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
       source_metadata: source_metadata,
@@ -107,14 +110,87 @@ class TeamProfileSnapshotQuery
   end
 
   def roster_memberships
-    @roster_memberships ||= team.team_memberships
-      .active_on(on)
+    @roster_memberships ||= begin
+      memberships = team.team_memberships.active_on(roster_reference_date)
+      memberships = memberships.where(player_id: season_roster.player_ids) if matching_season_roster?
+
+      memberships
       .includes(player: [ :profile, { player_positions: :position } ])
       .to_a
       .group_by(&:player_id)
       .values
       .map { |memberships| memberships.min_by { |membership| [ MlbRosterStatus.priority(membership.roster_status), -membership.starts_on.jd, membership.id ] } }
       .sort_by { |membership| [ membership.primary_position.to_s, membership.player.last_name, membership.player.first_name ] }
+    end
+  end
+
+  def season_roster
+    return @season_roster if defined?(@season_roster)
+
+    @season_roster = team.rosters.includes(:roster_players).find_by(season: season)
+  end
+
+  def roster_reference_date
+    @roster_reference_date ||= if season < on.year
+      season_games.maximum(:official_date) || Date.new(season, 12, 31)
+    else
+      season_roster&.snapshot_on || on
+    end
+  end
+
+  def matching_season_roster?
+    season_roster&.snapshot_on == roster_reference_date
+  end
+
+  def roster_snapshot(roster_type)
+    @roster_snapshots ||= {}
+    @roster_snapshots[roster_type] ||= team.roster_snapshots
+      .includes(roster_snapshot_players: { player: :profile })
+      .find_by(season: season, snapshot_on: roster_reference_date, roster_type: roster_type)
+  end
+
+  def serialized_forty_man_roster
+    snapshot = roster_snapshot("40Man")
+    return serialize_roster_snapshot(snapshot) if snapshot
+
+    roster_memberships.map { |membership| serialize_membership(membership) }
+  end
+
+  def serialized_active_roster
+    snapshot = roster_snapshot("active")
+    return serialize_roster_snapshot(snapshot) if snapshot
+
+    active_roster_memberships.map { |membership| serialize_membership(membership) }
+  end
+
+  def serialize_roster_snapshot(snapshot)
+    snapshot.roster_snapshot_players
+      .sort_by { |entry| [ entry.position_code.to_s, entry.full_name ] }
+      .map { |entry| serialize_roster_snapshot_player(entry) }
+  end
+
+  def serialize_roster_snapshot_player(entry)
+    player = entry.player
+    normalized_status = MlbRosterStatus.normalize(code: entry.status_code, description: entry.status_description)
+
+    {
+      id: "snapshot-#{entry.id}",
+      roster_status: normalized_status,
+      status_description: entry.status_description,
+      injured: MlbRosterStatus.injured?(normalized_status),
+      jersey_number: entry.jersey_number,
+      primary_position: entry.position_code,
+      starts_on: nil,
+      last_synced_at: entry.roster_snapshot.last_synced_at,
+      player: {
+        id: player&.id,
+        mlb_id: entry.mlb_id,
+        full_name: entry.full_name,
+        first_name: entry.first_name,
+        last_name: entry.last_name,
+        headshot_url: player&.profile&.headshot_url
+      }
+    }
   end
 
   def serialize_membership(membership)
@@ -152,18 +228,20 @@ class TeamProfileSnapshotQuery
     player.player_positions.find { |assignment| assignment.season.nil? && assignment.is_primary? }&.position
   end
 
-  def roster_summary
+  def roster_summary(forty_man_roster, active_roster)
     {
-      total: roster_memberships.length,
-      active: active_roster_memberships.length,
-      injured: roster_memberships.count(&:injured?),
-      other: roster_memberships.count { |membership| membership.roster_status != "active" && !membership.injured? }
+      total: forty_man_roster.length,
+      active: active_roster.length,
+      injured: forty_man_roster.count { |entry| entry[:injured] },
+      other: forty_man_roster.count { |entry| entry[:roster_status] != "active" && !entry[:injured] }
     }
   end
 
   def source_metadata
     game_sync = team_games.maximum(:last_synced_at)
-    roster_sync = team.team_memberships.maximum(:last_synced_at)
+    roster_sync = roster_snapshot("40Man")&.last_synced_at ||
+      (season_roster&.last_synced_at if matching_season_roster?) ||
+      roster_memberships.filter_map(&:last_synced_at).max
     analytics_sync = team_daily_metrics.maximum(:calculated_at)
 
     {
@@ -491,7 +569,7 @@ class TeamProfileSnapshotQuery
   def team_totals_index
     @team_totals_index ||= begin
       rows = TeamDailyMetric
-        .where(metric_date: season_start_date..on)
+        .where(metric_date: season_date_range)
         .where(calculation_version: analytics_version)
         .includes(:team)
         .to_a
@@ -501,18 +579,29 @@ class TeamProfileSnapshotQuery
 
   def team_daily_metrics
     @team_daily_metrics ||= TeamDailyMetric
-      .where(team_id: team.id, metric_date: season_start_date..on)
+      .where(team_id: team.id, metric_date: season_date_range)
       .where(calculation_version: analytics_version)
       .order(:metric_date)
       .to_a
   end
 
   def analytics_version
-    @analytics_version ||= TeamDailyMetric.maximum(:calculation_version)
+    @analytics_version ||= TeamDailyMetric
+      .where(metric_date: season_date_range)
+      .order(calculated_at: :desc)
+      .pick(:calculation_version)
   end
 
   def season_start_date
     @season_start_date ||= Date.new(season, 1, 1)
+  end
+
+  def season_end_date
+    @season_end_date ||= [ on, Date.new(season, 12, 31) ].min
+  end
+
+  def season_date_range
+    season_start_date..season_end_date
   end
 
   def summarize_team_rows(rows)
@@ -680,7 +769,7 @@ class TeamProfileSnapshotQuery
   def summarize_batter_split(split_type, split_value)
     rows = BatterSplitSummary
       .where(team_id: team.id, split_type: split_type, split_value: split_value)
-      .where(metric_date: season_start_date..on, calculation_version: analytics_version)
+      .where(metric_date: season_date_range, calculation_version: analytics_version)
       .to_a
 
     plate_appearances = rows.sum { |row| metric_number(row, :plate_appearances) }
@@ -707,7 +796,7 @@ class TeamProfileSnapshotQuery
   def summarize_pitcher_split(split_type, split_value)
     rows = PitcherSplitSummary
       .where(team_id: team.id, split_type: split_type, split_value: split_value)
-      .where(metric_date: season_start_date..on, calculation_version: analytics_version)
+      .where(metric_date: season_date_range, calculation_version: analytics_version)
       .to_a
 
     batters_faced = rows.sum { |row| metric_number(row, :batters_faced) }
@@ -783,14 +872,14 @@ class TeamProfileSnapshotQuery
 
   def team_player_batting_rows
     @team_player_batting_rows ||= PlayerBattingDaily
-      .where(team_id: team.id, metric_date: season_start_date..on, calculation_version: analytics_version)
+      .where(team_id: team.id, metric_date: season_date_range, calculation_version: analytics_version)
       .includes(:player)
       .to_a
   end
 
   def team_player_pitching_rows
     @team_player_pitching_rows ||= PlayerPitchingDaily
-      .where(team_id: team.id, metric_date: season_start_date..on, calculation_version: analytics_version)
+      .where(team_id: team.id, metric_date: season_date_range, calculation_version: analytics_version)
       .includes(:player)
       .to_a
   end

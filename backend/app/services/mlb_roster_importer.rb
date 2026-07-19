@@ -186,7 +186,10 @@ class MlbRosterImporter
 
   def inferred_membership_end_on(player)
     future_start = player.team_memberships.where("starts_on > ?", as_of).minimum(:starts_on)
-    future_start&.-(1.day)
+    return future_start - 1.day if future_start
+    return Date.new(season, 12, 31) if season < Date.current.year
+
+    nil
   end
 
   def close_other_team_memberships!(player, team, summary)

@@ -213,4 +213,21 @@ RSpec.describe MlbRosterImporter do
     expect(player.reload.team).to eq(current_team)
     expect(team.rosters.find_by!(season: 2025).snapshot_on).to eq(Date.new(2025, 12, 31))
   end
+
+  it "does not leave a past-season roster membership open into the current season" do
+    result = described_class.call(
+      payload: { "roster" => [ roster_entry ] },
+      team_mlb_id: team.mlb_id,
+      season: 2025,
+      as_of: Date.new(2025, 7, 14),
+      source_url: "https://statsapi.mlb.com/api/v1/teams/116/roster",
+      fetched_at: fetched_at
+    )
+
+    expect(result[:success]).to be(true)
+    expect(TeamMembership.sole).to have_attributes(
+      starts_on: Date.new(2025, 7, 14),
+      ends_on: Date.new(2025, 12, 31)
+    )
+  end
 end

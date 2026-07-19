@@ -6,7 +6,7 @@ class MlbRosterSyncJob < ApplicationJob
       team_mlb_id: team_mlb_id,
       season: season,
       roster_type: roster_type,
-      as_of: MlbRosterSyncBoundary.call(season: season)
+      as_of: MlbRosterSyncBoundary.call(season: season, team_mlb_id: team_mlb_id)
     )
 
     raise "MLB roster synchronization failed: #{result[:message]}" unless result[:success]
