@@ -1,4 +1,7 @@
 <script setup>
+import { formatCount, formatElapsed } from '../../utils/adminFormatting'
+import { taskStatusLabel } from '../../utils/gameDetailsTaskPresentation'
+
 defineProps({
   task: { type: Object, required: true },
   active: { type: Boolean, default: false },
@@ -9,39 +12,13 @@ defineProps({
 })
 const emit = defineEmits(['cancel'])
 
-function humanize(value) {
-  return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function formatElapsed(seconds) {
-  if (!Number.isFinite(seconds)) return 'Calculating…'
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return `${minutes}m${remainingSeconds ? ` ${remainingSeconds}s` : ''}`
-}
-
-function statusLabel(status) {
-  return {
-    queued: 'Queued',
-    running: 'Synchronizing',
-    completed: 'Completed',
-    failed: 'Completed with an error',
-    cancelled: 'Cancelled',
-  }[status] || humanize(status)
-}
 </script>
 
 <template>
   <section class="sync-progress" :data-test="testId" aria-live="polite">
     <header>
       <div>
-        <span>{{ statusLabel(task.status) }}</span>
+        <span>{{ taskStatusLabel(task.status) }}</span>
         <strong>{{ formatCount(task.processedItems) }} of {{ formatCount(task.totalItems) }} {{ itemNoun }}</strong>
       </div>
       <b>{{ task.progressPercentage.toFixed(1) }}%</b>

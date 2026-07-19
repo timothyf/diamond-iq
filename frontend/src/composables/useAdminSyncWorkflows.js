@@ -2,6 +2,14 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { useGameDetailsSync } from './useGameDetailsSync'
 import { usePitchDataSync } from './usePitchDataSync'
+import {
+  formatCount,
+  formatDate,
+  formatDurationRangeSeconds,
+  formatDurationSeconds,
+  inclusiveDayCount,
+} from '../utils/adminFormatting'
+import { gameDetailsRefreshParameters } from '../utils/gameDetailsTaskPresentation'
 
 const FINISHED_STATUSES = ['completed', 'failed', 'cancelled']
 const ACTIVE_STATUSES = ['queued', 'running']
@@ -190,60 +198,4 @@ function normalizeDateRange(options) {
 
 function historicalTimingAssumption(estimate) {
   return `Based on ${formatCount(estimate.timingSampleGameCount)} completed game${estimate.timingSampleGameCount === 1 ? '' : 's'} across ${estimate.timingSampleRunCount} prior sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerGame)} per game).`
-}
-
-function formatDate(value) {
-  if (!value) return '—'
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(`${value}T12:00:00`))
-}
-
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function inclusiveDayCount(startDate, endDate) {
-  const start = new Date(`${startDate}T12:00:00Z`)
-  const end = new Date(`${endDate}T12:00:00Z`)
-  return Math.max(1, Math.round((end - start) / 86_400_000) + 1)
-}
-
-function formatDuration(minutes) {
-  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
-
-  const hours = Math.floor(minutes / 60)
-  const remainingMinutes = minutes % 60
-  return `${hours} hr${remainingMinutes ? ` ${remainingMinutes} min` : ''}`
-}
-
-function formatDurationRange(lowMinutes, highMinutes) {
-  if (highMinutes < 60) return `${lowMinutes}–${highMinutes} minutes`
-  return `${formatDuration(lowMinutes)}–${formatDuration(highMinutes)}`
-}
-
-function formatDurationSeconds(seconds) {
-  const roundedMinutes = Math.max(1, Math.round(seconds / 60))
-  return formatDuration(roundedMinutes)
-}
-
-function formatDurationRangeSeconds(lowSeconds, highSeconds) {
-  const lowMinutes = Math.max(1, Math.round(lowSeconds / 60))
-  const highMinutes = Math.max(lowMinutes, Math.round(highSeconds / 60))
-  return formatDurationRange(lowMinutes, highMinutes)
-}
-
-function gameDetailsRefreshParameters(task) {
-  if (!task?.taskParameters) return null
-  const startDate = task.taskParameters.start_date
-  const endDate = task.taskParameters.end_date || startDate
-  if (!startDate || !endDate) return null
-
-  return {
-    start_date: startDate,
-    end_date: endDate,
-  }
 }

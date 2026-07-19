@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, ref, watch } from 'vue'
+import { formatBytes, formatCount, formatTimestamp } from '../../utils/adminFormatting'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -34,29 +35,6 @@ function handleViewKeydown(event, currentIndex) {
   nextTick(() => dialog.value?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus())
 }
 
-function formatBytes(value) {
-  if (!Number.isFinite(value) || value < 0) return 'Unavailable'
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let amount = value
-  let unit = 0
-  while (amount >= 1024 && unit < units.length - 1) {
-    amount /= 1024
-    unit += 1
-  }
-  const precision = unit < 2 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2
-  return `${amount.toFixed(precision)} ${units[unit]}`
-}
-
-function formatCount(value) {
-  return new Intl.NumberFormat('en-US').format(Number(value || 0))
-}
-
-function formatTimestamp(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  }).format(new Date(value))
-}
 </script>
 
 <template>

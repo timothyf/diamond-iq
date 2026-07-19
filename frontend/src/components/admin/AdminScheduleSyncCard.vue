@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { formatDate } from '../../utils/adminFormatting'
 
 import AdminTaskCard from './AdminTaskCard.vue'
 
@@ -21,11 +22,6 @@ const hasStoredGames = computed(
   () => Boolean(props.dateRange.earliestGameDate && props.dateRange.latestGameDate),
 )
 
-function formatDate(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${value}T12:00:00`))
-}
 </script>
 
 <template>

@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue'
+import { formatCount, formatDate } from '../../utils/adminFormatting'
 
 import AdminSyncProgress from './AdminSyncProgress.vue'
 import AdminTaskCard from './AdminTaskCard.vue'
@@ -19,17 +20,6 @@ const syncButton = ref(null)
 defineExpose({
   focusSyncButton: () => syncButton.value?.focus(),
 })
-
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function formatDate(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${value}T12:00:00`))
-}
 
 </script>
 

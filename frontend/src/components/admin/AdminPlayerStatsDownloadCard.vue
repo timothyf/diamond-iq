@@ -1,4 +1,5 @@
 <script setup>
+import { formatCount } from '../../utils/adminFormatting'
 import AdminTaskCard from './AdminTaskCard.vue'
 
 defineProps({
@@ -12,10 +13,6 @@ defineProps({
 const emit = defineEmits(['submit'])
 const currentSeason = new Date().getFullYear()
 
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
 </script>
 
 <template>

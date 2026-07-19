@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { formatDate, formatTimestamp } from '../../utils/adminFormatting'
 
 const props = defineProps({
   options: { type: Object, required: true },
@@ -21,18 +22,6 @@ const fortyManSnapshot = computed(
 )
 const selectedSnapshots = computed(() => [activeSnapshot.value, fortyManSnapshot.value])
 
-function formatDate(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${value}T12:00:00`))
-}
-
-function formatTimestamp(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  }).format(new Date(value))
-}
 </script>
 
 <template>

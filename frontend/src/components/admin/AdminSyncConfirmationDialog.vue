@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, ref, watch } from 'vue'
+import { formatCount } from '../../utils/adminFormatting'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -20,10 +21,6 @@ watch(
   },
 )
 
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
 </script>
 
 <template>

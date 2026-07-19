@@ -1,5 +1,6 @@
 <script setup>
 import { nextTick, ref } from 'vue'
+import { formatCount, formatTimestamp, humanize } from '../../utils/adminFormatting'
 
 const props = defineProps({
   report: { type: Object, default: null },
@@ -24,20 +25,6 @@ async function closeReport() {
   button.value?.focus()
 }
 
-function humanize(value) {
-  return String(value || '').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function formatCount(value) {
-  return new Intl.NumberFormat('en-US').format(Number(value || 0))
-}
-
-function formatTimestamp(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  }).format(new Date(value))
-}
 </script>
 
 <template>

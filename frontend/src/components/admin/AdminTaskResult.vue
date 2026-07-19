@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { formatTimestamp, humanize } from '../../utils/adminFormatting'
 
 const props = defineProps({
   error: { type: String, default: '' },
@@ -13,19 +14,6 @@ const resultEntries = computed(() => {
     .slice(0, 8)
 })
 
-function humanize(value) {
-  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function formatTimestamp(value) {
-  if (!value) return ''
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
 </script>
 
 <template>
@@ -37,7 +25,7 @@ function formatTimestamp(value) {
     <div>
       <p class="eyebrow">Latest task result</p>
       <h3>{{ result.message }}</h3>
-      <small>{{ humanize(result.task) }} · {{ formatTimestamp(result.finishedAt) }}</small>
+      <small>{{ humanize(result.task) }} · {{ formatTimestamp(result.finishedAt, '', false) }}</small>
     </div>
     <dl v-if="resultEntries.length">
       <div v-for="([key, value]) in resultEntries" :key="key">

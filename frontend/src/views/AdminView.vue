@@ -19,6 +19,7 @@ import { usePitchDataImport } from '../composables/usePitchDataImport'
 import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 import { useRosterSnapshots } from '../composables/useRosterSnapshots'
+import { formatBytes, formatDate, humanize } from '../utils/adminFormatting'
 
 const now = new Date()
 const today = [
@@ -278,34 +279,6 @@ async function handleStatsImport({ file, replaceSeason }) {
 async function handlePitchImport({ file }) {
   const result = await importPitchFile(file)
   if (result) await loadOverview()
-}
-
-function humanize(value) {
-  return String(value).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-function formatDate(value) {
-  if (!value) return '—'
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(`${value}T12:00:00`))
-}
-
-function formatBytes(value) {
-  if (!Number.isFinite(value) || value < 0) return 'Unavailable'
-
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let amount = value
-  let unitIndex = 0
-  while (amount >= 1024 && unitIndex < units.length - 1) {
-    amount /= 1024
-    unitIndex += 1
-  }
-
-  const precision = unitIndex < 2 || amount >= 100 ? 0 : amount >= 10 ? 1 : 2
-  return `${amount.toFixed(precision)} ${units[unitIndex]}`
 }
 
 async function openDatabaseDetails() {

@@ -1,6 +1,17 @@
 <script setup>
 import { ref } from 'vue'
 
+import { formatCount, formatDate } from '../../utils/adminFormatting'
+import {
+  analyticsRefreshClass,
+  analyticsRefreshMessage,
+  analyticsRefreshProcessing,
+  deferredAnalyticsRefreshAvailable,
+  failureRows,
+  failureText,
+  workerErrorRows,
+  workerPoolMessage,
+} from '../../utils/gameDetailsTaskPresentation'
 import AdminSyncProgress from './AdminSyncProgress.vue'
 import AdminTaskCard from './AdminTaskCard.vue'
 
@@ -21,95 +32,6 @@ defineExpose({
   focusSyncButton: () => syncButton.value?.focus(),
 })
 
-function formatCount(value) {
-  if (!Number.isFinite(value)) return 'Unavailable'
-  return new Intl.NumberFormat('en-US').format(value)
-}
-
-function formatDate(value) {
-  if (!value) return 'Unavailable'
-  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    .format(new Date(`${value}T12:00:00`))
-}
-
-function analyticsRefresh(task) {
-  return task?.resultData?.analytics_refresh || null
-}
-
-function analyticsRefreshMessage(task) {
-  const refresh = analyticsRefresh(task)
-  if (!refresh) return ''
-  if (refresh.skipped) return refresh.message || 'Daily analytics refresh was skipped.'
-  if (refresh.success) return refresh.message || 'Daily analytics refresh completed.'
-  return refresh.message || 'Daily analytics refresh failed.'
-}
-
-function analyticsRefreshClass(task) {
-  const refresh = analyticsRefresh(task)
-  if (!refresh) return ''
-  return refresh.success || refresh.skipped ? 'sync-progress__notice' : 'sync-progress__error'
-}
-
-function workerPoolSummary(task) {
-  return task?.resultData?.worker_pool_summary || null
-}
-
-function workerPoolMessage(task) {
-  const summary = workerPoolSummary(task)
-  if (!summary) return ''
-  return [
-    `Worker pool: ${summary.active_workers || 0}/${summary.configured_workers || 0}`,
-    `dequeued ${summary.games_dequeued || 0}`,
-    `finalized ${summary.games_finalized || 0}`,
-    `errors ${summary.worker_error_count || 0}`,
-  ].join(' · ')
-}
-
-function failureRows(task) {
-  if (!task?.resultData) return []
-  const normalized = []
-  const pushFailure = (failure) => {
-    if (!failure || typeof failure !== 'object') return
-    const message = String(failure.message || '').trim()
-    if (!message) return
-    const mlbId = failure.mlb_id ?? failure.mlbId ?? null
-    const errors = Array.isArray(failure.errors) ? failure.errors.filter(Boolean).map(String) : []
-    normalized.push({ mlbId, message, errors })
-  }
-  Array.isArray(task.resultData.errors) && task.resultData.errors.forEach(pushFailure)
-  Array.isArray(task.resultData.failures) && task.resultData.failures.forEach(pushFailure)
-  const seen = new Set()
-  return normalized.filter((entry) => {
-    const key = `${entry.mlbId || 'none'}|${entry.message}|${entry.errors.join(',')}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-}
-
-function failureText(entry) {
-  const gameLabel = entry.mlbId ? `Game ${entry.mlbId}` : 'Worker pool'
-  const errorSuffix = entry.errors.length ? ` (${entry.errors.join(', ')})` : ''
-  return `${gameLabel}: ${entry.message}${errorSuffix}`
-}
-
-function workerErrorRows(task) {
-  const summary = workerPoolSummary(task)
-  return Array.isArray(summary?.worker_errors)
-    ? summary.worker_errors.filter(Boolean).map((message) => String(message))
-    : []
-}
-
-function analyticsRefreshProcessing(task) {
-  if (!task) return false
-  const allGamesProcessed = Number(task.processedItems || 0) >= Number(task.totalItems || 0)
-  return task.status === 'running' && allGamesProcessed && !analyticsRefresh(task)
-}
-
-function deferredAnalyticsRefreshAvailable(task) {
-  const refresh = analyticsRefresh(task)
-  return Boolean(refresh?.deferred && task?.taskParameters?.start_date)
-}
 </script>
 
 <template>
