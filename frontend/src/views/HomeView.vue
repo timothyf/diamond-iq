@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
+import GameScheduleCard from '../components/GameScheduleCard.vue'
 import { useHomeDashboard } from '../composables/useHomeDashboard'
 
 const { dashboard, loading, error, refresh } = useHomeDashboard()
@@ -17,26 +18,9 @@ function formatDate(value, options = { month: 'short', day: 'numeric' }) {
   return new Intl.DateTimeFormat('en-US', options).format(date)
 }
 
-function formatTime(value) {
-  if (!value) return 'Time TBD'
-  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(value))
-}
-
 function formatTimestamp(value) {
   if (!value) return 'Not available'
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(value))
-}
-
-function gameState(game) {
-  const status = String(game.status || '').toLowerCase()
-  if (game.home_score !== null && game.home_score !== undefined && ['final', 'completed'].some((value) => status.includes(value))) return 'Final'
-  if (['live', 'in progress', 'manager challenge'].some((value) => status.includes(value))) return game.detailed_status || 'Live'
-  return formatTime(game.scheduled_at)
-}
-
-function score(game, side) {
-  const value = game[`${side}_score`]
-  return value === null || value === undefined ? '—' : value
 }
 
 function leaderValue(leader, value) {
@@ -97,25 +81,7 @@ function signed(value) {
           <span>{{ dashboard.games.length }} {{ dashboard.games.length === 1 ? 'game' : 'games' }}</span>
         </header>
         <div v-if="dashboard.games.length" class="game-grid">
-          <article v-for="game in dashboard.games" :key="game.id" class="game-card">
-            <RouterLink
-              class="game-card__summary-link"
-              :to="{ name: 'game-summary', params: { id: game.id } }"
-              :aria-label="`View ${game.away_team.name} at ${game.home_team.name} game summary`"
-              data-test="game-summary-link"
-            ></RouterLink>
-            <header><span>{{ gameState(game) }}</span><small>{{ game.venue_name || 'Venue TBD' }}</small></header>
-            <RouterLink :to="{ name: 'team-profile', params: { id: game.away_team.id } }" class="game-team">
-              <b>{{ game.away_team.abbreviation }}</b><strong>{{ game.away_team.name }}</strong><em>{{ score(game, 'away') }}</em>
-            </RouterLink>
-            <RouterLink :to="{ name: 'team-profile', params: { id: game.home_team.id } }" class="game-team">
-              <b>{{ game.home_team.abbreviation }}</b><strong>{{ game.home_team.name }}</strong><em>{{ score(game, 'home') }}</em>
-            </RouterLink>
-            <footer>
-              <span>{{ game.away_probable_pitcher?.full_name || 'Away probable TBD' }}</span>
-              <span>{{ game.home_probable_pitcher?.full_name || 'Home probable TBD' }}</span>
-            </footer>
-          </article>
+          <GameScheduleCard v-for="game in dashboard.games" :key="game.id" :game="game" />
         </div>
         <p v-else class="home-empty">No games are stored for {{ briefingDate }}.</p>
       </section>
@@ -220,18 +186,6 @@ function signed(value) {
 .home-heading > span, .home-heading > a { color: #62707a; font-size: .77rem; font-weight: 800; text-decoration: none; }
 .home-heading > a:hover { color: #a93627; }
 .game-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: .8rem; }
-.game-card { position: relative; min-width: 0; padding: 1rem; border: 1px solid rgba(16,38,61,.11); border-radius: 18px; background: rgba(255,255,255,.72); transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
-.game-card:hover,.game-card:focus-within { border-color: rgba(169,54,39,.35); transform: translateY(-2px); box-shadow: 0 10px 24px rgba(16,38,61,.09); }
-.game-card__summary-link { position: absolute; z-index: 1; inset: 0; border-radius: inherit; }
-.game-card > header { display: flex; justify-content: space-between; gap: .5rem; padding-bottom: .65rem; border-bottom: 1px solid rgba(16,38,61,.08); }
-.game-card > header span { color: #a93627; font-size: .73rem; font-weight: 900; text-transform: uppercase; }
-.game-card > header small { overflow: hidden; color: #78838b; text-overflow: ellipsis; white-space: nowrap; }
-.game-team { position: relative; z-index: 2; display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: .65rem; align-items: center; padding-top: .75rem; color: #10263d; text-decoration: none; }
-.game-team b { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: white; background: #183e5b; font-size: .7rem; }
-.game-team strong { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; white-space: nowrap; }
-.game-team em { font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.7rem; font-style: normal; font-weight: 900; }
-.game-card > footer { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-top: .75rem; padding-top: .65rem; border-top: 1px solid rgba(16,38,61,.08); color: #6c7881; font-size: .67rem; }
-.game-card > footer span:last-child { text-align: right; }
 .leader-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: .8rem; }
 .leader-card { padding: 1rem; border-radius: 18px; background: #10263d; color: #fffaf0; }
 .leader-card > header { display: flex; justify-content: space-between; gap: .4rem; align-items: baseline; }

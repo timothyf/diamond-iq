@@ -5,6 +5,7 @@ import AdminView from '../views/AdminView.vue'
 import GameSummaryView from '../views/GameSummaryView.vue'
 import HomeView from '../views/HomeView.vue'
 import PlayerProfileView from '../views/PlayerProfileView.vue'
+import ScheduleView from '../views/ScheduleView.vue'
 import TeamDirectoryView from '../views/TeamDirectoryView.vue'
 import TeamProfileView from '../views/TeamProfileView.vue'
 
@@ -15,6 +16,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/schedule',
+      name: 'schedule',
+      component: ScheduleView,
     },
     {
       path: '/explore',
