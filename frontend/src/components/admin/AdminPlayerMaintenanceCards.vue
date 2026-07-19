@@ -1,0 +1,49 @@
+<script setup>
+import AdminTaskCard from './AdminTaskCard.vue'
+
+defineProps({
+  profileOptions: { type: Object, required: true },
+  teamHistoryOptions: { type: Object, required: true },
+  anyActionRunning: { type: Boolean, default: false },
+  runningTask: { type: String, default: '' },
+})
+const emit = defineEmits(['sync-profiles', 'sync-team-histories'])
+</script>
+
+<template>
+  <AdminTaskCard
+    data-test="profile-sync-form"
+    source="Player identity"
+    title="MLB profile synchronization"
+    command="mlb_player_profiles:sync"
+    description="Downloads MLB biographical, handedness, position, and headshot information for players already stored in DiamondIQ."
+    @submit.prevent="emit('sync-profiles')"
+  >
+    <div class="admin-fields admin-fields--four">
+      <label><span>Batch size</span><input v-model.number="profileOptions.batchSize" type="number" min="1" max="100" required /></label>
+      <label><span>Limit (optional)</span><input v-model="profileOptions.limit" type="number" min="1" /></label>
+      <label class="admin-field--wide"><span>MLB IDs (optional)</span><input v-model="profileOptions.mlbIds" type="text" placeholder="700270, 669360" /></label>
+      <label class="admin-check"><input v-model="profileOptions.onlyMissing" type="checkbox" /><span>Only missing</span></label>
+    </div>
+    <button class="admin-button" type="submit" :disabled="anyActionRunning">
+      {{ runningTask === 'mlb_player_profiles_sync' ? 'Synchronizing profiles…' : 'Synchronize player profiles' }}
+    </button>
+  </AdminTaskCard>
+
+  <AdminTaskCard
+    data-test="team-history-sync-form"
+    source="Player organization trail"
+    title="MLB transaction history synchronization"
+    command="mlb_player_team_histories:sync"
+    description="Downloads official MLB transactions and rebuilds dated major-league organization tenures for Player Profile Team History cards."
+    @submit.prevent="emit('sync-team-histories')"
+  >
+    <div class="admin-fields admin-fields--two">
+      <label><span>Limit (optional)</span><input v-model="teamHistoryOptions.limit" type="number" min="1" /></label>
+      <label><span>MLB IDs (optional)</span><input v-model="teamHistoryOptions.mlbIds" type="text" placeholder="656427, 669360" /></label>
+    </div>
+    <button class="admin-button" type="submit" :disabled="anyActionRunning">
+      {{ runningTask === 'mlb_player_team_histories_sync' ? 'Synchronizing team histories…' : 'Synchronize team histories' }}
+    </button>
+  </AdminTaskCard>
+</template>
