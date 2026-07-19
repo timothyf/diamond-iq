@@ -220,17 +220,19 @@ class HomeSnapshotQuery
       totals = sum_metrics(rows)
       next if totals[:games].zero?
 
-      recent = sum_metrics(recent_rows(rows))
+      recent = recent_game_summary(team)
       {
         team: serialize_team(team),
         games: totals[:games],
         wins: totals[:wins],
         losses: totals[:losses],
+        ties: totals[:ties],
         winning_percentage: ratio(totals[:wins], totals[:wins] + totals[:losses]),
         run_differential: totals[:runs_scored] - totals[:runs_allowed],
         recent_games: recent[:games],
         recent_wins: recent[:wins],
         recent_losses: recent[:losses],
+        recent_ties: recent[:ties],
         recent_winning_percentage: ratio(recent[:wins], recent[:wins] + recent[:losses]),
         recent_run_differential: recent[:runs_scored] - recent[:runs_allowed]
       }
@@ -252,21 +254,39 @@ class HomeSnapshotQuery
   end
 
   def sum_metrics(rows)
-    rows.each_with_object({ games: 0, wins: 0, losses: 0, runs_scored: 0, runs_allowed: 0 }) do |row, totals|
+    rows.each_with_object({ games: 0, wins: 0, losses: 0, ties: 0, runs_scored: 0, runs_allowed: 0 }) do |row, totals|
       totals.each_key { |key| totals[key] += row.metrics.to_h[key.to_s].to_i }
     end
   end
 
-  def recent_rows(rows)
-    selected = []
-    game_count = 0
-    rows.reverse_each do |row|
-      break if game_count >= RECENT_TEAM_GAME_LIMIT
-
-      selected << row
-      game_count += row.metrics.to_h["games"].to_i
+  def recent_game_summary(team)
+    games = completed_games_by_team.fetch(team.id, []).last(RECENT_TEAM_GAME_LIMIT)
+    games.each_with_object({ games: games.length, wins: 0, losses: 0, ties: 0, runs_scored: 0, runs_allowed: 0 }) do |game, totals|
+      scored, allowed = game.home_team_id == team.id ? [ game.home_score, game.away_score ] : [ game.away_score, game.home_score ]
+      totals[:runs_scored] += scored
+      totals[:runs_allowed] += allowed
+      totals[:wins] += 1 if scored > allowed
+      totals[:losses] += 1 if scored < allowed
+      totals[:ties] += 1 if scored == allowed
     end
-    selected
+  end
+
+  def completed_games_by_team
+    @completed_games_by_team ||= begin
+      grouped = Hash.new { |hash, team_id| hash[team_id] = [] }
+      Game
+        .joins(:schedule)
+        .where(schedules: { season: season }, status: "final")
+        .where("official_date <= ?", on)
+        .where.not(home_score: nil, away_score: nil)
+        .order(:official_date, :scheduled_at, :mlb_id)
+        .select(:id, :mlb_id, :official_date, :scheduled_at, :home_team_id, :away_team_id, :home_score, :away_score)
+        .each do |game|
+          grouped[game.home_team_id] << game
+          grouped[game.away_team_id] << game
+        end
+      grouped
+    end
   end
 
   def ratio(numerator, denominator)

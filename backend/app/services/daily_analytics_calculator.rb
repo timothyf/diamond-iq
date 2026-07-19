@@ -284,16 +284,16 @@ class DailyAnalyticsCalculator
 
   def batting_lines
     @batting_lines ||= GamePlayerBattingLine.joins(:game)
-      .where(games: { official_date: metric_date }).select(*BATTING_LINE_COLUMNS).to_a
+      .where(games: { official_date: metric_date, status: "final" }).select(*BATTING_LINE_COLUMNS).to_a
   end
 
   def pitching_lines
     @pitching_lines ||= GamePlayerPitchingLine.joins(:game)
-      .where(games: { official_date: metric_date }).select(*PITCHING_LINE_COLUMNS).to_a
+      .where(games: { official_date: metric_date, status: "final" }).select(*PITCHING_LINE_COLUMNS).to_a
   end
 
   def games
-    @games ||= Game.where(official_date: metric_date)
+    @games ||= Game.where(official_date: metric_date, status: "final")
       .select(:id, :mlb_id, :home_team_id, :away_team_id, :home_score, :away_score, :boxscore_raw_data).to_a
   end
 

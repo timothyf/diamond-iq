@@ -18,7 +18,14 @@ function syncService(task = ref(null)) {
   }
 }
 
-function mountComposable({ gameDetailsOptions = {}, pitchOptions = {}, gameDetailsSync, pitchDataSync } = {}) {
+function mountComposable({
+  gameDetailsOptions = {},
+  pitchOptions = {},
+  rosterOptions = {},
+  gameDetailsSync = syncService(),
+  pitchDataSync = syncService(),
+  rosterSync = syncService(),
+} = {}) {
   const loadOverview = vi.fn().mockResolvedValue({ success: true })
   const runTask = vi.fn().mockResolvedValue({ success: true })
   let api
@@ -38,10 +45,17 @@ function mountComposable({ gameDetailsOptions = {}, pitchOptions = {}, gameDetai
           chunkDays: 7,
           ...pitchOptions,
         }),
+        rosterOptions: reactive({
+          teamScope: 'team',
+          teamMlbId: '116',
+          season: 2026,
+          ...rosterOptions,
+        }),
         loadOverview,
         runTask,
         gameDetailsSync,
         pitchDataSync,
+        rosterSync,
       })
       return () => h('div')
     },
@@ -53,10 +67,12 @@ function mountComposable({ gameDetailsOptions = {}, pitchOptions = {}, gameDetai
 describe('useAdminSyncWorkflows', () => {
   let gameDetailsSync
   let pitchDataSync
+  let rosterSync
 
   beforeEach(() => {
     gameDetailsSync = syncService()
     pitchDataSync = syncService()
+    rosterSync = syncService()
   })
 
   it('estimates, confirms, and cancels game-detail synchronization', async () => {
@@ -74,6 +90,7 @@ describe('useAdminSyncWorkflows', () => {
       gameDetailsOptions: { startDate: '2026-07-07', endDate: '2026-07-01' },
       gameDetailsSync,
       pitchDataSync,
+      rosterSync,
     })
     await flushPromises()
 
@@ -119,7 +136,7 @@ describe('useAdminSyncWorkflows', () => {
       timingSampleRunCount: 4,
       estimateSource: 'historical',
     })
-    const { api, wrapper } = mountComposable({ gameDetailsSync, pitchDataSync })
+    const { api, wrapper } = mountComposable({ gameDetailsSync, pitchDataSync, rosterSync })
     await flushPromises()
 
     await api.requestPitchDataSync()
@@ -146,11 +163,59 @@ describe('useAdminSyncWorkflows', () => {
     wrapper.unmount()
   })
 
+  it('estimates, starts, and cancels roster synchronization', async () => {
+    rosterSync.estimate.mockResolvedValue({
+      teamCount: 15,
+      estimatedSeconds: 120,
+      lowEstimatedSeconds: 90,
+      highEstimatedSeconds: 180,
+      secondsPerTeam: 8,
+      timingSampleTeamCount: 0,
+      timingSampleRunCount: 0,
+      estimateSource: 'conservative_default',
+    })
+    const { api, wrapper } = mountComposable({
+      gameDetailsSync,
+      pitchDataSync,
+      rosterSync,
+      rosterOptions: { teamScope: 'national', teamMlbId: '', season: 2026 },
+    })
+    await flushPromises()
+
+    await api.requestRosterSync()
+    expect(rosterSync.estimate).toHaveBeenCalledWith({
+      team_scope: 'national',
+      team_mlb_id: null,
+      season: 2026,
+    })
+    expect(api.rosterEstimate.value).toMatchObject({
+      scope: 'the national league for 2026',
+      estimatedGames: 15,
+      workloadSingular: 'team',
+      workloadPlural: 'teams',
+      duration: 'about 2 minutes',
+      range: '2–3 minutes',
+    })
+
+    await api.confirmRosterSync()
+    expect(rosterSync.start).toHaveBeenCalledWith({
+      team_scope: 'national',
+      team_mlb_id: null,
+      season: 2026,
+    })
+
+    rosterSync.task.value = { id: 14, status: 'running' }
+    await api.cancelActiveRosterSync()
+    expect(rosterSync.cancel).toHaveBeenCalledOnce()
+    wrapper.unmount()
+  })
+
   it('recovers active tasks and refreshes overview when either workflow finishes', async () => {
-    const { wrapper, loadOverview } = mountComposable({ gameDetailsSync, pitchDataSync })
+    const { wrapper, loadOverview } = mountComposable({ gameDetailsSync, pitchDataSync, rosterSync })
     await flushPromises()
     expect(gameDetailsSync.loadActiveTask).toHaveBeenCalledOnce()
     expect(pitchDataSync.loadActiveTask).toHaveBeenCalledOnce()
+    expect(rosterSync.loadActiveTask).toHaveBeenCalledOnce()
 
     gameDetailsSync.task.value = { status: 'running' }
     await nextTick()
@@ -163,6 +228,12 @@ describe('useAdminSyncWorkflows', () => {
     pitchDataSync.task.value = { status: 'cancelled' }
     await nextTick()
     expect(loadOverview).toHaveBeenCalledTimes(2)
+
+    rosterSync.task.value = { status: 'running' }
+    await nextTick()
+    rosterSync.task.value = { status: 'completed' }
+    await nextTick()
+    expect(loadOverview).toHaveBeenCalledTimes(3)
     wrapper.unmount()
   })
 
@@ -171,7 +242,7 @@ describe('useAdminSyncWorkflows', () => {
       status: 'completed',
       taskParameters: { start_date: '2026-05-12', end_date: '2026-05-15' },
     }
-    const { api, wrapper, loadOverview, runTask } = mountComposable({ gameDetailsSync, pitchDataSync })
+    const { api, wrapper, loadOverview, runTask } = mountComposable({ gameDetailsSync, pitchDataSync, rosterSync })
     await flushPromises()
 
     await api.refreshGameDetailsAnalytics()

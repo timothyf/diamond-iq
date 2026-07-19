@@ -4,12 +4,14 @@ class PitchDataSyncProgressTracker
   end
 
   def start!(total:)
+    execution_job_id = task_run.result_data.to_h["active_execution_job_id"]
+    result_data = execution_job_id.present? ? { "active_execution_job_id" => execution_job_id } : {}
     task_run.update!(
       status: "running",
       total_items: total,
       completed_items: 0,
       failed_items: 0,
-      result_data: {},
+      result_data: result_data,
       error_message: nil,
       current_item_mlb_id: nil,
       current_item_label: nil,
@@ -79,9 +81,11 @@ class PitchDataSyncProgressTracker
   attr_reader :task_run
 
   def finish!(status:, result:, error_message: nil)
+    result_data = task_run.result_data.deep_merge((result || {}).deep_stringify_keys)
+    result_data.delete("active_execution_job_id")
     task_run.update!(
       status: status,
-      result_data: task_run.result_data.deep_merge((result || {}).deep_stringify_keys),
+      result_data: result_data,
       error_message: error_message,
       current_item_mlb_id: nil,
       current_item_label: nil,

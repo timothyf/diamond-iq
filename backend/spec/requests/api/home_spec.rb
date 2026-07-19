@@ -131,4 +131,65 @@ RSpec.describe "Api::Home", type: :request do
     expect(json_body.dig("data", "team_pulse", "run_differential", 0, "run_differential")).to eq(2)
     expect(json_body.dig("data", "freshness", "analytics")).to eq("2026-07-16T20:32:00.000Z")
   end
+
+  it "uses the last ten final games for recent form and ignores today's preview score" do
+    tigers = create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
+    opponent = create_team(mlb_id: 108, name: "Los Angeles Angels", abbreviation: "LAA")
+    schedule = create_schedule(season: 2026, start_date: Date.new(2026, 3, 25), end_date: Date.new(2026, 9, 27))
+    calculated_at = Time.zone.parse("2026-07-19T12:00:00Z")
+
+    10.times do |index|
+      date = Date.new(2026, 7, 9) + index.days
+      win = index >= 2
+      create_game(
+        schedule: schedule,
+        mlb_id: 824_100 + index,
+        official_date: date,
+        home_team: tigers,
+        away_team: opponent,
+        home_score: win ? 5 : 2,
+        away_score: win ? 2 : 5,
+        status: "final"
+      )
+      TeamDailyMetric.create!(
+        team: tigers,
+        metric_date: date,
+        source_start_date: date,
+        source_end_date: date,
+        sample_size: 1,
+        calculation_version: "v1",
+        calculated_at: calculated_at,
+        source_name: "DiamondIQ daily analytics",
+        metrics: { games: 1, wins: win ? 1 : 0, losses: win ? 0 : 1, runs_scored: win ? 5 : 2, runs_allowed: win ? 2 : 5 }
+      )
+    end
+
+    preview_date = Date.new(2026, 7, 19)
+    create_game(
+      schedule: schedule,
+      mlb_id: 824_200,
+      official_date: preview_date,
+      home_team: opponent,
+      away_team: tigers,
+      home_score: 0,
+      away_score: 0,
+      status: "preview"
+    )
+    TeamDailyMetric.create!(
+      team: tigers,
+      metric_date: preview_date,
+      source_start_date: preview_date,
+      source_end_date: preview_date,
+      sample_size: 1,
+      calculation_version: "v1",
+      calculated_at: calculated_at,
+      source_name: "DiamondIQ daily analytics",
+      metrics: { games: 1, wins: 0, losses: 0, ties: 1, runs_scored: 0, runs_allowed: 0 }
+    )
+
+    get api_home_path, params: { date: preview_date.iso8601 }
+
+    recent = json_body.dig("data", "team_pulse", "recent_form").find { |entry| entry.dig("team", "abbreviation") == "DET" }
+    expect(recent).to include("recent_games" => 10, "recent_wins" => 8, "recent_losses" => 2, "recent_ties" => 0)
+  end
 end

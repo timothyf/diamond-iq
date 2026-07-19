@@ -8,6 +8,7 @@ class PitchDataSyncJob < ApplicationJob
 
   def perform(task_run_id)
     task_run = AdminTaskRun.find(task_run_id)
+    record_execution_claim(task_run)
     tracker = PitchDataSyncProgressTracker.new(task_run)
     parameters = task_run.task_parameters.symbolize_keys
     result = PitchDataBatchSync.call(**parameters, progress_tracker: tracker)
@@ -21,5 +22,19 @@ class PitchDataSyncJob < ApplicationJob
     end
 
     result
+  end
+
+  private
+
+  def record_execution_claim(task_run)
+    task_run.with_lock do
+      result_data = task_run.result_data.to_h.deep_dup
+      result_data["active_execution_job_id"] = job_id
+      task_run.update!(
+        result_data: result_data,
+        started_at: task_run.started_at || Time.current,
+        last_heartbeat_at: Time.current
+      )
+    end
   end
 end

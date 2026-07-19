@@ -30,6 +30,8 @@ module Api
             game_types: params[:game_types],
             chunk_days: params[:chunk_days]
           )
+        when MlbRosterSyncTaskLauncher::TASK_NAME
+          MlbRosterSyncTaskLauncher.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season])
         else
           raise ArgumentError, "Only tracked synchronization tasks support tracked execution"
         end
@@ -59,6 +61,8 @@ module Api
             game_types: params[:game_types],
             chunk_days: params[:chunk_days]
           )
+        when MlbRosterSyncTaskEstimate::TASK_NAME
+          MlbRosterSyncTaskEstimate.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season])
         else
           raise ArgumentError, "Unsupported tracked task estimate request"
         end
@@ -86,12 +90,11 @@ module Api
 
       def reconcile_orphaned_task_run!(task_run)
         return task_run unless task_run.active?
-        return task_run unless task_run.task_name == MlbGameDetailsTaskLauncher::TASK_NAME
+        return task_run unless tracked_task_name?(task_run.task_name)
 
         execution_job_id = task_run.result_data.to_h["active_execution_job_id"]
-        return task_run if execution_job_id.blank?
-
-        queue_job = SolidQueue::Job.find_by(active_job_id: execution_job_id)
+        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < ORPHANED_HEARTBEAT_SECONDS.seconds.ago
+        queue_job = execution_job_id.present? ? SolidQueue::Job.find_by(active_job_id: execution_job_id) : legacy_queue_job_for(task_run, stale_heartbeat: stale_heartbeat)
         return task_run unless queue_job
 
         has_claim = SolidQueue::ClaimedExecution.exists?(job_id: queue_job.id)
@@ -99,7 +102,6 @@ module Api
 
         failed_execution = SolidQueue::FailedExecution.where(job_id: queue_job.id).order(created_at: :desc).first
 
-        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < ORPHANED_HEARTBEAT_SECONDS.seconds.ago
         return task_run if failed_execution.blank? && !stale_heartbeat
 
         return task_run if failed_execution.blank? && queue_job.finished_at.present?
@@ -122,6 +124,24 @@ module Api
         end
 
         task_run
+      end
+
+      def tracked_task_name?(task_name)
+        task_name.in?([ MlbGameDetailsTaskLauncher::TASK_NAME, PitchDataSyncTaskLauncher::TASK_NAME, MlbRosterSyncTaskLauncher::TASK_NAME ])
+      end
+
+      def legacy_queue_job_for(task_run, stale_heartbeat:)
+        return unless stale_heartbeat
+
+        job_class = {
+          MlbGameDetailsTaskLauncher::TASK_NAME => "MlbGameDetailsSyncJob",
+          PitchDataSyncTaskLauncher::TASK_NAME => "PitchDataSyncJob",
+          MlbRosterSyncTaskLauncher::TASK_NAME => "MlbRosterBatchSyncJob"
+        }.fetch(task_run.task_name)
+
+        SolidQueue::Job.where(class_name: job_class).order(created_at: :desc).find do |job|
+          Array(job.arguments.to_h["arguments"]).first.to_i == task_run.id
+        end
       end
     end
   end

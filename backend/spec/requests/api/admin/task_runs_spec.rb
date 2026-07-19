@@ -39,6 +39,38 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     )
   end
 
+  it "estimates and enqueues a tracked roster synchronization by team count" do
+    get estimate_api_admin_task_runs_path, params: {
+      task_name: "mlb_roster_sync",
+      team_scope: "national",
+      season: Date.current.year
+    }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data")).to include(
+      "team_count" => 15,
+      "estimated_seconds" => 120,
+      "estimate_source" => "conservative_default"
+    )
+
+    expect do
+      post api_admin_task_runs_path, params: {
+        task_name: "mlb_roster_sync",
+        team_scope: "national",
+        season: Date.current.year
+      }
+    end.to have_enqueued_job(MlbRosterBatchSyncJob)
+
+    expect(response).to have_http_status(:accepted)
+    expect(json_body.fetch("data")).to include(
+      "task_name" => "mlb_roster_sync",
+      "status" => "queued",
+      "total_items" => 15,
+      "processed_items" => 0,
+      "progress_percentage" => 0.0
+    )
+  end
+
   it "returns active runs for page-reload recovery and accepts cancellation" do
     completed = AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "completed", total_items: 1, completed_items: 1)
     active = AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "running", total_items: 10, completed_items: 4)
@@ -140,6 +172,40 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     expect(json_body.dig("data", "status")).to eq("failed")
     expect(json_body.dig("data", "error_message")).to include("Received unhandled signal 9")
     expect(json_body.dig("data", "result_data", "active_execution_job_id")).to be_nil
+  end
+
+  it "marks legacy pitch-data tasks as failed when their worker process died" do
+    run = AdminTaskRun.create!(
+      task_name: "pitch_data_sync",
+      status: "running",
+      total_items: 1,
+      result_data: {},
+      last_heartbeat_at: 5.minutes.ago,
+      started_at: 10.minutes.ago
+    )
+
+    queue_job = instance_double(
+      "SolidQueue::Job",
+      id: 789,
+      finished_at: nil,
+      arguments: { "arguments" => [ run.id ] }
+    )
+    jobs_scope = instance_double("ActiveRecord::Relation")
+    failed_execution = instance_double("SolidQueue::FailedExecution", message: "Process was found dead and pruned")
+    failed_scope = instance_double("ActiveRecord::Relation")
+
+    allow(SolidQueue::Job).to receive(:where).with(class_name: "PitchDataSyncJob").and_return(jobs_scope)
+    allow(jobs_scope).to receive(:order).with(created_at: :desc).and_return([ queue_job ])
+    allow(SolidQueue::ClaimedExecution).to receive(:exists?).with(job_id: 789).and_return(false)
+    allow(SolidQueue::FailedExecution).to receive(:where).with(job_id: 789).and_return(failed_scope)
+    allow(failed_scope).to receive(:order).with(created_at: :desc).and_return(failed_scope)
+    allow(failed_scope).to receive(:first).and_return(failed_execution)
+
+    get api_admin_task_run_path(run)
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "status")).to eq("failed")
+    expect(json_body.dig("data", "error_message")).to include("Process was found dead and pruned")
   end
 
   it "prevents concurrent game-detail synchronizations" do

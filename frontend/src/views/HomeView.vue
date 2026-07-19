@@ -48,9 +48,10 @@ function leaderValue(leader, value) {
 }
 
 function record(entry, recent = false) {
-  return recent
-    ? `${entry.recent_wins}-${entry.recent_losses}`
-    : `${entry.wins}-${entry.losses}`
+  const wins = recent ? entry.recent_wins : entry.wins
+  const losses = recent ? entry.recent_losses : entry.losses
+  const ties = recent ? entry.recent_ties : entry.ties
+  return [wins, losses, ...(Number(ties || 0) > 0 ? [ties] : [])].join('-')
 }
 
 function signed(value) {

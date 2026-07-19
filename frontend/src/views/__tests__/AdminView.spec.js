@@ -21,6 +21,11 @@ const cancelPitchDataSync = vi.fn()
 const loadActivePitchDataSync = vi.fn()
 const estimatePitchDataSync = vi.fn()
 const pitchDataTask = ref(null)
+const startRosterSync = vi.fn()
+const cancelRosterSync = vi.fn()
+const loadActiveRosterSync = vi.fn()
+const estimateRosterSync = vi.fn()
+const rosterTask = ref(null)
 const rosterSnapshots = ref([])
 
 vi.mock('../../composables/useAdminTask', () => ({
@@ -197,6 +202,20 @@ vi.mock('../../composables/usePitchDataSync', () => ({
   }),
 }))
 
+vi.mock('../../composables/useRosterSync', () => ({
+  useRosterSync: () => ({
+    task: computed(() => rosterTask.value),
+    active: computed(() => ['queued', 'running'].includes(rosterTask.value?.status)),
+    starting: computed(() => false),
+    estimating: computed(() => false),
+    error: computed(() => ''),
+    start: startRosterSync,
+    estimate: estimateRosterSync,
+    cancel: cancelRosterSync,
+    loadActiveTask: loadActiveRosterSync,
+  }),
+}))
+
 vi.mock('../../composables/usePlayerSeasonStatsImport', () => ({
   usePlayerSeasonStatsImport: () => ({
     uploading: computed(() => false),
@@ -259,8 +278,22 @@ describe('AdminView', () => {
       timingSampleRunCount: 4,
       estimateSource: 'historical',
     })
+    startRosterSync.mockReset().mockResolvedValue({ id: 13, status: 'queued' })
+    cancelRosterSync.mockReset().mockResolvedValue({ id: 13, status: 'running', cancelRequested: true })
+    loadActiveRosterSync.mockReset().mockResolvedValue(null)
+    estimateRosterSync.mockReset().mockResolvedValue({
+      teamCount: 15,
+      estimatedSeconds: 120,
+      lowEstimatedSeconds: 90,
+      highEstimatedSeconds: 180,
+      secondsPerTeam: 8,
+      timingSampleTeamCount: 0,
+      timingSampleRunCount: 0,
+      estimateSource: 'conservative_default',
+    })
     gameDetailsTask.value = null
     pitchDataTask.value = null
+    rosterTask.value = null
     rosterSnapshots.value = []
   })
 
@@ -268,6 +301,14 @@ describe('AdminView', () => {
     const wrapper = mount(AdminView)
 
     expect(wrapper.text()).toContain('Data administration')
+    const dailyRunbook = wrapper.get('[data-test="daily-task-runbook"]')
+    expect(dailyRunbook.text()).toContain('Daily in-season sequence')
+    expect(dailyRunbook.text()).toContain('Synchronize schedules')
+    expect(dailyRunbook.text()).toContain('Synchronize game details')
+    expect(dailyRunbook.text()).toContain('Retrieve Statcast and season stats')
+    expect(dailyRunbook.text()).toContain('Refresh rosters and player identity')
+    expect(dailyRunbook.text()).toContain('Refresh contextual benchmarks')
+    expect(dailyRunbook.text()).toContain('Not daily:')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('Development database')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('512 MB')
     expect(wrapper.get('[data-test="database-size"]').text()).toContain('PostgreSQL footprint')
@@ -430,12 +471,16 @@ describe('AdminView', () => {
 
     await wrapper.get('[data-test="roster-team-scope"]').setValue('national')
     await wrapper.get('[data-test="roster-sync-form"]').trigger('submit')
-    expect(runTask).toHaveBeenCalledWith(
-      'mlb_roster_sync',
+    await flushPromises()
+    expect(wrapper.get('[data-test="roster-confirmation"]').attributes('role')).toBe('dialog')
+    expect(startRosterSync).not.toHaveBeenCalled()
+    await wrapper.get('[data-test="roster-continue"]').trigger('click')
+    await flushPromises()
+    expect(startRosterSync).toHaveBeenCalledWith(
       expect.objectContaining({ team_scope: 'national', team_mlb_id: null }),
     )
-    expect(runTask.mock.calls.at(-1)[1]).not.toHaveProperty('as_of')
-    expect(runTask.mock.calls.at(-1)[1]).not.toHaveProperty('roster_type')
+    expect(startRosterSync.mock.calls.at(-1)[0]).not.toHaveProperty('as_of')
+    expect(startRosterSync.mock.calls.at(-1)[0]).not.toHaveProperty('roster_type')
 
     await wrapper.get('[data-test="snapshot-team"]').setValue('116')
     await wrapper.get('[data-test="roster-snapshot-form"]').trigger('submit')
@@ -721,6 +766,46 @@ describe('AdminView', () => {
 
     await wrapper.get('[data-test="pitch-data-cancel-active"]').trigger('click')
     expect(cancelPitchDataSync).toHaveBeenCalledOnce()
+  })
+
+  it('shows a roster estimate and persisted team progress with safe cancellation', async () => {
+    const wrapper = mount(AdminView)
+    await wrapper.get('[data-test="roster-team-scope"]').setValue('national')
+    await wrapper.get('[data-test="roster-sync-form"]').trigger('submit')
+    await flushPromises()
+
+    const confirmation = wrapper.get('[data-test="roster-confirmation"]')
+    expect(confirmation.text()).toContain('15 teams')
+    expect(confirmation.text()).toContain('the national league for')
+    expect(confirmation.text()).toContain('about 2 minutes')
+
+    await wrapper.get('[data-test="roster-cancel"]').trigger('click')
+    expect(startRosterSync).not.toHaveBeenCalled()
+    wrapper.unmount()
+
+    rosterTask.value = {
+      id: 13,
+      status: 'running',
+      totalItems: 15,
+      completedItems: 6,
+      failedItems: 1,
+      processedItems: 7,
+      progressPercentage: 46.7,
+      currentItemLabel: 'DET · Detroit Tigers',
+      cancelRequested: false,
+      elapsedSeconds: 56,
+      estimatedRemainingSeconds: 64,
+      errorMessage: null,
+    }
+    const progressWrapper = mount(AdminView)
+    const progress = progressWrapper.get('[data-test="roster-sync-progress"]')
+    expect(progress.text()).toContain('7 of 15 teams')
+    expect(progress.text()).toContain('Current team')
+    expect(progress.text()).toContain('DET · Detroit Tigers')
+    expect(progress.text()).toContain('Cancel after current team')
+
+    await progressWrapper.get('[data-test="roster-sync-cancel-active"]').trigger('click')
+    expect(cancelRosterSync).toHaveBeenCalledOnce()
   })
 
   it('displays stored Active and 40-man snapshot players', async () => {

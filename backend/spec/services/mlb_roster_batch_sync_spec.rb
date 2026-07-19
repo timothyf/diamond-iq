@@ -74,4 +74,20 @@ RSpec.describe MlbRosterBatchSync do
       "Synchronized 0 of 1 MLB team rosters. First failure for MLB team 116: Cannot synchronize before existing snapshot"
     )
   end
+
+  it "reports team-level progress" do
+    create_team(mlb_id: 116, name: "Detroit Tigers", abbreviation: "DET")
+    tracker = instance_double(MlbRosterSyncProgressTracker)
+    allow(tracker).to receive(:start!)
+    allow(tracker).to receive(:cancel_requested?).and_return(false)
+    allow(tracker).to receive(:team_started!)
+    allow(tracker).to receive(:team_finished!)
+    allow(MlbRosterSync).to receive(:call).and_return(success: true, message: "Synchronized", data: {})
+
+    described_class.call(scope: "team", team_mlb_id: 116, progress_tracker: tracker)
+
+    expect(tracker).to have_received(:start!).with(total: 1)
+    expect(tracker).to have_received(:team_started!).with(116)
+    expect(tracker).to have_received(:team_finished!).with(success: true)
+  end
 end

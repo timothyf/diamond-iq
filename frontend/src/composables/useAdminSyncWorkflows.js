@@ -2,6 +2,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import { useGameDetailsSync } from './useGameDetailsSync'
 import { usePitchDataSync } from './usePitchDataSync'
+import { useRosterSync } from './useRosterSync'
 import {
   formatCount,
   formatDate,
@@ -17,10 +18,12 @@ const ACTIVE_STATUSES = ['queued', 'running']
 export function useAdminSyncWorkflows({
   gameDetailsOptions,
   pitchOptions,
+  rosterOptions,
   loadOverview,
   runTask,
   gameDetailsSync = useGameDetailsSync(),
   pitchDataSync = usePitchDataSync(),
+  rosterSync = useRosterSync(),
 }) {
   const gameDetailsConfirmationOpen = ref(false)
   const gameDetailsSyncCard = ref(null)
@@ -30,6 +33,10 @@ export function useAdminSyncWorkflows({
   const pitchDataSyncCard = ref(null)
   const pendingPitchDataParameters = ref(null)
   const pendingPitchDataEstimate = ref(null)
+  const rosterConfirmationOpen = ref(false)
+  const rosterSyncCard = ref(null)
+  const pendingRosterParameters = ref(null)
+  const pendingRosterEstimate = ref(null)
 
   const gameDetailsEstimate = computed(() => {
     const parameters = pendingGameDetailsParameters.value
@@ -69,10 +76,34 @@ export function useAdminSyncWorkflows({
     }
   })
 
-  onMounted(() => Promise.all([gameDetailsSync.loadActiveTask(), pitchDataSync.loadActiveTask()]))
+  const rosterEstimate = computed(() => {
+    const parameters = pendingRosterParameters.value
+    const estimate = pendingRosterEstimate.value
+    if (!parameters) return null
+    const historical = estimate?.estimateSource === 'historical'
+    const scope = parameters.team_scope === 'team' ? `MLB team ${parameters.team_mlb_id}` : parameters.team_scope === 'all' ? 'all MLB teams' : `the ${parameters.team_scope} league`
+    return {
+      scope: `${scope} for ${parameters.season}`,
+      estimatedGames: estimate?.teamCount ?? 0,
+      workloadSingular: 'team',
+      workloadPlural: 'teams',
+      duration: `about ${formatDurationSeconds(estimate?.estimatedSeconds ?? 0)}`,
+      range: formatDurationRangeSeconds(estimate?.lowEstimatedSeconds ?? 0, estimate?.highEstimatedSeconds ?? 0),
+      assumption: historical
+        ? `Based on ${formatCount(estimate.timingSampleTeamCount)} completed teams across ${estimate.timingSampleRunCount} prior roster sync ${estimate.timingSampleRunCount === 1 ? 'run' : 'runs'} (${formatDurationSeconds(estimate.secondsPerTeam)} per team).`
+        : `Conservative starting estimate: ${formatDurationSeconds(estimate?.secondsPerTeam ?? 8)} per team. It will improve as completed roster sync timings are recorded.`,
+    }
+  })
+
+  onMounted(() => Promise.all([gameDetailsSync.loadActiveTask(), pitchDataSync.loadActiveTask(), rosterSync.loadActiveTask()]))
 
   watch(
     () => gameDetailsSync.task.value?.status,
+    (status, previousStatus) => refreshOverviewAfterCompletion(status, previousStatus, loadOverview),
+  )
+
+  watch(
+    () => rosterSync.task.value?.status,
     (status, previousStatus) => refreshOverviewAfterCompletion(status, previousStatus, loadOverview),
   )
 
@@ -159,6 +190,32 @@ export function useAdminSyncWorkflows({
     }
   }
 
+  async function requestRosterSync() {
+    const parameters = { team_scope: rosterOptions.teamScope, team_mlb_id: rosterOptions.teamScope === 'team' ? rosterOptions.teamMlbId : null, season: rosterOptions.season }
+    const estimate = await rosterSync.estimate(parameters)
+    if (!estimate) return
+    pendingRosterParameters.value = parameters
+    pendingRosterEstimate.value = estimate
+    rosterConfirmationOpen.value = true
+  }
+
+  async function cancelRosterSync() {
+    rosterConfirmationOpen.value = false
+    pendingRosterParameters.value = null
+    pendingRosterEstimate.value = null
+    await nextTick()
+    rosterSyncCard.value?.focusSyncButton()
+  }
+
+  async function confirmRosterSync() {
+    const parameters = pendingRosterParameters.value
+    if (!parameters) return
+    rosterConfirmationOpen.value = false
+    pendingRosterParameters.value = null
+    pendingRosterEstimate.value = null
+    await rosterSync.start(parameters)
+  }
+
   return {
     gameDetailsConfirmationOpen,
     gameDetailsSyncCard,
@@ -185,6 +242,18 @@ export function useAdminSyncWorkflows({
     requestPitchDataSync,
     cancelPitchDataSync,
     confirmPitchDataSync,
+    rosterConfirmationOpen,
+    rosterSyncCard,
+    rosterEstimate,
+    rosterTask: rosterSync.task,
+    rosterSyncActive: rosterSync.active,
+    rosterSyncStarting: rosterSync.starting,
+    rosterSyncEstimating: rosterSync.estimating,
+    rosterSyncError: rosterSync.error,
+    cancelActiveRosterSync: rosterSync.cancel,
+    requestRosterSync,
+    cancelRosterSync,
+    confirmRosterSync,
   }
 }
 

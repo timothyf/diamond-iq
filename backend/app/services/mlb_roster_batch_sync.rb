@@ -16,13 +16,14 @@ class MlbRosterBatchSync
     duplicate_entry_count
   ].freeze
 
-  def self.call(scope:, team_mlb_id: nil, season: Date.current.year, roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE, as_of: Date.current)
+  def self.call(scope:, team_mlb_id: nil, season: Date.current.year, roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE, as_of: Date.current, progress_tracker: nil)
     new(
       scope: scope,
       team_mlb_id: team_mlb_id,
       season: season,
       roster_type: roster_type,
-      as_of: as_of
+      as_of: as_of,
+      progress_tracker: progress_tracker
     ).call
   end
 
@@ -30,12 +31,13 @@ class MlbRosterBatchSync
     TEAM_IDS_BY_LEAGUE.find { |_league, team_ids| team_ids.include?(team_mlb_id.to_i) }&.first
   end
 
-  def initialize(scope:, team_mlb_id: nil, season: Date.current.year, roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE, as_of: Date.current)
+  def initialize(scope:, team_mlb_id: nil, season: Date.current.year, roster_type: MlbRosterDownloader::DEFAULT_ROSTER_TYPE, as_of: Date.current, progress_tracker: nil)
     @scope = scope.to_s.downcase
     @team_mlb_id = Integer(team_mlb_id, exception: false)
     @season = season
     @roster_type = roster_type
     @as_of = as_of
+    @progress_tracker = progress_tracker
   end
 
   def call
@@ -52,7 +54,18 @@ class MlbRosterBatchSync
     end
 
     summary = initial_summary(requested_team_ids)
-    requested_team_ids.each { |id| synchronize_team(id, summary) }
+    progress_tracker&.start!(total: requested_team_ids.length)
+    requested_team_ids.each do |id|
+      if progress_tracker&.cancel_requested?
+        summary[:cancelled] = true
+        break
+      end
+      progress_tracker&.team_started!(id)
+      success = synchronize_team(id, summary)
+      progress_tracker&.team_finished!(success: success)
+    end
+
+    return { success: true, message: "Roster synchronization cancelled", data: summary } if summary[:cancelled]
 
     if summary[:failed_team_count].positive?
       return {
@@ -71,7 +84,7 @@ class MlbRosterBatchSync
 
   private
 
-  attr_reader :as_of, :roster_type, :scope, :season, :team_mlb_id
+  attr_reader :as_of, :progress_tracker, :roster_type, :scope, :season, :team_mlb_id
 
   def target_team_ids
     case scope
@@ -90,6 +103,7 @@ class MlbRosterBatchSync
       team_count: team_ids.length,
       successful_team_count: 0,
       failed_team_count: 0,
+      cancelled: false,
       team_mlb_ids: team_ids,
       errors: []
     }.merge(SUMMARY_KEYS.index_with(0))
@@ -110,12 +124,13 @@ class MlbRosterBatchSync
         message: result[:message],
         errors: Array(result.dig(:data, :errors))
       }
-      return
+      return false
     end
 
     summary[:successful_team_count] += 1
     result_data = result[:data] || {}
     SUMMARY_KEYS.each { |key| summary[key] += result_data.fetch(key, 0) }
+    true
   end
 
   def failure(message, data = {})

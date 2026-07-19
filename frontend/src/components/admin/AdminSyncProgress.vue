@@ -9,6 +9,7 @@ defineProps({
   ariaLabel: { type: String, required: true },
   itemNoun: { type: String, default: 'games' },
   currentItemLabel: { type: String, default: 'Current game' },
+  cancelItemNoun: { type: String, default: 'game' },
 })
 const emit = defineEmits(['cancel'])
 
@@ -40,7 +41,7 @@ const emit = defineEmits(['cancel'])
       <div><dt>Remaining</dt><dd>{{ active ? formatElapsed(task.estimatedRemainingSeconds) : '—' }}</dd></div>
     </dl>
     <p v-if="task.currentItemLabel" class="sync-progress__current"><span>{{ currentItemLabel }}</span>{{ task.currentItemLabel }}</p>
-    <p v-if="task.cancelRequested && active" class="sync-progress__notice">Cancellation requested. The current game will finish safely before the task stops.</p>
+    <p v-if="task.cancelRequested && active" class="sync-progress__notice">Cancellation requested. The current {{ cancelItemNoun }} will finish safely before the task stops.</p>
     <p v-else-if="task.errorMessage" class="sync-progress__error">{{ task.errorMessage }}</p>
 
     <slot />
@@ -53,7 +54,7 @@ const emit = defineEmits(['cancel'])
       :disabled="task.cancelRequested"
       @click="emit('cancel')"
     >
-      {{ task.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
+      {{ task.cancelRequested ? 'Cancellation requested…' : `Cancel after current ${cancelItemNoun}` }}
     </button>
   </section>
 </template>

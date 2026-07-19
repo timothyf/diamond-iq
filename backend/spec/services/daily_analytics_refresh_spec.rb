@@ -156,6 +156,24 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     expect(result.dig(:data, :benchmark_refreshes)).to eq([])
   end
 
+  it "does not count a preview with placeholder scores as a played game" do
+    preview_home = create_team(mlb_id: 108, abbreviation: "LAA")
+    preview_away = create_team(mlb_id: 117, abbreviation: "HOU")
+    create_game(
+      mlb_id: 823_444,
+      official_date: date,
+      home_team: preview_home,
+      away_team: preview_away,
+      home_score: 0,
+      away_score: 0,
+      status: "preview"
+    )
+
+    described_class.call(start_date: date, end_date: date, refresh_contextual_benchmarks: false)
+
+    expect(TeamDailyMetric.where(metric_date: date).pluck(:team_id)).to contain_exactly(home_team.id, away_team.id)
+  end
+
   def create_pitch(attributes)
     PitchDatum.create!(
       {

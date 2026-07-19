@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { formatCount } from '../../utils/adminFormatting'
 
 const props = defineProps({
@@ -11,6 +11,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['cancel', 'confirm'])
 const dialog = ref(null)
+const workloadSingular = computed(() => props.estimate?.workloadSingular || 'stored game')
+const workloadPlural = computed(() => props.estimate?.workloadPlural || 'stored games')
 
 watch(
   () => props.open,
@@ -46,14 +48,14 @@ watch(
       <h2 :id="`${testPrefix}-confirmation-title`">{{ title }}</h2>
       <p :id="`${testPrefix}-confirmation-description`">
         DiamondIQ found
-        <strong>{{ formatCount(estimate.estimatedGames) }} stored {{ estimate.estimatedGames === 1 ? 'game' : 'games' }}</strong>
+        <strong>{{ formatCount(estimate.estimatedGames) }} {{ estimate.estimatedGames === 1 ? workloadSingular : workloadPlural }}</strong>
         in <strong>{{ estimate.scope }}</strong>. Based on this selection, the operation should take
         <strong>{{ estimate.duration }}</strong> (typically {{ estimate.range }}).
       </p>
       <dl>
         <div>
           <dt>Estimated workload</dt>
-          <dd>{{ estimate.estimatedGames === 1 ? '1 stored game' : `${formatCount(estimate.estimatedGames)} stored games` }}</dd>
+          <dd>{{ formatCount(estimate.estimatedGames) }} {{ estimate.estimatedGames === 1 ? workloadSingular : workloadPlural }}</dd>
         </div>
         <div><dt>How this estimate works</dt><dd>{{ estimate.assumption }}</dd></div>
       </dl>

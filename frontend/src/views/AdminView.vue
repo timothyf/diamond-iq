@@ -8,6 +8,7 @@ import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCa
 import AdminPitchDataSyncCard from '../components/admin/AdminPitchDataSyncCard.vue'
 import AdminPlayerMaintenanceCards from '../components/admin/AdminPlayerMaintenanceCards.vue'
 import AdminPlayerStatsDownloadCard from '../components/admin/AdminPlayerStatsDownloadCard.vue'
+import AdminRosterSyncCard from '../components/admin/AdminRosterSyncCard.vue'
 import AdminRosterSnapshotWorkspace from '../components/admin/AdminRosterSnapshotWorkspace.vue'
 import AdminScheduleSyncCard from '../components/admin/AdminScheduleSyncCard.vue'
 import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
@@ -139,7 +140,19 @@ const {
   requestPitchDataSync,
   cancelPitchDataSync,
   confirmPitchDataSync,
-} = useAdminSyncWorkflows({ gameDetailsOptions, pitchOptions, loadOverview, runTask })
+  rosterConfirmationOpen,
+  rosterSyncCard,
+  rosterEstimate,
+  rosterTask,
+  rosterSyncActive,
+  rosterSyncStarting,
+  rosterSyncEstimating,
+  rosterSyncError,
+  cancelActiveRosterSync,
+  requestRosterSync,
+  cancelRosterSync,
+  confirmRosterSync,
+} = useAdminSyncWorkflows({ gameDetailsOptions, pitchOptions, rosterOptions, loadOverview, runTask })
 const {
   downloading: statsDownloading,
   error: statsDownloadError,
@@ -174,6 +187,9 @@ const anyActionRunning = computed(
     pitchDataSyncActive.value ||
     pitchDataSyncStarting.value ||
     pitchDataSyncEstimating.value ||
+    rosterSyncActive.value ||
+    rosterSyncStarting.value ||
+    rosterSyncEstimating.value ||
     statsDownloading.value ||
     statsUploading.value ||
     pitchUploading.value ||
@@ -236,14 +252,6 @@ async function handleTeamHistorySync() {
   await runTask('mlb_player_team_histories_sync', {
     limit: teamHistoryOptions.limit || null,
     mlb_ids: teamHistoryOptions.mlbIds || null,
-  })
-}
-
-async function handleRosterSync() {
-  await runTask('mlb_roster_sync', {
-    team_scope: rosterOptions.teamScope,
-    team_mlb_id: rosterOptions.teamScope === 'team' ? rosterOptions.teamMlbId : null,
-    season: rosterOptions.season,
   })
 }
 
@@ -352,6 +360,16 @@ async function closeDatabaseDetails() {
       @confirm="confirmGameDetailsSync"
     />
 
+    <AdminSyncConfirmationDialog
+      :open="rosterConfirmationOpen"
+      test-prefix="roster"
+      title="Roster synchronization may take a while"
+      :estimate="rosterEstimate"
+      note="MLB response times and player profile updates can make the actual duration shorter or longer. Keep the Rails server running until the task finishes."
+      @cancel="cancelRosterSync"
+      @confirm="confirmRosterSync"
+    />
+
     <nav class="admin-tabs" role="tablist" aria-label="Administration tools">
       <button
         v-for="(tab, index) in adminTabs"
@@ -370,6 +388,54 @@ async function closeDatabaseDetails() {
         {{ tab.label }}
       </button>
     </nav>
+
+    <aside class="admin-runbook" data-test="daily-task-runbook" aria-labelledby="daily-task-runbook-title">
+      <header>
+        <div>
+          <p class="eyebrow">Recommended operating cadence</p>
+          <h2 id="daily-task-runbook-title">Daily in-season sequence</h2>
+        </div>
+        <p>Run the source tasks in this order for completed game dates. Each synchronization is safe to repeat.</p>
+      </header>
+      <ol>
+        <li>
+          <span>01</span>
+          <div>
+            <strong>Synchronize schedules</strong>
+            <p>Run MLB schedule synchronization first for the completed date and your upcoming schedule window. Downstream tasks require these canonical games.</p>
+          </div>
+        </li>
+        <li>
+          <span>02</span>
+          <div>
+            <strong>Synchronize game details</strong>
+            <p>Load final box scores, player lines, batting orders, and plate appearances. This task automatically refreshes daily analytics for its synchronized dates.</p>
+          </div>
+        </li>
+        <li>
+          <span>03</span>
+          <div>
+            <strong>Retrieve Statcast and season stats</strong>
+            <p>Download Statcast pitches after games and plate appearances exist, then update current-season batting and pitching statistics.</p>
+          </div>
+        </li>
+        <li>
+          <span>04</span>
+          <div>
+            <strong>Refresh rosters and player identity</strong>
+            <p>Synchronize all 40-man rosters, then missing player profiles and MLB transaction histories so team and roster context stays current.</p>
+          </div>
+        </li>
+        <li>
+          <span>05</span>
+          <div>
+            <strong>Refresh contextual benchmarks</strong>
+            <p>Run benchmarks last for the affected date range. If game-detail analytics were deferred, use that card’s analytics retry first.</p>
+          </div>
+        </li>
+      </ol>
+      <p class="admin-runbook__note"><strong>Not daily:</strong> local CSV imports, dated roster snapshots, and rebuilding player positions are maintenance tools to use when data needs correction or verification.</p>
+    </aside>
 
     <section
       v-show="activeAdminTab === 'download'"
@@ -511,50 +577,20 @@ async function closeDatabaseDetails() {
           @sync-team-histories="handleTeamHistorySync"
         />
 
-        <AdminTaskCard
-          data-test="roster-sync-form"
-          source="Current roster state"
-          title="MLB 40-man roster synchronization"
-          command="mlb_roster:sync"
-          description="Downloads MLB 40-man rosters and updates player profiles, roster status, and dated team memberships for the selected season."
-          @submit.prevent="handleRosterSync"
-        >
-          <p class="admin-card__coverage" data-test="roster-database-coverage">
-            <strong>Database coverage:</strong>
-            <template v-if="rosterCoverage.earliestDate && rosterCoverage.latestDate">
-              {{ formatDate(rosterCoverage.earliestDate) }}–{{ formatDate(rosterCoverage.latestDate) }}
-            </template>
-            <template v-else>No dated roster memberships stored</template>
-          </p>
-          <div class="admin-fields admin-fields--three">
-            <label>
-              <span>Team selection</span>
-              <select v-model="rosterOptions.teamScope" data-test="roster-team-scope">
-                <option value="all">All MLB teams</option>
-                <option value="american">American League</option>
-                <option value="national">National League</option>
-                <option value="team">Specific team</option>
-              </select>
-            </label>
-            <label v-if="rosterOptions.teamScope === 'team'" class="admin-field--wide">
-              <span>MLB team</span>
-              <select v-model="rosterOptions.teamMlbId" data-test="roster-team" required>
-                <option value="" disabled>Select a team</option>
-                <option v-for="team in mlbTeams" :key="team.mlbId" :value="String(team.mlbId)">
-                  {{ team.abbreviation }} · {{ team.name }} ({{ team.league === 'american' ? 'AL' : 'NL' }})
-                </option>
-              </select>
-            </label>
-            <label><span>Season</span><input v-model.number="rosterOptions.season" type="number" min="1876" :max="currentSeason" required /></label>
-          </div>
-          <p class="admin-card__hint" data-test="roster-coverage-policy">
-            Synchronizes MLB's 40-man roster only. Completed seasons use the final stored regular-season game date; the current season uses today.
-            Historical roster construction will be handled as a separate transaction-based workflow.
-          </p>
-          <button class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ runningTask === 'mlb_roster_sync' ? 'Synchronizing roster…' : 'Synchronize team roster' }}
-          </button>
-        </AdminTaskCard>
+        <AdminRosterSyncCard
+          ref="rosterSyncCard"
+          :options="rosterOptions"
+          :teams="mlbTeams"
+          :coverage="rosterCoverage"
+          :task="rosterTask"
+          :active="rosterSyncActive"
+          :starting="rosterSyncStarting"
+          :any-action-running="anyActionRunning"
+          :error="rosterSyncError"
+          :max-season="currentSeason"
+          @submit="requestRosterSync"
+          @cancel-active="cancelActiveRosterSync"
+        />
 
         <AdminTaskCard
           as="article"
@@ -626,6 +662,86 @@ async function closeDatabaseDetails() {
 .admin-tabs {
   width: min(1440px, calc(100vw - 2.5rem));
   margin: 0 auto;
+}
+
+.admin-runbook {
+  width: min(1440px, calc(100vw - 2.5rem));
+  margin: 1rem auto 0;
+  padding: 1.25rem;
+  border: 1px solid rgba(16, 38, 61, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 252, 244, 0.82);
+}
+
+.admin-runbook > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  align-items: end;
+}
+
+.admin-runbook h2 {
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.65rem;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.admin-runbook > header > p {
+  max-width: 38rem;
+  color: #53616b;
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.admin-runbook ol {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-runbook li {
+  display: flex;
+  gap: 0.7rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 1px solid rgba(16, 38, 61, 0.09);
+  border-radius: 14px;
+  background: rgba(231, 237, 241, 0.62);
+}
+
+.admin-runbook li > span {
+  flex: 0 0 auto;
+  color: #8f2d24;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.admin-runbook li strong {
+  color: #10263d;
+  font-size: 0.84rem;
+}
+
+.admin-runbook li p {
+  margin-top: 0.3rem;
+  color: #5a6872;
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+
+.admin-runbook__note {
+  margin-top: 0.8rem;
+  color: #53616b;
+  font-size: 0.78rem;
+}
+
+.admin-runbook__note strong {
+  color: #37506a;
 }
 
 .admin-hero {
@@ -1474,6 +1590,10 @@ async function closeDatabaseDetails() {
 }
 
 @media (max-width: 1000px) {
+  .admin-runbook ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .admin-grid--two {
     grid-template-columns: 1fr;
   }
@@ -1490,13 +1610,27 @@ async function closeDatabaseDetails() {
 }
 
 @media (max-width: 680px) {
+  .admin-runbook > header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-runbook > header > p {
+    text-align: left;
+  }
+
+  .admin-runbook ol {
+    grid-template-columns: 1fr;
+  }
+
   .admin-shell {
     padding: 1rem 0.7rem 3rem;
   }
 
   .admin-hero,
   .admin-section,
-  .admin-tabs {
+  .admin-tabs,
+  .admin-runbook {
     width: 100%;
     border-radius: 20px;
   }
