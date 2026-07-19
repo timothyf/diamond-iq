@@ -7,6 +7,7 @@ import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetails
 import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCard.vue'
 import AdminPitchDataSyncCard from '../components/admin/AdminPitchDataSyncCard.vue'
 import AdminRosterSnapshotWorkspace from '../components/admin/AdminRosterSnapshotWorkspace.vue'
+import AdminScheduleSyncCard from '../components/admin/AdminScheduleSyncCard.vue'
 import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import { useAdminTask } from '../composables/useAdminTask'
@@ -186,13 +187,6 @@ const resultEntries = computed(() => {
     .filter(([, value]) => value !== null && value !== undefined && !Array.isArray(value) && typeof value !== 'object')
     .slice(0, 8)
 })
-
-const hasStoredGames = computed(
-  () => Boolean(scheduleDateRange.value.earliestGameDate && scheduleDateRange.value.latestGameDate),
-)
-const hasImportedSchedule = computed(
-  () => Boolean(scheduleImportRange.value.earliestImportDate && scheduleImportRange.value.latestImportDate),
-)
 
 const gameDetailsEstimate = computed(() => {
   const parameters = pendingGameDetailsParameters.value
@@ -750,58 +744,16 @@ async function closeDatabaseDetails() {
       </header>
 
       <div class="admin-grid admin-grid--two">
-        <AdminTaskCard
-          source="Games & schedules"
-          title="MLB schedule synchronization"
-          command="mlb_schedule:sync"
-          description="Downloads MLB schedules and updates games, teams, venues, statuses, and probable pitchers for the selected dates."
-          data-test="schedule-sync-form"
-          @submit.prevent="handleScheduleSync"
-        >
-          <div class="schedule-coverage" data-test="schedule-date-range">
-            <p v-if="overviewLoading">Loading stored dates…</p>
-            <p v-else-if="overviewError" class="schedule-coverage__error">{{ overviewError }}</p>
-            <div v-else class="schedule-coverage__ranges">
-              <section class="schedule-coverage__range">
-                <span>Imported schedule coverage</span>
-                <dl v-if="hasImportedSchedule">
-                  <div>
-                    <dt>From</dt>
-                    <dd>{{ formatDate(scheduleImportRange.earliestImportDate) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Through</dt>
-                    <dd>{{ formatDate(scheduleImportRange.latestImportDate) }}</dd>
-                  </div>
-                </dl>
-                <p v-else>No schedule windows have been imported.</p>
-              </section>
-              <section class="schedule-coverage__range">
-                <span>Stored game-date span</span>
-                <dl v-if="hasStoredGames">
-                  <div>
-                    <dt>Earliest game</dt>
-                    <dd>{{ formatDate(scheduleDateRange.earliestGameDate) }}</dd>
-                  </div>
-                  <div>
-                    <dt>Latest game</dt>
-                    <dd>{{ formatDate(scheduleDateRange.latestGameDate) }}</dd>
-                  </div>
-                </dl>
-                <p v-else>No games are currently stored.</p>
-              </section>
-            </div>
-          </div>
-          <div class="admin-fields admin-fields--four">
-            <label><span>Start date</span><input v-model="scheduleOptions.startDate" type="date" required /></label>
-            <label><span>End date</span><input v-model="scheduleOptions.endDate" type="date" required /></label>
-            <label><span>Game types</span><input v-model="scheduleOptions.gameTypes" type="text" required /></label>
-            <label><span>Sport ID</span><input v-model.number="scheduleOptions.sportId" type="number" min="1" required /></label>
-          </div>
-          <button class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ runningTask === 'mlb_schedule_sync' ? 'Synchronizing schedule…' : 'Synchronize schedule' }}
-          </button>
-        </AdminTaskCard>
+        <AdminScheduleSyncCard
+          :options="scheduleOptions"
+          :import-range="scheduleImportRange"
+          :date-range="scheduleDateRange"
+          :overview-loading="overviewLoading"
+          :overview-error="overviewError"
+          :any-action-running="anyActionRunning"
+          :running-task="runningTask"
+          @submit="handleScheduleSync"
+        />
 
         <AdminGameDetailsSyncCard
           ref="gameDetailsSyncCard"
@@ -1697,66 +1649,6 @@ async function closeDatabaseDetails() {
   color: #6b7780;
 }
 
-.schedule-coverage {
-  margin-top: 1rem;
-  padding: 0.8rem 0.9rem;
-  border: 1px solid rgba(16, 38, 61, 0.1);
-  border-radius: 14px;
-  background: rgba(231, 237, 241, 0.7);
-}
-
-.schedule-coverage__ranges {
-  display: grid;
-  gap: 0.9rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.schedule-coverage__range {
-  min-width: 0;
-}
-
-.schedule-coverage__range + .schedule-coverage__range {
-  padding-left: 0.9rem;
-  border-left: 1px solid rgba(16, 38, 61, 0.1);
-}
-
-.schedule-coverage__range > span,
-.schedule-coverage dt {
-  color: #61707b;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.schedule-coverage > p,
-.schedule-coverage__range > p {
-  margin-top: 0.35rem;
-  color: #53616b;
-  font-size: 0.84rem;
-}
-
-.schedule-coverage dl {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 0.45rem;
-}
-
-.schedule-coverage dl div {
-  min-width: 0;
-}
-
-.schedule-coverage dd {
-  color: #10263d;
-  font-size: 0.98rem;
-  font-weight: 850;
-}
-
-.schedule-coverage .schedule-coverage__error {
-  color: #992e26;
-}
-
 .admin-fields {
   position: relative;
   display: grid;
@@ -2032,17 +1924,6 @@ async function closeDatabaseDetails() {
 
   .admin-field--wide {
     grid-column: auto;
-  }
-
-  .schedule-coverage__ranges {
-    grid-template-columns: 1fr;
-  }
-
-  .schedule-coverage__range + .schedule-coverage__range {
-    padding-top: 0.9rem;
-    padding-left: 0;
-    border-top: 1px solid rgba(16, 38, 61, 0.1);
-    border-left: 0;
   }
 
   .admin-card__title {
