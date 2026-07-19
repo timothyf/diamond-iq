@@ -5,6 +5,7 @@ import CsvImportPicker from '../components/CsvImportPicker.vue'
 import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
 import AdminDatabaseDetailsDialog from '../components/admin/AdminDatabaseDetailsDialog.vue'
 import AdminGameDetailsSyncCard from '../components/admin/AdminGameDetailsSyncCard.vue'
+import AdminPitchDataSyncCard from '../components/admin/AdminPitchDataSyncCard.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import { useAdminTask } from '../composables/useAdminTask'
 import { useGameDetailsSync } from '../composables/useGameDetailsSync'
@@ -30,7 +31,7 @@ const pendingGameDetailsParameters = ref(null)
 const pendingGameDetailsEstimate = ref(null)
 const pitchDataConfirmationOpen = ref(false)
 const pitchDataConfirmationDialog = ref(null)
-const pitchDataSyncButton = ref(null)
+const pitchDataSyncCard = ref(null)
 const pendingPitchDataParameters = ref(null)
 const pendingPitchDataEstimate = ref(null)
 const adminTabs = [
@@ -310,7 +311,7 @@ async function cancelPitchDataSync() {
   pendingPitchDataParameters.value = null
   pendingPitchDataEstimate.value = null
   await nextTick()
-  pitchDataSyncButton.value?.focus()
+  pitchDataSyncCard.value?.focusSyncButton()
 }
 
 async function confirmPitchDataSync() {
@@ -511,15 +512,6 @@ function formatDurationRangeSeconds(lowSeconds, highSeconds) {
   return formatDurationRange(lowMinutes, highMinutes)
 }
 
-function formatElapsed(seconds) {
-  if (!Number.isFinite(seconds)) return 'Calculating…'
-  if (seconds < 60) return `${seconds}s`
-
-  const minutes = Math.floor(seconds / 60)
-  const remainingSeconds = seconds % 60
-  return `${minutes}m${remainingSeconds ? ` ${remainingSeconds}s` : ''}`
-}
-
 function gameDetailsRefreshParameters(task) {
   if (!task?.taskParameters) return null
   const startDate = task.taskParameters.start_date
@@ -530,16 +522,6 @@ function gameDetailsRefreshParameters(task) {
     start_date: startDate,
     end_date: endDate,
   }
-}
-
-function pitchDataStatusLabel(status) {
-  return {
-    queued: 'Queued',
-    running: 'Synchronizing',
-    completed: 'Completed',
-    failed: 'Completed with an error',
-    cancelled: 'Cancelled',
-  }[status] || humanize(status)
 }
 
 async function openDatabaseDetails() {
@@ -788,109 +770,18 @@ async function closeDatabaseDetails() {
           <p v-else-if="statsDownloadSummary" class="admin-message admin-message--success">{{ statsDownloadSummary }}</p>
         </AdminTaskCard>
 
-        <AdminTaskCard
-          number="02"
-          source="Baseball Savant"
-          title="Statcast pitch data"
-          chip="Download + import"
-          description="Downloads pitch-by-pitch Statcast data from Baseball Savant for the selected games and date range."
-          data-test="pitch-download-form"
-          @submit.prevent="requestPitchDataSync"
-        >
-          <div class="data-coverage" data-test="pitch-data-coverage">
-            <span>Currently stored</span>
-            <dl v-if="pitchDataMetrics.earliestGameDate && pitchDataMetrics.latestGameDate">
-              <div>
-                <dt>Earliest game</dt>
-                <dd>{{ formatDate(pitchDataMetrics.earliestGameDate) }}</dd>
-              </div>
-              <div>
-                <dt>Latest game</dt>
-                <dd>{{ formatDate(pitchDataMetrics.latestGameDate) }}</dd>
-              </div>
-            </dl>
-            <p v-else>No Statcast pitch data is currently stored.</p>
-            <small>Approximately {{ formatCount(pitchDataMetrics.approximateRowCount) }} pitch rows</small>
-          </div>
-          <div class="admin-fields admin-fields--four">
-            <label>
-              <span>Start date</span>
-              <input v-model="pitchOptions.startDate" type="date" required />
-            </label>
-            <label>
-              <span>End date</span>
-              <input v-model="pitchOptions.endDate" type="date" required />
-            </label>
-            <label>
-              <span>Game types</span>
-              <input v-model="pitchOptions.gameTypes" type="text" placeholder="R" required />
-            </label>
-            <label>
-              <span>Chunk days</span>
-              <input v-model.number="pitchOptions.chunkDays" type="number" min="1" max="31" required />
-            </label>
-          </div>
-          <button ref="pitchDataSyncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
-            {{ pitchDataSyncStarting ? 'Starting synchronization…' : pitchDataSyncActive ? 'Synchronization in progress…' : 'Retrieve Statcast pitches' }}
-          </button>
-          <section v-if="pitchDataTask" class="sync-progress" data-test="pitch-data-progress" aria-live="polite">
-            <header>
-              <div>
-                <span>{{ pitchDataStatusLabel(pitchDataTask.status) }}</span>
-                <strong>
-                  {{ formatCount(pitchDataTask.processedItems) }} of {{ formatCount(pitchDataTask.totalItems) }} games
-                </strong>
-              </div>
-              <b>{{ pitchDataTask.progressPercentage.toFixed(1) }}%</b>
-            </header>
-            <div
-              class="sync-progress__track"
-              role="progressbar"
-              :aria-valuenow="pitchDataTask.progressPercentage"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              :aria-label="`Statcast pitch synchronization ${pitchDataTask.progressPercentage}% complete`"
-            >
-              <i :style="{ width: `${pitchDataTask.progressPercentage}%` }"></i>
-            </div>
-            <dl>
-              <div>
-                <dt>Completed</dt>
-                <dd>{{ formatCount(pitchDataTask.completedItems) }}</dd>
-              </div>
-              <div>
-                <dt>Failed</dt>
-                <dd>{{ formatCount(pitchDataTask.failedItems) }}</dd>
-              </div>
-              <div>
-                <dt>Elapsed</dt>
-                <dd>{{ formatElapsed(pitchDataTask.elapsedSeconds) }}</dd>
-              </div>
-              <div>
-                <dt>Remaining</dt>
-                <dd>{{ pitchDataSyncActive ? formatElapsed(pitchDataTask.estimatedRemainingSeconds) : '—' }}</dd>
-              </div>
-            </dl>
-            <p v-if="pitchDataTask.currentItemLabel" class="sync-progress__current">
-              <span>Current game</span>{{ pitchDataTask.currentItemLabel }}
-            </p>
-            <p v-if="pitchDataTask.cancelRequested && pitchDataSyncActive" class="sync-progress__notice">
-              Cancellation requested. The current game will finish safely before the task stops.
-            </p>
-            <p v-else-if="pitchDataTask.errorMessage" class="sync-progress__error">{{ pitchDataTask.errorMessage }}</p>
-            <button
-              v-if="pitchDataSyncActive"
-              type="button"
-              class="admin-button admin-button--danger"
-              data-test="pitch-data-cancel-active"
-              :disabled="pitchDataTask.cancelRequested"
-              @click="cancelActivePitchDataSync"
-            >
-              {{ pitchDataTask.cancelRequested ? 'Cancellation requested…' : 'Cancel after current game' }}
-            </button>
-          </section>
-          <p v-if="pitchDataSyncError" class="admin-message admin-message--error">{{ pitchDataSyncError }}</p>
-        </AdminTaskCard>
+        <AdminPitchDataSyncCard
+          ref="pitchDataSyncCard"
+          :options="pitchOptions"
+          :metrics="pitchDataMetrics"
+          :task="pitchDataTask"
+          :active="pitchDataSyncActive"
+          :starting="pitchDataSyncStarting"
+          :any-action-running="anyActionRunning"
+          :error="pitchDataSyncError"
+          @submit="requestPitchDataSync"
+          @cancel-active="cancelActivePitchDataSync"
+        />
       </div>
     </section>
 
