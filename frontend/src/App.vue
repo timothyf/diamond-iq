@@ -18,6 +18,7 @@ import diamondIqLogo from './assets/diamondiq_logo.png'
     <nav aria-label="Primary navigation">
       <RouterLink to="/">Home</RouterLink>
       <RouterLink to="/schedule">Schedule</RouterLink>
+      <RouterLink to="/standings">Standings</RouterLink>
       <RouterLink to="/explore">Stat Explorer</RouterLink>
       <RouterLink to="/teams">Teams</RouterLink>
       <RouterLink to="/admin">Admin</RouterLink>
