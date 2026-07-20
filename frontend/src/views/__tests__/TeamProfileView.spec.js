@@ -31,9 +31,9 @@ const payload = {
       },
       {
         id: 10,
-        roster_status: 'minors',
-        status_description: 'Minors',
-        injured: false,
+        roster_status: 'injured_10_day',
+        status_description: '10-Day Injured List',
+        injured: true,
         jersey_number: '20',
         primary_position: '1B',
         starts_on: '2026-06-01',
@@ -54,9 +54,9 @@ const payload = {
         },
         {
           id: 10,
-          roster_status: 'minors',
-          status_description: 'Minors',
-          injured: false,
+          roster_status: 'injured_10_day',
+          status_description: '10-Day Injured List',
+          injured: true,
           jersey_number: '20',
           primary_position: '1B',
           starts_on: '2026-06-01',
@@ -83,6 +83,20 @@ const payload = {
       { id: 81, official_date: '2026-07-16', venue_name: 'Comerica Park', home_score: null, away_score: null, home_team: { id: 1, abbreviation: 'DET' }, away_team: { id: 2, abbreviation: 'CLE' }, home_probable_pitcher: { full_name: 'Tarik Skubal' } },
     ],
     source_metadata: { last_updated_at: '2026-07-15T12:00:00Z', schedule_last_synced_at: '2026-07-15T12:00:00Z', roster_last_synced_at: '2026-07-15T11:00:00Z', sources: ['MLB Stats API'] },
+    team_leaders: {
+      batting: [
+        { key: 'avg', label: 'Batting average', abbreviation: 'AVG', value: '0.287', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
+        { key: 'ops', label: 'On-base plus slugging', abbreviation: 'OPS', value: '0.842', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
+        { key: 'homeRuns', label: 'Home runs', abbreviation: 'HR', value: '24', player: { id: 43, full_name: 'Spencer Torkelson', first_name: 'Spencer', last_name: 'Torkelson', headshot_url: null } },
+        { key: 'rbi', label: 'Runs batted in', abbreviation: 'RBI', value: '68', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
+      ],
+      pitching: [
+        { key: 'W', label: 'Wins', abbreviation: 'W', value: '11', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
+        { key: 'ERA', label: 'Earned run average', abbreviation: 'ERA', value: '2.01', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
+        { key: 'whip', label: 'Walks and hits per inning', abbreviation: 'WHIP', value: '0.99', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
+        { key: 'strikeOuts', label: 'Strikeouts', abbreviation: 'SO', value: '162', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
+      ],
+    },
     performance_dashboard: {
       rankings: {
         offense: {
@@ -160,7 +174,7 @@ const payload = {
 }
 
 describe('TeamProfileView', () => {
-  it('renders team identity, record, schedule, and current roster', async () => {
+  it('renders the overview and opens a separate roster tab on the active roster', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(TeamProfileView, {
       props: { teamId: '1' },
@@ -173,18 +187,35 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="upcoming-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="recent-games"]').text()).toContain('5–2')
     expect(wrapper.get('[data-test="recent-games"] .game-result-link').exists()).toBe(true)
+    expect(wrapper.get('[data-test="team-profile-tab-overview"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-test="team-profile-panel-overview"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-roster"]').attributes('style')).toContain('display: none')
+
+    await wrapper.get('[data-test="team-profile-tab-roster"]').trigger('click')
+
+    expect(wrapper.get('[data-test="team-profile-tab-roster"]').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('[data-test="team-profile-panel-overview"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-roster"]').attributes('style') || '').not.toContain('display: none')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('CF')
-    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Spencer Torkelson')
-    expect(wrapper.get('[data-test="roster-view-40man"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="team-roster"]').text()).not.toContain('Spencer Torkelson')
+    expect(wrapper.get('[data-test="roster-view-active"]').attributes('aria-pressed')).toBe('true')
     expect(wrapper.get('[data-test="roster-view-40man"]').text()).toContain('2')
     expect(wrapper.get('[data-test="roster-view-active"]').text()).toContain('1')
+    expect(wrapper.get('[data-test="roster-view-injured"]').text()).toContain('1')
 
-    await wrapper.get('[data-test="roster-view-active"]').trigger('click')
+    await wrapper.get('[data-test="roster-view-injured"]').trigger('click')
 
-    expect(wrapper.get('[data-test="roster-view-active"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="roster-view-injured"]').attributes('aria-pressed')).toBe('true')
+    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Spencer Torkelson')
+    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('10-Day Injured List')
+    expect(wrapper.get('[data-test="team-roster"]').text()).not.toContain('Riley Greene')
+
+    await wrapper.get('[data-test="roster-view-40man"]').trigger('click')
+
+    expect(wrapper.get('[data-test="roster-view-40man"]').attributes('aria-pressed')).toBe('true')
     expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Riley Greene')
-    expect(wrapper.get('[data-test="team-roster"]').text()).not.toContain('Spencer Torkelson')
+    expect(wrapper.get('[data-test="team-roster"]').text()).toContain('Spencer Torkelson')
     expect(wrapper.get('[data-test="team-season-select"]').text()).toContain('2025')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Team performance dashboard')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Last 7 games')
@@ -194,6 +225,15 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="pitching-ranking-whip"]').text()).toContain('#10')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
+    const leaders = wrapper.get('[data-test="team-leaders"]')
+    expect(leaders.text()).toContain('Team leaders')
+    expect(leaders.text()).toContain('Riley Greene')
+    expect(leaders.text()).toContain('.287')
+    expect(leaders.text()).toContain('Spencer Torkelson')
+    expect(leaders.text()).toContain('Tarik Skubal')
+    expect(wrapper.get('[data-test="team-leader-ERA"]').text()).toContain('2.01')
+    expect(wrapper.get('[data-test="team-leader-ops"]').text()).toContain('.842')
+    expect(wrapper.get('[data-test="team-leader-whip"]').text()).toContain('0.99')
   })
 
   it('sizes ranking bars from empty to full using the 30-team comparison', async () => {

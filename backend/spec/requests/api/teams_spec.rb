@@ -84,6 +84,25 @@ RSpec.describe "Api::Teams", type: :request do
       status: "scheduled",
       venue_name: "Progressive Field"
     )
+    {
+      "atBats" => [ "batting", 300 ],
+      "avg" => [ "batting", 0.287 ],
+      "ops" => [ "batting", 0.842 ],
+      "homeRuns" => [ "batting", 14 ],
+      "rbi" => [ "batting", 55 ],
+      "inningsPitched" => [ "pitching", 120.1 ],
+      "W" => [ "pitching", 8 ],
+      "ERA" => [ "pitching", 2.25 ],
+      "whip" => [ "pitching", 0.99 ],
+      "strikeOuts" => [ "pitching", 130 ]
+    }.each do |name, (category, value)|
+      stat_type = create_stat_type(name: name, label: name, category: category)
+      create_player_season_stat(
+        player: player,
+        stat_type: stat_type,
+        attributes: { team: @tigers, season: Date.current.year, value: value }
+      )
+    end
     TeamDailyMetric.create!(
       team: @tigers,
       metric_date: Date.current - 1.day,
@@ -274,6 +293,13 @@ RSpec.describe "Api::Teams", type: :request do
     )
     expect(json_body.dig("data", "recent_games", 0, "id")).to eq(completed_game.id)
     expect(json_body.dig("data", "upcoming_games", 0, "id")).to eq(upcoming_game.id)
+    expect(json_body.dig("data", "team_leaders", "batting").map { |entry| entry.fetch("key") }).to eq(%w[avg ops homeRuns rbi])
+    expect(json_body.dig("data", "team_leaders", "batting", 0)).to include("value" => "0.287", "abbreviation" => "AVG")
+    expect(json_body.dig("data", "team_leaders", "batting", 0, "player", "full_name")).to eq("Riley Greene")
+    expect(json_body.dig("data", "team_leaders", "batting", 1)).to include("value" => "0.842", "abbreviation" => "OPS")
+    expect(json_body.dig("data", "team_leaders", "pitching").map { |entry| entry.fetch("key") }).to eq(%w[W ERA whip strikeOuts])
+    expect(json_body.dig("data", "team_leaders", "pitching", 1)).to include("value" => "2.25", "abbreviation" => "ERA")
+    expect(json_body.dig("data", "team_leaders", "pitching", 2)).to include("value" => "0.99", "abbreviation" => "WHIP")
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(0.8728)

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import { useTeamProfile } from '../composables/useTeamProfile'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
+import TeamLeadersCard from '../components/TeamLeadersCard.vue'
 
 const props = defineProps({
   teamId: { type: [String, Number], required: true },
@@ -10,7 +11,12 @@ const props = defineProps({
 
 const teamId = computed(() => props.teamId)
 const selectedSeason = ref(null)
-const selectedRosterView = ref('fortyMan')
+const selectedProfileTab = ref('overview')
+const selectedRosterView = ref('active')
+const profileTabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'roster', label: 'Roster' },
+]
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
 
 watch(
@@ -22,12 +28,22 @@ watch(
 
 watch(teamId, () => {
   selectedSeason.value = null
-  selectedRosterView.value = 'fortyMan'
+  selectedProfileTab.value = 'overview'
+  selectedRosterView.value = 'active'
 })
 
-const displayedRoster = computed(() => team.value?.rosters?.[selectedRosterView.value] || [])
+const injuredRoster = computed(() => team.value?.rosters?.fortyMan?.filter((membership) => membership.injured) || [])
 
-const rosterViewLabel = computed(() => (selectedRosterView.value === 'active' ? 'Active roster' : '40-man roster'))
+const displayedRoster = computed(() => {
+  if (selectedRosterView.value === 'injured') return injuredRoster.value
+  return team.value?.rosters?.[selectedRosterView.value] || []
+})
+
+const rosterViewLabel = computed(() => ({
+  active: 'Active roster',
+  injured: 'Injured list',
+  fortyMan: '40-man roster',
+})[selectedRosterView.value])
 
 const recordLabel = computed(() => {
   const record = team.value?.record
@@ -132,6 +148,19 @@ function rankingBarPercent(entry) {
 
   return Math.round(Math.max(0, Math.min(100, ((totalTeams - rank) / totalTeams) * 100)) * 10) / 10
 }
+
+function handleProfileTabKeydown(event, currentIndex) {
+  let nextIndex
+  if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % profileTabs.length
+  if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + profileTabs.length) % profileTabs.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = profileTabs.length - 1
+  if (nextIndex === undefined) return
+
+  event.preventDefault()
+  selectedProfileTab.value = profileTabs[nextIndex].id
+  event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
+}
 </script>
 
 <template>
@@ -170,6 +199,37 @@ function rankingBarPercent(entry) {
         <article><span>{{ team.season }} roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
         <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'DiamondIQ' }}</small></article>
       </section>
+
+      <nav class="team-profile-tabs" role="tablist" aria-label="Team profile sections">
+        <button
+          v-for="(tab, index) in profileTabs"
+          :id="`team-profile-tab-${tab.id}`"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-controls="`team-profile-panel-${tab.id}`"
+          :aria-selected="selectedProfileTab === tab.id"
+          :tabindex="selectedProfileTab === tab.id ? 0 : -1"
+          :class="{ 'is-selected': selectedProfileTab === tab.id }"
+          :data-test="`team-profile-tab-${tab.id}`"
+          @click="selectedProfileTab = tab.id"
+          @keydown="handleProfileTabKeydown($event, index)"
+        >
+          {{ tab.label }}
+          <span v-if="tab.id === 'roster'">{{ team.rosters.active.length }}</span>
+        </button>
+      </nav>
+
+      <div
+        v-show="selectedProfileTab === 'overview'"
+        id="team-profile-panel-overview"
+        class="team-profile-tab-panel"
+        role="tabpanel"
+        aria-labelledby="team-profile-tab-overview"
+        data-test="team-profile-panel-overview"
+      >
+
+      <TeamLeadersCard :leaders="team.teamLeaders" :season="team.season" />
 
       <section class="team-panel performance-panel" data-test="team-performance-dashboard">
         <header>
@@ -358,20 +418,20 @@ function rankingBarPercent(entry) {
         </section>
       </div>
 
-      <section class="team-panel roster-panel">
+      </div>
+
+      <section
+        v-show="selectedProfileTab === 'roster'"
+        id="team-profile-panel-roster"
+        class="team-panel roster-panel team-profile-tab-panel"
+        role="tabpanel"
+        aria-labelledby="team-profile-tab-roster"
+        data-test="team-profile-panel-roster"
+      >
         <header>
           <div><p>Dated roster state</p><h2>{{ team.season }} roster</h2></div>
           <div class="roster-view-controls">
             <div role="group" aria-label="Roster view">
-              <button
-                type="button"
-                data-test="roster-view-40man"
-                :class="{ 'is-selected': selectedRosterView === 'fortyMan' }"
-                :aria-pressed="selectedRosterView === 'fortyMan'"
-                @click="selectedRosterView = 'fortyMan'"
-              >
-                40-man <span>{{ team.rosters.fortyMan.length }}</span>
-              </button>
               <button
                 type="button"
                 data-test="roster-view-active"
@@ -380,6 +440,24 @@ function rankingBarPercent(entry) {
                 @click="selectedRosterView = 'active'"
               >
                 Active <span>{{ team.rosters.active.length }}</span>
+              </button>
+              <button
+                type="button"
+                data-test="roster-view-injured"
+                :class="{ 'is-selected': selectedRosterView === 'injured' }"
+                :aria-pressed="selectedRosterView === 'injured'"
+                @click="selectedRosterView = 'injured'"
+              >
+                IL <span>{{ injuredRoster.length }}</span>
+              </button>
+              <button
+                type="button"
+                data-test="roster-view-40man"
+                :class="{ 'is-selected': selectedRosterView === 'fortyMan' }"
+                :aria-pressed="selectedRosterView === 'fortyMan'"
+                @click="selectedRosterView = 'fortyMan'"
+              >
+                40-man <span>{{ team.rosters.fortyMan.length }}</span>
               </button>
             </div>
             <small>As of {{ formatDate(team.rosterAsOf, true) }}</small>
@@ -442,6 +520,12 @@ function rankingBarPercent(entry) {
 .team-summary strong { margin: .25rem 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: 2.3rem; }
 .team-summary .summary-date { font-family: inherit; font-size: .92rem; line-height: 2.6rem; }
 .team-summary small { color: #788188; }
+.team-profile-tabs { display: flex; gap: .45rem; margin: 0 0 1rem; padding: .3rem; border: 1px solid #d9d7ce; border-radius: 16px; background: rgba(255,250,240,.72); }
+.team-profile-tabs button { display: inline-flex; gap: .45rem; align-items: center; justify-content: center; min-width: 130px; padding: .72rem 1rem; border: 0; border-radius: 12px; color: #5b6871; background: transparent; font: inherit; font-size: .78rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
+.team-profile-tabs button span { display: grid; min-width: 22px; height: 22px; padding: 0 .35rem; place-items: center; border-radius: 999px; color: inherit; background: rgba(16,38,61,.09); font-size: .65rem; }
+.team-profile-tabs button.is-selected { color: #fffaf0; background: #10263d; box-shadow: 0 5px 14px rgba(16,38,61,.18); }
+.team-profile-tabs button.is-selected span { background: rgba(255,255,255,.16); }
+.team-profile-tab-panel:focus { outline: none; }
 .team-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .team-panel { padding: 1.35rem; }
 .performance-panel h3 { margin: 0 0 .55rem; font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: #5f6c76; }
@@ -485,7 +569,7 @@ function rankingBarPercent(entry) {
 .game-list span { margin-top: .15rem; color: #758088; font-size: .75rem; }
 .result { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: white; font-size: .75rem; }
 .result--w { background: #176044; } .result--l { background: #9c382c; } .result--t { background: #69747c; }
-.roster-panel { margin-top: 1rem; }
+.roster-panel { margin-top: 0; }
 .roster-view-controls { display: flex; gap: .8rem; align-items: center; }
 .roster-view-controls > div { display: inline-flex; padding: .2rem; border-radius: 999px; background: #e9e6dd; }
 .roster-view-controls button { display: inline-flex; gap: .35rem; align-items: center; padding: .42rem .7rem; border: 0; border-radius: 999px; color: #5c6871; background: transparent; font: inherit; font-size: .72rem; font-weight: 800; cursor: pointer; }
@@ -510,5 +594,5 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
 @media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
-@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 </style>

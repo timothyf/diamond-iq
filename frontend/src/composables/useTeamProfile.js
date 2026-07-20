@@ -64,6 +64,10 @@ function normalizeProfile(data) {
     rosterSummary: data.roster_summary || {},
     recentGames: (data.recent_games || []).map(normalizeGame),
     upcomingGames: (data.upcoming_games || []).map(normalizeGame),
+    teamLeaders: {
+      batting: data.team_leaders?.batting || [],
+      pitching: data.team_leaders?.pitching || [],
+    },
     sourceMetadata: {
       lastUpdatedAt: data.source_metadata?.last_updated_at,
       scheduleLastSyncedAt: data.source_metadata?.schedule_last_synced_at,

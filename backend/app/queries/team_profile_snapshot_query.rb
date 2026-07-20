@@ -2,6 +2,20 @@ class TeamProfileSnapshotQuery
   GAME_LIMIT = 5
   RECENT_GAME_WINDOWS = [ 7, 15, 30 ].freeze
   MIN_PITCHING_OUTS_FOR_RATE = 9
+  TEAM_LEADER_DEFINITIONS = {
+    batting: [
+      { key: "avg", label: "Batting average", abbreviation: "AVG", aliases: %w[avg AVG], direction: :desc, qualifier: :at_bats },
+      { key: "ops", label: "On-base plus slugging", abbreviation: "OPS", aliases: %w[ops OPS], direction: :desc, qualifier: :at_bats },
+      { key: "homeRuns", label: "Home runs", abbreviation: "HR", aliases: %w[homeRuns HR], direction: :desc },
+      { key: "rbi", label: "Runs batted in", abbreviation: "RBI", aliases: %w[rbi RBI], direction: :desc }
+    ],
+    pitching: [
+      { key: "W", label: "Wins", abbreviation: "W", aliases: %w[W wins], direction: :desc },
+      { key: "ERA", label: "Earned run average", abbreviation: "ERA", aliases: %w[ERA era], direction: :asc, qualifier: :innings },
+      { key: "whip", label: "Walks and hits per inning", abbreviation: "WHIP", aliases: %w[whip WHIP], direction: :asc, qualifier: :innings },
+      { key: "strikeOuts", label: "Strikeouts", abbreviation: "SO", aliases: %w[strikeOuts SO], direction: :desc }
+    ]
+  }.freeze
 
   def initialize(team:, season: nil, on: Date.current)
     @team = team
@@ -26,6 +40,7 @@ class TeamProfileSnapshotQuery
       roster_summary: roster_summary(forty_man_roster, active_roster),
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
+      team_leaders: team_leaders,
       source_metadata: source_metadata,
       performance_dashboard: performance_dashboard
     }
@@ -59,7 +74,7 @@ class TeamProfileSnapshotQuery
   end
 
   def completed_games
-    @completed_games ||= season_games.where.not(home_score: nil, away_score: nil).to_a
+    @completed_games ||= season_games.where(status: "final").where.not(home_score: nil, away_score: nil).to_a
   end
 
   def record
@@ -80,6 +95,89 @@ class TeamProfileSnapshotQuery
     totals.merge(games_played: completed_games.length, winning_percentage: winning_percentage(totals))
   end
 
+  def team_leaders
+    TEAM_LEADER_DEFINITIONS.transform_values do |definitions|
+      definitions.map { |definition| team_leader(definition) }
+    end
+  end
+
+  def team_leader(definition)
+    candidates = leader_stat_rows.group_by(&:player).filter_map do |player, rows|
+      stat = definition.fetch(:aliases).filter_map do |alias_name|
+        rows.find { |row| row.stat_type.name == alias_name && row.stat_type.category == leader_category(definition) }
+      end.first
+      next unless stat
+      next unless qualified_team_leader?(rows, definition[:qualifier])
+
+      [ player, stat.value ]
+    end
+    player, value = candidates.public_send(definition.fetch(:direction) == :asc ? :min_by : :max_by) do |candidate|
+      [ candidate.last, candidate.first.last_name, candidate.first.first_name ]
+    end
+
+    {
+      key: definition.fetch(:key),
+      label: definition.fetch(:label),
+      abbreviation: definition.fetch(:abbreviation),
+      value: value&.to_s("F"),
+      player: player && {
+        id: player.id,
+        mlb_id: player.mlb_id,
+        full_name: player.full_name,
+        first_name: player.first_name,
+        last_name: player.last_name,
+        headshot_url: player.profile&.headshot_url
+      }
+    }
+  end
+
+  def leader_category(definition)
+    TEAM_LEADER_DEFINITIONS.fetch(:batting).include?(definition) ? "batting" : "pitching"
+  end
+
+  def qualified_team_leader?(rows, qualifier)
+    case qualifier
+    when :at_bats
+      leader_stat_value(rows, %w[atBats AB]).to_f >= [ (completed_games.length * 2.7).floor, 1 ].max
+    when :innings
+      innings_outs(leader_stat_value(rows, %w[inningsPitched IP])) >= [ completed_games.length, 1 ].max * 3
+    else
+      true
+    end
+  end
+
+  def leader_stat_value(rows, aliases)
+    aliases.each do |name|
+      row = rows.find { |candidate| candidate.stat_type.name == name }
+      return row.value if row
+    end
+    nil
+  end
+
+  def leader_stat_rows
+    @leader_stat_rows ||= PlayerSeasonStat
+      .joins(:stat_type)
+      .where(team: team, season: season, stat_types: { name: team_leader_stat_names })
+      .includes(:stat_type, player: :profile)
+      .to_a
+  end
+
+  def team_leader_stat_names
+    @team_leader_stat_names ||= (
+      TEAM_LEADER_DEFINITIONS.values.flatten.flat_map { |definition| definition.fetch(:aliases) } +
+      %w[atBats AB inningsPitched IP]
+    ).uniq
+  end
+
+  def innings_outs(value)
+    decimal = BigDecimal(value.to_s)
+    whole = decimal.floor
+    partial = ((decimal - whole) * 10).round
+    (whole * 3) + partial
+  rescue ArgumentError
+    0
+  end
+
   def scores_for(game)
     game.home_team_id == team.id ? [ game.home_score, game.away_score ] : [ game.away_score, game.home_score ]
   end
@@ -93,6 +191,7 @@ class TeamProfileSnapshotQuery
 
   def recent_games
     season_games
+      .where(status: "final")
       .where("official_date <= ?", on)
       .where.not(home_score: nil, away_score: nil)
       .order(official_date: :desc, scheduled_at: :desc, mlb_id: :desc)
