@@ -3,6 +3,7 @@ import { computed } from 'vue'
 
 import GameScheduleCard from '../components/GameScheduleCard.vue'
 import { useHomeDashboard } from '../composables/useHomeDashboard'
+import diamondIqLogo from '../assets/diamondiq_logo_hero.png'
 
 const { dashboard, loading, error, refresh } = useHomeDashboard()
 
@@ -47,22 +48,27 @@ function signed(value) {
 <template>
   <main class="home-shell">
     <section class="home-hero">
+      <div class="home-hero__brand">
+        <img :src="diamondIqLogo" alt="DiamondIQ Baseball" />
+        <div class="home-hero__baseball" aria-hidden="true"><span>Baseball Intelligence</span></div>
+      </div>
       <div class="home-hero__copy">
-        <p class="home-eyebrow">{{ dashboard.season || new Date().getFullYear() }} MLB briefing · {{ briefingDate }}</p>
         <h1>Baseball intelligence, ready for first pitch.</h1>
         <p>
           Track today’s slate, scan the league’s top performers, and move directly into the player and team analysis behind the numbers.
         </p>
-        <div class="home-actions">
-          <RouterLink class="home-button" :to="{ name: 'stat-explorer' }">Explore league stats</RouterLink>
-          <RouterLink class="home-button home-button--secondary" :to="{ name: 'teams' }">Browse all teams</RouterLink>
+        <div class="home-hero__tools">
+          <div class="home-actions">
+            <RouterLink class="home-button" :to="{ name: 'stat-explorer' }">Explore league stats</RouterLink>
+            <RouterLink class="home-button home-button--secondary" :to="{ name: 'teams' }">Browse all teams</RouterLink>
+          </div>
+          <aside class="home-hero__signal" aria-label="DiamondIQ quick start">
+            <span>Start with a name</span>
+            <strong>Find any player from the search bar above.</strong>
+            <small>Jump from season totals into career history, rolling trends, pitch-level analysis, and contextual benchmarks.</small>
+          </aside>
         </div>
       </div>
-      <aside class="home-hero__signal" aria-label="DiamondIQ quick start">
-        <span>Start with a name</span>
-        <strong>Find any player from the search bar above.</strong>
-        <small>Jump from season totals into career history, rolling trends, pitch-level analysis, and contextual benchmarks.</small>
-      </aside>
     </section>
 
     <div v-if="loading" class="home-state" data-test="home-loading">
@@ -160,17 +166,23 @@ function signed(value) {
 
 <style scoped>
 .home-shell { width: min(1440px, calc(100% - 2.5rem)); margin: 0 auto; padding: 2.4rem 0 5rem; color: #10263d; }
-.home-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(280px, .55fr); gap: 1.2rem; padding: clamp(1.5rem, 4vw, 3.5rem); overflow: hidden; border-radius: 30px; color: #fffaf0; background: linear-gradient(125deg, #10263d 0%, #183e5b 62%, #8f2d24 145%); box-shadow: 0 24px 70px rgba(16,38,61,.18); }
+.home-hero { position: relative; display: grid; grid-template-columns: minmax(330px, .95fr) minmax(0, 1.45fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; min-height: 510px; padding: clamp(2rem, 3vw, 4rem); overflow: hidden; border-radius: 30px; color: #fffaf0; background: linear-gradient(115deg, #0d293f 0%, #17435f 58%, #413542 130%); box-shadow: 0 24px 70px rgba(16,38,61,.18); }
 .home-hero::after { position: absolute; right: -90px; bottom: -165px; width: 390px; height: 390px; border: 45px solid rgba(255,250,240,.045); border-radius: 50%; content: ''; }
-.home-hero__copy { position: relative; z-index: 1; }
+.home-hero__brand, .home-hero__copy { position: relative; z-index: 1; min-width: 0; }
+.home-hero__brand { display: grid; place-items: center; }
+.home-hero__brand img { display: block; width: min(100%, 570px); max-height: 390px; object-fit: contain; }
+.home-hero__baseball { display: grid; grid-template-columns: minmax(30px,1fr) auto minmax(30px,1fr); gap: clamp(.75rem,2vw,1.25rem); align-items: center; width: min(93%,490px); margin-top: .25rem; color: #fffaf0; }
+.home-hero__baseball::before,.home-hero__baseball::after { height: 2px; background: linear-gradient(90deg,transparent,#fffaf0 32%,#fffaf0); content: ''; }
+.home-hero__baseball::after { transform: scaleX(-1); }
+.home-hero__baseball span { font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(.78rem,1.15vw,1.05rem); font-weight: 900; letter-spacing: .55em; line-height: 1; text-transform: uppercase; }
 .home-eyebrow { margin: 0; color: #a93627; font-size: .71rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.home-hero .home-eyebrow { color: #e8b276; }
-.home-hero h1 { max-width: 900px; margin: .45rem 0 .85rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: clamp(3rem, 7vw, 6.4rem); line-height: .88; letter-spacing: -.025em; text-transform: uppercase; }
-.home-hero__copy > p:not(.home-eyebrow) { max-width: 750px; color: #d8e1e7; font-size: clamp(.95rem, 2vw, 1.15rem); line-height: 1.6; }
-.home-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.4rem; }
-.home-button { padding: .75rem 1rem; border-radius: 11px; color: #10263d; background: #fffaf0; font-weight: 900; text-decoration: none; }
+.home-hero h1 { max-width: 850px; margin: 0 0 1.1rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: clamp(3.2rem, 5.5vw, 6rem); line-height: .96; letter-spacing: -.025em; text-transform: uppercase; }
+.home-hero__copy > p { max-width: 820px; color: #f0f2f3; font-size: clamp(1rem, 1.5vw, 1.25rem); font-weight: 750; line-height: 1.55; }
+.home-hero__tools { display: grid; grid-template-columns: minmax(180px, .65fr) minmax(280px, 1fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: start; margin-top: 1.7rem; }
+.home-actions { display: flex; flex-direction: column; gap: .8rem; align-items: flex-start; margin-top: 10px;}
+.home-button { min-width: 190px; padding: .85rem 1.15rem; border-radius: 12px; color: #10263d; background: #fffaf0; font-weight: 900; text-align: center; text-decoration: none; }
 .home-button--secondary { color: #fffaf0; border: 1px solid rgba(255,255,255,.28); background: rgba(255,255,255,.08); }
-.home-hero__signal { position: relative; z-index: 1; align-self: end; padding: 1.25rem; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; background: rgba(7,23,37,.38); backdrop-filter: blur(8px); }
+.home-hero__signal { position: relative; z-index: 1; padding: 1.25rem; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; background: rgba(7,23,37,.38); backdrop-filter: blur(8px); }
 .home-hero__signal span, .home-hero__signal strong, .home-hero__signal small { display: block; }
 .home-hero__signal span { color: #e8b276; font-size: .68rem; font-weight: 900; letter-spacing: .13em; text-transform: uppercase; }
 .home-hero__signal strong { margin: .45rem 0; font-size: 1.25rem; line-height: 1.2; }
@@ -217,7 +229,7 @@ function signed(value) {
 .home-freshness { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem .2rem 0; color: #697680; font-size: .7rem; }
 .home-freshness span { font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 @keyframes pulse { to { opacity: .25; transform: scale(.8); } }
-@media (max-width: 1050px) { .leader-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .home-hero { grid-template-columns: 1fr; } .home-hero__signal { max-width: 600px; } }
-@media (max-width: 760px) { .home-shell { width: min(100% - 1.2rem, 1440px); padding-top: 1rem; } .home-hero { padding: 1.4rem; border-radius: 22px; } .home-heading { align-items: flex-start; flex-direction: column; } .pulse-grid, .quick-grid { grid-template-columns: 1fr; } }
-@media (max-width: 520px) { .leader-grid { grid-template-columns: 1fr; } .home-actions { align-items: stretch; flex-direction: column; } .home-button { text-align: center; } .home-freshness { flex-direction: column; } }
+@media (max-width: 1100px) { .leader-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .home-hero { grid-template-columns: minmax(260px,.7fr) minmax(0,1.3fr); min-height: 460px; gap: 2rem; } .home-hero__tools { grid-template-columns: 1fr; } .home-actions { flex-direction: row; flex-wrap: wrap; } }
+@media (max-width: 800px) { .home-shell { width: min(100% - 1.2rem, 1440px); padding-top: 1rem; } .home-hero { grid-template-columns: 1fr; min-height: auto; padding: 1.8rem; border-radius: 22px; text-align: center; } .home-hero__brand img { width: min(78vw, 390px); max-height: 275px; } .home-hero__baseball { width: min(68vw,335px); } .home-hero__copy > p { margin-inline: auto; } .home-actions { justify-content: center; } .home-hero__signal { text-align: left; } .home-heading { align-items: flex-start; flex-direction: column; } .pulse-grid, .quick-grid { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .leader-grid { grid-template-columns: 1fr; } .home-hero { padding: 1.25rem; } .home-hero h1 { font-size: clamp(2.65rem,14vw,4rem); } .home-actions { align-items: stretch; flex-direction: column; width: 100%; } .home-button { width: 100%; min-width: 0; } .home-freshness { flex-direction: column; } }
 </style>
