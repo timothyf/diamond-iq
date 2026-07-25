@@ -125,6 +125,7 @@ RSpec.describe "Api::Teams", type: :request do
         doubles: 2,
         triples: 0,
         home_runs: 1,
+        stolen_bases: 2,
         walks: 3,
         strikeouts: 8,
         hit_by_pitch: 1,
@@ -134,7 +135,9 @@ RSpec.describe "Api::Teams", type: :request do
         pitching_hits_allowed: 6,
         pitching_earned_runs: 2,
         pitching_walks: 2,
-        pitching_strikeouts: 9
+        pitching_strikeouts: 9,
+        pitching_saves: 1,
+        pitching_quality_starts: 1
       }
     )
     TeamDailyMetric.create!(
@@ -159,6 +162,7 @@ RSpec.describe "Api::Teams", type: :request do
         doubles: 1,
         triples: 0,
         home_runs: 0,
+        stolen_bases: 0,
         walks: 2,
         strikeouts: 10,
         hit_by_pitch: 0,
@@ -168,7 +172,9 @@ RSpec.describe "Api::Teams", type: :request do
         pitching_hits_allowed: 10,
         pitching_earned_runs: 5,
         pitching_walks: 3,
-        pitching_strikeouts: 8
+        pitching_strikeouts: 8,
+        pitching_saves: 0,
+        pitching_quality_starts: 0
       }
     )
     PlayerBattingDaily.create!(
@@ -303,8 +309,14 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(0.8728)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "home_runs")).to include("rank" => 1, "value" => 1.0)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "batting_average")).to include("rank" => 1, "value" => 0.3226)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "stolen_bases")).to include("rank" => 1, "value" => 2.0)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "strikeout_rate", "value")).to eq(0.2813)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "walk_rate", "value")).to eq(0.0625)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "saves")).to include("rank" => 1, "value" => 1.0)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "strikeouts")).to include("rank" => 1, "value" => 9.0)
+    expect(json_body.dig("data", "performance_dashboard", "rankings", "pitching", "quality_starts")).to include("rank" => 1, "value" => 1.0)
     expect(json_body.dig("data", "performance_dashboard", "analytics_coverage")).to include(
       "complete" => false,
       "completed_game_count" => 1,

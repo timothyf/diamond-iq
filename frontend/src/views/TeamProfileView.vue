@@ -59,6 +59,9 @@ const rankingGroups = computed(() => [
     metrics: [
       { key: 'ops', label: 'OPS', entry: dashboard.value.rankings?.offense?.ops, value: formatDecimal(dashboard.value.rankings?.offense?.ops?.value) },
       { key: 'runs-per-game', label: 'Runs / G', entry: dashboard.value.rankings?.offense?.runs_per_game, value: formatDecimal(dashboard.value.rankings?.offense?.runs_per_game?.value, 2) },
+      { key: 'home-runs', label: 'Home Runs', entry: dashboard.value.rankings?.offense?.home_runs, value: formatInteger(dashboard.value.rankings?.offense?.home_runs?.value) },
+      { key: 'batting-average', label: 'AVG', entry: dashboard.value.rankings?.offense?.batting_average, value: formatDecimal(dashboard.value.rankings?.offense?.batting_average?.value) },
+      { key: 'stolen-bases', label: 'Stolen Bases', entry: dashboard.value.rankings?.offense?.stolen_bases, value: formatInteger(dashboard.value.rankings?.offense?.stolen_bases?.value) },
       { key: 'strikeout-rate', label: 'K Rate', entry: dashboard.value.rankings?.offense?.strikeout_rate, value: formatPercent(dashboard.value.rankings?.offense?.strikeout_rate?.value) },
       { key: 'walk-rate', label: 'BB Rate', entry: dashboard.value.rankings?.offense?.walk_rate, value: formatPercent(dashboard.value.rankings?.offense?.walk_rate?.value) },
     ],
@@ -69,6 +72,9 @@ const rankingGroups = computed(() => [
     metrics: [
       { key: 'era', label: 'ERA', entry: dashboard.value.rankings?.pitching?.era, value: formatTwoDecimalPitchingRate(dashboard.value.rankings?.pitching?.era?.value) },
       { key: 'whip', label: 'WHIP', entry: dashboard.value.rankings?.pitching?.whip, value: formatTwoDecimalPitchingRate(dashboard.value.rankings?.pitching?.whip?.value) },
+      { key: 'saves', label: 'Saves', entry: dashboard.value.rankings?.pitching?.saves, value: formatInteger(dashboard.value.rankings?.pitching?.saves?.value) },
+      { key: 'strikeouts', label: 'Strikeouts', entry: dashboard.value.rankings?.pitching?.strikeouts, value: formatInteger(dashboard.value.rankings?.pitching?.strikeouts?.value) },
+      { key: 'quality-starts', label: 'Quality Starts', entry: dashboard.value.rankings?.pitching?.quality_starts, value: formatInteger(dashboard.value.rankings?.pitching?.quality_starts?.value) },
       { key: 'strikeout-rate', label: 'K Rate', entry: dashboard.value.rankings?.pitching?.strikeout_rate, value: formatPercent(dashboard.value.rankings?.pitching?.strikeout_rate?.value) },
       { key: 'walk-rate', label: 'BB Rate', entry: dashboard.value.rankings?.pitching?.walk_rate, value: formatPercent(dashboard.value.rankings?.pitching?.walk_rate?.value) },
     ],
@@ -126,6 +132,13 @@ function formatDecimal(value, digits = 3) {
   const number = Number(value)
   if (!Number.isFinite(number)) return '—'
   return number.toFixed(digits)
+}
+
+function formatInteger(value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return '—'
+  return Math.round(number).toLocaleString('en-US')
 }
 
 function formatPercent(value, digits = 1) {
@@ -374,7 +387,15 @@ function handleProfileTabKeydown(event, currentIndex) {
             <p>Total tracked PA: {{ dashboard.drillDown?.plateAppearances?.teamTotal || 0 }}</p>
             <ul>
               <li v-for="entry in dashboard.drillDown?.plateAppearances?.leaders || []" :key="`pa-${entry.player?.id}`">
-                {{ entry.player?.full_name }} · {{ entry.plate_appearances }} PA
+                <RouterLink
+                  v-if="entry.player?.id"
+                  :to="{ name: 'player-profile', params: { id: entry.player.id } }"
+                  :data-test="`plate-appearance-player-${entry.player.id}`"
+                >
+                  {{ entry.player.full_name }}
+                </RouterLink>
+                <template v-else>{{ entry.player?.full_name || 'Unknown player' }}</template>
+                · {{ entry.plate_appearances }} PA
               </li>
             </ul>
           </article>
@@ -383,7 +404,15 @@ function handleProfileTabKeydown(event, currentIndex) {
             <p>Total tracked pitches: {{ dashboard.drillDown?.pitches?.teamTotal || 0 }}</p>
             <ul>
               <li v-for="entry in dashboard.drillDown?.pitches?.leaders || []" :key="`pi-${entry.player?.id}`">
-                {{ entry.player?.full_name }} · {{ entry.pitches }} pitches
+                <RouterLink
+                  v-if="entry.player?.id"
+                  :to="{ name: 'player-profile', params: { id: entry.player.id } }"
+                  :data-test="`pitch-player-${entry.player.id}`"
+                >
+                  {{ entry.player.full_name }}
+                </RouterLink>
+                <template v-else>{{ entry.player?.full_name || 'Unknown player' }}</template>
+                · {{ entry.pitches }} pitches
               </li>
             </ul>
           </article>

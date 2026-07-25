@@ -261,6 +261,8 @@ class DailyAnalyticsCalculator
           pitching_earned_runs: pit[:earned_runs],
           pitching_walks: pit[:walks],
           pitching_strikeouts: pit[:strikeouts],
+          pitching_saves: pit[:saves],
+          pitching_quality_starts: pit[:quality_starts],
           era: pit[:outs_recorded].positive? ? round(pit[:earned_runs] * 27.0 / pit[:outs_recorded]) : nil,
           whip: pit[:outs_recorded].positive? ? round((pit[:hits] + pit[:walks]) * 3.0 / pit[:outs_recorded]) : nil
         )
@@ -351,11 +353,14 @@ class DailyAnalyticsCalculator
   end
 
   def team_pitching_totals(team_id, team_games, pitching_lines_for_team)
-    fields = %i[outs_recorded batters_faced hits earned_runs walks strikeouts]
+    fields = %i[outs_recorded batters_faced hits earned_runs walks strikeouts saves quality_starts]
     lines_by_game_id = pitching_lines_for_team.group_by(&:game_id)
 
     team_games.each_with_object(fields.to_h { |field| [ field, 0 ] }) do |game, totals|
-      fallback = sum_fields(lines_by_game_id.fetch(game.id, []), fields)
+      game_lines = lines_by_game_id.fetch(game.id, [])
+      fallback = sum_fields(game_lines, fields - %i[quality_starts]).merge(
+        quality_starts: game_lines.count { |line| line.starter? && line.outs_recorded.to_i >= 18 && line.earned_runs.to_i <= 3 }
+      )
       official = official_team_pitching_stats(game, team_id)
       game_totals = official.present? ? official_pitching_totals(official, fallback) : fallback
 
@@ -413,7 +418,9 @@ class DailyAnalyticsCalculator
       hits: integer_or_fallback(stats["hits"], fallback.fetch(:hits)),
       earned_runs: integer_or_fallback(stats["earnedRuns"], fallback.fetch(:earned_runs)),
       walks: integer_or_fallback(stats["baseOnBalls"], fallback.fetch(:walks)),
-      strikeouts: integer_or_fallback(stats["strikeOuts"], fallback.fetch(:strikeouts))
+      strikeouts: integer_or_fallback(stats["strikeOuts"], fallback.fetch(:strikeouts)),
+      saves: integer_or_fallback(stats["saves"], fallback.fetch(:saves)),
+      quality_starts: fallback.fetch(:quality_starts)
     }
   end
 

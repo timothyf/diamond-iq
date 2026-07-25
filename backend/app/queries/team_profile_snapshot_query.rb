@@ -378,12 +378,18 @@ class TeamProfileSnapshotQuery
       offense: {
         ops: ranking_entry(team_totals, team.id, :ops, descending: true),
         runs_per_game: ranking_entry(team_totals, team.id, :runs_per_game, descending: true),
+        home_runs: ranking_entry(team_totals, team.id, :home_runs, descending: true),
+        batting_average: ranking_entry(team_totals, team.id, :batting_average, descending: true),
+        stolen_bases: ranking_entry(team_totals, team.id, :stolen_bases, descending: true),
         strikeout_rate: ranking_entry(team_totals, team.id, :strikeout_rate, descending: false),
         walk_rate: ranking_entry(team_totals, team.id, :walk_rate, descending: true)
       },
       pitching: {
         era: ranking_entry(team_totals, team.id, :era, descending: false),
         whip: ranking_entry(team_totals, team.id, :whip, descending: false),
+        saves: ranking_entry(team_totals, team.id, :pitching_saves, descending: true),
+        strikeouts: ranking_entry(team_totals, team.id, :pitching_strikeouts, descending: true),
+        quality_starts: ranking_entry(team_totals, team.id, :pitching_quality_starts, descending: true),
         strikeout_rate: ranking_entry(team_totals, team.id, :pitching_strikeout_rate, descending: true),
         walk_rate: ranking_entry(team_totals, team.id, :pitching_walk_rate, descending: false)
       },
@@ -672,7 +678,48 @@ class TeamProfileSnapshotQuery
         .where(calculation_version: analytics_version)
         .includes(:team)
         .to_a
-      rows.group_by(&:team_id).transform_values { |team_rows| summarize_team_rows(team_rows) }
+      rows_by_team = rows.group_by(&:team_id)
+      totals_by_team = rows_by_team.transform_values { |team_rows| summarize_team_rows(team_rows) }
+
+      # Older analytics rows did not persist stolen bases. Replace that total
+      # from the source batting lines until the full season has been recalculated.
+      legacy_team_ids = rows_by_team.filter_map do |team_id, team_rows|
+        team_id if team_rows.any? { |row| !row.metrics.key?("stolen_bases") }
+      end
+      if legacy_team_ids.any?
+        stolen_bases_by_team = GamePlayerBattingLine
+          .joins(:game)
+          .where(team_id: legacy_team_ids, games: { official_date: season_date_range })
+          .group(:team_id)
+          .sum(:stolen_bases)
+        legacy_team_ids.each do |team_id|
+          totals_by_team.fetch(team_id)[:stolen_bases] = stolen_bases_by_team.fetch(team_id, 0).to_f
+        end
+      end
+
+      legacy_pitching_team_ids = rows_by_team.filter_map do |team_id, team_rows|
+        team_id if team_rows.any? do |row|
+          !row.metrics.key?("pitching_saves") || !row.metrics.key?("pitching_quality_starts")
+        end
+      end
+      if legacy_pitching_team_ids.any?
+        pitching_lines = GamePlayerPitchingLine
+          .joins(:game)
+          .where(team_id: legacy_pitching_team_ids, games: { official_date: season_date_range })
+        saves_by_team = pitching_lines.group(:team_id).sum(:saves)
+        quality_starts_by_team = pitching_lines
+          .where(starter: true, outs_recorded: 18..)
+          .where(earned_runs: ..3)
+          .group(:team_id)
+          .count
+
+        legacy_pitching_team_ids.each do |team_id|
+          totals_by_team.fetch(team_id)[:pitching_saves] = saves_by_team.fetch(team_id, 0).to_f
+          totals_by_team.fetch(team_id)[:pitching_quality_starts] = quality_starts_by_team.fetch(team_id, 0).to_f
+        end
+      end
+
+      totals_by_team
     end
   end
 
@@ -717,6 +764,7 @@ class TeamProfileSnapshotQuery
       doubles: 0,
       triples: 0,
       home_runs: 0,
+      stolen_bases: 0,
       walks: 0,
       strikeouts: 0,
       hit_by_pitch: 0,
@@ -726,7 +774,9 @@ class TeamProfileSnapshotQuery
       pitching_hits_allowed: 0,
       pitching_earned_runs: 0,
       pitching_walks: 0,
-      pitching_strikeouts: 0
+      pitching_strikeouts: 0,
+      pitching_saves: 0,
+      pitching_quality_starts: 0
     }
 
     rows.each do |row|
@@ -743,6 +793,7 @@ class TeamProfileSnapshotQuery
       run_differential: totals[:runs_scored] - totals[:runs_allowed],
       winning_percentage: ratio_or_nil(totals[:wins], totals[:wins] + totals[:losses]),
       runs_per_game: ratio_or_nil(totals[:runs_scored], totals[:games]),
+      batting_average: ratio_or_nil(totals[:hits], totals[:at_bats]),
       ops: ops,
       era: era,
       whip: whip,
@@ -822,14 +873,19 @@ class TeamProfileSnapshotQuery
     end
     return { rank: nil, value: nil, percentile: nil } if values.empty?
 
-    sorted = values.sort_by { |(_, value)| descending ? -value : value }
-    rank = sorted.index { |id, _| id == team_id }
     team_value = team_totals.dig(team_id, metric_key)
+    return { rank: nil, value: nil, percentile: nil } if team_value.nil?
+
+    rank = values.count do |id, value|
+      next false if id == team_id
+
+      descending ? value > team_value : value < team_value
+    end + 1
 
     {
-      rank: rank ? rank + 1 : nil,
+      rank: rank,
       value: team_value,
-      percentile: rank ? round(((sorted.length - rank).to_f / sorted.length) * 100) : nil
+      percentile: round(((values.length - rank + 1).to_f / values.length) * 100)
     }
   end
 

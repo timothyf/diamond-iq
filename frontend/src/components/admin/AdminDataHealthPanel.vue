@@ -30,7 +30,7 @@ async function closeReport() {
 <template>
   <div class="data-health-summary" :class="report ? `data-health-summary--${report.status}` : ''" data-test="data-health-summary">
     <span>Data health</span>
-    <strong>{{ loading ? 'Checking…' : report ? humanize(report.status) : 'Not checked' }}</strong>
+    <strong :class="report?.status === 'healthy' ? 'data-health-text--healthy' : ''">{{ loading ? 'Checking…' : report ? humanize(report.status) : 'Not checked' }}</strong>
     <small v-if="report">{{ report.summary.criticalCount }} critical · {{ report.summary.warningCount }} warnings</small>
     <small v-else>Run contextual completeness checks</small>
     <button ref="button" type="button" data-test="data-health-button" :disabled="loading" @click="openReport">

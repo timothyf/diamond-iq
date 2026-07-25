@@ -3,6 +3,12 @@ import { vi } from 'vitest'
 
 import TeamProfileView from '../TeamProfileView.vue'
 
+const RouterLinkStub = {
+  name: 'RouterLink',
+  props: ['to'],
+  template: '<a><slot /></a>',
+}
+
 const payload = {
   data: {
     id: 1,
@@ -102,12 +108,18 @@ const payload = {
         offense: {
           ops: { rank: 5, value: 0.765 },
           runs_per_game: { rank: 8, value: 4.5 },
+          home_runs: { rank: 6, value: 132 },
+          batting_average: { rank: 7, value: 0.261 },
+          stolen_bases: { rank: 11, value: 68 },
           strikeout_rate: { rank: 12, value: 0.219 },
           walk_rate: { rank: 9, value: 0.086 },
         },
         pitching: {
           era: { rank: 7, value: 3.8126 },
           whip: { rank: 10, value: 1.2346 },
+          saves: { rank: 4, value: 31 },
+          strikeouts: { rank: 3, value: 902 },
+          quality_starts: { rank: 8, value: 44 },
           strikeout_rate: { rank: 6, value: 0.251 },
           walk_rate: { rank: 11, value: 0.082 },
         },
@@ -178,7 +190,7 @@ describe('TeamProfileView', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(TeamProfileView, {
       props: { teamId: '1' },
-      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+      global: { stubs: { RouterLink: RouterLinkStub } },
     })
     await flushPromises()
 
@@ -223,8 +235,25 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="pitching-ranking-era"]').text()).toContain('#7')
     expect(wrapper.get('[data-test="pitching-ranking-whip"]').text()).toContain('1.23')
     expect(wrapper.get('[data-test="pitching-ranking-whip"]').text()).toContain('#10')
+    expect(wrapper.get('[data-test="pitching-ranking-saves"]').text()).toContain('31')
+    expect(wrapper.get('[data-test="pitching-ranking-strikeouts"]').text()).toContain('902')
+    expect(wrapper.get('[data-test="pitching-ranking-quality-starts"]').text()).toContain('44')
+    expect(wrapper.get('[data-test="offense-ranking-home-runs"]').text()).toContain('132')
+    expect(wrapper.get('[data-test="offense-ranking-home-runs"]').text()).toContain('#6')
+    expect(wrapper.get('[data-test="offense-ranking-batting-average"]').text()).toContain('0.261')
+    expect(wrapper.get('[data-test="offense-ranking-batting-average"]').text()).toContain('#7')
+    expect(wrapper.get('[data-test="offense-ranking-stolen-bases"]').text()).toContain('68')
+    expect(wrapper.get('[data-test="offense-ranking-stolen-bases"]').text()).toContain('#11')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
+    expect(wrapper.getComponent('[data-test="plate-appearance-player-42"]').props('to')).toEqual({
+      name: 'player-profile',
+      params: { id: 42 },
+    })
+    expect(wrapper.getComponent('[data-test="pitch-player-51"]').props('to')).toEqual({
+      name: 'player-profile',
+      params: { id: 51 },
+    })
     const leaders = wrapper.get('[data-test="team-leaders"]')
     expect(leaders.text()).toContain('Team leaders')
     expect(leaders.text()).toContain('Riley Greene')

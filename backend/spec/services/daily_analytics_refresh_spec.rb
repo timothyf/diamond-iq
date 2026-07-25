@@ -90,7 +90,7 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
 
     batting = PlayerBattingDaily.find_by!(player: batter, metric_date: date)
     expect(batting).to have_attributes(
-      calculation_version: "1.0.0",
+        calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION,
       source_start_date: date,
       source_end_date: date,
       sample_size: 4
@@ -118,7 +118,9 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       "pitching_batters_faced" => 24,
       "pitching_earned_runs" => 1,
       "pitching_strikeouts" => 8,
-      "pitching_walks" => 2
+      "pitching_walks" => 2,
+      "pitching_saves" => 0,
+      "pitching_quality_starts" => 1
     )
     expect(TeamDailyMetric.find_by!(team: away_team).metrics).to include(
       "hit_by_pitch" => 1,
