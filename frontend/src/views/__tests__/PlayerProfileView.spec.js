@@ -12,6 +12,7 @@ function apiPayload() {
       last_name: 'Greene',
       full_name: 'Riley Greene',
       team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+      display_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
       profile: {
         age: 25,
         birth_date: '2000-09-28',
@@ -186,6 +187,24 @@ function apiPayloadWith(mutator) {
 }
 
 describe('PlayerProfileView', () => {
+  it('uses the longest-served team in a retired player header', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.team = { id: 2, mlb_id: 146, name: 'Miami Marlins', abbreviation: 'MIA' }
+      response.data.display_team = { id: 3, mlb_id: 110, name: 'Baltimore Orioles', abbreviation: 'BAL' }
+      response.data.current_membership = null
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('.profile-teamline').text()).toContain('Baltimore Orioles')
+    expect(wrapper.get('.profile-teamline').text()).not.toContain('Miami Marlins')
+  })
+
   it('labels completed team-history windows as organization tenures instead of active', async () => {
     const payload = apiPayloadWith((response) => {
       response.data.team_history.push({
@@ -234,6 +253,20 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('Active')
+    expect(wrapper.get('[data-test="external-profile-mlb"]').attributes()).toMatchObject({
+      href: 'https://www.mlb.com/player/riley-greene-680776',
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    })
+    expect(wrapper.get('[data-test="external-profile-fangraphs"]').attributes('href')).toBe(
+      'https://www.fangraphs.com/players.aspx?lastname=Riley%20Greene',
+    )
+    expect(wrapper.get('[data-test="external-profile-baseball-reference"]').attributes('href')).toBe(
+      'https://www.baseball-reference.com/search/search.fcgi?search=Riley%20Greene',
+    )
+    expect(wrapper.get('[data-test="external-profile-baseball-savant"]').attributes('href')).toBe(
+      'https://baseballsavant.mlb.com/savant-player/riley-greene-680776',
+    )
     expect(wrapper.text()).toContain('Batting by season')
     expect(wrapper.text()).toContain('2022–2026 · 5 seasons')
     const careerTable = wrapper.get('[data-test="career-season-table"]')

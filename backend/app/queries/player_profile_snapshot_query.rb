@@ -15,6 +15,7 @@ class PlayerProfileSnapshotQuery
     {
       season_overview: season_overview,
       career_overview: career_overview,
+      display_team: serialize_team(display_team),
       current_membership: serialize_membership(current_membership),
       team_history: organization_tenures,
       recent_pitch_indicators: recent_pitch_indicators,
@@ -31,6 +32,29 @@ class PlayerProfileSnapshotQuery
   private
 
   attr_reader :player, :on, :analysis_range
+
+  def display_team
+    return current_membership&.team || player.team unless retired_player?
+
+    longest_served_team || player.team
+  end
+
+  def retired_player?
+    player.profile&.raw_data.to_h["active"] == false
+  end
+
+  def longest_served_team
+    seasons_by_team = player.player_season_stats
+      .where.not(team_id: nil)
+      .pluck(:team_id, :season)
+      .group_by(&:first)
+      .transform_values { |rows| rows.map(&:last).uniq }
+    team_id, = seasons_by_team.max_by do |candidate_team_id, seasons|
+      [ seasons.length, seasons.max || 0, candidate_team_id ]
+    end
+
+    Team.find_by(id: team_id) if team_id
+  end
 
   def season_overview
     return empty_season_overview if latest_season.nil?

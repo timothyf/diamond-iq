@@ -61,6 +61,27 @@ const careerRangeLabel = computed(() => {
   return `${range} · ${career.seasonCount} ${seasonLabel}`
 })
 
+const externalProfileLinks = computed(() => {
+  const fullName = player.value?.fullName
+  const mlbId = player.value?.mlbId
+  if (!fullName || !mlbId) return []
+
+  const slug = fullName
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  const encodedName = encodeURIComponent(fullName)
+
+  return [
+    { key: 'mlb', label: 'MLB.com', href: `https://www.mlb.com/player/${slug}-${mlbId}` },
+    { key: 'fangraphs', label: 'FanGraphs', href: `https://www.fangraphs.com/players.aspx?lastname=${encodedName}` },
+    { key: 'baseball-reference', label: 'Baseball Reference', href: `https://www.baseball-reference.com/search/search.fcgi?search=${encodedName}` },
+    { key: 'baseball-savant', label: 'Baseball Savant', href: `https://baseballsavant.mlb.com/savant-player/${slug}-${mlbId}` },
+  ]
+})
+
 const pitchingMetrics = computed(() => [
   ['Pitches', player.value?.pitchIndicators.pitching.pitch_count],
   ['Games', player.value?.pitchIndicators.pitching.game_count],
@@ -298,10 +319,10 @@ function formatTimestamp(value) {
           <p class="profile-teamline">
             <strong>
               <RouterLink
-                v-if="player.currentMembership?.team?.id || player.team?.id"
-                :to="{ name: 'team-profile', params: { id: player.currentMembership?.team?.id || player.team?.id } }"
+                v-if="player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id"
+                :to="{ name: 'team-profile', params: { id: player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id } }"
               >
-                {{ player.currentMembership?.team?.name || player.team?.name }}
+                {{ player.displayTeam?.name || player.currentMembership?.team?.name || player.team?.name }}
               </RouterLink>
               <template v-else>Team unavailable</template>
             </strong>
@@ -312,6 +333,19 @@ function formatTimestamp(value) {
             <span class="profile-status__dot"></span>
             {{ rosterLabel }}
           </div>
+          <nav class="external-profile-links" aria-label="External player profiles">
+            <a
+              v-for="link in externalProfileLinks"
+              :key="link.key"
+              :href="link.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              :data-test="`external-profile-${link.key}`"
+            >
+              {{ link.label }}
+              <span aria-hidden="true">↗</span>
+            </a>
+          </nav>
         </div>
 
         <dl class="profile-bio">
@@ -819,6 +853,39 @@ function formatTimestamp(value) {
   height: 0.55rem;
   border-radius: 50%;
   background: currentColor;
+}
+
+.external-profile-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.external-profile-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.34rem 0.58rem;
+  border: 1px solid rgba(23, 54, 82, 0.2);
+  border-radius: 999px;
+  color: #173652;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.external-profile-links a:hover {
+  border-color: rgba(23, 54, 82, 0.5);
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.external-profile-links a:focus-visible {
+  outline: 3px solid rgba(31, 111, 235, 0.32);
+  outline-offset: 2px;
 }
 
 .profile-bio {

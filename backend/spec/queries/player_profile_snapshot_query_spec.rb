@@ -1,6 +1,44 @@
 require "rails_helper"
 
 RSpec.describe PlayerProfileSnapshotQuery do
+  it "displays the team a retired player spent the most seasons with" do
+    longest_team = create_team(attributes: { name: "Detroit Tigers" })
+    recent_team = create_team(attributes: { name: "Miami Marlins" })
+    player = create_player(team: recent_team)
+    player.create_profile!(
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current,
+      raw_data: { "active" => false }
+    )
+    stat_type = create_stat_type(name: "gamesPlayed", label: "G", category: "batting")
+    [ 2018, 2019, 2020 ].each do |season|
+      create_player_season_stat(player: player, stat_type: stat_type, attributes: { team: longest_team, season: season, value: 100 })
+    end
+    [ 2021, 2022 ].each do |season|
+      create_player_season_stat(player: player, stat_type: stat_type, attributes: { team: recent_team, season: season, value: 100 })
+    end
+
+    display_team = described_class.new(player: player).result.fetch(:display_team)
+
+    expect(display_team).to include(id: longest_team.id, name: "Detroit Tigers")
+  end
+
+  it "keeps an active player's current membership team in the header" do
+    cached_team = create_team
+    current_team = create_team
+    player = create_player(team: cached_team)
+    player.create_profile!(
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current,
+      raw_data: { "active" => true }
+    )
+    create_team_membership(player: player, team: current_team, starts_on: Date.current - 1.month)
+
+    display_team = described_class.new(player: player).result.fetch(:display_team)
+
+    expect(display_team).to include(id: current_team.id)
+  end
+
   it "coalesces adjacent same-team roster windows into one organization tenure" do
     player = create_player
     team = player.team

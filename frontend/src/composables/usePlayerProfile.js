@@ -65,6 +65,7 @@ function normalizeProfile(data = {}) {
     lastName: data.last_name,
     fullName: data.full_name,
     team: normalizeTeam(data.team),
+    displayTeam: normalizeTeam(data.display_team),
     profile,
     positions: data.positions || { primary: null, secondary: [], assignments: [] },
     seasonOverview: {
