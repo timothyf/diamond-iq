@@ -2,8 +2,8 @@ require "rails_helper"
 
 RSpec.describe PlayerProfileSnapshotQuery do
   it "displays the team a retired player spent the most seasons with" do
-    longest_team = create_team(attributes: { name: "Detroit Tigers" })
-    recent_team = create_team(attributes: { name: "Miami Marlins" })
+    longest_team = create_team(name: "Detroit Tigers")
+    recent_team = create_team(name: "Miami Marlins")
     player = create_player(team: recent_team)
     player.create_profile!(
       source_name: "MLB Stats API",
@@ -37,6 +37,22 @@ RSpec.describe PlayerProfileSnapshotQuery do
     display_team = described_class.new(player: player).result.fetch(:display_team)
 
     expect(display_team).to include(id: current_team.id)
+  end
+
+  it "returns mapped external player identifiers" do
+    player = create_player(attributes: { mlb_id: 682_985 })
+    PlayerIdMapping.create!(
+      mlb_id: player.mlb_id,
+      chadwick_id: "abc12345",
+      chadwick_uuid: "abc12345-1234-4567-890a-123456789012",
+      baseball_reference_id: "greenri03",
+      fangraphs_id: "25976",
+      imported_at: Time.current
+    )
+
+    external_ids = described_class.new(player: player).result.fetch(:external_ids)
+
+    expect(external_ids).to eq(baseball_reference: "greenri03", fangraphs: "25976")
   end
 
   it "coalesces adjacent same-team roster windows into one organization tenure" do

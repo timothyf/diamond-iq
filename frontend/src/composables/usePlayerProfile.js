@@ -66,6 +66,10 @@ function normalizeProfile(data = {}) {
     fullName: data.full_name,
     team: normalizeTeam(data.team),
     displayTeam: normalizeTeam(data.display_team),
+    externalIds: {
+      baseballReference: data.external_ids?.baseball_reference,
+      fangraphs: data.external_ids?.fangraphs,
+    },
     profile,
     positions: data.positions || { primary: null, secondary: [], assignments: [] },
     seasonOverview: {

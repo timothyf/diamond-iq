@@ -23,6 +23,7 @@ class Player < ApplicationRecord
   has_many :batter_split_summaries, dependent: :destroy
   has_many :pitcher_split_summaries, dependent: :destroy
   has_many :player_metric_percentiles, dependent: :destroy
+  has_one :player_id_mapping, primary_key: :mlb_id, foreign_key: :mlb_id
 
   validates :mlb_id, presence: true, uniqueness: true
   validates :first_name, presence: true

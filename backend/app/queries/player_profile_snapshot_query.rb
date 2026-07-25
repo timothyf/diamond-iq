@@ -16,6 +16,7 @@ class PlayerProfileSnapshotQuery
       season_overview: season_overview,
       career_overview: career_overview,
       display_team: serialize_team(display_team),
+      external_ids: external_ids,
       current_membership: serialize_membership(current_membership),
       team_history: organization_tenures,
       recent_pitch_indicators: recent_pitch_indicators,
@@ -41,6 +42,15 @@ class PlayerProfileSnapshotQuery
 
   def retired_player?
     player.profile&.raw_data.to_h["active"] == false
+  end
+
+  def external_ids
+    mapping = player.player_id_mapping
+
+    {
+      baseball_reference: mapping&.baseball_reference_id,
+      fangraphs: mapping&.fangraphs_id
+    }
   end
 
   def longest_served_team

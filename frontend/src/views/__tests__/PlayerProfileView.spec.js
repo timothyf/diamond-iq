@@ -13,6 +13,7 @@ function apiPayload() {
       full_name: 'Riley Greene',
       team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
       display_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+      external_ids: { baseball_reference: 'greenri03', fangraphs: '25976' },
       profile: {
         age: 25,
         birth_date: '2000-09-28',
@@ -259,10 +260,10 @@ describe('PlayerProfileView', () => {
       rel: 'noopener noreferrer',
     })
     expect(wrapper.get('[data-test="external-profile-fangraphs"]').attributes('href')).toBe(
-      'https://www.fangraphs.com/players.aspx?lastname=Riley%20Greene',
+      'https://www.fangraphs.com/players/riley-greene/25976/stats',
     )
     expect(wrapper.get('[data-test="external-profile-baseball-reference"]').attributes('href')).toBe(
-      'https://www.baseball-reference.com/search/search.fcgi?search=Riley%20Greene',
+      'https://www.baseball-reference.com/players/g/greenri03.shtml',
     )
     expect(wrapper.get('[data-test="external-profile-baseball-savant"]').attributes('href')).toBe(
       'https://baseballsavant.mlb.com/savant-player/riley-greene-680776',

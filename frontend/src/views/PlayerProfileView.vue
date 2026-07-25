@@ -73,11 +73,25 @@ const externalProfileLinks = computed(() => {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
   const encodedName = encodeURIComponent(fullName)
+  const baseballReferenceId = player.value?.externalIds?.baseballReference
+  const fangraphsId = player.value?.externalIds?.fangraphs
 
   return [
     { key: 'mlb', label: 'MLB.com', href: `https://www.mlb.com/player/${slug}-${mlbId}` },
-    { key: 'fangraphs', label: 'FanGraphs', href: `https://www.fangraphs.com/players.aspx?lastname=${encodedName}` },
-    { key: 'baseball-reference', label: 'Baseball Reference', href: `https://www.baseball-reference.com/search/search.fcgi?search=${encodedName}` },
+    {
+      key: 'fangraphs',
+      label: 'FanGraphs',
+      href: fangraphsId
+        ? `https://www.fangraphs.com/players/${slug}/${fangraphsId}/stats`
+        : `https://www.fangraphs.com/players.aspx?lastname=${encodedName}`,
+    },
+    {
+      key: 'baseball-reference',
+      label: 'Baseball Reference',
+      href: baseballReferenceId
+        ? `https://www.baseball-reference.com/players/${baseballReferenceId.charAt(0)}/${baseballReferenceId}.shtml`
+        : `https://www.baseball-reference.com/search/search.fcgi?search=${encodedName}`,
+    },
     { key: 'baseball-savant', label: 'Baseball Savant', href: `https://baseballsavant.mlb.com/savant-player/${slug}-${mlbId}` },
   ]
 })

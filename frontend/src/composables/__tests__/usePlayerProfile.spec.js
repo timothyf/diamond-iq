@@ -17,6 +17,7 @@ describe('usePlayerProfile', () => {
           full_name: 'Riley Greene',
           team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
           display_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+          external_ids: { baseball_reference: 'greenri03', fangraphs: '25976' },
           profile: {
             bats: 'L',
             throws: 'L',
@@ -94,6 +95,7 @@ describe('usePlayerProfile', () => {
       fullName: 'Riley Greene',
       team: { abbreviation: 'DET' },
       displayTeam: { abbreviation: 'DET' },
+      externalIds: { baseballReference: 'greenri03', fangraphs: '25976' },
       currentMembership: { rosterStatus: 'active' },
       seasonOverview: { season: 2026, category: 'batting' },
       careerOverview: { category: 'batting', firstSeason: 2022, lastSeason: 2026, seasonCount: 5 },

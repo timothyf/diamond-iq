@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_15_242000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -471,6 +471,29 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_15_242000) do
     t.index ["team_id"], name: "index_player_batting_daily_on_team_id"
     t.check_constraint "sample_size >= 0", name: "player_batting_daily_sample_size_nonnegative"
     t.check_constraint "source_end_date >= source_start_date", name: "player_batting_daily_source_range_valid"
+  end
+
+  create_table "player_id_mappings", force: :cascade do |t|
+    t.integer "mlb_id", null: false
+    t.string "chadwick_id", null: false
+    t.uuid "chadwick_uuid", null: false
+    t.string "retrosheet_id"
+    t.string "baseball_reference_id"
+    t.string "baseball_reference_minors_id"
+    t.string "fangraphs_id"
+    t.string "npb_id"
+    t.string "pro_football_reference_id"
+    t.string "basketball_reference_id"
+    t.string "hockey_reference_id"
+    t.string "wikidata_id"
+    t.string "source_name", default: "Chadwick Register", null: false
+    t.datetime "imported_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["baseball_reference_id"], name: "index_player_id_mappings_on_baseball_reference_id"
+    t.index ["chadwick_id"], name: "index_player_id_mappings_on_chadwick_id", unique: true
+    t.index ["fangraphs_id"], name: "index_player_id_mappings_on_fangraphs_id"
+    t.index ["mlb_id"], name: "index_player_id_mappings_on_mlb_id", unique: true
   end
 
   create_table "player_metric_percentiles", force: :cascade do |t|
