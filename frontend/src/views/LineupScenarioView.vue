@@ -36,6 +36,18 @@ watch(() => props.scenarioId, load)
         <h1>{{ scenario.name }}</h1>
         <span>{{ formatDate(scenario.scenario_date) }}</span>
         <p v-if="scenario.notes" class="scenario-notes">{{ scenario.notes }}</p>
+        <section class="scenario-score" data-test="scenario-score">
+          <header><strong>Transparent evaluation</strong><b>{{ scenario.total_score ?? '—' }}/100</b></header>
+          <p>
+            Opponent {{ scenario.score_breakdown?.opponent ?? '—' }} ·
+            Park {{ scenario.score_breakdown?.park ?? '—' }} ·
+            Platoon {{ scenario.score_breakdown?.platoon ?? '—' }} ·
+            Recent {{ scenario.score_breakdown?.recent_performance ?? '—' }} ·
+            Reliability {{ scenario.score_breakdown?.reliability ?? '—' }}
+          </p>
+          <small>Weights: 20% opponent · 15% park · 25% platoon · 20% recent · 20% reliability</small>
+          <small>Inputs: {{ scenario.evaluation_inputs?.opponent || 'Opponent not specified' }} · {{ scenario.evaluation_inputs?.pitcher_hand || '—' }}HP · park {{ scenario.evaluation_inputs?.park_factor ?? '—' }}</small>
+        </section>
         <table>
           <thead><tr><th>Order</th><th>Player</th><th>Defense</th></tr></thead>
           <tbody>
@@ -59,6 +71,10 @@ watch(() => props.scenarioId, load)
 .scenario-shell section > p:first-child { color: #a93627; font-size: .7rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 h1 { margin: .3rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.5rem,7vw,5rem); line-height: .9; text-transform: uppercase; }
 .scenario-notes { padding: .75rem; border-radius: 10px; background: #edf3ee; }
+.scenario-score { margin-top: 1rem; padding: .9rem; border-radius: 14px; background: #edf3ee; }
+.scenario-score header { display: flex; justify-content: space-between; gap: 1rem; }
+.scenario-score b { color: #20543c; font-size: 1.2rem; }
+.scenario-score p,.scenario-score small { display: block; margin: .35rem 0 0; color: #526572; font-size: .78rem; }
 table { width: 100%; margin-top: 1.2rem; border-collapse: collapse; }
 th,td { padding: .7rem; border-bottom: 1px solid #e4e1d9; text-align: left; }
 thead { color: #68747e; font-size: .7rem; text-transform: uppercase; }

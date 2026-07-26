@@ -27,9 +27,12 @@ module Api
         scenario_date: scenario_date,
         name: scenario_params.fetch(:name),
         notes: scenario_params[:notes],
-        validated_at: Time.current
+        validated_at: Time.current,
+        evaluation_inputs: evaluation_inputs
       )
       scenario.entries.create!(entries.map { |entry| entry.slice(:player_id, :batting_slot, :defensive_position) })
+      score = LineupScenarioScorer.call(scenario: scenario, inputs: evaluation_inputs)
+      scenario.update!(score)
 
       render json: { data: serialize_scenario(scenario.reload) }, status: :created
     end
@@ -37,7 +40,15 @@ module Api
     private
 
     def scenario_params
-      params.permit(:season, :scenario_date, :name, :notes, entries: [ :player_id, :batting_slot, :defensive_position ])
+      params.permit(
+        :season, :scenario_date, :name, :notes,
+        evaluation_inputs: [ :opponent, :opponent_strength, :park_factor, :pitcher_hand, :recent_performance, :reliability ],
+        entries: [ :player_id, :batting_slot, :defensive_position ]
+      )
+    end
+
+    def evaluation_inputs
+      scenario_params[:evaluation_inputs]&.to_h || {}
     end
 
     def scenario_date
@@ -55,6 +66,9 @@ module Api
         name: scenario.name,
         notes: scenario.notes,
         validated_at: scenario.validated_at,
+        evaluation_inputs: scenario.evaluation_inputs || {},
+        total_score: scenario.total_score&.to_f,
+        score_breakdown: scenario.score_breakdown || {},
         entries: scenario.entries.sort_by(&:batting_slot).map do |entry|
           {
             id: entry.id,

@@ -85,7 +85,10 @@ class TeamProfileSnapshotQuery
         name: scenario.name,
         scenario_date: scenario.scenario_date,
         validated_at: scenario.validated_at,
-        entry_count: scenario.entries.count
+        entry_count: scenario.entries.count,
+        evaluation_inputs: scenario.evaluation_inputs || {},
+        total_score: scenario.total_score&.to_f,
+        score_breakdown: scenario.score_breakdown || {}
       }
     end
   end

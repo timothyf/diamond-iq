@@ -94,6 +94,9 @@ function normalizeProfile(data) {
       scenarioDate: scenario.scenario_date,
       validatedAt: scenario.validated_at,
       entryCount: scenario.entry_count || 0,
+      evaluationInputs: scenario.evaluation_inputs || {},
+      totalScore: scenario.total_score,
+      scoreBreakdown: scenario.score_breakdown || {},
     })),
     teamLeaders: {
       batting: data.team_leaders?.batting || [],

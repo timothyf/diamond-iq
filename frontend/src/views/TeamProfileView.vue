@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 
 import { useTeamProfile } from '../composables/useTeamProfile'
 import { adminRequestHeaders } from '../composables/apiAuth'
@@ -27,8 +27,18 @@ const savingLineup = ref(false)
 const lineupError = ref('')
 const lineupName = ref('')
 const lineupNotes = ref('')
+const lineupEvaluation = reactive({
+  opponent: '',
+  opponentStrength: 50,
+  parkFactor: 100,
+  pitcherHand: 'R',
+  recentPerformance: 50,
+  reliability: 50,
+})
+const availableTeams = ref([])
 const lineupRows = ref(Array.from({ length: 9 }, (_, index) => ({ battingSlot: index + 1, playerId: '', defensivePosition: '' })))
 const lineupPositions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']
+const opponentTeamOptions = computed(() => availableTeams.value.filter((teamOption) => teamOption.id !== team.value?.id))
 
 watch(
   () => team.value?.season,
@@ -44,6 +54,23 @@ watch(teamId, () => {
   reportSaveError.value = ''
   lineupError.value = ''
 })
+
+async function loadAvailableTeams() {
+  try {
+    const response = await fetch('/api/teams', { headers: { Accept: 'application/json' } })
+    if (!response.ok) return
+    const payload = await response.json()
+    availableTeams.value = (payload.data || []).map((team) => ({
+      id: team.id,
+      name: team.name,
+      abbreviation: team.abbreviation,
+    }))
+  } catch {
+    availableTeams.value = []
+  }
+}
+
+onMounted(loadAvailableTeams)
 
 const injuredRoster = computed(() => team.value?.rosters?.fortyMan?.filter((membership) => membership.injured) || [])
 
@@ -80,6 +107,9 @@ const nextSeriesGames = computed(() => {
 const nextOpponent = computed(() => nextSeriesGames.value.length ? opponent(nextSeriesGames.value[0]) : null)
 const opponentPrep = computed(() => team.value?.opponentPreparation || {})
 const lineupPlayers = computed(() => team.value?.rosters?.active || [])
+watch(nextOpponent, (opponent) => {
+  if (!lineupEvaluation.opponent && opponent?.name) lineupEvaluation.opponent = opponent.name
+})
 const nextSeriesDateLabel = computed(() => {
   const games = nextSeriesGames.value
   if (!games.length) return 'No upcoming series'
@@ -282,6 +312,14 @@ async function saveLineupScenario() {
         scenario_date: new Date().toISOString().slice(0, 10),
         name: lineupName.value.trim() || `${team.value.abbreviation} lineup scenario`,
         notes: lineupNotes.value.trim(),
+        evaluation_inputs: {
+          opponent: lineupEvaluation.opponent.trim(),
+          opponent_strength: Number(lineupEvaluation.opponentStrength),
+          park_factor: Number(lineupEvaluation.parkFactor),
+          pitcher_hand: lineupEvaluation.pitcherHand,
+          recent_performance: Number(lineupEvaluation.recentPerformance),
+          reliability: Number(lineupEvaluation.reliability),
+        },
         entries: lineupRows.value.map((row) => ({
           player_id: row.playerId,
           batting_slot: row.battingSlot,
@@ -567,6 +605,20 @@ async function saveLineupScenario() {
           <label>Scenario name<input v-model="lineupName" type="text" placeholder="e.g. vs RHP — series opener" /></label>
           <label>Notes<input v-model="lineupNotes" type="text" placeholder="Optional game-plan notes" /></label>
         </div>
+        <fieldset class="lineup-evaluation" data-test="lineup-evaluation-inputs">
+          <legend>Evaluation context</legend>
+          <label>Opponent<select v-model="lineupEvaluation.opponent" data-test="lineup-opponent-select">
+            <option value="">Choose team</option>
+            <option v-for="teamOption in opponentTeamOptions" :key="teamOption.id" :value="teamOption.name">
+              {{ teamOption.abbreviation }} · {{ teamOption.name }}
+            </option>
+          </select></label>
+          <label>Opponent strength (0–100)<input v-model.number="lineupEvaluation.opponentStrength" type="number" min="0" max="100" /></label>
+          <label>Park factor<input v-model.number="lineupEvaluation.parkFactor" type="number" min="80" max="120" /></label>
+          <label>Pitcher hand<select v-model="lineupEvaluation.pitcherHand"><option value="R">RHP</option><option value="L">LHP</option></select></label>
+          <label>Recent performance (0–100)<input v-model.number="lineupEvaluation.recentPerformance" type="number" min="0" max="100" /></label>
+          <label>Reliability (0–100)<input v-model.number="lineupEvaluation.reliability" type="number" min="0" max="100" /></label>
+        </fieldset>
         <div class="lineup-grid" role="table" aria-label="Lineup scenario editor">
           <div class="lineup-grid__header" role="row"><span>Order</span><span>Player</span><span>Defense</span></div>
           <label v-for="row in lineupRows" :key="row.battingSlot" class="lineup-row" :data-test="`lineup-row-${row.battingSlot}`">
@@ -591,7 +643,21 @@ async function saveLineupScenario() {
           </button>
         </footer>
         <div v-if="team.lineupScenarios.length" class="lineup-scenario-history">
-          <strong>Saved scenarios</strong>
+          <strong>Saved scenarios · score comparison</strong>
+          <div class="lineup-score-comparison" data-test="lineup-score-comparison">
+            <article v-for="scenario in team.lineupScenarios" :key="scenario.id">
+              <div><strong>{{ scenario.name }}</strong><span>{{ scenario.totalScore ?? '—' }}/100</span></div>
+              <small>
+                Opponent {{ scenario.scoreBreakdown?.opponent ?? '—' }} ·
+                Park {{ scenario.scoreBreakdown?.park ?? '—' }} ·
+                Platoon {{ scenario.scoreBreakdown?.platoon ?? '—' }} ·
+                Recent {{ scenario.scoreBreakdown?.recent_performance ?? '—' }} ·
+                Reliability {{ scenario.scoreBreakdown?.reliability ?? '—' }}
+              </small>
+              <small>Weights: 20% opponent · 15% park · 25% platoon · 20% recent · 20% reliability</small>
+              <RouterLink :to="{ name: 'lineup-scenario', params: { id: scenario.id } }">Open scenario →</RouterLink>
+            </article>
+          </div>
           <ul>
             <li v-for="scenario in team.lineupScenarios" :key="scenario.id">
               <RouterLink :to="{ name: 'lineup-scenario', params: { id: scenario.id } }">{{ scenario.name }}</RouterLink>
@@ -935,6 +1001,10 @@ async function saveLineupScenario() {
 .lineup-scenarios button:disabled { opacity: .5; cursor: not-allowed; }
 .lineup-scenarios__fields { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-top: .9rem; }
 .lineup-scenarios__fields label { display: grid; gap: .3rem; color: #697784; font-size: .68rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.lineup-evaluation { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .7rem; margin: .9rem 0 0; padding: .8rem; border: 1px solid rgba(16,38,61,.12); border-radius: 14px; }
+.lineup-evaluation legend { grid-column: 1 / -1; padding: 0 .3rem; color: #173652; font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.lineup-evaluation label { display: grid; gap: .3rem; color: #697784; font-size: .65rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }
+.lineup-evaluation input,.lineup-evaluation select { min-width: 0; padding: .55rem .65rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; }
 .lineup-scenarios input,.lineup-row select { min-width: 0; padding: .55rem .65rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; }
 .lineup-grid { display: grid; gap: .35rem; margin-top: .9rem; }
 .lineup-grid__header,.lineup-row { display: grid; grid-template-columns: 64px minmax(0,1fr) 120px; gap: .55rem; align-items: center; }
@@ -946,6 +1016,12 @@ async function saveLineupScenario() {
 .lineup-scenario-history { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid rgba(16,38,61,.1); }
 .lineup-scenario-history strong { color: #173652; font-size: .78rem; text-transform: uppercase; }
 .lineup-scenario-history ul { display: grid; gap: .35rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+.lineup-score-comparison { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: .55rem; margin-top: .55rem; }
+.lineup-score-comparison article { display: grid; gap: .25rem; padding: .7rem; border-radius: 12px; background: rgba(32,84,60,.08); }
+.lineup-score-comparison article > div { display: flex; justify-content: space-between; gap: .5rem; }
+.lineup-score-comparison article > div span { color: #20543c; font-weight: 900; }
+.lineup-score-comparison small { color: #526572; font-size: .67rem; line-height: 1.4; }
+.lineup-score-comparison a { color: #20543c; font-size: .7rem; font-weight: 900; }
 .lineup-scenario-history li { display: flex; justify-content: space-between; gap: 1rem; }
 .lineup-scenario-history a { color: #20543c; font-size: .8rem; font-weight: 900; }
 .lineup-scenario-history span { color: #71808c; font-size: .72rem; }
@@ -1090,4 +1166,5 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 @media (max-width: 900px) { .scouting-layout { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .opponent-prep__overview,.starter-scouting > header { align-items: flex-start; flex-direction: column; } .opponent-prep__venue { max-width: none; text-align: left; } .opponent-recent dl { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .lineup-evaluation { grid-template-columns: 1fr; } }
 </style>

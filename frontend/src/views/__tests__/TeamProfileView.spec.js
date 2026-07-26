@@ -159,6 +159,9 @@ const payload = {
         scenario_date: '2026-07-16',
         validated_at: '2026-07-15T14:00:00Z',
         entry_count: 9,
+        total_score: 78.4,
+        evaluation_inputs: { opponent: 'Cleveland Guardians', pitcher_hand: 'R', park_factor: 105 },
+        score_breakdown: { opponent: 35, park: 25, platoon: 75, recent_performance: 82, reliability: 88 },
       },
     ],
     source_metadata: { last_updated_at: '2026-07-15T12:00:00Z', schedule_last_synced_at: '2026-07-15T12:00:00Z', roster_last_synced_at: '2026-07-15T11:00:00Z', sources: ['MLB Stats API'] },
@@ -260,11 +263,11 @@ const payload = {
 
 describe('TeamProfileView', () => {
   it('generates a frozen report from the current opponent preparation', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: async () => payload })
-      .mockResolvedValueOnce({ ok: true, json: async () => payload })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { id: 302 } }) })
-      .mockResolvedValueOnce({ ok: true, json: async () => payload })
+    const fetchMock = vi.fn().mockImplementation((url, options = {}) => {
+      if (url === '/api/teams') return Promise.resolve({ ok: true, json: async () => ({ data: [{ id: 2, name: 'Cleveland Guardians', abbreviation: 'CLE' }] }) })
+      if (url === '/api/teams/1/opponent_reports') return Promise.resolve({ ok: true, json: async () => ({ data: { id: 302 } }) })
+      return Promise.resolve({ ok: true, json: async () => payload })
+    })
     vi.stubGlobal('fetch', fetchMock)
     const wrapper = mount(TeamProfileView, {
       props: { teamId: '1' },
@@ -275,15 +278,14 @@ describe('TeamProfileView', () => {
     await wrapper.get('[data-test="save-opponent-report"]').trigger('click')
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+    expect(fetchMock).toHaveBeenCalledWith(
       '/api/teams/1/opponent_reports',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ season: 2026 }),
       }),
     )
-    expect(fetchMock).toHaveBeenCalledTimes(4)
+    expect(fetchMock).toHaveBeenCalledWith('/api/teams/1?season=2026', expect.any(Object))
   })
 
   it('renders the overview and opens a separate roster tab on the active roster', async () => {
@@ -320,6 +322,9 @@ describe('TeamProfileView', () => {
     })
     expect(wrapper.get('[data-test="lineup-scenarios"]').text()).toContain('Lineup scenarios')
     expect(wrapper.get('[data-test="lineup-scenarios"]').text()).toContain('Vs RHP — opener')
+    expect(wrapper.get('[data-test="lineup-evaluation-inputs"]').text()).toContain('Evaluation context')
+    expect(wrapper.get('[data-test="lineup-score-comparison"]').text()).toContain('78.4/100')
+    expect(wrapper.get('[data-test="lineup-score-comparison"]').text()).toContain('Platoon 75')
     expect(wrapper.findAll('[data-test^="lineup-row-"]')).toHaveLength(9)
     const starterScouting = wrapper.get('[data-test="starter-scouting-52"]')
     expect(starterScouting.text()).toContain('4-Seam Fastball')

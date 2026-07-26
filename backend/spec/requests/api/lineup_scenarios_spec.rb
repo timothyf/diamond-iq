@@ -24,6 +24,14 @@ RSpec.describe "Api::LineupScenarios", type: :request do
       scenario_date: Date.current.iso8601,
       name: "Vs right-handed starter",
       notes: "Favor on-base skills early.",
+      evaluation_inputs: {
+        opponent: "Cleveland Guardians",
+        opponent_strength: 65,
+        park_factor: 105,
+        pitcher_hand: "R",
+        recent_performance: 78,
+        reliability: 88
+      },
       entries: valid_entries
     }
 
@@ -31,11 +39,17 @@ RSpec.describe "Api::LineupScenarios", type: :request do
     scenario_id = json_body.dig("data", "id")
     expect(json_body.dig("data", "entries").map { |entry| entry.fetch("batting_slot") }).to eq((1..9).to_a)
     expect(json_body.dig("data", "entries").map { |entry| entry.fetch("defensive_position") }).to match_array(LineupScenarioEntry::DEFENSIVE_POSITIONS)
+    expect(json_body.dig("data", "evaluation_inputs", "opponent")).to eq("Cleveland Guardians")
+    expect(json_body.dig("data", "total_score")).to be_between(0, 100)
+    expect(json_body.dig("data", "score_breakdown")).to include(
+      "opponent", "park", "platoon", "recent_performance", "reliability"
+    )
 
     get api_team_lineup_scenarios_path(team), params: { season: season }
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", 0, "id")).to eq(scenario_id)
+    expect(json_body.dig("data", 0, "total_score")).to be_between(0, 100)
 
     get api_lineup_scenario_path(scenario_id)
 
