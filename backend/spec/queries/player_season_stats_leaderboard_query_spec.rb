@@ -336,7 +336,8 @@ RSpec.describe PlayerSeasonStatsLeaderboardQuery, type: :model do
         ["baseOnBalls", "BB"],
         ["strikeOuts", "SO"],
         ["whip", "WHIP"],
-        ["avg", "AVG"]
+        ["avg", "AVG"],
+        ["WAR", "WAR"]
       ]
     )
   end

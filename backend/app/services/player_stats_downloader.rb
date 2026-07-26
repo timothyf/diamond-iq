@@ -66,6 +66,7 @@ class PlayerStatsDownloader
     "obp",
     "slg",
     "ops",
+    "WAR",
     "totalBases",
     "hitByPitch",
     "sacBunts",
@@ -170,7 +171,54 @@ class PlayerStatsDownloader
       sleep(delay) if delay.positive?
     end
 
+    merge_war_values(rows, year)
     rows
+  end
+
+  def merge_war_values(rows, year)
+    war_values = fetch_war_values(year)
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      row["WAR"] = war_values[player_id] if war_values.key?(player_id)
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download FanGraphs WAR for #{category} #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def fetch_war_values(year)
+    uri = URI("https://www.fangraphs.com/api/leaders/major-league/data")
+    query = {
+      pos: "all",
+      stats: category == "batting" ? "bat" : "pit",
+      lg: "all",
+      qual: 0,
+      season: year,
+      season1: year,
+      month: 0,
+      ind: 0,
+      pageitems: 20_000,
+      pagenum: 1
+    }.to_query
+    uri.query = query
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request["User-Agent"] = USER_AGENT
+    request["Accept"] = "application/json,text/plain,*/*"
+
+    response = http.request(request)
+    raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+    payload = JSON.parse(response.body)
+    Array(payload["data"]).each_with_object({}) do |row, values|
+      mlb_id = Integer(row["xMLBAMID"], exception: false)
+      war = row["WAR"]
+      values[mlb_id] = war if mlb_id && war.present?
+    end
   end
 
   def build_url(year, offset)

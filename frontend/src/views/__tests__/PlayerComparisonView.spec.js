@@ -38,12 +38,12 @@ describe('PlayerComparisonView', () => {
     const responses = {
       '/api/players/1': profile(
         1, 'Riley Greene', { id: 10, name: 'Detroit Tigers', abbreviation: 'DET' },
-        [{ key: 'homeRuns', label: 'HR', value: '24.0' }, { key: 'ops', label: 'OPS', value: '0.842' }, { key: 'caughtStealing', label: 'CS', value: '5.0' }],
-        [{ key: 'homeRuns', label: 'HR', value: '82.0' }, { key: 'ops', label: 'OPS', value: '0.821' }, { key: 'caughtStealing', label: 'CS', value: '11.0' }],
+        [{ key: 'homeRuns', label: 'HR', value: '24.0' }, { key: 'ops', label: 'OPS', value: '0.842' }, { key: 'WAR', label: 'WAR', value: '3.2' }, { key: 'caughtStealing', label: 'CS', value: '5.0' }],
+        [{ key: 'homeRuns', label: 'HR', value: '82.0' }, { key: 'ops', label: 'OPS', value: '0.821' }, { key: 'WAR', label: 'WAR', value: '8.1' }, { key: 'caughtStealing', label: 'CS', value: '11.0' }],
       ),
       '/api/players/2': profile(
         2, 'Aaron Judge', { id: 11, name: 'New York Yankees', abbreviation: 'NYY' },
-        [{ key: 'homeRuns', label: 'HR', value: '38' }, { key: 'avg', label: 'AVG', value: '0.311' }, { key: 'caughtStealing', label: 'CS', value: '2' }],
+        [{ key: 'homeRuns', label: 'HR', value: '38' }, { key: 'avg', label: 'AVG', value: '0.311' }, { key: 'WAR', label: 'WAR', value: '8.1' }, { key: 'caughtStealing', label: 'CS', value: '2' }],
         [{ key: 'homeRuns', label: 'HR', value: '353' }, { key: 'avg', label: 'AVG', value: '0.288' }, { key: 'caughtStealing', label: 'CS', value: '7' }],
       ),
     }
@@ -74,6 +74,8 @@ describe('PlayerComparisonView', () => {
     expect(season.text()).toContain('38')
     expect(season.text()).toContain('0.842')
     expect(season.text()).toContain('0.311')
+    expect(season.text()).toContain('3.2')
+    expect(season.text()).toContain('8.1')
     expect(season.text()).toContain('—')
     const homeRuns = wrapper.get('[data-test="season-stat-homeRuns"]')
     expect(homeRuns.findAll('td')[0].classes()).toContain('is-lesser')

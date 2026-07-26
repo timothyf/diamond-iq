@@ -29,7 +29,7 @@ const LOWER_IS_BETTER = {
 }
 const DECIMAL_STAT_KEYS = new Set([
   'avg', 'obp', 'slg', 'ops', 'era', 'whip', 'inningspitched', 'ip',
-  'k/9', 'bb/9', 'k/bb', 'hr/9', 'h/9',
+  'k/9', 'bb/9', 'k/bb', 'hr/9', 'h/9', 'war',
 ])
 
 watch([leftId, rightId], () => {

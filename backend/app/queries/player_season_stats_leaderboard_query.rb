@@ -26,7 +26,8 @@ class PlayerSeasonStatsLeaderboardQuery
       { key: "avg", label: "AVG", aliases: %w[avg AVG] },
       { key: "obp", label: "OBP", aliases: %w[obp OBP] },
       { key: "slg", label: "SLG", aliases: %w[slg SLG] },
-      { key: "ops", label: "OPS", aliases: %w[ops OPS] }
+      { key: "ops", label: "OPS", aliases: %w[ops OPS] },
+      { key: "WAR", label: "WAR", aliases: %w[WAR war] }
     ],
     "pitching" => [
       { key: "W", label: "W", aliases: %w[W wins] },
@@ -47,7 +48,8 @@ class PlayerSeasonStatsLeaderboardQuery
       { key: "baseOnBalls", label: "BB", aliases: %w[baseOnBalls BB] },
       { key: "strikeOuts", label: "SO", aliases: %w[strikeOuts SO] },
       { key: "whip", label: "WHIP", aliases: %w[whip WHIP] },
-      { key: "avg", label: "AVG", aliases: %w[avg AVG] }
+      { key: "avg", label: "AVG", aliases: %w[avg AVG] },
+      { key: "WAR", label: "WAR", aliases: %w[WAR war] }
     ],
     "pitchStats" => [
       { key: "pitch", label: "Count", aliases: %w[pitch] },

@@ -31,6 +31,13 @@ const dashboardPayload = {
         entries: [{ rank: 1, value: '1.025', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
       },
       {
+        key: 'WAR',
+        label: 'WAR',
+        category: 'batting',
+        qualifier: '',
+        entries: [{ rank: 1, value: '4.2', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
+      },
+      {
         key: 'ERA',
         label: 'ERA',
         category: 'pitching',
@@ -74,6 +81,7 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Aaron Judge')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.025')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.75')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('4.2')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('60-36')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
     expect(wrapper.text()).toContain('Stat Explorer')

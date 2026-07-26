@@ -56,6 +56,7 @@ class PlayerStatsImporter
       "whip" => %w[whip WHIP],
       "AVG" => %w[AVG avg],
       "avg" => %w[avg AVG],
+      "WAR" => %w[WAR war],
       "TBF" => %w[TBF battersFaced],
       "battersFaced" => %w[battersFaced TBF],
       "K/9" => %w[K/9 strikeoutsPer9Inn],

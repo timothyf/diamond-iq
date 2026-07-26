@@ -75,6 +75,7 @@ RSpec.describe "Api::Home", type: :request do
     stat_types = {
       at_bats: create_stat_type(name: "atBats", label: "AB", category: "batting"),
       ops: create_stat_type(name: "ops", label: "OPS", category: "batting"),
+      war: create_stat_type(name: "WAR", label: "WAR", category: "batting"),
       home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "batting"),
       innings: create_stat_type(name: "inningsPitched", label: "IP", category: "pitching"),
       era: create_stat_type(name: "ERA", label: "ERA", category: "pitching"),
@@ -83,6 +84,7 @@ RSpec.describe "Api::Home", type: :request do
     {
       at_bats: 10,
       ops: 1.050,
+      war: 4.2,
       home_runs: 3
     }.each do |key, value|
       create_player_season_stat(player: hitter, stat_type: stat_types.fetch(key), attributes: { team: tigers, season: 2026, value: value })
@@ -124,9 +126,9 @@ RSpec.describe "Api::Home", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "season")).to eq(2026)
     expect(json_body.dig("data", "games", 0, "id")).to eq(game.id)
-    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops homeRuns ERA strikeOuts])
+    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops WAR homeRuns ERA strikeOuts])
     expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("Riley Greene")
-    expect(json_body.dig("data", "leaders", 2, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
+    expect(json_body.dig("data", "leaders", 3, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
     expect(json_body.dig("data", "team_pulse", "best_records", 0, "team", "abbreviation")).to eq("DET")
     expect(json_body.dig("data", "team_pulse", "run_differential", 0, "run_differential")).to eq(2)
     expect(json_body.dig("data", "freshness", "analytics")).to eq("2026-07-16T20:32:00.000Z")

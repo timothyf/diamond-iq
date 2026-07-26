@@ -36,6 +36,7 @@ function apiPayload() {
         preferred_category: 'batting',
         stats: [
           { key: 'homeRuns', label: 'HR', value: '18.0', scope_key: 'DET' },
+          { key: 'WAR', label: 'WAR', value: '3.2', scope_key: 'DET' },
           { key: 'ops', label: 'OPS', value: '0.842', scope_key: 'DET' },
         ],
       },
@@ -49,6 +50,7 @@ function apiPayload() {
           { key: 'gamesPlayed', label: 'G' },
           { key: 'homeRuns', label: 'HR' },
           { key: 'ops', label: 'OPS' },
+          { key: 'WAR', label: 'WAR' },
         ],
         seasons: [
           {
@@ -58,6 +60,7 @@ function apiPayload() {
               { key: 'gamesPlayed', label: 'G', value: '93' },
               { key: 'homeRuns', label: 'HR', value: '5' },
               { key: 'ops', label: 'OPS', value: '0.740' },
+              { key: 'WAR', label: 'WAR', value: '2.1' },
             ],
           },
           {
@@ -67,6 +70,7 @@ function apiPayload() {
               { key: 'gamesPlayed', label: 'G', value: '120' },
               { key: 'homeRuns', label: 'HR', value: '18' },
               { key: 'ops', label: 'OPS', value: '0.842' },
+              { key: 'WAR', label: 'WAR', value: '3.2' },
             ],
           },
         ],
@@ -74,6 +78,7 @@ function apiPayload() {
           { key: 'gamesPlayed', label: 'G', value: '590' },
           { key: 'homeRuns', label: 'HR', value: '82' },
           { key: 'ops', label: 'OPS', value: '0.821' },
+          { key: 'WAR', label: 'WAR', value: '12.4' },
         ],
       },
       similar_players: {
@@ -301,6 +306,8 @@ describe('PlayerProfileView', () => {
     expect(careerTable.text()).toContain('2026')
     expect(careerTable.text()).toContain('DET')
     expect(careerTable.text()).toContain('0.740')
+    expect(careerTable.text()).toContain('WAR')
+    expect(careerTable.text()).toContain('3.2')
     expect(careerTable.text()).toContain('Career')
     expect(careerTable.text()).toContain('0.821')
     expect(wrapper.text()).not.toContain('Season snapshot')

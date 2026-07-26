@@ -3,6 +3,7 @@ class HomeSnapshotQuery
   RECENT_TEAM_GAME_LIMIT = 10
   LEADER_DEFINITIONS = [
     { key: "ops", label: "OPS", category: "batting", aliases: %w[ops OPS], descending: true, qualifier: :at_bats },
+    { key: "WAR", label: "WAR", category: "batting", aliases: %w[WAR war], descending: true },
     { key: "homeRuns", label: "Home runs", category: "batting", aliases: %w[homeRuns HR], descending: true },
     { key: "ERA", label: "ERA", category: "pitching", aliases: %w[ERA era], descending: false, qualifier: :innings },
     { key: "strikeOuts", label: "Strikeouts", category: "pitching", aliases: %w[strikeOuts SO], descending: true }

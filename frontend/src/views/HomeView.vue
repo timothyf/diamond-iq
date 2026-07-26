@@ -29,6 +29,7 @@ function leaderValue(leader, value) {
   if (!Number.isFinite(number)) return '—'
   if (leader.key === 'ops') return number.toFixed(3)
   if (leader.key === 'ERA') return number.toFixed(2)
+  if (leader.key === 'WAR') return number.toFixed(1)
   return Math.round(number).toLocaleString()
 }
 
