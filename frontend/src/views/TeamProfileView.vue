@@ -52,6 +52,28 @@ const recordLabel = computed(() => {
 })
 
 const dashboard = computed(() => team.value?.performanceDashboard || {})
+const nextSeriesGames = computed(() => {
+  const upcoming = team.value?.upcomingGames || []
+  if (!upcoming.length) return []
+
+  const opponentId = opponent(upcoming[0])?.id
+  const series = []
+  for (const game of upcoming) {
+    if (opponent(game)?.id !== opponentId) break
+    series.push(game)
+  }
+  return series
+})
+const nextOpponent = computed(() => nextSeriesGames.value.length ? opponent(nextSeriesGames.value[0]) : null)
+const opponentPrep = computed(() => team.value?.opponentPreparation || {})
+const nextSeriesDateLabel = computed(() => {
+  const games = nextSeriesGames.value
+  if (!games.length) return 'No upcoming series'
+
+  const first = formatDate(games[0].officialDate, true)
+  const last = formatDate(games.at(-1).officialDate, true)
+  return first === last ? first : `${first} – ${last}`
+})
 const rankingGroups = computed(() => [
   {
     key: 'offense',
@@ -127,6 +149,14 @@ function probablePitcher(game) {
   return isHome(game) ? game.homeProbablePitcher : game.awayProbablePitcher
 }
 
+function opponentProbablePitcher(game) {
+  return isHome(game) ? game.awayProbablePitcher : game.homeProbablePitcher
+}
+
+function seriesLocation(game) {
+  return isHome(game) ? `vs ${nextOpponent.value?.abbreviation}` : `at ${nextOpponent.value?.abbreviation}`
+}
+
 function formatDecimal(value, digits = 3) {
   if (value === null || value === undefined || value === '') return '—'
   const number = Number(value)
@@ -146,6 +176,18 @@ function formatPercent(value, digits = 1) {
   const number = Number(value)
   if (!Number.isFinite(number)) return '—'
   return `${(number * 100).toFixed(digits)}%`
+}
+
+function signedChange(value, unit) {
+  if (value === null || value === undefined) return '—'
+  const number = Number(value)
+  const formatted = `${number > 0 ? '+' : ''}${number.toFixed(1)}`
+  return unit === 'mph' ? `${formatted} mph` : `${formatted} pts`
+}
+
+function evidenceLabel(item) {
+  const velocity = Number(item.velocity)
+  return [item.pitch_name, Number.isFinite(velocity) ? `${velocity.toFixed(1)} mph` : null].filter(Boolean).join(' · ')
 }
 
 function formatRank(entry) {
@@ -241,6 +283,149 @@ function handleProfileTabKeydown(event, currentIndex) {
         aria-labelledby="team-profile-tab-overview"
         data-test="team-profile-panel-overview"
       >
+
+      <section class="team-panel opponent-prep" data-test="opponent-preparation">
+        <header>
+          <div><p>Opponent preparation</p><h2>Next series</h2></div>
+          <span>{{ nextSeriesGames.length }} {{ nextSeriesGames.length === 1 ? 'game' : 'games' }}</span>
+        </header>
+
+        <div v-if="nextOpponent" class="opponent-prep__overview">
+          <div class="opponent-prep__identity">
+            <span class="opponent-prep__logo">
+              <img :src="`https://www.mlbstatic.com/team-logos/${nextOpponent.mlb_id}.svg`" :alt="`${nextOpponent.name} logo`" />
+            </span>
+            <div>
+              <small>Next opponent</small>
+              <RouterLink :to="{ name: 'team-profile', params: { id: nextOpponent.id } }">
+                {{ nextOpponent.name }}
+              </RouterLink>
+              <p>{{ nextSeriesDateLabel }} · {{ seriesLocation(nextSeriesGames[0]) }}</p>
+            </div>
+          </div>
+          <div class="opponent-prep__venue">
+            <small>Series venue</small>
+            <strong>{{ nextSeriesGames[0].venueName || 'Venue TBD' }}</strong>
+          </div>
+        </div>
+
+        <div v-if="nextSeriesGames.length" class="probable-starters" aria-label="Probable starters">
+          <article v-for="game in nextSeriesGames" :key="game.id" :data-test="`opponent-series-game-${game.id}`">
+            <header>
+              <div><strong>{{ formatDate(game.officialDate, true) }}</strong><span>{{ seriesLocation(game) }}</span></div>
+              <RouterLink :to="{ name: 'game-summary', params: { id: game.id } }">Game preview →</RouterLink>
+            </header>
+            <div class="starter-matchup">
+              <div>
+                <small>{{ team.abbreviation }} probable</small>
+                <RouterLink
+                  v-if="probablePitcher(game)?.id"
+                  :to="{ name: 'player-profile', params: { id: probablePitcher(game).id } }"
+                  :data-test="`team-probable-${game.id}`"
+                >
+                  {{ probablePitcher(game).full_name }}
+                </RouterLink>
+                <strong v-else>{{ probablePitcher(game)?.full_name || 'TBD' }}</strong>
+              </div>
+              <span aria-hidden="true">vs</span>
+              <div>
+                <small>{{ nextOpponent.abbreviation }} probable</small>
+                <RouterLink
+                  v-if="opponentProbablePitcher(game)?.id"
+                  :to="{ name: 'player-profile', params: { id: opponentProbablePitcher(game).id } }"
+                  :data-test="`opponent-probable-${game.id}`"
+                >
+                  {{ opponentProbablePitcher(game).full_name }}
+                </RouterLink>
+                <strong v-else>{{ opponentProbablePitcher(game)?.full_name || 'TBD' }}</strong>
+              </div>
+            </div>
+          </article>
+        </div>
+        <p v-else class="team-empty">No upcoming opponent is stored for this season.</p>
+
+        <section v-if="nextOpponent && opponentPrep.recentPerformance" class="opponent-recent" data-test="opponent-recent-performance">
+          <header><div><small>Recent opponent performance</small><strong>Last {{ opponentPrep.recentPerformance.games }} games</strong></div></header>
+          <dl>
+            <div><dt>Record</dt><dd>{{ opponentPrep.recentPerformance.wins }}–{{ opponentPrep.recentPerformance.losses }}</dd></div>
+            <div><dt>Runs / G</dt><dd>{{ formatDecimal(opponentPrep.recentPerformance.runs_per_game, 2) }}</dd></div>
+            <div><dt>OPS</dt><dd>{{ formatDecimal(opponentPrep.recentPerformance.ops) }}</dd></div>
+            <div><dt>ERA</dt><dd>{{ formatTwoDecimalPitchingRate(opponentPrep.recentPerformance.era) }}</dd></div>
+          </dl>
+        </section>
+
+        <section
+          v-for="starter in opponentPrep.probableStarters || []"
+          :key="starter.player.id"
+          class="starter-scouting"
+          :data-test="`starter-scouting-${starter.player.id}`"
+        >
+          <header>
+            <div>
+              <small>Probable starter scouting</small>
+              <RouterLink :to="{ name: 'player-profile', params: { id: starter.player.id } }">{{ starter.player.full_name }}</RouterLink>
+            </div>
+            <span>{{ starter.throws || '—' }}HP · {{ starter.sampleSize }} tracked pitches</span>
+          </header>
+
+          <div class="scouting-layout">
+            <div class="scouting-table-wrap">
+              <h4>Repertoire</h4>
+              <table>
+                <thead><tr><th>Pitch</th><th>Usage</th><th>Velo</th><th>H-break</th><th>V-break</th><th>Evidence</th></tr></thead>
+                <tbody>
+                  <tr v-for="pitch in starter.repertoire" :key="pitch.pitch_type">
+                    <th>{{ pitch.pitch_name }} <small>{{ pitch.pitch_type }}</small></th>
+                    <td>{{ formatDecimal(pitch.usage_percentage, 1) }}%</td>
+                    <td>{{ formatDecimal(pitch.average_velocity, 1) }} mph</td>
+                    <td>{{ formatDecimal(pitch.horizontal_break, 1) }} in</td>
+                    <td>{{ formatDecimal(pitch.vertical_break, 1) }} in</td>
+                    <td>
+                      <RouterLink
+                        v-for="item in pitch.evidence"
+                        :key="item.pitch_id"
+                        class="evidence-link"
+                        :to="{ name: 'game-summary', params: { id: item.game_id }, hash: `#pitch-${item.pitch_id}` }"
+                      >{{ evidenceLabel(item) }}</RouterLink>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="scouting-side">
+              <article>
+                <h4>Handedness splits</h4>
+                <dl>
+                  <div v-for="split in starter.handednessSplits" :key="split.batter_hand">
+                    <dt>vs {{ split.batter_hand }}HB</dt>
+                    <dd>{{ split.plate_appearances }} PA · K {{ formatDecimal(split.strikeout_rate, 1) }}% · Whiff {{ formatDecimal(split.whiff_rate, 1) }}%</dd>
+                    <RouterLink
+                      v-if="split.evidence[0]"
+                      class="evidence-link"
+                      :to="{ name: 'game-summary', params: { id: split.evidence[0].game_id }, hash: `#plate-appearance-${split.evidence[0].plate_appearance_id}` }"
+                    >View supporting PA →</RouterLink>
+                  </div>
+                </dl>
+              </article>
+              <article>
+                <h4>Recent changes</h4>
+                <ul v-if="starter.recentChanges.length">
+                  <li v-for="change in starter.recentChanges" :key="change.key">
+                    <span>{{ change.label }}</span><strong :class="{ 'is-up': change.change > 0, 'is-down': change.change < 0 }">{{ signedChange(change.change, change.unit) }}</strong>
+                    <RouterLink
+                      v-if="change.evidence[0]"
+                      class="evidence-link"
+                      :to="{ name: 'game-summary', params: { id: change.evidence[0].game_id }, hash: `#pitch-${change.evidence[0].pitch_id}` }"
+                    >Supporting pitch →</RouterLink>
+                  </li>
+                </ul>
+                <p v-else>At least 200 tracked pitches are needed for recent-change comparisons.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+      </section>
 
       <TeamLeadersCard :leaders="team.teamLeaders" :season="team.season" />
 
@@ -557,6 +742,65 @@ function handleProfileTabKeydown(event, currentIndex) {
 .team-profile-tab-panel:focus { outline: none; }
 .team-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .team-panel { padding: 1.35rem; }
+.opponent-prep { overflow: hidden; background: linear-gradient(135deg, rgba(255,250,240,.95), rgba(232,239,243,.88)); }
+.opponent-prep__overview { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: 1rem; padding: 1rem; border-radius: 18px; color: #fffaf0; background: #10263d; }
+.opponent-prep__identity { display: flex; min-width: 0; gap: .9rem; align-items: center; }
+.opponent-prep__logo { display: grid; flex: 0 0 auto; width: 66px; height: 66px; place-items: center; border-radius: 50%; background: #fff; }
+.opponent-prep__logo img { width: 48px; height: 48px; object-fit: contain; }
+.opponent-prep__identity small,.opponent-prep__identity a,.opponent-prep__identity p,.opponent-prep__venue small,.opponent-prep__venue strong { display: block; }
+.opponent-prep__identity small,.opponent-prep__venue small { color: #9fb0bc; font-size: .66rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.opponent-prep__identity a { margin: .15rem 0; color: #fffaf0; font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.7rem; font-weight: 900; line-height: 1; text-decoration-color: rgba(255,250,240,.35); text-underline-offset: .14em; text-transform: uppercase; }
+.opponent-prep__identity p { margin: .3rem 0 0; color: #d2dce2; font-size: .78rem; }
+.opponent-prep__venue { flex: 0 0 auto; max-width: 240px; text-align: right; }
+.opponent-prep__venue strong { margin-top: .25rem; }
+.probable-starters { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: .75rem; margin-top: .75rem; }
+.probable-starters > article { padding: .9rem; border: 1px solid rgba(16,38,61,.11); border-radius: 16px; background: rgba(255,255,255,.76); }
+.probable-starters > article > header { display: flex; justify-content: space-between; gap: .7rem; align-items: start; padding-bottom: .7rem; border-bottom: 1px solid rgba(16,38,61,.09); }
+.probable-starters > article > header strong,.probable-starters > article > header span { display: block; }
+.probable-starters > article > header span { margin-top: .15rem; color: #6d7b85; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.probable-starters > article > header a { color: #8d392e; font-size: .68rem; font-weight: 850; text-decoration: none; }
+.starter-matchup { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: .6rem; align-items: center; padding-top: .75rem; }
+.starter-matchup > span { color: #a93627; font-size: .65rem; font-weight: 900; text-transform: uppercase; }
+.starter-matchup > div:last-child { text-align: right; }
+.starter-matchup small,.starter-matchup a,.starter-matchup strong { display: block; }
+.starter-matchup small { margin-bottom: .25rem; color: #71808c; font-size: .61rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.starter-matchup a,.starter-matchup strong { overflow: hidden; color: #173652; font-size: .84rem; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+.opponent-recent { margin-top: .85rem; padding: 1rem; border: 1px solid rgba(16,38,61,.11); border-radius: 16px; background: rgba(255,255,255,.76); }
+.opponent-recent > header small,.opponent-recent > header strong { display: block; }
+.opponent-recent > header small,.starter-scouting > header small { color: #a93627; font-size: .64rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.opponent-recent > header strong { margin-top: .2rem; }
+.opponent-recent dl { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .6rem; margin: .8rem 0 0; }
+.opponent-recent dl div { padding: .7rem; border-radius: 12px; background: rgba(16,38,61,.055); }
+.opponent-recent dt { color: #71808c; font-size: .62rem; font-weight: 850; text-transform: uppercase; }
+.opponent-recent dd { margin: .2rem 0 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.35rem; font-weight: 900; }
+.starter-scouting { margin-top: .85rem; padding: 1rem; border: 1px solid rgba(16,38,61,.14); border-radius: 18px; background: rgba(255,255,255,.82); }
+.starter-scouting > header { display: flex; justify-content: space-between; gap: 1rem; align-items: end; padding-bottom: .8rem; border-bottom: 1px solid rgba(16,38,61,.1); }
+.starter-scouting > header small,.starter-scouting > header a { display: block; }
+.starter-scouting > header a { margin-top: .2rem; color: #173652; font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.55rem; font-weight: 900; text-transform: uppercase; }
+.starter-scouting > header > span { color: #667680; font-size: .7rem; font-weight: 850; }
+.scouting-layout { display: grid; grid-template-columns: minmax(0,1.7fr) minmax(270px,.8fr); gap: .8rem; margin-top: .8rem; }
+.scouting-table-wrap { overflow-x: auto; }
+.scouting-layout h4 { margin: 0 0 .55rem; color: #173652; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+.scouting-table-wrap table { width: 100%; border-collapse: collapse; font-size: .72rem; }
+.scouting-table-wrap th,.scouting-table-wrap td { padding: .55rem .45rem; border-top: 1px solid rgba(16,38,61,.09); text-align: right; white-space: nowrap; }
+.scouting-table-wrap th:first-child { text-align: left; }
+.scouting-table-wrap tbody th small { display: block; color: #7a858d; font-size: .58rem; }
+.scouting-table-wrap td:last-child { max-width: 170px; white-space: normal; }
+.evidence-link { display: block; margin-top: .2rem; color: #8d392e; font-size: .62rem; font-weight: 800; text-decoration: none; }
+.evidence-link:hover { text-decoration: underline; }
+.scouting-side { display: grid; gap: .7rem; }
+.scouting-side > article { padding: .8rem; border-radius: 13px; background: rgba(16,38,61,.05); }
+.scouting-side dl { margin: 0; }
+.scouting-side dl > div + div { margin-top: .65rem; padding-top: .65rem; border-top: 1px solid rgba(16,38,61,.09); }
+.scouting-side dt { font-size: .68rem; font-weight: 900; }
+.scouting-side dd { margin: .15rem 0 0; color: #526573; font-size: .68rem; line-height: 1.4; }
+.scouting-side ul { margin: 0; padding: 0; list-style: none; }
+.scouting-side li { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .3rem .6rem; padding: .45rem 0; border-top: 1px solid rgba(16,38,61,.08); font-size: .68rem; }
+.scouting-side li:first-child { border-top: 0; }
+.scouting-side li .evidence-link { grid-column: 1 / -1; }
+.scouting-side .is-up { color: #1b6d45; }
+.scouting-side .is-down { color: #9b3328; }
+.scouting-side article > p { margin: 0; color: #6f7d86; font-size: .68rem; line-height: 1.45; }
 .performance-panel h3 { margin: 0 0 .55rem; font-size: .9rem; letter-spacing: .05em; text-transform: uppercase; color: #5f6c76; }
 .analytics-coverage-warning { display: flex; gap: .35rem; flex-direction: column; margin-top: 1rem; padding: .75rem .9rem; border: 1px solid #d89a32; border-radius: 12px; color: #68420d; background: #fff4d8; }
 .analytics-coverage-warning span { font-size: .86rem; }
@@ -623,5 +867,7 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state--error { color: #8f2e23; }
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
 @media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 900px) { .scouting-layout { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .opponent-prep__overview,.starter-scouting > header { align-items: flex-start; flex-direction: column; } .opponent-prep__venue { max-width: none; text-align: left; } .opponent-recent dl { grid-template-columns: 1fr 1fr; } }
 </style>

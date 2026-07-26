@@ -16,6 +16,20 @@ const gameTabs = [
 const activeTab = ref('overview')
 
 watch(() => props.gameId, () => { activeTab.value = 'overview' })
+watch(
+  () => game.value?.id,
+  async () => {
+    if (!window.location.hash) return
+
+    activeTab.value = 'play-by-play'
+    await nextTick()
+    const target = document.querySelector(window.location.hash)
+    const appearance = target?.closest('details')
+    if (appearance) appearance.open = true
+    await nextTick()
+    target?.scrollIntoView({ block: 'center' })
+  },
+)
 
 const innings = computed(() => game.value?.details.lineScore.innings || [])
 const awayBatting = computed(() => game.value?.details.battingLines.filter((line) => !line.home) || [])
@@ -632,7 +646,7 @@ async function handleTabKey(event, index) {
           <section v-for="inning in playByPlayInnings" :key="inning.key" class="play-inning">
             <header><h3>{{ inning.label }}</h3><span>{{ inning.appearances.length }} {{ inning.appearances.length === 1 ? 'plate appearance' : 'plate appearances' }}</span></header>
             <div class="play-inning__appearances">
-              <details v-for="appearance in inning.appearances" :key="appearance.id" class="plate-appearance" data-test="plate-appearance">
+              <details v-for="appearance in inning.appearances" :id="`plate-appearance-${appearance.id}`" :key="appearance.id" class="plate-appearance" data-test="plate-appearance">
                 <summary>
                   <div class="plate-appearance__matchup">
                     <span>#{{ appearance.plateAppearanceNumber }}</span>
@@ -658,7 +672,7 @@ async function handleTabKey(event, index) {
                     <table class="pitch-sequence-table">
                       <thead><tr><th>#</th><th>Count</th><th>Pitch</th><th>Velocity</th><th>Result</th><th>Exit velo</th><th>Launch</th><th>Distance</th><th>xwOBA</th></tr></thead>
                       <tbody>
-                        <tr v-for="pitch in appearance.pitches" :key="pitch.id || pitch.pitchNumber">
+                        <tr v-for="pitch in appearance.pitches" :id="pitch.id ? `pitch-${pitch.id}` : undefined" :key="pitch.id || pitch.pitchNumber">
                           <td>{{ pitch.pitchNumber }}</td>
                           <td>{{ countLabel(pitch) }}</td>
                           <th><strong>{{ pitch.pitchName || pitch.pitchType || 'Unknown' }}</strong><small v-if="pitch.pitchName && pitch.pitchType">{{ pitch.pitchType }}</small></th>

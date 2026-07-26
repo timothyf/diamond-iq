@@ -43,6 +43,7 @@ function normalizeMembership(membership) {
 
 function normalizeProfile(data) {
   const drillDown = data.performance_dashboard?.drill_down || {}
+  const opponentPreparation = data.opponent_preparation || {}
   return {
     id: data.id,
     mlbId: data.mlb_id,
@@ -64,6 +65,19 @@ function normalizeProfile(data) {
     rosterSummary: data.roster_summary || {},
     recentGames: (data.recent_games || []).map(normalizeGame),
     upcomingGames: (data.upcoming_games || []).map(normalizeGame),
+    opponentPreparation: {
+      opponent: opponentPreparation.opponent || null,
+      recentPerformance: opponentPreparation.recent_performance || null,
+      probableStarters: (opponentPreparation.probable_starters || []).map((starter) => ({
+        player: starter.player,
+        throws: starter.throws,
+        sampleSize: starter.sample_size || 0,
+        repertoire: starter.repertoire || [],
+        handednessSplits: starter.handedness_splits || [],
+        recentChanges: starter.recent_changes || [],
+        evidence: starter.evidence || [],
+      })),
+    },
     teamLeaders: {
       batting: data.team_leaders?.batting || [],
       pitching: data.team_leaders?.pitching || [],

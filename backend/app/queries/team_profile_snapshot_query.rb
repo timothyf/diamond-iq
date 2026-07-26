@@ -40,6 +40,12 @@ class TeamProfileSnapshotQuery
       roster_summary: roster_summary(forty_man_roster, active_roster),
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
+      opponent_preparation: OpponentPreparationQuery.new(
+        team: team,
+        upcoming_games: upcoming_games,
+        season: season,
+        on: on
+      ).result,
       team_leaders: team_leaders,
       source_metadata: source_metadata,
       performance_dashboard: performance_dashboard

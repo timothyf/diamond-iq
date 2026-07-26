@@ -86,8 +86,60 @@ const payload = {
       { id: 80, official_date: '2026-07-14', home_score: 5, away_score: 2, home_team: { id: 1, abbreviation: 'DET' }, away_team: { id: 2, abbreviation: 'CLE' } },
     ],
     upcoming_games: [
-      { id: 81, official_date: '2026-07-16', venue_name: 'Comerica Park', home_score: null, away_score: null, home_team: { id: 1, abbreviation: 'DET' }, away_team: { id: 2, abbreviation: 'CLE' }, home_probable_pitcher: { full_name: 'Tarik Skubal' } },
+      {
+        id: 81, official_date: '2026-07-16', venue_name: 'Comerica Park', home_score: null, away_score: null,
+        home_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+        away_team: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
+        home_probable_pitcher: { id: 51, full_name: 'Tarik Skubal' },
+        away_probable_pitcher: { id: 52, full_name: 'Tanner Bibee' },
+      },
+      {
+        id: 82, official_date: '2026-07-17', venue_name: 'Comerica Park', home_score: null, away_score: null,
+        home_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+        away_team: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
+        home_probable_pitcher: { id: 53, full_name: 'Jack Flaherty' },
+        away_probable_pitcher: null,
+      },
+      {
+        id: 83, official_date: '2026-07-18', venue_name: 'Comerica Park', home_score: null, away_score: null,
+        home_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
+        away_team: { id: 3, mlb_id: 145, name: 'Chicago White Sox', abbreviation: 'CWS' },
+        home_probable_pitcher: { id: 54, full_name: 'Casey Mize' },
+        away_probable_pitcher: { id: 55, full_name: 'Garrett Crochet' },
+      },
     ],
+    opponent_preparation: {
+      opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
+      recent_performance: { games: 10, wins: 7, losses: 3, runs_per_game: 4.8, ops: 0.781, era: 3.42 },
+      probable_starters: [
+        {
+          player: { id: 52, mlb_id: 999001, full_name: 'Tanner Bibee' },
+          throws: 'R',
+          sample_size: 200,
+          repertoire: [
+            {
+              pitch_type: 'FF', pitch_name: '4-Seam Fastball', count: 100, usage_percentage: 50,
+              average_velocity: 95.6, horizontal_break: -7.2, vertical_break: 14.4,
+              evidence: [{ game_id: 80, pitch_id: 1001, plate_appearance_id: 901, pitch_name: '4-Seam Fastball', velocity: 96.1, result: 'swinging_strike' }],
+            },
+          ],
+          handedness_splits: [
+            {
+              batter_hand: 'L', pitches: 100, plate_appearances: 24, strikeout_rate: 29.2, whiff_rate: 31.5,
+              evidence: [{ game_id: 80, pitch_id: 1001, plate_appearance_id: 901, pitch_name: '4-Seam Fastball', velocity: 96.1 }],
+            },
+            { batter_hand: 'R', pitches: 100, plate_appearances: 25, strikeout_rate: 24, whiff_rate: 27.2, evidence: [] },
+          ],
+          recent_changes: [
+            {
+              key: 'velocity', label: 'Average velocity', change: 1.2, unit: 'mph',
+              evidence: [{ game_id: 80, pitch_id: 1001, plate_appearance_id: 901, pitch_name: '4-Seam Fastball', velocity: 96.1 }],
+            },
+          ],
+          evidence: [],
+        },
+      ],
+    },
     source_metadata: { last_updated_at: '2026-07-15T12:00:00Z', schedule_last_synced_at: '2026-07-15T12:00:00Z', roster_last_synced_at: '2026-07-15T11:00:00Z', sources: ['MLB Stats API'] },
     team_leaders: {
       batting: [
@@ -199,6 +251,32 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="upcoming-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="recent-games"]').text()).toContain('5–2')
     expect(wrapper.get('[data-test="recent-games"] .game-result-link').exists()).toBe(true)
+    const opponentPrep = wrapper.get('[data-test="opponent-preparation"]')
+    expect(opponentPrep.text()).toContain('Cleveland Guardians')
+    expect(opponentPrep.text()).toContain('Jul 16, 2026 – Jul 17, 2026')
+    expect(opponentPrep.text()).toContain('Tarik Skubal')
+    expect(opponentPrep.text()).toContain('Tanner Bibee')
+    expect(opponentPrep.text()).toContain('Jack Flaherty')
+    expect(opponentPrep.text()).toContain('TBD')
+    expect(opponentPrep.text()).not.toContain('Garrett Crochet')
+    expect(wrapper.findAll('[data-test^="opponent-series-game-"]')).toHaveLength(2)
+    expect(wrapper.getComponent('[data-test="opponent-probable-81"]').props('to')).toEqual({
+      name: 'player-profile',
+      params: { id: 52 },
+    })
+    expect(wrapper.get('[data-test="opponent-recent-performance"]').text()).toContain('7–3')
+    const starterScouting = wrapper.get('[data-test="starter-scouting-52"]')
+    expect(starterScouting.text()).toContain('4-Seam Fastball')
+    expect(starterScouting.text()).toContain('95.6 mph')
+    expect(starterScouting.text()).toContain('-7.2 in')
+    expect(starterScouting.text()).toContain('vs LHB')
+    expect(starterScouting.text()).toContain('+1.2 mph')
+    const evidenceLink = wrapper.getComponent('.evidence-link')
+    expect(evidenceLink.props('to')).toEqual({
+      name: 'game-summary',
+      params: { id: 80 },
+      hash: '#pitch-1001',
+    })
     expect(wrapper.get('[data-test="team-profile-tab-overview"]').attributes('aria-selected')).toBe('true')
     expect(wrapper.get('[data-test="team-profile-panel-overview"]').attributes('style') || '').not.toContain('display: none')
     expect(wrapper.get('[data-test="team-profile-panel-roster"]').attributes('style')).toContain('display: none')
