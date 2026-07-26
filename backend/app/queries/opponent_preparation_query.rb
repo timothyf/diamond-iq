@@ -103,6 +103,13 @@ class OpponentPreparationQuery
       sample_size: pitches.length,
       repertoire: repertoire(pitches),
       handedness_splits: handedness_splits(pitches),
+      usage_by_count: usage_by_count(pitches),
+      first_pitch_tendencies: first_pitch_tendencies(pitches),
+      two_strike_tendencies: two_strike_tendencies(pitches),
+      location_zones: location_zones(pitches),
+      put_away_pitches: put_away_pitches(pitches),
+      times_through_order: times_through_order(pitches),
+      hitter_attack_plan: hitter_attack_plan(pitches),
       recent_changes: recent_changes(current, previous),
       evidence: evidence(pitches.first(5))
     }
@@ -139,6 +146,159 @@ class OpponentPreparationQuery
         evidence: evidence(rows.first(2))
       }
     end
+  end
+
+  def usage_by_count(pitches)
+    pitches.group_by { |pitch| count_label(pitch) }.sort_by { |label, _rows| count_sort_key(label) }.map do |count, rows|
+      {
+        count: count,
+        pitches: rows.length,
+        percentage: percentage(rows.length, pitches.length),
+        repertoire: pitch_mix(rows),
+        evidence: evidence(rows.first(2))
+      }
+    end
+  end
+
+  def first_pitch_tendencies(pitches)
+    rows = first_pitches(pitches)
+    {
+      pitches: rows.length,
+      repertoire: pitch_mix(rows),
+      location_zones: zone_mix(rows),
+      evidence: evidence(rows.first(4))
+    }
+  end
+
+  def two_strike_tendencies(pitches)
+    rows = pitches.select { |pitch| pitch.strikes.to_i >= 2 }
+    {
+      pitches: rows.length,
+      repertoire: pitch_mix(rows),
+      location_zones: zone_mix(rows),
+      evidence: evidence(rows.first(4))
+    }
+  end
+
+  def location_zones(pitches)
+    pitches.group_by { |pitch| pitch.zone.presence || "unknown" }.sort_by { |zone, _rows| zone.to_s }.map do |zone, rows|
+      {
+        zone: zone,
+        label: zone == "unknown" ? "Unknown" : "Zone #{zone}",
+        pitches: rows.length,
+        percentage: percentage(rows.length, pitches.length),
+        evidence: evidence(rows.first(2))
+      }
+    end
+  end
+
+  def put_away_pitches(pitches)
+    strikeout_appearances = pitches.group_by { |pitch| plate_appearance_key(pitch) }.values.select do |rows|
+      rows.max_by(&:pitch_number)&.events.to_s.downcase.in?(DailyAnalyticsCalculator::STRIKEOUT_EVENTS)
+    end
+    rows = strikeout_appearances.map { |appearance| appearance.max_by(&:pitch_number) }
+    pitches.group_by(&:pitch_type).sort_by { |_type, type_rows| -type_rows.length }.filter_map do |pitch_type, type_rows|
+      strikeout_rows = rows.select { |pitch| pitch.pitch_type == pitch_type }
+      strikeouts = strikeout_rows.length
+      next if strikeouts.zero?
+
+      {
+        pitch_type: pitch_type,
+        pitch_name: type_rows.filter_map(&:pitch_name).first || pitch_type,
+        strikeouts: strikeouts,
+        strikeout_rate: percentage(strikeouts, strikeout_appearances.length),
+        evidence: evidence(strikeout_rows.first(3))
+      }
+    end.first(5)
+  end
+
+  def times_through_order(pitches)
+    appearances = pitches.group_by { |pitch| plate_appearance_key(pitch) }
+    appearances.group_by { |_key, rows| rows.max_by(&:pitch_number)&.n_thruorder_pitcher || 1 }.sort_by { |order, _rows| order.to_i }.map do |order, grouped|
+      rows = grouped.map { |_key, pitches_for_appearance| pitches_for_appearance.max_by(&:pitch_number) }
+      strikeouts = rows.count { |pitch| pitch.events.to_s.downcase.in?(DailyAnalyticsCalculator::STRIKEOUT_EVENTS) }
+      {
+        order: order.to_i,
+        plate_appearances: rows.length,
+        strikeouts: strikeouts,
+        strikeout_rate: percentage(strikeouts, rows.length),
+        woba: average(rows.filter_map(&:woba_value)),
+        evidence: evidence(rows.first(3))
+      }
+    end
+  end
+
+  def hitter_attack_plan(pitches)
+    plan = []
+    first = first_pitch_tendencies(pitches)
+    if (pitch = first[:repertoire].max_by { |row| row[:percentage].to_f })
+      plan << {
+        key: "first_pitch",
+        label: "First-pitch plan",
+        recommendation: "Expect #{pitch[:pitch_name]} early and be ready to attack it in the zone.",
+        rationale: "It is the most frequent first pitch (#{pitch[:percentage]}%).",
+        evidence: pitch[:evidence]
+      }
+    end
+
+    put_away = put_away_pitches(pitches).max_by { |row| row[:strikeout_rate].to_f }
+    if put_away
+      plan << {
+        key: "two_strike",
+        label: "Two-strike plan",
+        recommendation: "Protect against #{put_away[:pitch_name]} with two strikes and expand only with two strikes.",
+        rationale: "It accounts for #{put_away[:strikeout_rate]}% of tracked strikeout appearances.",
+        evidence: put_away[:evidence]
+      }
+    end
+
+    zone = location_zones(pitches).reject { |row| row[:zone] == "unknown" }.max_by { |row| row[:percentage].to_f }
+    if zone
+      plan << {
+        key: "location",
+        label: "Location plan",
+        recommendation: "Prioritize pitches in #{zone[:label]} and avoid chasing outside that area.",
+        rationale: "#{zone[:percentage]}% of tracked pitches were recorded there.",
+        evidence: zone[:evidence]
+      }
+    end
+    plan
+  end
+
+  def pitch_mix(rows)
+    rows.group_by(&:pitch_type).sort_by { |_type, type_rows| -type_rows.length }.first(5).map do |pitch_type, type_rows|
+      {
+        pitch_type: pitch_type,
+        pitch_name: type_rows.filter_map(&:pitch_name).first || pitch_type,
+        pitches: type_rows.length,
+        percentage: percentage(type_rows.length, rows.length),
+        evidence: evidence(type_rows.first(2))
+      }
+    end
+  end
+
+  def zone_mix(rows)
+    location_zones(rows)
+  end
+
+  def first_pitches(pitches)
+    pitches.group_by { |pitch| plate_appearance_key(pitch) }.values.filter_map do |rows|
+      rows.min_by(&:pitch_number)
+    end
+  end
+
+  def count_label(pitch)
+    balls = pitch.balls
+    strikes = pitch.strikes
+    balls.nil? || strikes.nil? ? "unknown" : "#{balls}-#{strikes}"
+  end
+
+  def count_sort_key(label)
+    label == "unknown" ? [ 99, 99 ] : label.split("-").map(&:to_i)
+  end
+
+  def plate_appearance_key(pitch)
+    [ pitch.game_pk, pitch.at_bat_number ]
   end
 
   def recent_changes(current, previous)

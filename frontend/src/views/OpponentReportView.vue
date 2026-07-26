@@ -52,6 +52,10 @@ function changeLabel(change) {
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}${change.unit === 'mph' ? ' mph' : ' pts'}`
 }
 
+function printReport() {
+  window.print()
+}
+
 onMounted(load)
 watch(() => props.reportId, load)
 </script>
@@ -76,6 +80,7 @@ watch(() => props.reportId, load)
           <strong>{{ formatTimestamp(report.generated_at) }}</strong>
           <span>Data is preserved as of this time</span>
         </div>
+        <button class="report-print" type="button" data-test="print-report" @click="printReport">Print / PDF</button>
       </header>
 
       <section class="report-panel report-series">
@@ -153,6 +158,77 @@ watch(() => props.reportId, load)
             </article>
           </aside>
         </div>
+        <div class="report-tendency-grid">
+          <section>
+            <h3>Usage by count</h3>
+            <table>
+              <thead><tr><th>Count</th><th>Pitches</th><th>Usage</th><th>Primary pitch</th></tr></thead>
+              <tbody>
+                <tr v-for="count in starter.usage_by_count || []" :key="count.count">
+                  <th>{{ count.count }}</th><td>{{ count.pitches }}</td><td>{{ decimal(count.percentage) }}%</td>
+                  <td>{{ count.repertoire?.[0]?.pitch_name || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+          <section>
+            <h3>First pitch</h3>
+            <p class="report-callout">{{ starter.first_pitch_tendencies?.pitches || 0 }} tracked first pitches</p>
+            <ul class="report-list">
+              <li v-for="pitch in starter.first_pitch_tendencies?.repertoire || []" :key="pitch.pitch_type">
+                <strong>{{ pitch.pitch_name }}</strong><span>{{ decimal(pitch.percentage) }}%</span>
+              </li>
+            </ul>
+          </section>
+          <section>
+            <h3>Two-strike tendencies</h3>
+            <p class="report-callout">{{ starter.two_strike_tendencies?.pitches || 0 }} tracked two-strike pitches</p>
+            <ul class="report-list">
+              <li v-for="pitch in starter.two_strike_tendencies?.repertoire || []" :key="pitch.pitch_type">
+                <strong>{{ pitch.pitch_name }}</strong><span>{{ decimal(pitch.percentage) }}%</span>
+              </li>
+            </ul>
+          </section>
+          <section>
+            <h3>Location zones</h3>
+            <ul class="report-list">
+              <li v-for="zone in starter.location_zones || []" :key="zone.label">
+                <strong>{{ zone.label }}</strong><span>{{ decimal(zone.percentage) }}%</span>
+              </li>
+            </ul>
+          </section>
+          <section>
+            <h3>Put-away pitches</h3>
+            <table>
+              <thead><tr><th>Pitch</th><th>Ks</th><th>Rate</th></tr></thead>
+              <tbody><tr v-for="pitch in starter.put_away_pitches || []" :key="pitch.pitch_type">
+                <th>{{ pitch.pitch_name }}</th><td>{{ pitch.strikeouts }}</td><td>{{ decimal(pitch.strikeout_rate) }}%</td>
+              </tr></tbody>
+            </table>
+          </section>
+          <section>
+            <h3>Times through order</h3>
+            <table>
+              <thead><tr><th>Pass</th><th>PA</th><th>K rate</th><th>wOBA</th></tr></thead>
+              <tbody><tr v-for="pass in starter.times_through_order || []" :key="pass.order">
+                <th>{{ pass.order }}</th><td>{{ pass.plate_appearances }}</td><td>{{ decimal(pass.strikeout_rate) }}%</td><td>{{ decimal(pass.woba, 3) }}</td>
+              </tr></tbody>
+            </table>
+          </section>
+        </div>
+        <section class="report-attack-plan" data-test="hitter-attack-plan">
+          <h3>Evidence-backed hitter attack plan</h3>
+          <article v-for="plan in starter.hitter_attack_plan || []" :key="plan.key">
+            <strong>{{ plan.label }}</strong>
+            <p>{{ plan.recommendation }}</p>
+            <small>{{ plan.rationale }}</small>
+            <RouterLink
+              v-for="item in plan.evidence || []"
+              :key="`${plan.key}-${item.pitch_id}`"
+              :to="{ name: 'game-summary', params: { id: item.game_id }, hash: `#pitch-${item.pitch_id}` }"
+            >Supporting pitch →</RouterLink>
+          </article>
+        </section>
       </section>
     </template>
   </main>
@@ -172,6 +248,7 @@ watch(() => props.reportId, load)
 .report-stamp small,.report-stamp strong,.report-stamp span { display: block; }
 .report-stamp small { color: #b79569; text-transform: uppercase; }
 .report-stamp span { margin-top: .2rem; font-size: .7rem; }
+.report-print { align-self: center; padding: .7rem 1rem; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: #fffaf0; background: rgba(255,255,255,.08); font: inherit; font-weight: 900; cursor: pointer; }
 .report-panel { margin-top: 1rem; padding: 1.4rem; }
 .report-panel > header { display: flex; justify-content: space-between; gap: 1rem; align-items: end; margin-bottom: 1rem; }
 .report-panel h2 { color: #10263d; font-size: 2rem; }
@@ -191,7 +268,19 @@ td a,.report-columns aside a { display: block; color: #8d392e; font-size: .68rem
 .report-columns aside { display: grid; align-content: start; gap: .5rem; }
 .report-columns aside article strong,.report-columns aside article span { display: block; }
 .report-columns aside article span { margin: .2rem 0; color: #667680; font-size: .75rem; }
+.report-tendency-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; margin-top: 1.25rem; }
+.report-tendency-grid section { min-width: 0; }
+.report-tendency-grid h3,.report-attack-plan h3 { margin: .4rem 0 .6rem; color: #173652; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; }
+.report-callout { margin: 0 0 .5rem; color: #667680; font-size: .78rem; }
+.report-list { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.report-list li { display: flex; justify-content: space-between; gap: 1rem; padding: .55rem .65rem; border-radius: 10px; background: rgba(16,38,61,.05); font-size: .78rem; }
+.report-list span { color: #8d392e; font-weight: 900; }
+.report-attack-plan { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid rgba(16,38,61,.1); }
+.report-attack-plan article { display: grid; gap: .2rem; margin-top: .55rem; padding: .75rem; border-left: 4px solid #b79569; border-radius: 0 12px 12px 0; background: rgba(16,38,61,.04); }
+.report-attack-plan p,.report-attack-plan small { margin: 0; color: #526572; font-size: .78rem; }
+.report-attack-plan a { color: #8d392e; font-size: .7rem; font-weight: 900; }
 .report-state { display: grid; min-height: 50vh; place-items: center; }
 .report-state--error { color: #7d291f; }
-@media (max-width: 760px) { .report-hero { flex-direction: column; } .report-stamp { align-self: stretch; text-align: left; } .report-columns { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .report-hero { flex-direction: column; } .report-stamp { align-self: stretch; text-align: left; } .report-columns,.report-tendency-grid { grid-template-columns: 1fr; } }
+@media print { .report-shell { min-height: auto; padding: 0; background: #fff; } .report-shell > * { width: 100%; } .report-back,.report-print { display: none; } .report-hero,.report-panel { box-shadow: none; break-inside: avoid; } .report-hero { color: #10263d; background: #fff; } .report-hero h1,.report-hero span,.report-stamp strong,.report-stamp span { color: #10263d; } .report-stamp { border-color: #ccd5da; } }
 </style>

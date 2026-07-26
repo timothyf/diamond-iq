@@ -56,6 +56,10 @@ RSpec.describe OpponentPreparationQuery do
         release_speed: recent ? 96.0 : 86.0,
         pfx_x: recent ? -0.6 : 0.3,
         pfx_z: recent ? 1.2 : 0.2,
+        balls: index % 4,
+        strikes: [ index % 3, 2 ].min,
+        zone: (index % 9) + 1,
+        n_thruorder_pitcher: 1,
         description: index % 5 == 0 ? "swinging_strike" : "called_strike",
         events: index == 199 ? "strikeout" : nil,
         raw_data: { "source" => "spec" }
@@ -92,6 +96,13 @@ RSpec.describe OpponentPreparationQuery do
       hash_including(pitch_type: "FF", usage_percentage: 50.0, average_velocity: 96.0, horizontal_break: -7.2, vertical_break: 14.4)
     )
     expect(report.fetch(:handedness_splits).map { |split| split.fetch(:batter_hand) }).to eq(%w[L R])
+    expect(report.fetch(:usage_by_count)).not_to be_empty
+    expect(report.dig(:first_pitch_tendencies, :pitches)).to eq(1)
+    expect(report.dig(:two_strike_tendencies, :pitches)).to be > 0
+    expect(report.fetch(:location_zones)).to include(hash_including(label: "Zone 1"))
+    expect(report.fetch(:put_away_pitches)).to include(hash_including(pitch_type: "FF", strikeouts: 1))
+    expect(report.fetch(:times_through_order)).to include(hash_including(order: 1, plate_appearances: 1))
+    expect(report.fetch(:hitter_attack_plan).length).to be >= 2
     expect(report.fetch(:recent_changes)).to include(hash_including(key: "velocity", change: 10.0, unit: "mph"))
     expect(report.dig(:repertoire, 0, :evidence, 0)).to include(
       game_id: historical_game.id,
