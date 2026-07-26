@@ -435,6 +435,37 @@ describe('PlayerProfileView', () => {
     expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
   })
 
+  it('shows a pitcher walk rate as BB/9 in the pitching indicators', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => apiPayloadWith((payload) => {
+        payload.data.positions = {
+          primary: { abbreviation: 'P', name: 'Pitcher', position_type: 'pitcher' },
+          secondary: [],
+          assignments: [],
+        }
+        payload.data.season_overview = {
+          season: 2026,
+          category: 'pitching',
+          preferred_category: 'pitching',
+          stats: [
+            { key: 'baseOnBalls', label: 'BB', value: '20' },
+            { key: 'inningsPitched', label: 'IP', value: '90.0' },
+          ],
+        }
+      }),
+    }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="indicator-card-pitching"]').text()).toContain('Walk rate')
+    expect(wrapper.get('[data-test="indicator-card-pitching"]').text()).toContain('2.00 BB/9')
+  })
+
   it('falls back to player initials when the headshot cannot load', async () => {
     vi.stubGlobal(
       'fetch',

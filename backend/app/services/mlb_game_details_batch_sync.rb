@@ -1,7 +1,7 @@
 require "timeout"
 
 class MlbGameDetailsBatchSync
-  DEFAULT_WORKER_COUNT = 2
+  DEFAULT_WORKER_COUNT = 3
   MAX_WORKER_COUNT = 6
   PER_GAME_TIMEOUT_SECONDS = 60
 

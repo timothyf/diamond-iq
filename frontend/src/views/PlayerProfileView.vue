@@ -96,9 +96,21 @@ const externalProfileLinks = computed(() => {
   ]
 })
 
+const pitcherWalkRate = computed(() => {
+  const stats = player.value?.seasonOverview?.stats || []
+  const walks = Number(stats.find((stat) => ['baseOnBalls', 'BB'].includes(stat.key))?.value)
+  const inningsText = stats.find((stat) => ['inningsPitched', 'IP'].includes(stat.key))?.value
+  if (!Number.isFinite(walks) || inningsText === null || inningsText === undefined) return null
+
+  const inningsParts = String(inningsText).split('.')
+  const innings = Number(inningsParts[0]) + (Number(inningsParts[1] || 0) / 3)
+  return innings > 0 ? `${((walks * 9) / innings).toFixed(2)} BB/9` : null
+})
+
 const pitchingMetrics = computed(() => [
   ['Pitches', player.value?.pitchIndicators.pitching.pitch_count],
   ['Games', player.value?.pitchIndicators.pitching.game_count],
+  ['Walk rate', pitcherWalkRate.value],
   ['Avg velo', withUnit(player.value?.pitchIndicators.pitching.average_velocity, ' mph')],
   ['Max velo', withUnit(player.value?.pitchIndicators.pitching.max_velocity, ' mph')],
   ['Avg spin', withUnit(player.value?.pitchIndicators.pitching.average_spin_rate, ' rpm')],
