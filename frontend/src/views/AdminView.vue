@@ -20,7 +20,7 @@ import { usePitchDataImport } from '../composables/usePitchDataImport'
 import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStatsDownload'
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 import { useRosterSnapshots } from '../composables/useRosterSnapshots'
-import { formatBytes, formatDate, humanize } from '../utils/adminFormatting'
+import { formatBytes, formatCount, formatDate, formatTimestamp, humanize } from '../utils/adminFormatting'
 
 const now = new Date()
 const today = [
@@ -111,6 +111,7 @@ const {
   playerSeasonStatsMetrics,
   pitchDataMetrics,
   gameDetailsMetrics,
+  contextualBenchmarkMetrics,
   loadOverview,
   loadDataHealth,
   runTask,
@@ -623,6 +624,27 @@ async function closeDatabaseDetails() {
           <div class="admin-fields admin-fields--two">
             <label><span>Start date</span><input v-model="contextualBenchmarkOptions.startDate" type="date" required /></label>
             <label><span>End date</span><input v-model="contextualBenchmarkOptions.endDate" type="date" required /></label>
+          </div>
+          <div class="data-coverage" data-test="contextual-benchmark-coverage">
+            <span>Currently stored</span>
+            <dl v-if="contextualBenchmarkMetrics.earliestSourceDate && contextualBenchmarkMetrics.latestSourceDate">
+              <div>
+                <dt>Source start</dt>
+                <dd>{{ formatDate(contextualBenchmarkMetrics.earliestSourceDate) }}</dd>
+              </div>
+              <div>
+                <dt>Source end</dt>
+                <dd>{{ formatDate(contextualBenchmarkMetrics.latestSourceDate) }}</dd>
+              </div>
+            </dl>
+            <p v-else>No contextual benchmark data is currently stored.</p>
+            <small>
+              {{ formatCount(contextualBenchmarkMetrics.benchmarkCount) }} benchmarks ·
+              {{ formatCount(contextualBenchmarkMetrics.percentileCount) }} player percentiles
+              <template v-if="contextualBenchmarkMetrics.lastCalculatedAt">
+                · Updated {{ formatTimestamp(contextualBenchmarkMetrics.lastCalculatedAt) }}
+              </template>
+            </small>
           </div>
           <button class="admin-button" type="submit" :disabled="anyActionRunning">
             {{ runningTask === 'contextual_benchmarks_refresh' ? 'Refreshing contextual benchmarks…' : 'Refresh contextual benchmarks' }}

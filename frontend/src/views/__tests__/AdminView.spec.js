@@ -159,6 +159,14 @@ vi.mock('../../composables/useAdminTask', () => ({
       plateAppearanceCount: 5400,
       linkedPitchCount: 18000,
     })),
+    contextualBenchmarkMetrics: computed(() => ({
+      calculationVersion: '1.0.0',
+      benchmarkCount: 1240,
+      percentileCount: 12800,
+      earliestSourceDate: '2026-04-01',
+      latestSourceDate: '2026-05-31',
+      lastCalculatedAt: '2026-07-15T22:00:00Z',
+    })),
     loadOverview,
     loadDataHealth,
     runTask,
@@ -391,6 +399,10 @@ describe('AdminView', () => {
     expect(wrapper.text()).toContain('Rebuild current player positions')
     expect(wrapper.get('[data-test="contextual-benchmarks-refresh-form"]').text()).toContain('Refresh contextual benchmarks')
     expect(wrapper.get('[data-test="contextual-benchmarks-refresh-form"]').text()).toContain('position, and player-percentile benchmark context')
+    expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('Apr 1, 2026')
+    expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('May 31, 2026')
+    expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('1,240 benchmarks')
+    expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('12,800 player percentiles')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Stored game-date span')

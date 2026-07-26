@@ -87,6 +87,14 @@ describe('useAdminTask', () => {
               plate_appearance_count: 5400,
               linked_pitch_count: 18000,
             },
+            contextual_benchmarks: {
+              calculation_version: '1.0.0',
+              benchmark_count: 1240,
+              percentile_count: 12800,
+              earliest_source_date: '2026-04-01',
+              latest_source_date: '2026-05-31',
+              last_calculated_at: '2026-07-15T22:00:00Z',
+            },
           },
         }),
       }),
@@ -101,6 +109,7 @@ describe('useAdminTask', () => {
       playerSeasonStatsMetrics,
       pitchDataMetrics,
       gameDetailsMetrics,
+      contextualBenchmarkMetrics,
       overviewError,
     } = useAdminTask()
 
@@ -180,6 +189,14 @@ describe('useAdminTask', () => {
       pitchingLineCount: 720,
       plateAppearanceCount: 5400,
       linkedPitchCount: 18000,
+    })
+    expect(contextualBenchmarkMetrics.value).toEqual({
+      calculationVersion: '1.0.0',
+      benchmarkCount: 1240,
+      percentileCount: 12800,
+      earliestSourceDate: '2026-04-01',
+      latestSourceDate: '2026-05-31',
+      lastCalculatedAt: '2026-07-15T22:00:00Z',
     })
     expect(overviewError.value).toBe('')
   })

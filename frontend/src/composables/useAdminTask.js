@@ -43,6 +43,14 @@ export function useAdminTask() {
     plateAppearanceCount: 0,
     linkedPitchCount: 0,
   })
+  const contextualBenchmarkMetrics = ref({
+    calculationVersion: '',
+    benchmarkCount: 0,
+    percentileCount: 0,
+    earliestSourceDate: null,
+    latestSourceDate: null,
+    lastCalculatedAt: null,
+  })
 
   async function loadOverview() {
     overviewLoading.value = true
@@ -141,6 +149,15 @@ export function useAdminTask() {
         pitchingLineCount: Number(gameDetails.pitching_line_count || 0),
         plateAppearanceCount: Number(gameDetails.plate_appearance_count || 0),
         linkedPitchCount: Number(gameDetails.linked_pitch_count || 0),
+      }
+      const contextualBenchmarks = payload?.meta?.contextual_benchmarks || {}
+      contextualBenchmarkMetrics.value = {
+        calculationVersion: contextualBenchmarks.calculation_version || '',
+        benchmarkCount: Number(contextualBenchmarks.benchmark_count || 0),
+        percentileCount: Number(contextualBenchmarks.percentile_count || 0),
+        earliestSourceDate: contextualBenchmarks.earliest_source_date || null,
+        latestSourceDate: contextualBenchmarks.latest_source_date || null,
+        lastCalculatedAt: contextualBenchmarks.last_calculated_at || null,
       }
       return payload
     } catch (overviewLoadError) {
@@ -247,6 +264,7 @@ export function useAdminTask() {
     playerSeasonStatsMetrics: computed(() => playerSeasonStatsMetrics.value),
     pitchDataMetrics: computed(() => pitchDataMetrics.value),
     gameDetailsMetrics: computed(() => gameDetailsMetrics.value),
+    contextualBenchmarkMetrics: computed(() => contextualBenchmarkMetrics.value),
     loadOverview,
     loadDataHealth,
     runTask,
