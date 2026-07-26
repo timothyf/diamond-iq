@@ -336,6 +336,16 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-profile-tab-overview"]').attributes('aria-selected')).toBe('true')
     expect(wrapper.get('[data-test="team-profile-panel-overview"]').attributes('style') || '').not.toContain('display: none')
     expect(wrapper.get('[data-test="team-profile-panel-roster"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-opponent"]').attributes('style')).toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-lineup"]').attributes('style')).toContain('display: none')
+
+    await wrapper.get('[data-test="team-profile-tab-opponent"]').trigger('click')
+    expect(wrapper.get('[data-test="team-profile-panel-opponent"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-overview"]').attributes('style')).toContain('display: none')
+
+    await wrapper.get('[data-test="team-profile-tab-lineup"]').trigger('click')
+    expect(wrapper.get('[data-test="team-profile-panel-lineup"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="team-profile-panel-opponent"]').attributes('style')).toContain('display: none')
 
     await wrapper.get('[data-test="team-profile-tab-roster"]').trigger('click')
 

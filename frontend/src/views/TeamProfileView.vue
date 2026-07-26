@@ -17,6 +17,8 @@ const selectedRosterView = ref('active')
 const profileTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
+  { id: 'opponent', label: 'Opponent Preparation' },
+  { id: 'lineup', label: 'Lineup Planner' },
 ]
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
 const savingReport = ref(false)
@@ -358,12 +360,12 @@ async function saveLineupScenario() {
       </nav>
 
       <div
-        v-show="selectedProfileTab === 'overview'"
-        id="team-profile-panel-overview"
+        v-show="selectedProfileTab === 'opponent'"
+        id="team-profile-panel-opponent"
         class="team-profile-tab-panel"
         role="tabpanel"
-        aria-labelledby="team-profile-tab-overview"
-        data-test="team-profile-panel-overview"
+        aria-labelledby="team-profile-tab-opponent"
+        data-test="team-profile-panel-opponent"
       >
 
       <section class="team-panel opponent-prep" data-test="opponent-preparation">
@@ -542,6 +544,16 @@ async function saveLineupScenario() {
         </section>
       </section>
 
+      </div>
+
+      <div
+        v-show="selectedProfileTab === 'lineup'"
+        id="team-profile-panel-lineup"
+        class="team-profile-tab-panel"
+        role="tabpanel"
+        aria-labelledby="team-profile-tab-lineup"
+        data-test="team-profile-panel-lineup"
+      >
       <section class="team-panel lineup-scenarios" data-test="lineup-scenarios">
         <header>
           <div><p>Lineup planner</p><h2>Lineup scenarios</h2></div>
@@ -589,6 +601,16 @@ async function saveLineupScenario() {
         </div>
       </section>
 
+      </div>
+
+      <div
+        v-show="selectedProfileTab === 'overview'"
+        id="team-profile-panel-overview"
+        class="team-profile-tab-panel"
+        role="tabpanel"
+        aria-labelledby="team-profile-tab-overview"
+        data-test="team-profile-panel-overview"
+      >
       <TeamLeadersCard :leaders="team.teamLeaders" :season="team.season" />
 
       <section class="team-panel performance-panel" data-test="team-performance-dashboard">
