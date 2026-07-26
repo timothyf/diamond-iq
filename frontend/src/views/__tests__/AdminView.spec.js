@@ -403,6 +403,21 @@ describe('AdminView', () => {
     expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('May 31, 2026')
     expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('1,240 benchmarks')
     expect(wrapper.get('[data-test="contextual-benchmark-coverage"]').text()).toContain('12,800 player percentiles')
+    const operationalCardTitles = wrapper
+      .get('[data-test="admin-panel-operations"]')
+      .findAll('.admin-card h3')
+      .map((heading) => heading.text())
+    expect(operationalCardTitles).toEqual([
+      'MLB schedule synchronization',
+      'MLB game detail synchronization',
+      'Statcast pitch data',
+      'Player season statistics',
+      'MLB 40-man roster synchronization',
+      'MLB profile synchronization',
+      'MLB transaction history synchronization',
+      'Refresh contextual benchmarks',
+      'Rebuild current player positions',
+    ])
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Imported schedule coverage')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('May 31, 2026')
     expect(wrapper.get('[data-test="schedule-date-range"]').text()).toContain('Stored game-date span')
@@ -411,21 +426,13 @@ describe('AdminView', () => {
 
   it('organizes administration tools into accessible tab panels', async () => {
     const wrapper = mount(AdminView)
-    const downloadTab = wrapper.get('[data-test="admin-tab-download"]')
     const operationsTab = wrapper.get('[data-test="admin-tab-operations"]')
     const localImportsTab = wrapper.get('[data-test="admin-tab-local-imports"]')
 
-    expect(downloadTab.attributes('role')).toBe('tab')
-    expect(downloadTab.attributes('aria-selected')).toBe('true')
-    expect(wrapper.get('[data-test="admin-panel-download"]').attributes('style') || '').not.toContain('display: none')
-    expect(wrapper.get('[data-test="admin-panel-operations"]').attributes('style')).toContain('display: none')
-    expect(wrapper.get('[data-test="admin-panel-local-imports"]').attributes('style')).toContain('display: none')
-
-    await operationsTab.trigger('click')
+    expect(operationsTab.attributes('role')).toBe('tab')
     expect(operationsTab.attributes('aria-selected')).toBe('true')
-    expect(downloadTab.attributes('aria-selected')).toBe('false')
-    expect(wrapper.get('[data-test="admin-panel-download"]').attributes('style')).toContain('display: none')
     expect(wrapper.get('[data-test="admin-panel-operations"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="admin-panel-local-imports"]').attributes('style')).toContain('display: none')
 
     await operationsTab.trigger('keydown', { key: 'ArrowRight' })
     expect(localImportsTab.attributes('aria-selected')).toBe('true')

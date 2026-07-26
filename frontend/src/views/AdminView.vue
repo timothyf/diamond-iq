@@ -32,11 +32,10 @@ const currentSeason = new Date().getFullYear()
 const databaseDetailsOpen = ref(false)
 const databaseDetailsButton = ref(null)
 const adminTabs = [
-  { id: 'download', label: 'Download & Import' },
-  { id: 'operations', label: 'Operational Tasks' },
+  { id: 'operations', label: 'Daily in-season' },
   { id: 'local-imports', label: 'Local File Imports' },
 ]
-const activeAdminTab = ref(adminTabs[0].id)
+const activeAdminTab = ref('operations')
 
 const statsOptions = reactive({
   category: 'batting',
@@ -440,49 +439,6 @@ async function closeDatabaseDetails() {
     </aside>
 
     <section
-      v-show="activeAdminTab === 'download'"
-      id="admin-panel-download"
-      class="admin-section admin-tab-panel"
-      role="tabpanel"
-      aria-labelledby="admin-tab-download"
-      tabindex="0"
-      data-test="admin-panel-download"
-    >
-      <header class="admin-section__heading">
-        <div>
-          <p class="eyebrow">Source retrieval</p>
-          <h2>Download & import</h2>
-        </div>
-        <p>Fetch fresh source data and immediately upsert it into DiamondIQ.</p>
-      </header>
-
-      <div class="admin-grid admin-grid--two">
-        <AdminPlayerStatsDownloadCard
-          :options="statsOptions"
-          :metrics="playerSeasonStatsMetrics"
-          :downloading="statsDownloading"
-          :any-action-running="anyActionRunning"
-          :error="statsDownloadError"
-          :summary="statsDownloadSummary"
-          @submit="handleStatsDownload"
-        />
-
-        <AdminPitchDataSyncCard
-          ref="pitchDataSyncCard"
-          :options="pitchOptions"
-          :metrics="pitchDataMetrics"
-          :task="pitchDataTask"
-          :active="pitchDataSyncActive"
-          :starting="pitchDataSyncStarting"
-          :any-action-running="anyActionRunning"
-          :error="pitchDataSyncError"
-          @submit="requestPitchDataSync"
-          @cancel-active="cancelActivePitchDataSync"
-        />
-      </div>
-    </section>
-
-    <section
       v-show="activeAdminTab === 'local-imports'"
       id="admin-panel-local-imports"
       class="admin-section admin-tab-panel"
@@ -538,7 +494,7 @@ async function closeDatabaseDetails() {
       <header class="admin-section__heading">
         <div>
           <p class="eyebrow">MLB synchronization</p>
-          <h2>Operational tasks</h2>
+          <h2>Daily in-season tasks</h2>
         </div>
         <p>These actions use the same services as their corresponding Rails tasks.</p>
       </header>
@@ -570,13 +526,27 @@ async function closeDatabaseDetails() {
           @refresh-analytics="refreshGameDetailsAnalytics"
         />
 
-        <AdminPlayerMaintenanceCards
-          :profile-options="profileOptions"
-          :team-history-options="teamHistoryOptions"
+        <AdminPitchDataSyncCard
+          ref="pitchDataSyncCard"
+          :options="pitchOptions"
+          :metrics="pitchDataMetrics"
+          :task="pitchDataTask"
+          :active="pitchDataSyncActive"
+          :starting="pitchDataSyncStarting"
           :any-action-running="anyActionRunning"
-          :running-task="runningTask"
-          @sync-profiles="handleProfileSync"
-          @sync-team-histories="handleTeamHistorySync"
+          :error="pitchDataSyncError"
+          @submit="requestPitchDataSync"
+          @cancel-active="cancelActivePitchDataSync"
+        />
+
+        <AdminPlayerStatsDownloadCard
+          :options="statsOptions"
+          :metrics="playerSeasonStatsMetrics"
+          :downloading="statsDownloading"
+          :any-action-running="anyActionRunning"
+          :error="statsDownloadError"
+          :summary="statsDownloadSummary"
+          @submit="handleStatsDownload"
         />
 
         <AdminRosterSyncCard
@@ -594,23 +564,14 @@ async function closeDatabaseDetails() {
           @cancel-active="cancelActiveRosterSync"
         />
 
-        <AdminTaskCard
-          as="article"
-          source="Data maintenance"
-          title="Rebuild current player positions"
-          command="player_positions:backfill"
-          maintenance
-        >
-          <p>Reconcile current position assignments from the latest active team membership for every player.</p>
-          <button
-            class="admin-button"
-            type="button"
-            :disabled="anyActionRunning"
-            @click="runTask('player_positions_backfill')"
-          >
-            {{ runningTask === 'player_positions_backfill' ? 'Rebuilding positions…' : 'Rebuild player positions' }}
-          </button>
-        </AdminTaskCard>
+        <AdminPlayerMaintenanceCards
+          :profile-options="profileOptions"
+          :team-history-options="teamHistoryOptions"
+          :any-action-running="anyActionRunning"
+          :running-task="runningTask"
+          @sync-profiles="handleProfileSync"
+          @sync-team-histories="handleTeamHistorySync"
+        />
 
         <AdminTaskCard
           data-test="contextual-benchmarks-refresh-form"
@@ -650,6 +611,25 @@ async function closeDatabaseDetails() {
             {{ runningTask === 'contextual_benchmarks_refresh' ? 'Refreshing contextual benchmarks…' : 'Refresh contextual benchmarks' }}
           </button>
         </AdminTaskCard>
+
+        <AdminTaskCard
+          as="article"
+          source="Data maintenance"
+          title="Rebuild current player positions"
+          command="player_positions:backfill"
+          maintenance
+        >
+          <p>Reconcile current position assignments from the latest active team membership for every player.</p>
+          <button
+            class="admin-button"
+            type="button"
+            :disabled="anyActionRunning"
+            @click="runTask('player_positions_backfill')"
+          >
+            {{ runningTask === 'player_positions_backfill' ? 'Rebuilding positions…' : 'Rebuild player positions' }}
+          </button>
+        </AdminTaskCard>
+
       </div>
 
       <AdminRosterSnapshotWorkspace
