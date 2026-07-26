@@ -29,7 +29,7 @@ defineExpose({
     source="Baseball Savant"
     title="Statcast pitch data"
     chip="Download + import"
-    description="Downloads pitch-by-pitch Statcast data from Baseball Savant for the selected games and date range."
+    description="Downloads pitch-by-pitch Statcast data only for games without a completed local Statcast import."
     data-test="pitch-download-form"
     @submit.prevent="emit('submit')"
   >
@@ -49,6 +49,13 @@ defineExpose({
       <label><span>Game types</span><input v-model="options.gameTypes" type="text" placeholder="R" required /></label>
       <label><span>Chunk days</span><input v-model.number="options.chunkDays" type="number" min="1" max="31" required /></label>
     </div>
+    <label class="pitch-replace-existing">
+      <input v-model="options.replaceExisting" type="checkbox" />
+      <span>
+        <strong>Replace completed game data</strong>
+        <small>Redownload selected games and replace their existing local pitch rows.</small>
+      </span>
+    </label>
 
     <button ref="syncButton" class="admin-button" type="submit" :disabled="anyActionRunning">
       {{ starting ? 'Starting synchronization…' : active ? 'Synchronization in progress…' : 'Retrieve Statcast pitches' }}
@@ -65,3 +72,11 @@ defineExpose({
     <p v-if="error" class="admin-message admin-message--error">{{ error }}</p>
   </AdminTaskCard>
 </template>
+
+<style scoped>
+.pitch-replace-existing { display: flex; gap: .65rem; align-items: flex-start; margin-top: .85rem; padding: .75rem; border: 1px solid rgba(16,38,61,.12); border-radius: 12px; background: rgba(16,38,61,.035); cursor: pointer; }
+.pitch-replace-existing input { width: 16px; height: 16px; margin-top: .1rem; }
+.pitch-replace-existing strong,.pitch-replace-existing small { display: block; }
+.pitch-replace-existing strong { color: #173652; font-size: .78rem; }
+.pitch-replace-existing small { margin-top: .2rem; color: #697784; font-size: .7rem; line-height: 1.35; }
+</style>

@@ -40,14 +40,15 @@ class PitchDataImporter
     new(source_name: source_name).import_rows(rows)
   end
 
-  def self.import_raw_rows(rows:, source_name: nil)
-    new(source_name: source_name).send(:import_raw_rows, rows)
+  def self.import_raw_rows(rows:, source_name: nil, replace_game_id: nil)
+    new(source_name: source_name, replace_game_id: replace_game_id).send(:import_raw_rows, rows)
   end
 
-  def initialize(csv_data: nil, file_path: nil, source_name: nil)
+  def initialize(csv_data: nil, file_path: nil, source_name: nil, replace_game_id: nil)
     @csv_data = csv_data
     @file_path = file_path
     @source_name = source_name
+    @replace_game_id = replace_game_id
     @errors = []
   end
 
@@ -64,7 +65,7 @@ class PitchDataImporter
     return failure("No valid pitch data rows found in CSV") if rows.empty?
 
     link_games(rows)
-    PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
+    persist_rows(rows)
 
     linked_count = rows.count { |row| row[:game_id].present? }
     analytics_refresh = refresh_daily_analytics(rows)
@@ -92,13 +93,13 @@ class PitchDataImporter
 
   private
 
-  attr_reader :csv_data, :file_path, :source_name, :errors
+  attr_reader :csv_data, :file_path, :source_name, :replace_game_id, :errors
 
   def import_rows(rows)
     return failure("No valid pitch data rows found in CSV") if rows.blank?
 
     link_games(rows)
-    PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
+    persist_rows(rows)
 
     linked_count = rows.count { |row| row[:game_id].present? }
     analytics_refresh = refresh_daily_analytics(rows)
@@ -143,6 +144,13 @@ class PitchDataImporter
     DailyAnalyticsRefresh.call(dates: dates)
   rescue StandardError => error
     { success: false, message: "Pitch data was imported, but daily analytics refresh failed: #{error.message}" }
+  end
+
+  def persist_rows(rows)
+    PitchDatum.transaction do
+      PitchDatum.where(game_id: replace_game_id).delete_all if replace_game_id.present?
+      PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
+    end
   end
 
   def required_headers

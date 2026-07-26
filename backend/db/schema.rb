@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_26_030000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_26_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -165,6 +165,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_26_030000) do
     t.datetime "details_last_synced_at"
     t.jsonb "boxscore_raw_data", default: {}, null: false
     t.jsonb "live_feed_raw_data", default: {}, null: false
+    t.datetime "pitch_data_complete_at"
+    t.integer "pitch_data_row_count", default: 0, null: false
     t.index ["away_probable_pitcher_id"], name: "index_games_on_away_probable_pitcher_id"
     t.index ["away_team_id", "official_date"], name: "index_games_on_away_team_id_and_official_date"
     t.index ["away_team_id"], name: "index_games_on_away_team_id"
@@ -173,6 +175,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_26_030000) do
     t.index ["home_team_id"], name: "index_games_on_home_team_id"
     t.index ["mlb_id"], name: "index_games_on_mlb_id", unique: true
     t.index ["official_date", "status"], name: "index_games_on_official_date_and_status"
+    t.index ["pitch_data_complete_at"], name: "index_games_on_pitch_data_complete_at"
     t.index ["schedule_id"], name: "index_games_on_schedule_id"
     t.check_constraint "away_score IS NULL OR away_score >= 0", name: "games_nonnegative_away_score"
     t.check_constraint "home_score IS NULL OR home_score >= 0", name: "games_nonnegative_home_score"

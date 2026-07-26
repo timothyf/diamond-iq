@@ -50,6 +50,7 @@ const pitchOptions = reactive({
   endDate: today,
   gameTypes: 'R',
   chunkDays: 7,
+  replaceExisting: false,
 })
 
 const scheduleOptions = reactive({

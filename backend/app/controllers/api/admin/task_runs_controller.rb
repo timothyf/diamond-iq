@@ -28,7 +28,8 @@ module Api
             start_date: params[:start_date],
             end_date: params[:end_date],
             game_types: params[:game_types],
-            chunk_days: params[:chunk_days]
+            chunk_days: params[:chunk_days],
+            replace_existing: params[:replace_existing]
           )
         when MlbRosterSyncTaskLauncher::TASK_NAME
           MlbRosterSyncTaskLauncher.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season])
@@ -59,7 +60,8 @@ module Api
             start_date: params[:start_date],
             end_date: params[:end_date],
             game_types: params[:game_types],
-            chunk_days: params[:chunk_days]
+            chunk_days: params[:chunk_days],
+            replace_existing: params[:replace_existing]
           )
         when MlbRosterSyncTaskEstimate::TASK_NAME
           MlbRosterSyncTaskEstimate.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season])

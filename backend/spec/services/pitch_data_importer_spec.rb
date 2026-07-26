@@ -1,6 +1,20 @@
 require "rails_helper"
 
 RSpec.describe PitchDataImporter, type: :service do
+  it "replaces a single game's local pitches when requested" do
+    game = create_game
+    PitchDatum.create!(game: game, game_pk: game.mlb_id, at_bat_number: 1, pitch_number: 1, raw_data: { "old" => true })
+
+    result = described_class.import_raw_rows(
+      rows: [ { "game_pk" => game.mlb_id.to_s, "at_bat_number" => "2", "pitch_number" => "1", "game_date" => game.official_date.iso8601 } ],
+      source_name: "spec replacement",
+      replace_game_id: game.id
+    )
+
+    expect(result).to include(success: true)
+    expect(PitchDatum.where(game_id: game.id).pluck(:at_bat_number, :pitch_number)).to eq([ [ 2, 1 ] ])
+  end
+
   it "imports pitch data rows and upserts duplicate pitch identities" do
     game = create_game(mlb_id: 1001)
     plate_appearance = PlateAppearance.create!(

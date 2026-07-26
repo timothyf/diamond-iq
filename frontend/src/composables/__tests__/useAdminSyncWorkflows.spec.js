@@ -43,6 +43,7 @@ function mountComposable({
           endDate: '2026-07-07',
           gameTypes: 'R',
           chunkDays: 7,
+          replaceExisting: false,
           ...pitchOptions,
         }),
         rosterOptions: reactive({
@@ -145,6 +146,7 @@ describe('useAdminSyncWorkflows', () => {
       end_date: '2026-07-07',
       game_types: 'R',
       chunk_days: 7,
+      replace_existing: false,
     })
     expect(api.pitchDataEstimate.value).toMatchObject({
       scope: '7 calendar days · Jul 1, 2026–Jul 7, 2026',
@@ -159,6 +161,7 @@ describe('useAdminSyncWorkflows', () => {
       end_date: '2026-07-07',
       game_types: 'R',
       chunk_days: 7,
+      replace_existing: false,
     })
     wrapper.unmount()
   })

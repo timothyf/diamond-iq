@@ -1,13 +1,14 @@
 class PitchDataBatchSync
-  def self.call(start_date:, end_date:, game_types:, chunk_days:, progress_tracker: nil)
-    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days, progress_tracker: progress_tracker).call
+  def self.call(start_date:, end_date:, game_types:, chunk_days:, replace_existing: false, progress_tracker: nil)
+    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days, replace_existing: replace_existing, progress_tracker: progress_tracker).call
   end
 
-  def initialize(start_date:, end_date:, game_types:, chunk_days:, progress_tracker: nil)
+  def initialize(start_date:, end_date:, game_types:, chunk_days:, replace_existing: false, progress_tracker: nil)
     @start_date = Date.iso8601(start_date.to_s)
     @end_date = Date.iso8601(end_date.to_s)
     @game_types = game_types.to_s
     @chunk_days = Integer(chunk_days, exception: false)
+    @replace_existing = ActiveModel::Type::Boolean.new.cast(replace_existing)
     @progress_tracker = progress_tracker
   end
 
@@ -19,6 +20,7 @@ class PitchDataBatchSync
       imported_count: 0,
       duplicate_count: 0,
       skipped_count: 0,
+      already_complete_game_count: already_complete_games.count,
       cancelled: false,
       chunk_count: chunks.length,
       game_count: games_by_chunk.values.sum(&:length),
@@ -34,6 +36,8 @@ class PitchDataBatchSync
       end
 
       targeted_games = games_by_chunk.fetch([chunk_start, chunk_end], [])
+      next if targeted_games.empty?
+
       download_result = download_chunk(chunk_start:, chunk_end:)
       unless download_result[:success]
         summary[:errors] << { chunk: "#{chunk_start.iso8601} — #{chunk_end.iso8601}", message: download_result[:message], errors: Array(download_result.dig(:data, :errors)) }
@@ -89,7 +93,7 @@ class PitchDataBatchSync
 
   private
 
-  attr_reader :start_date, :end_date, :game_types, :chunk_days, :progress_tracker
+  attr_reader :start_date, :end_date, :game_types, :chunk_days, :replace_existing, :progress_tracker
 
   def download_chunk(chunk_start:, chunk_end:)
     PitchDataDownloader.call(
@@ -105,9 +109,12 @@ class PitchDataBatchSync
 
     import_result = PitchDataImporter.import_raw_rows(
       rows: rows,
-      source_name: "Baseball Savant pitch data #{chunk_start.iso8601}-#{chunk_end.iso8601}"
+      source_name: "Baseball Savant pitch data #{chunk_start.iso8601}-#{chunk_end.iso8601}",
+      replace_game_id: (game.id if replace_existing)
     )
     return import_result unless import_result[:success]
+
+    game.update!(pitch_data_complete_at: Time.current, pitch_data_row_count: PitchDatum.where(game_id: game.id).count)
 
     { success: true, message: import_result[:message], data: import_result[:data].merge(downloaded_count: rows.length) }
   end
@@ -141,7 +148,15 @@ class PitchDataBatchSync
   end
 
   def selected_games
-    @selected_games ||= Game.where(official_date: start_date..end_date, game_type: game_types.split(",")).to_a
+    @selected_games ||= (replace_existing ? base_games : base_games.where(pitch_data_complete_at: nil)).to_a
+  end
+
+  def already_complete_games
+    @already_complete_games ||= replace_existing ? Game.none : base_games.where.not(pitch_data_complete_at: nil)
+  end
+
+  def base_games
+    @base_games ||= Game.where(official_date: start_date..end_date, game_type: game_types.split(","))
   end
 
   def success(message, data)

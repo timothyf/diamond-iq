@@ -5,15 +5,16 @@ class PitchDataSyncTaskEstimate
   HIGH_RANGE_FACTOR = 1.35
   DEFAULT_CHUNK_DAYS = PitchDataDownloader::DEFAULT_CHUNK_DAYS
 
-  def self.call(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS)
-    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days).call
+  def self.call(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, replace_existing: false)
+    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days, replace_existing: replace_existing).call
   end
 
-  def initialize(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS)
+  def initialize(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, replace_existing: false)
     @start_date_input = start_date
     @end_date_input = end_date
     @game_types_input = game_types
     @chunk_days_input = chunk_days
+    @replace_existing_input = replace_existing
   end
 
   def call
@@ -25,6 +26,7 @@ class PitchDataSyncTaskEstimate
     {
       task_parameters: attributes,
       game_count: game_count,
+      already_complete_game_count: already_complete_games(attributes).count,
       estimated_seconds: (game_count * seconds_per_game).round,
       low_estimated_seconds: (game_count * seconds_per_game * LOW_RANGE_FACTOR).ceil,
       high_estimated_seconds: (game_count * seconds_per_game * HIGH_RANGE_FACTOR).ceil,
@@ -37,7 +39,7 @@ class PitchDataSyncTaskEstimate
 
   private
 
-  attr_reader :start_date_input, :end_date_input, :game_types_input, :chunk_days_input
+  attr_reader :start_date_input, :end_date_input, :game_types_input, :chunk_days_input, :replace_existing_input
 
   def normalized_attributes
     start_date = parse_required_date(:start_date, start_date_input)
@@ -58,7 +60,8 @@ class PitchDataSyncTaskEstimate
       "start_date" => start_date.iso8601,
       "end_date" => end_date.iso8601,
       "game_types" => game_types.join(","),
-      "chunk_days" => chunk_days
+      "chunk_days" => chunk_days,
+      "replace_existing" => ActiveModel::Type::Boolean.new.cast(replace_existing_input)
     }
   end
 
@@ -79,10 +82,20 @@ class PitchDataSyncTaskEstimate
   end
 
   def selected_games(attributes)
-    game_types = attributes.fetch("game_types").split(",")
+    scope = base_games(attributes)
+    attributes.fetch("replace_existing") ? scope : scope.where(pitch_data_complete_at: nil)
+  end
+
+  def already_complete_games(attributes)
+    return Game.none if attributes.fetch("replace_existing")
+
+    base_games(attributes).where.not(pitch_data_complete_at: nil)
+  end
+
+  def base_games(attributes)
     Game.where(
       official_date: Date.iso8601(attributes.fetch("start_date"))..Date.iso8601(attributes.fetch("end_date")),
-      game_type: game_types
+      game_type: attributes.fetch("game_types").split(",")
     )
   end
 

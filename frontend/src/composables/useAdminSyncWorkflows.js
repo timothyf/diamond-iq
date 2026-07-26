@@ -119,6 +119,7 @@ export function useAdminSyncWorkflows({
       end_date: pitchOptions.endDate,
       game_types: pitchOptions.gameTypes,
       chunk_days: pitchOptions.chunkDays,
+      replace_existing: pitchOptions.replaceExisting,
     }
     const estimate = await pitchDataSync.estimate(parameters)
     if (!estimate) return

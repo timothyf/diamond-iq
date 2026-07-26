@@ -2,19 +2,20 @@ class PitchDataSyncTaskLauncher
   EnqueueFailure = Class.new(StandardError)
   TASK_NAME = PitchDataSyncTaskEstimate::TASK_NAME
 
-  def self.call(start_date:, end_date:, game_types:, chunk_days:)
-    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days).call
+  def self.call(start_date:, end_date:, game_types:, chunk_days:, replace_existing: false)
+    new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days, replace_existing: replace_existing).call
   end
 
-  def initialize(start_date:, end_date:, game_types:, chunk_days:)
+  def initialize(start_date:, end_date:, game_types:, chunk_days:, replace_existing: false)
     @start_date = start_date
     @end_date = end_date
     @game_types = game_types
     @chunk_days = chunk_days
+    @replace_existing = replace_existing
   end
 
   def call
-    estimate = PitchDataSyncTaskEstimate.call(start_date: @start_date, end_date: @end_date, game_types: @game_types, chunk_days: @chunk_days)
+    estimate = PitchDataSyncTaskEstimate.call(start_date: @start_date, end_date: @end_date, game_types: @game_types, chunk_days: @chunk_days, replace_existing: @replace_existing)
     attributes = estimate.fetch(:task_parameters)
     raise ArgumentError, "A Statcast pitch data synchronization is already queued or running" if AdminTaskRun.active.exists?(task_name: TASK_NAME)
 

@@ -565,7 +565,7 @@ describe('AdminView', () => {
     await wrapper.get('[data-test="pitch-data-continue"]').trigger('click')
     await flushPromises()
     expect(startPitchDataSync).toHaveBeenCalledWith(
-      { start_date: '2026-07-01', end_date: '2026-07-07', game_types: 'R', chunk_days: 7 },
+      { start_date: '2026-07-01', end_date: '2026-07-07', game_types: 'R', chunk_days: 7, replace_existing: false },
     )
   })
 
