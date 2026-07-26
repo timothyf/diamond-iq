@@ -18,7 +18,16 @@ Rails.application.routes.draw do
     end
 
     resources :players, only: [:index, :show]
-    resources :teams, only: [:index, :show]
+    resources :teams, only: [:index, :show] do
+      resources :opponent_reports, only: [ :index, :create ]
+      resources :lineup_scenarios, only: [ :index, :create ]
+    end
+    resources :opponent_reports, only: [ :show ]
+    resources :lineup_scenarios, only: [ :show ]
+    resources :watchlists, only: [ :index, :show, :create, :update ] do
+      resources :watchlist_entries, only: [ :create ]
+    end
+    resources :watchlist_entries, only: [ :update, :destroy ]
     resource :home, only: [:show], controller: :home
     resource :standings, only: [:show], controller: :standings
     resources :positions, only: [:index]

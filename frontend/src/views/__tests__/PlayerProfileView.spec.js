@@ -76,6 +76,31 @@ function apiPayload() {
           { key: 'ops', label: 'OPS', value: '0.821' },
         ],
       },
+      similar_players: {
+        season: 2026,
+        category: 'batting',
+        methodology: 'Standardized same-season statistical distance with a position-role adjustment.',
+        matches: [
+          {
+            player: {
+              id: 84,
+              mlb_id: 666185,
+              full_name: 'Julio Rodríguez',
+              headshot_url: null,
+            },
+            team: { id: 12, mlb_id: 136, name: 'Seattle Mariners', abbreviation: 'SEA' },
+            position: { abbreviation: 'CF', name: 'Center Fielder', position_type: 'outfielder' },
+            similarity_score: 91.4,
+            shared_metric_count: 8,
+            same_position_type: true,
+            closest_metrics: [
+              { key: 'avg', label: 'AVG', target_value: 0.281, candidate_value: 0.278 },
+              { key: 'hr_rate', label: 'HR / PA', target_value: 4.1, candidate_value: 4.0 },
+              { key: 'ops', label: 'OPS', target_value: 0.842, candidate_value: 0.835 },
+            ],
+          },
+        ],
+      },
       current_membership: {
         id: 8,
         team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
@@ -254,6 +279,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('Active')
+    expect(wrapper.get('[data-test="compare-player-link"]').text()).toContain('Compare player')
     expect(wrapper.get('[data-test="external-profile-mlb"]').attributes()).toMatchObject({
       href: 'https://www.mlb.com/player/riley-greene-680776',
       target: '_blank',
@@ -429,6 +455,23 @@ describe('PlayerProfileView', () => {
     expect(wrapper.find('.profile-portrait img').exists()).toBe(false)
     expect(wrapper.get('.profile-portrait').classes()).not.toContain('profile-portrait--photo')
     expect(wrapper.get('.profile-portrait span').text()).toBe('RG')
+  })
+
+  it('shows statistically similar players and the metrics behind each match', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => apiPayload() }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+
+    const panel = wrapper.get('[data-test="similar-players"]')
+    expect(panel.text()).toContain('Julio Rodríguez')
+    expect(panel.text()).toContain('91.4%')
+    expect(panel.text()).toContain('AVG')
+    expect(panel.text()).toContain('HR / PA')
+    expect(panel.text()).toContain('Compare side by side')
   })
 
   it('renders a retry state when loading fails', async () => {

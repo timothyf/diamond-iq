@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 
 import { useTeamProfile } from '../composables/useTeamProfile'
+import { adminRequestHeaders } from '../composables/apiAuth'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
 import TeamLeadersCard from '../components/TeamLeadersCard.vue'
 
@@ -18,6 +19,14 @@ const profileTabs = [
   { id: 'roster', label: 'Roster' },
 ]
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
+const savingReport = ref(false)
+const reportSaveError = ref('')
+const savingLineup = ref(false)
+const lineupError = ref('')
+const lineupName = ref('')
+const lineupNotes = ref('')
+const lineupRows = ref(Array.from({ length: 9 }, (_, index) => ({ battingSlot: index + 1, playerId: '', defensivePosition: '' })))
+const lineupPositions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']
 
 watch(
   () => team.value?.season,
@@ -30,6 +39,8 @@ watch(teamId, () => {
   selectedSeason.value = null
   selectedProfileTab.value = 'overview'
   selectedRosterView.value = 'active'
+  reportSaveError.value = ''
+  lineupError.value = ''
 })
 
 const injuredRoster = computed(() => team.value?.rosters?.fortyMan?.filter((membership) => membership.injured) || [])
@@ -66,6 +77,7 @@ const nextSeriesGames = computed(() => {
 })
 const nextOpponent = computed(() => nextSeriesGames.value.length ? opponent(nextSeriesGames.value[0]) : null)
 const opponentPrep = computed(() => team.value?.opponentPreparation || {})
+const lineupPlayers = computed(() => team.value?.rosters?.active || [])
 const nextSeriesDateLabel = computed(() => {
   const games = nextSeriesGames.value
   if (!games.length) return 'No upcoming series'
@@ -216,6 +228,76 @@ function handleProfileTabKeydown(event, currentIndex) {
   selectedProfileTab.value = profileTabs[nextIndex].id
   event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
 }
+
+async function saveOpponentReport() {
+  if (!team.value?.id || !nextOpponent.value || savingReport.value) return
+
+  savingReport.value = true
+  reportSaveError.value = ''
+  try {
+    const response = await fetch(`/api/teams/${encodeURIComponent(team.value.id)}/opponent_reports`, {
+      method: 'POST',
+      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ season: team.value.season }),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(payload.message || 'Unable to generate opponent report.')
+    await refresh()
+  } catch (requestError) {
+    reportSaveError.value = requestError.message
+  } finally {
+    savingReport.value = false
+  }
+}
+
+function suggestedPosition(membership) {
+  const position = String(membership?.primaryPosition || '').toUpperCase()
+  return lineupPositions.includes(position) ? position : ''
+}
+
+function populateLineup() {
+  lineupRows.value = Array.from({ length: 9 }, (_, index) => {
+    const membership = lineupPlayers.value[index]
+    return {
+      battingSlot: index + 1,
+      playerId: membership?.player?.id ? String(membership.player.id) : '',
+      defensivePosition: suggestedPosition(membership),
+    }
+  })
+}
+
+async function saveLineupScenario() {
+  if (!team.value?.id || savingLineup.value) return
+
+  savingLineup.value = true
+  lineupError.value = ''
+  try {
+    const response = await fetch(`/api/teams/${encodeURIComponent(team.value.id)}/lineup_scenarios`, {
+      method: 'POST',
+      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        season: team.value.season,
+        scenario_date: new Date().toISOString().slice(0, 10),
+        name: lineupName.value.trim() || `${team.value.abbreviation} lineup scenario`,
+        notes: lineupNotes.value.trim(),
+        entries: lineupRows.value.map((row) => ({
+          player_id: row.playerId,
+          batting_slot: row.battingSlot,
+          defensive_position: row.defensivePosition,
+        })),
+      }),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error((payload.violations || [payload.message || 'Unable to save lineup scenario.']).join(' '))
+    lineupName.value = ''
+    lineupNotes.value = ''
+    await refresh()
+  } catch (requestError) {
+    lineupError.value = requestError.message
+  } finally {
+    savingLineup.value = false
+  }
+}
 </script>
 
 <template>
@@ -287,8 +369,19 @@ function handleProfileTabKeydown(event, currentIndex) {
       <section class="team-panel opponent-prep" data-test="opponent-preparation">
         <header>
           <div><p>Opponent preparation</p><h2>Next series</h2></div>
-          <span>{{ nextSeriesGames.length }} {{ nextSeriesGames.length === 1 ? 'game' : 'games' }}</span>
+          <div class="opponent-report-actions">
+            <span>{{ nextSeriesGames.length }} {{ nextSeriesGames.length === 1 ? 'game' : 'games' }}</span>
+            <button
+              type="button"
+              :disabled="!nextOpponent || savingReport"
+              data-test="save-opponent-report"
+              @click="saveOpponentReport"
+            >
+              {{ savingReport ? 'Generating…' : 'Save opponent report' }}
+            </button>
+          </div>
         </header>
+        <p v-if="reportSaveError" class="opponent-report-error" role="alert">{{ reportSaveError }}</p>
 
         <div v-if="nextOpponent" class="opponent-prep__overview">
           <div class="opponent-prep__identity">
@@ -425,6 +518,75 @@ function handleProfileTabKeydown(event, currentIndex) {
             </div>
           </div>
         </section>
+
+        <section class="opponent-report-history" data-test="opponent-report-history">
+          <header>
+            <div><small>Saved intelligence</small><strong>Opponent reports</strong></div>
+            <span>{{ team.opponentReports.length }} saved</span>
+          </header>
+          <div v-if="team.opponentReports.length" class="opponent-report-list">
+            <RouterLink
+              v-for="report in team.opponentReports"
+              :key="report.id"
+              :to="{ name: 'opponent-report', params: { id: report.id } }"
+              :data-test="`opponent-report-${report.id}`"
+            >
+              <span>
+                <strong>{{ report.title }}</strong>
+                <small>Generated {{ formatTimestamp(report.generatedAt) }}</small>
+              </span>
+              <em>{{ report.probableStarterCount }} {{ report.probableStarterCount === 1 ? 'starter' : 'starters' }} →</em>
+            </RouterLink>
+          </div>
+          <p v-else>No reports saved for {{ team.season }} yet.</p>
+        </section>
+      </section>
+
+      <section class="team-panel lineup-scenarios" data-test="lineup-scenarios">
+        <header>
+          <div><p>Lineup planner</p><h2>Lineup scenarios</h2></div>
+          <span>9 hitters · defensive coverage required</span>
+        </header>
+        <div class="lineup-scenarios__intro">
+          <p>Build a DH lineup from the active roster. Saving checks batting order, duplicate players, position coverage, and roster availability.</p>
+          <button type="button" data-test="populate-lineup" @click="populateLineup">Start with active roster</button>
+        </div>
+        <div class="lineup-scenarios__fields">
+          <label>Scenario name<input v-model="lineupName" type="text" placeholder="e.g. vs RHP — series opener" /></label>
+          <label>Notes<input v-model="lineupNotes" type="text" placeholder="Optional game-plan notes" /></label>
+        </div>
+        <div class="lineup-grid" role="table" aria-label="Lineup scenario editor">
+          <div class="lineup-grid__header" role="row"><span>Order</span><span>Player</span><span>Defense</span></div>
+          <label v-for="row in lineupRows" :key="row.battingSlot" class="lineup-row" :data-test="`lineup-row-${row.battingSlot}`">
+            <strong>{{ row.battingSlot }}</strong>
+            <select v-model="row.playerId" :aria-label="`Batting slot ${row.battingSlot} player`">
+              <option value="">Choose player</option>
+              <option v-for="membership in lineupPlayers" :key="membership.player.id" :value="String(membership.player.id)">
+                {{ membership.player.fullName }} · {{ membership.primaryPosition || '—' }}
+              </option>
+            </select>
+            <select v-model="row.defensivePosition" :aria-label="`Batting slot ${row.battingSlot} defensive position`">
+              <option value="">Position</option>
+              <option v-for="position in lineupPositions" :key="position" :value="position">{{ position }}</option>
+            </select>
+          </label>
+        </div>
+        <p v-if="lineupError" class="lineup-scenarios__error" role="alert">{{ lineupError }}</p>
+        <footer class="lineup-scenarios__footer">
+          <span>{{ lineupPlayers.length }} active players available</span>
+          <button type="button" :disabled="savingLineup" data-test="save-lineup-scenario" @click="saveLineupScenario">
+            {{ savingLineup ? 'Checking constraints…' : 'Save lineup scenario' }}
+          </button>
+        </footer>
+        <div v-if="team.lineupScenarios.length" class="lineup-scenario-history">
+          <strong>Saved scenarios</strong>
+          <ul>
+            <li v-for="scenario in team.lineupScenarios" :key="scenario.id">
+              <RouterLink :to="{ name: 'lineup-scenario', params: { id: scenario.id } }">{{ scenario.name }}</RouterLink>
+              <span>{{ formatDate(scenario.scenarioDate, true) }} · {{ scenario.entryCount }} players</span>
+            </li>
+          </ul>
+        </div>
       </section>
 
       <TeamLeadersCard :leaders="team.teamLeaders" :season="team.season" />
@@ -743,6 +905,42 @@ function handleProfileTabKeydown(event, currentIndex) {
 .team-schedule-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .team-panel { padding: 1.35rem; }
 .opponent-prep { overflow: hidden; background: linear-gradient(135deg, rgba(255,250,240,.95), rgba(232,239,243,.88)); }
+.lineup-scenarios { background: linear-gradient(135deg, rgba(237,247,240,.92), rgba(255,252,244,.96)); }
+.lineup-scenarios__intro,.lineup-scenarios__footer { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.lineup-scenarios__intro p { max-width: 700px; margin: 0; color: #526572; font-size: .84rem; }
+.lineup-scenarios button { padding: .55rem .8rem; border: 1px solid rgba(16,38,61,.18); border-radius: 999px; color: #173652; background: #fffdf7; font-size: .72rem; font-weight: 900; cursor: pointer; }
+.lineup-scenarios__footer button { border: 0; color: #fffaf0; background: #20543c; }
+.lineup-scenarios button:disabled { opacity: .5; cursor: not-allowed; }
+.lineup-scenarios__fields { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin-top: .9rem; }
+.lineup-scenarios__fields label { display: grid; gap: .3rem; color: #697784; font-size: .68rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.lineup-scenarios input,.lineup-row select { min-width: 0; padding: .55rem .65rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; }
+.lineup-grid { display: grid; gap: .35rem; margin-top: .9rem; }
+.lineup-grid__header,.lineup-row { display: grid; grid-template-columns: 64px minmax(0,1fr) 120px; gap: .55rem; align-items: center; }
+.lineup-grid__header { padding: 0 .4rem; color: #71808c; font-size: .65rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
+.lineup-row { padding: .38rem; border-radius: 10px; background: rgba(255,255,255,.74); }
+.lineup-row > strong { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fffaf0; background: #173652; font-size: .78rem; }
+.lineup-scenarios__error { margin: .8rem 0 0; padding: .65rem .8rem; border-radius: 10px; color: #7d291f; background: #f5ddd5; font-size: .78rem; font-weight: 800; }
+.lineup-scenarios__footer { margin-top: .9rem; color: #667680; font-size: .75rem; }
+.lineup-scenario-history { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid rgba(16,38,61,.1); }
+.lineup-scenario-history strong { color: #173652; font-size: .78rem; text-transform: uppercase; }
+.lineup-scenario-history ul { display: grid; gap: .35rem; margin: .5rem 0 0; padding: 0; list-style: none; }
+.lineup-scenario-history li { display: flex; justify-content: space-between; gap: 1rem; }
+.lineup-scenario-history a { color: #20543c; font-size: .8rem; font-weight: 900; }
+.lineup-scenario-history span { color: #71808c; font-size: .72rem; }
+.opponent-report-actions { display: flex; gap: .75rem; align-items: center; }
+.opponent-report-actions button { padding: .55rem .8rem; border: 0; border-radius: 999px; color: #fffaf0; background: #8d392e; font-size: .72rem; font-weight: 900; cursor: pointer; }
+.opponent-report-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.opponent-report-error { margin-top: .7rem; padding: .65rem .8rem; border-radius: 10px; color: #7d291f; background: #f5ddd5; font-size: .78rem; font-weight: 800; }
+.opponent-report-history { margin-top: .9rem; padding: 1rem; border: 1px solid rgba(16,38,61,.12); border-radius: 18px; background: rgba(16,38,61,.04); }
+.opponent-report-history > header { display: flex; justify-content: space-between; gap: 1rem; align-items: end; }
+.opponent-report-history > header small,.opponent-report-history > header strong { display: block; }
+.opponent-report-history > header small { color: #a93627; font-size: .64rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.opponent-report-history > header span,.opponent-report-history > p { color: #667680; font-size: .75rem; }
+.opponent-report-list { display: grid; gap: .5rem; margin-top: .7rem; }
+.opponent-report-list > a { display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: .7rem .8rem; border-radius: 12px; color: #173652; background: rgba(255,255,255,.78); text-decoration: none; }
+.opponent-report-list strong,.opponent-report-list small { display: block; }
+.opponent-report-list small { margin-top: .15rem; color: #71808c; font-size: .68rem; }
+.opponent-report-list em { color: #8d392e; font-size: .7rem; font-style: normal; font-weight: 900; white-space: nowrap; }
 .opponent-prep__overview { display: flex; justify-content: space-between; gap: 1rem; align-items: center; margin-top: 1rem; padding: 1rem; border-radius: 18px; color: #fffaf0; background: #10263d; }
 .opponent-prep__identity { display: flex; min-width: 0; gap: .9rem; align-items: center; }
 .opponent-prep__logo { display: grid; flex: 0 0 auto; width: 66px; height: 66px; place-items: center; border-radius: 50%; background: #fff; }

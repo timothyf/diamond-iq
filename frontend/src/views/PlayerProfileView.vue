@@ -279,6 +279,12 @@ function seasonTeamLabel(seasonRow) {
   return abbreviations.length ? [...new Set(abbreviations)].join(' / ') : '—'
 }
 
+function similarityValue(metric, value) {
+  if (value === null || value === undefined) return '—'
+  if (metric.key.endsWith('_rate')) return `${Number(value).toFixed(1)}%`
+  return formatBaseballStatValue(metric.key, value)
+}
+
 function formatDate(value) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(
@@ -348,6 +354,14 @@ function formatTimestamp(value) {
             {{ rosterLabel }}
           </div>
           <nav class="external-profile-links" aria-label="External player profiles">
+            <RouterLink
+              class="compare-player-link"
+              :to="{ name: 'player-comparison', query: { left: player.id } }"
+              data-test="compare-player-link"
+            >
+              Compare player
+              <span aria-hidden="true">⇄</span>
+            </RouterLink>
             <a
               v-for="link in externalProfileLinks"
               :key="link.key"
@@ -423,6 +437,65 @@ function formatTimestamp(value) {
           </table>
         </div>
         <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
+      </section>
+
+      <section class="profile-panel similar-players-panel" data-test="similar-players">
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Statistical neighbors</p>
+            <h2>Similar players</h2>
+          </div>
+          <span v-if="player.similarPlayers.season">
+            {{ player.similarPlayers.season }} {{ titleize(player.similarPlayers.category) }}
+          </span>
+        </header>
+
+        <div v-if="player.similarPlayers.matches.length" class="similar-player-grid">
+          <article
+            v-for="match in player.similarPlayers.matches"
+            :key="match.player.id"
+            class="similar-player-card"
+            :data-test="`similar-player-${match.player.id}`"
+          >
+            <div class="similar-player-card__heading">
+              <img v-if="match.player.headshotUrl" :src="match.player.headshotUrl" :alt="`${match.player.fullName} headshot`" />
+              <div>
+                <RouterLink :to="{ name: 'player-profile', params: { id: match.player.id } }">
+                  {{ match.player.fullName }}
+                </RouterLink>
+                <span>
+                  {{ match.position?.abbreviation || '—' }}
+                  <template v-if="match.team?.abbreviation"> · {{ match.team.abbreviation }}</template>
+                </span>
+              </div>
+              <strong>{{ match.similarityScore }}%</strong>
+            </div>
+
+            <dl>
+              <div v-for="metric in match.closestMetrics" :key="metric.key">
+                <dt>{{ metric.label }}</dt>
+                <dd>
+                  {{ similarityValue(metric, metric.targetValue) }}
+                  <span aria-hidden="true">↔</span>
+                  {{ similarityValue(metric, metric.candidateValue) }}
+                </dd>
+              </div>
+            </dl>
+
+            <RouterLink
+              class="similar-player-card__compare"
+              :to="{ name: 'player-comparison', query: { left: player.id, right: match.player.id } }"
+            >
+              Compare side by side →
+            </RouterLink>
+          </article>
+        </div>
+        <p v-else class="profile-empty">
+          Similar players will appear when at least three comparable same-season metrics are available.
+        </p>
+        <small v-if="player.similarPlayers.methodology" class="similar-player-methodology">
+          {{ player.similarPlayers.methodology }}
+        </small>
       </section>
 
       <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
@@ -891,6 +964,21 @@ function formatTimestamp(value) {
   text-decoration: none;
 }
 
+.external-profile-links .compare-player-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.34rem 0.58rem;
+  border: 1px solid rgba(169, 54, 39, 0.35);
+  border-radius: 999px;
+  color: #8f2d24;
+  background: rgba(255, 250, 240, 0.9);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-decoration: none;
+}
+
 .external-profile-links a:hover {
   border-color: rgba(23, 54, 82, 0.5);
   background: #fff;
@@ -980,6 +1068,103 @@ function formatTimestamp(value) {
   color: #8f2d24;
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 2rem;
+}
+
+.similar-player-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.similar-player-card {
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 18px;
+  background: #fffdf7;
+}
+
+.similar-player-card__heading {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  align-items: center;
+}
+
+.similar-player-card__heading img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #e7edf1;
+}
+
+.similar-player-card__heading a,
+.similar-player-card__heading span {
+  display: block;
+}
+
+.similar-player-card__heading a {
+  color: #10263d;
+  font-weight: 900;
+  text-decoration-color: #b79569;
+  text-underline-offset: 0.18em;
+}
+
+.similar-player-card__heading span {
+  color: #71808c;
+  font-size: 0.76rem;
+}
+
+.similar-player-card__heading > strong {
+  color: #20543c;
+  font-size: 1.15rem;
+}
+
+.similar-player-card dl {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.similar-player-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.07);
+}
+
+.similar-player-card dt {
+  color: #71808c;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.similar-player-card dd {
+  color: #243b50;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.similar-player-card dd span {
+  margin-inline: 0.25rem;
+  color: #b79569;
+}
+
+.similar-player-card__compare {
+  display: inline-block;
+  margin-top: 0.85rem;
+  color: #8f2d24;
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.similar-player-methodology {
+  display: block;
+  margin-top: 0.85rem;
+  color: #71808c;
 }
 
 .career-table-wrap {

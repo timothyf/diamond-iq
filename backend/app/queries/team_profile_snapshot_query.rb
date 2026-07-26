@@ -46,6 +46,8 @@ class TeamProfileSnapshotQuery
         season: season,
         on: on
       ).result,
+      opponent_reports: opponent_report_summaries,
+      lineup_scenarios: lineup_scenario_summaries,
       team_leaders: team_leaders,
       source_metadata: source_metadata,
       performance_dashboard: performance_dashboard
@@ -55,6 +57,38 @@ class TeamProfileSnapshotQuery
   private
 
   attr_reader :team, :requested_season, :on
+
+  def opponent_report_summaries
+    team.opponent_reports.includes(:opponent_team).where(season: season).recent_first.limit(5).map do |report|
+      {
+        id: report.id,
+        title: report.title,
+        season: report.season,
+        series_starts_on: report.series_starts_on,
+        series_ends_on: report.series_ends_on,
+        generated_at: report.generated_at,
+        opponent: {
+          id: report.opponent_team.id,
+          mlb_id: report.opponent_team.mlb_id,
+          name: report.opponent_team.name,
+          abbreviation: report.opponent_team.abbreviation
+        },
+        probable_starter_count: Array(report.snapshot["probable_starters"]).length
+      }
+    end
+  end
+
+  def lineup_scenario_summaries
+    team.lineup_scenarios.where(season: season).order(scenario_date: :desc, created_at: :desc).limit(5).map do |scenario|
+      {
+        id: scenario.id,
+        name: scenario.name,
+        scenario_date: scenario.scenario_date,
+        validated_at: scenario.validated_at,
+        entry_count: scenario.entries.count
+      }
+    end
+  end
 
   def season
     @season ||= Integer(requested_season, exception: false) || stored_seasons.max || on.year

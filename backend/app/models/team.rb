@@ -15,6 +15,10 @@ class Team < ApplicationRecord
   has_many :batter_split_summaries, dependent: :nullify
   has_many :pitcher_split_summaries, dependent: :nullify
   has_many :team_daily_metrics, dependent: :restrict_with_error
+  has_many :opponent_reports, dependent: :destroy
+  has_many :lineup_scenarios, dependent: :destroy
+  has_many :reports_as_opponent, class_name: "OpponentReport", foreign_key: :opponent_team_id,
+    inverse_of: :opponent_team, dependent: :restrict_with_error
 
   def logo_url
     "https://www.mlbstatic.com/team-logos/#{mlb_id}.svg"

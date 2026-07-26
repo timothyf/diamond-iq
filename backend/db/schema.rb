@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_26_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -227,6 +227,51 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
     t.index ["game_id"], name: "index_lineup_entries_on_game_id"
     t.index ["player_id"], name: "index_lineup_entries_on_player_id"
     t.index ["team_id"], name: "index_lineup_entries_on_team_id"
+  end
+
+  create_table "lineup_scenario_entries", force: :cascade do |t|
+    t.bigint "lineup_scenario_id", null: false
+    t.bigint "player_id", null: false
+    t.integer "batting_slot", null: false
+    t.string "defensive_position", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["lineup_scenario_id", "batting_slot"], name: "index_lineup_scenario_entries_on_slot", unique: true
+    t.index ["lineup_scenario_id", "player_id"], name: "index_lineup_scenario_entries_on_player", unique: true
+    t.index ["lineup_scenario_id"], name: "index_lineup_scenario_entries_on_lineup_scenario_id"
+    t.index ["player_id"], name: "index_lineup_scenario_entries_on_player_id"
+    t.check_constraint "batting_slot >= 1 AND batting_slot <= 9", name: "lineup_scenario_entries_valid_slot"
+  end
+
+  create_table "lineup_scenarios", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.integer "season", null: false
+    t.date "scenario_date", null: false
+    t.string "name", null: false
+    t.text "notes"
+    t.datetime "validated_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id", "season", "scenario_date"], name: "index_lineup_scenarios_on_team_season_date"
+    t.index ["team_id"], name: "index_lineup_scenarios_on_team_id"
+  end
+
+  create_table "opponent_reports", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.bigint "opponent_team_id", null: false
+    t.integer "season", null: false
+    t.date "series_starts_on", null: false
+    t.date "series_ends_on", null: false
+    t.string "title", null: false
+    t.jsonb "snapshot", default: {}, null: false
+    t.datetime "generated_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["opponent_team_id"], name: "index_opponent_reports_on_opponent_team_id"
+    t.index ["team_id", "generated_at"], name: "index_opponent_reports_on_team_id_and_generated_at"
+    t.index ["team_id", "opponent_team_id", "series_starts_on"], name: "index_opponent_reports_on_series"
+    t.index ["team_id"], name: "index_opponent_reports_on_team_id"
+    t.check_constraint "series_ends_on >= series_starts_on", name: "opponent_reports_valid_series_range"
   end
 
   create_table "pitch_data", force: :cascade do |t|
@@ -911,6 +956,40 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  create_table "watchlist_entries", force: :cascade do |t|
+    t.bigint "watchlist_id", null: false
+    t.bigint "player_id", null: false
+    t.string "priority", default: "medium", null: false
+    t.string "status", default: "scouting", null: false
+    t.string "recommendation", default: "monitor", null: false
+    t.integer "fit_score"
+    t.integer "need_score"
+    t.integer "cost_score"
+    t.integer "risk_score"
+    t.string "tags", default: [], null: false, array: true
+    t.text "notes"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id"], name: "index_watchlist_entries_on_player_id"
+    t.index ["watchlist_id", "player_id"], name: "index_watchlist_entries_on_watchlist_id_and_player_id", unique: true
+    t.index ["watchlist_id"], name: "index_watchlist_entries_on_watchlist_id"
+    t.check_constraint "cost_score IS NULL OR cost_score >= 1 AND cost_score <= 5", name: "watchlist_entries_cost_score_range"
+    t.check_constraint "fit_score IS NULL OR fit_score >= 1 AND fit_score <= 5", name: "watchlist_entries_fit_score_range"
+    t.check_constraint "need_score IS NULL OR need_score >= 1 AND need_score <= 5", name: "watchlist_entries_need_score_range"
+    t.check_constraint "priority::text = ANY (ARRAY['low'::character varying, 'medium'::character varying, 'high'::character varying]::text[])", name: "watchlist_entries_valid_priority"
+    t.check_constraint "recommendation::text = ANY (ARRAY['pursue'::character varying, 'monitor'::character varying, 'pass'::character varying]::text[])", name: "watchlist_entries_valid_recommendation"
+    t.check_constraint "risk_score IS NULL OR risk_score >= 1 AND risk_score <= 5", name: "watchlist_entries_risk_score_range"
+    t.check_constraint "status::text = ANY (ARRAY['scouting'::character varying, 'active'::character varying, 'paused'::character varying, 'closed'::character varying]::text[])", name: "watchlist_entries_valid_status"
+  end
+
+  create_table "watchlists", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_watchlists_on_name", unique: true
+  end
+
   add_foreign_key "batter_split_summaries", "players"
   add_foreign_key "batter_split_summaries", "teams"
   add_foreign_key "game_player_batting_lines", "games"
@@ -929,6 +1008,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
   add_foreign_key "lineup_entries", "games"
   add_foreign_key "lineup_entries", "players"
   add_foreign_key "lineup_entries", "teams"
+  add_foreign_key "lineup_scenario_entries", "lineup_scenarios"
+  add_foreign_key "lineup_scenario_entries", "players"
+  add_foreign_key "lineup_scenarios", "teams"
+  add_foreign_key "opponent_reports", "teams"
+  add_foreign_key "opponent_reports", "teams", column: "opponent_team_id"
   add_foreign_key "pitch_data", "games"
   add_foreign_key "pitch_data", "plate_appearances"
   add_foreign_key "pitcher_pitch_type_daily", "players"
@@ -968,4 +1052,6 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_25_200000) do
   add_foreign_key "team_daily_metrics", "teams"
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"
+  add_foreign_key "watchlist_entries", "players"
+  add_foreign_key "watchlist_entries", "watchlists"
 end

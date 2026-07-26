@@ -55,6 +55,7 @@ function normalizeProfile(data = {}) {
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
   const analysis = data.analysis || {}
+  const similarPlayers = data.similar_players || {}
   const analysisRange = analysis.range || {}
   const source = data.source_metadata || {}
 
@@ -93,6 +94,30 @@ function normalizeProfile(data = {}) {
       })),
       stats: career.stats || [],
       statValues: Object.fromEntries((career.stats || []).map((stat) => [stat.key, stat.value])),
+    },
+    similarPlayers: {
+      season: similarPlayers.season,
+      category: similarPlayers.category,
+      methodology: similarPlayers.methodology,
+      matches: (similarPlayers.matches || []).map((match) => ({
+        player: {
+          id: match.player?.id,
+          mlbId: match.player?.mlb_id,
+          fullName: match.player?.full_name,
+          headshotUrl: match.player?.headshot_url,
+        },
+        team: normalizeTeam(match.team),
+        position: match.position,
+        similarityScore: match.similarity_score,
+        sharedMetricCount: match.shared_metric_count,
+        samePositionType: match.same_position_type,
+        closestMetrics: (match.closest_metrics || []).map((metric) => ({
+          key: metric.key,
+          label: metric.label,
+          targetValue: metric.target_value,
+          candidateValue: metric.candidate_value,
+        })),
+      })),
     },
     currentMembership: normalizeMembership(data.current_membership),
     teamHistory: (data.team_history || []).map(normalizeMembership),

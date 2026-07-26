@@ -78,6 +78,23 @@ function normalizeProfile(data) {
         evidence: starter.evidence || [],
       })),
     },
+    opponentReports: (data.opponent_reports || []).map((report) => ({
+      id: report.id,
+      title: report.title,
+      season: report.season,
+      seriesStartsOn: report.series_starts_on,
+      seriesEndsOn: report.series_ends_on,
+      generatedAt: report.generated_at,
+      opponent: report.opponent,
+      probableStarterCount: report.probable_starter_count || 0,
+    })),
+    lineupScenarios: (data.lineup_scenarios || []).map((scenario) => ({
+      id: scenario.id,
+      name: scenario.name,
+      scenarioDate: scenario.scenario_date,
+      validatedAt: scenario.validated_at,
+      entryCount: scenario.entry_count || 0,
+    })),
     teamLeaders: {
       batting: data.team_leaders?.batting || [],
       pitching: data.team_leaders?.pitching || [],

@@ -15,6 +15,11 @@ class PlayerProfileSnapshotQuery
     {
       season_overview: season_overview,
       career_overview: career_overview,
+      similar_players: SimilarPlayersQuery.new(
+        player: player,
+        season: latest_season,
+        category: preferred_category
+      ).result,
       display_team: serialize_team(display_team),
       external_ids: external_ids,
       current_membership: serialize_membership(current_membership),

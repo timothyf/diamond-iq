@@ -20,7 +20,9 @@ import diamondIqLogo from './assets/diamondiq_logo.png'
       <RouterLink to="/schedule">Schedule</RouterLink>
       <RouterLink to="/standings">Standings</RouterLink>
       <RouterLink to="/explore">Stat Explorer</RouterLink>
+      <RouterLink to="/compare">Compare</RouterLink>
       <RouterLink to="/teams">Teams</RouterLink>
+      <RouterLink to="/watchlists">Watchlists</RouterLink>
       <RouterLink to="/admin">Admin</RouterLink>
     </nav>
   </header>

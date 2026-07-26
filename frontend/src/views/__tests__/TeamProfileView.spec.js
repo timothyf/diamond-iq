@@ -140,6 +140,27 @@ const payload = {
         },
       ],
     },
+    opponent_reports: [
+      {
+        id: 301,
+        title: 'DET vs CLE · Jul 16–Jul 17, 2026',
+        season: 2026,
+        series_starts_on: '2026-07-16',
+        series_ends_on: '2026-07-17',
+        generated_at: '2026-07-15T14:00:00Z',
+        opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
+        probable_starter_count: 1,
+      },
+    ],
+    lineup_scenarios: [
+      {
+        id: 401,
+        name: 'Vs RHP — opener',
+        scenario_date: '2026-07-16',
+        validated_at: '2026-07-15T14:00:00Z',
+        entry_count: 9,
+      },
+    ],
     source_metadata: { last_updated_at: '2026-07-15T12:00:00Z', schedule_last_synced_at: '2026-07-15T12:00:00Z', roster_last_synced_at: '2026-07-15T11:00:00Z', sources: ['MLB Stats API'] },
     team_leaders: {
       batting: [
@@ -238,6 +259,33 @@ const payload = {
 }
 
 describe('TeamProfileView', () => {
+  it('generates a frozen report from the current opponent preparation', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => payload })
+      .mockResolvedValueOnce({ ok: true, json: async () => payload })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ data: { id: 302 } }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => payload })
+    vi.stubGlobal('fetch', fetchMock)
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="save-opponent-report"]').trigger('click')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/teams/1/opponent_reports',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ season: 2026 }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
   it('renders the overview and opens a separate roster tab on the active roster', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(TeamProfileView, {
@@ -265,6 +313,14 @@ describe('TeamProfileView', () => {
       params: { id: 52 },
     })
     expect(wrapper.get('[data-test="opponent-recent-performance"]').text()).toContain('7–3')
+    expect(wrapper.get('[data-test="opponent-report-history"]').text()).toContain('DET vs CLE')
+    expect(wrapper.getComponent('[data-test="opponent-report-301"]').props('to')).toEqual({
+      name: 'opponent-report',
+      params: { id: 301 },
+    })
+    expect(wrapper.get('[data-test="lineup-scenarios"]').text()).toContain('Lineup scenarios')
+    expect(wrapper.get('[data-test="lineup-scenarios"]').text()).toContain('Vs RHP — opener')
+    expect(wrapper.findAll('[data-test^="lineup-row-"]')).toHaveLength(9)
     const starterScouting = wrapper.get('[data-test="starter-scouting-52"]')
     expect(starterScouting.text()).toContain('4-Seam Fastball')
     expect(starterScouting.text()).toContain('95.6 mph')
