@@ -24,10 +24,19 @@ Rails.application.routes.draw do
     end
     resources :opponent_reports, only: [ :show ]
     resources :lineup_scenarios, only: [ :show ]
+    resources :need_profiles
     resources :watchlists, only: [ :index, :show, :create, :update ] do
       resources :watchlist_entries, only: [ :create ]
+      member do
+        get :discovery
+      end
     end
-    resources :watchlist_entries, only: [ :update, :destroy ]
+    resources :watchlist_entries, only: [ :update, :destroy ] do
+      member do
+        post :recalculate
+        get :alternatives
+      end
+    end
     resource :home, only: [:show], controller: :home
     resource :standings, only: [:show], controller: :standings
     resources :positions, only: [:index]

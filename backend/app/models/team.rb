@@ -1,4 +1,5 @@
 class Team < ApplicationRecord
+  has_many :need_profiles, dependent: :destroy
   has_many :players, dependent: :destroy
   has_many :team_memberships, dependent: :destroy
   has_many :membership_players, through: :team_memberships, source: :player

@@ -21,6 +21,23 @@ module Api
       head :no_content
     end
 
+    def recalculate
+      entry = WatchlistEntry.includes(:watchlist, player: [ :team, :profile ]).find(params[:id])
+      return render json: { message: "Attach a need profile before calculating fit." },
+        status: :unprocessable_content unless entry.watchlist.need_profile
+
+      entry.recalculate_fit!
+      render json: { data: serialize_entry(entry.reload) }
+    end
+
+    def alternatives
+      entry = WatchlistEntry.includes(watchlist: :need_profile, player: [ :team, :profile, { player_positions: :position } ]).find(params[:id])
+      render json: {
+        data: NeedProfileAlternativesQuery.new(entry: entry, limit: params[:limit] || 5).result,
+        meta: { need_profile_id: entry.watchlist.need_profile_id, source_player_id: entry.player_id }
+      }
+    end
+
     private
 
     def entry_params
@@ -34,6 +51,9 @@ module Api
         status: entry.status,
         recommendation: entry.recommendation,
         fit_score: entry.fit_score,
+        calculated_fit_score: entry.calculated_fit_score&.to_f,
+        fit_breakdown: entry.fit_breakdown,
+        fit_calculated_at: entry.fit_calculated_at,
         need_score: entry.need_score,
         cost_score: entry.cost_score,
         risk_score: entry.risk_score,

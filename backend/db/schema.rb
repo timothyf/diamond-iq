@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -260,6 +260,19 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
     t.decimal "total_score", precision: 6, scale: 2
     t.index ["team_id", "season", "scenario_date"], name: "index_lineup_scenarios_on_team_season_date"
     t.index ["team_id"], name: "index_lineup_scenarios_on_team_id"
+  end
+
+  create_table "need_profiles", force: :cascade do |t|
+    t.bigint "team_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.jsonb "criteria", default: {}, null: false
+    t.jsonb "weights", default: {}, null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["team_id", "name"], name: "index_need_profiles_on_team_id_and_name", unique: true
+    t.index ["team_id"], name: "index_need_profiles_on_team_id"
   end
 
   create_table "opponent_reports", force: :cascade do |t|
@@ -1017,9 +1030,14 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
     t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "calculated_fit_score", precision: 5, scale: 2
+    t.jsonb "fit_breakdown", default: {}, null: false
+    t.datetime "fit_calculated_at"
+    t.index ["calculated_fit_score"], name: "index_watchlist_entries_on_calculated_fit_score"
     t.index ["player_id"], name: "index_watchlist_entries_on_player_id"
     t.index ["watchlist_id", "player_id"], name: "index_watchlist_entries_on_watchlist_id_and_player_id", unique: true
     t.index ["watchlist_id"], name: "index_watchlist_entries_on_watchlist_id"
+    t.check_constraint "calculated_fit_score IS NULL OR calculated_fit_score >= 0::numeric AND calculated_fit_score <= 100::numeric", name: "watchlist_entries_calculated_fit_range"
     t.check_constraint "cost_score IS NULL OR cost_score >= 1 AND cost_score <= 5", name: "watchlist_entries_cost_score_range"
     t.check_constraint "fit_score IS NULL OR fit_score >= 1 AND fit_score <= 5", name: "watchlist_entries_fit_score_range"
     t.check_constraint "need_score IS NULL OR need_score >= 1 AND need_score <= 5", name: "watchlist_entries_need_score_range"
@@ -1034,7 +1052,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
     t.text "description"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "need_profile_id"
     t.index ["name"], name: "index_watchlists_on_name", unique: true
+    t.index ["need_profile_id"], name: "index_watchlists_on_need_profile_id"
   end
 
   add_foreign_key "batter_split_summaries", "players"
@@ -1058,6 +1078,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
   add_foreign_key "lineup_scenario_entries", "lineup_scenarios"
   add_foreign_key "lineup_scenario_entries", "players"
   add_foreign_key "lineup_scenarios", "teams"
+  add_foreign_key "need_profiles", "teams"
   add_foreign_key "opponent_reports", "teams"
   add_foreign_key "opponent_reports", "teams", column: "opponent_team_id"
   add_foreign_key "pitch_data", "games"
@@ -1102,4 +1123,5 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
   add_foreign_key "team_memberships", "teams"
   add_foreign_key "watchlist_entries", "players"
   add_foreign_key "watchlist_entries", "watchlists"
+  add_foreign_key "watchlists", "need_profiles"
 end

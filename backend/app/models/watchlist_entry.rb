@@ -14,6 +14,20 @@ class WatchlistEntry < ApplicationRecord
     numericality: { only_integer: true, in: 1..5 }, allow_nil: true
 
   before_validation :normalize_tags
+  after_create_commit :recalculate_fit!
+
+  def recalculate_fit!
+    profile = watchlist.need_profile
+    return update_columns(calculated_fit_score: nil, fit_breakdown: {}, fit_calculated_at: nil) unless profile
+
+    result = NeedProfileFitCalculator.new(need_profile: profile, player: player).result
+    update_columns(
+      calculated_fit_score: result.fetch(:score),
+      fit_breakdown: result.fetch(:breakdown),
+      fit_calculated_at: Time.current
+    )
+    result
+  end
 
   private
 
