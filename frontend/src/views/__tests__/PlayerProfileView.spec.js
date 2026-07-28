@@ -162,6 +162,30 @@ function apiPayload() {
           },
         ],
       },
+      trend_events: {
+        active_count: 1,
+        events: [
+          {
+            id: 17,
+            event_type: 'chase_rate_movement',
+            role: 'batter',
+            metric_key: 'chase_percentage',
+            direction: 'increase',
+            severity: 'warning',
+            status: 'active',
+            unit: 'percentage_points',
+            baseline_value: 24,
+            current_value: 34,
+            change_value: 10,
+            threshold_value: 8,
+            thresholds: { warning: 8, critical: 15 },
+            baseline_sample_size: 30,
+            sample_size: 32,
+            onset_date: '2026-07-01',
+            supporting_pitches: [{ game_pk: 123, pitch_number: 4 }],
+          },
+        ],
+      },
       analysis: {
         range: {
           preset: 'season',
@@ -318,6 +342,9 @@ describe('PlayerProfileView', () => {
     expect(wrapper.get('[data-test="player-date-range-controls"]').text()).toContain('Last 30 days')
     expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Performance trends')
     expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Batting · Exit velocity')
+    expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Chase-rate movement')
+    expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Sample 32 vs 30 baseline')
+    expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Onset Jul 1, 2026')
     expect(wrapper.get('[data-test="player-trends"] svg').attributes('aria-label')).toBe('Batting · Exit velocity rolling trend')
     const benchmarks = wrapper.get('[data-test="contextual-benchmarks"]')
     expect(benchmarks.text()).toContain('Benchmarks & percentiles')

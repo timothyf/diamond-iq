@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_26_050000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_28_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -669,6 +669,47 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_26_050000) do
     t.index ["player_id", "source_url"], name: "index_player_stats_on_player_id_and_source_url"
   end
 
+  create_table "player_trend_events", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.string "identity_key", null: false
+    t.string "event_type", null: false
+    t.string "role", null: false
+    t.string "metric_key", null: false
+    t.string "pitch_type"
+    t.string "direction", null: false
+    t.string "severity", null: false
+    t.string "status", default: "active", null: false
+    t.string "unit", null: false
+    t.decimal "baseline_value", precision: 12, scale: 4, null: false
+    t.decimal "current_value", precision: 12, scale: 4, null: false
+    t.decimal "change_value", precision: 12, scale: 4, null: false
+    t.decimal "threshold_value", precision: 12, scale: 4, null: false
+    t.integer "baseline_sample_size", null: false
+    t.integer "sample_size", null: false
+    t.date "baseline_start_date", null: false
+    t.date "baseline_end_date", null: false
+    t.date "current_start_date", null: false
+    t.date "current_end_date", null: false
+    t.date "onset_date", null: false
+    t.datetime "detected_at", null: false
+    t.datetime "last_observed_at", null: false
+    t.datetime "resolved_at"
+    t.string "calculation_version", null: false
+    t.jsonb "thresholds", default: {}, null: false
+    t.jsonb "supporting_pitches", default: [], null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id", "identity_key"], name: "idx_player_trend_events_one_active", unique: true, where: "((status)::text = 'active'::text)"
+    t.index ["player_id", "status", "severity", "onset_date"], name: "idx_player_trend_events_feed"
+    t.index ["player_id"], name: "index_player_trend_events_on_player_id"
+    t.check_constraint "direction::text = ANY (ARRAY['increase'::character varying, 'decrease'::character varying]::text[])", name: "player_trend_events_direction"
+    t.check_constraint "role::text = ANY (ARRAY['batter'::character varying, 'pitcher'::character varying]::text[])", name: "player_trend_events_role"
+    t.check_constraint "sample_size > 0 AND baseline_sample_size > 0", name: "player_trend_events_sample_sizes"
+    t.check_constraint "severity::text = ANY (ARRAY['warning'::character varying, 'critical'::character varying]::text[])", name: "player_trend_events_severity"
+    t.check_constraint "status::text = ANY (ARRAY['active'::character varying, 'resolved'::character varying]::text[])", name: "player_trend_events_status"
+  end
+
   create_table "players", force: :cascade do |t|
     t.integer "mlb_id", null: false
     t.string "first_name", null: false
@@ -1042,6 +1083,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_26_050000) do
   add_foreign_key "player_season_stats", "players"
   add_foreign_key "player_season_stats", "stat_types"
   add_foreign_key "player_season_stats", "teams"
+  add_foreign_key "player_trend_events", "players"
   add_foreign_key "players", "teams"
   add_foreign_key "roster_players", "players"
   add_foreign_key "roster_players", "rosters"

@@ -212,6 +212,22 @@ const trendCharts = computed(() => {
   return charts
 })
 
+const trendEventLabels = {
+  velocity_loss: 'Velocity loss',
+  pitch_mix_change: 'Pitch-mix change',
+  chase_rate_movement: 'Chase-rate movement',
+}
+
+function trendEventValue(event, value) {
+  const suffix = event.unit === 'mph' ? ' mph' : ' pts'
+  return `${Number(value).toFixed(1)}${suffix}`
+}
+
+function trendEventTitle(event) {
+  const pitch = event.pitchType ? ` · ${event.pitchType}` : ''
+  return `${trendEventLabels[event.eventType] || event.eventType}${pitch}`
+}
+
 function isTwoWayPlayer(playerData) {
   const primaryPositionType = playerData?.positions?.primary?.position_type
   if (primaryPositionType === 'two_way') return true
@@ -556,6 +572,25 @@ function formatTimestamp(value) {
           </span>
         </header>
 
+        <div v-if="player.trendEvents?.events?.length" class="trend-events" data-test="trend-events">
+          <article v-for="event in player.trendEvents.events" :key="event.id"
+            :class="[`trend-event--${event.severity}`, { 'trend-event--resolved': event.status === 'resolved' }]">
+            <header>
+              <span>{{ event.severity }} · {{ event.status }}</span>
+              <time :datetime="event.onsetDate">Onset {{ formatDate(event.onsetDate) }}</time>
+            </header>
+            <strong>{{ trendEventTitle(event) }}</strong>
+            <p>
+              {{ trendEventValue(event, event.baselineValue) }} → {{ trendEventValue(event, event.currentValue) }}
+              ({{ signedContextualValue(event.changeValue, event.unit === 'mph' ? 'mph' : 'percent') }})
+            </p>
+            <small>
+              Sample {{ event.sampleSize }} vs {{ event.baselineSampleSize }} baseline ·
+              {{ event.supportingPitches.length }} supporting pitches
+            </small>
+          </article>
+        </div>
+
         <div class="period-comparison">
           <article v-for="metric in comparisonMetrics" :key="metric.key">
             <span>{{ metric.label }}</span>
@@ -822,6 +857,29 @@ function formatTimestamp(value) {
   gap: 0.65rem;
   margin-bottom: 1rem;
 }
+
+.trend-events {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .7rem;
+  margin-bottom: 1rem;
+}
+
+.trend-events article {
+  padding: .85rem;
+  border: 1px solid rgba(169, 54, 39, .22);
+  border-left: 4px solid #c37a28;
+  border-radius: 12px;
+  background: rgba(255, 248, 229, .86);
+}
+
+.trend-events article.trend-event--critical { border-left-color: #a93627; }
+.trend-events article.trend-event--resolved { opacity: .64; }
+.trend-events header { display: flex; justify-content: space-between; gap: .5rem; }
+.trend-events header span { color: #a93627; font-size: .64rem; font-weight: 900; text-transform: uppercase; }
+.trend-events time, .trend-events small { color: #65747d; font-size: .68rem; }
+.trend-events strong { display: block; margin-top: .4rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.2rem; text-transform: uppercase; }
+.trend-events p { margin: .3rem 0; font-size: .78rem; }
 
 .period-comparison article {
   display: flex;

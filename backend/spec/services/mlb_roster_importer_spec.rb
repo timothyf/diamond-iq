@@ -136,6 +136,22 @@ RSpec.describe MlbRosterImporter do
     expect(team.rosters.sole.players).to be_empty
   end
 
+  it "does not carry transaction-only organization memberships into the current 40-man cache" do
+    stale_player = create_player(team: team, attributes: { mlb_id: 570_615, first_name: "Steven", last_name: "Moya" })
+    create_team_membership(
+      player: stale_player,
+      team: team,
+      starts_on: Date.new(2013, 11, 20),
+      roster_status: "organization",
+      source_name: "MLB Stats API transactions"
+    )
+
+    result = import(payload: { "roster" => [ roster_entry ] })
+
+    expect(result[:success]).to be(true)
+    expect(team.rosters.sole.players).not_to include(stale_player)
+  end
+
   it "closes a prior team window and refreshes players.team_id after a transfer" do
     import(payload: { "roster" => [ roster_entry ] })
     new_team = create_team(mlb_id: 147, abbreviation: "NYY")

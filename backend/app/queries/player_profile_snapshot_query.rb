@@ -30,6 +30,11 @@ class PlayerProfileSnapshotQuery
         start_date: analysis_range.start_date,
         end_date: analysis_range.end_date
       ).result,
+      trend_events: PlayerTrendEventQuery.new(
+        player: player,
+        start_date: analysis_range.start_date,
+        end_date: analysis_range.end_date
+      ).result,
       analysis: PlayerTrendQuery.new(player: player, analysis_range: analysis_range).result,
       source_metadata: source_metadata
     }

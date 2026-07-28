@@ -44,4 +44,20 @@ namespace :daily_analytics do
     puts "Calculation version: #{result.dig(:data, :calculation_version)}"
     result.dig(:data, :row_counts).each { |table, count| puts "#{table}: #{count}" }
   end
+
+  desc "Refresh persisted player trend events through AS_OF (defaults to latest pitch date)"
+  task :refresh_trend_events, [ :as_of ] => :environment do |_task, args|
+    as_of = args[:as_of].presence || ENV["AS_OF"].presence
+    parsed_as_of = as_of.present? ? Date.iso8601(as_of) : nil
+    mlb_ids = PitchDatum.where.not(pitcher: nil).distinct.pluck(:pitcher) |
+      PitchDatum.where.not(batter: nil).distinct.pluck(:batter)
+    result = PlayerTrendEventRefresh.call(players: Player.where(mlb_id: mlb_ids), as_of: parsed_as_of)
+    abort result[:message] unless result[:success]
+
+    counts = result.fetch(:data)
+    puts "Trend events refreshed for #{counts.fetch(:players)} players"
+    puts "Created: #{counts.fetch(:created)}, updated: #{counts.fetch(:updated)}, resolved: #{counts.fetch(:resolved)}"
+  rescue Date::Error
+    abort "AS_OF must be a valid ISO date"
+  end
 end

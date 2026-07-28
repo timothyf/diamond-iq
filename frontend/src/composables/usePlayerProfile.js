@@ -55,6 +55,7 @@ function normalizeProfile(data = {}) {
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
   const analysis = data.analysis || {}
+  const trendEvents = data.trend_events || {}
   const similarPlayers = data.similar_players || {}
   const analysisRange = analysis.range || {}
   const source = data.source_metadata || {}
@@ -175,6 +176,37 @@ function normalizeProfile(data = {}) {
       summary: analysis.summary || { current: { batting: {}, pitching: {} }, previous: { batting: {}, pitching: {} }, changes: {} },
       batting: normalizeTrendGroup(analysis.batting),
       pitching: normalizeTrendGroup(analysis.pitching),
+    },
+    trendEvents: {
+      activeCount: trendEvents.active_count || 0,
+      events: (trendEvents.events || []).map((event) => ({
+        id: event.id,
+        eventType: event.event_type,
+        role: event.role,
+        metricKey: event.metric_key,
+        pitchType: event.pitch_type,
+        direction: event.direction,
+        severity: event.severity,
+        status: event.status,
+        unit: event.unit,
+        baselineValue: event.baseline_value,
+        currentValue: event.current_value,
+        changeValue: event.change_value,
+        thresholdValue: event.threshold_value,
+        thresholds: event.thresholds || {},
+        baselineSampleSize: event.baseline_sample_size,
+        sampleSize: event.sample_size,
+        baselineStartDate: event.baseline_start_date,
+        baselineEndDate: event.baseline_end_date,
+        currentStartDate: event.current_start_date,
+        currentEndDate: event.current_end_date,
+        onsetDate: event.onset_date,
+        detectedAt: event.detected_at,
+        lastObservedAt: event.last_observed_at,
+        resolvedAt: event.resolved_at,
+        supportingPitches: event.supporting_pitches || [],
+        metadata: event.metadata || {},
+      })),
     },
     sourceMetadata: {
       lastUpdatedAt: source.last_updated_at,

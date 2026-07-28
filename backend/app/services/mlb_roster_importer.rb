@@ -104,7 +104,8 @@ class MlbRosterImporter
         roster_type: roster_type,
         source_name: SOURCE_NAME,
         last_synced_at: fetched_at,
-        raw_data: payload
+        raw_data: payload,
+        player_ids: players.map(&:id)
       )
     end
 

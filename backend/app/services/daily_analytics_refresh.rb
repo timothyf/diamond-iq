@@ -39,6 +39,7 @@ class DailyAnalyticsRefresh
       counts.each { |table, count| totals[table] += count }
     end
     benchmark_refreshes = refresh_contextual_benchmarks ? refresh_contextual_benchmark_ranges(calculation_dates) : []
+    trend_event_refresh = refresh_trend_events(calculation_dates)
 
     {
       success: true,
@@ -49,6 +50,7 @@ class DailyAnalyticsRefresh
         source_end_date: calculation_dates.max.iso8601,
         calculated_date_count: calculation_dates.length,
         row_counts: totals,
+        trend_event_refresh: trend_event_refresh,
         contextual_benchmarks_refreshed: refresh_contextual_benchmarks,
         benchmark_refreshes: benchmark_refreshes
       }
@@ -62,6 +64,18 @@ class DailyAnalyticsRefresh
   private
 
   attr_reader :start_date, :end_date, :dates, :calculation_version, :refresh_contextual_benchmarks
+
+  def refresh_trend_events(calculation_dates)
+    mlb_ids = PitchDatum.where(game_date: calculation_dates)
+      .pluck(:pitcher, :batter)
+      .flatten
+      .compact
+      .uniq
+    players = Player.where(mlb_id: mlb_ids).to_a
+    return { success: true, data: { players: 0, created: 0, updated: 0, resolved: 0 } } if players.empty?
+
+    PlayerTrendEventRefresh.call(players: players, as_of: calculation_dates.max)
+  end
 
   def refresh_contextual_benchmark_ranges(calculation_dates)
     calculation_dates.map(&:year).uniq.sort.flat_map do |year|

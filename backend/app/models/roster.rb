@@ -13,8 +13,10 @@ class Roster < ApplicationRecord
   validates :source_name, presence: true
   validates :last_synced_at, presence: true
 
-  def rebuild_from_memberships!(on:, roster_type:, source_name:, last_synced_at:, raw_data: {})
-    memberships = team.team_memberships.active_on(on).includes(:player)
+  def rebuild_from_memberships!(on:, roster_type:, source_name:, last_synced_at:, raw_data: {}, player_ids: nil)
+    memberships = team.team_memberships.active_on(on)
+    memberships = memberships.where(player_id: player_ids) if player_ids
+    memberships = memberships.includes(:player)
 
     self.class.transaction do
       update!(
@@ -24,7 +26,7 @@ class Roster < ApplicationRecord
         last_synced_at: last_synced_at,
         raw_data: raw_data
       )
-      self.player_ids = memberships.map(&:player_id).uniq
+      self.player_ids = player_ids || memberships.map(&:player_id).uniq
     end
 
     self

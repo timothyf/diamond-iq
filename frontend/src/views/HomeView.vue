@@ -170,7 +170,7 @@ function signed(value) {
 .home-hero { position: relative; display: grid; grid-template-columns: minmax(330px, .95fr) minmax(0, 1.45fr); gap: clamp(2rem, 5vw, 5rem); align-items: center; min-height: 510px; padding: clamp(2rem, 3vw, 4rem); overflow: hidden; border-radius: 30px; color: #fffaf0; background: linear-gradient(115deg, #0d293f 0%, #17435f 58%, #413542 130%); box-shadow: 0 24px 70px rgba(16,38,61,.18); }
 .home-hero::after { position: absolute; right: -90px; bottom: -165px; width: 390px; height: 390px; border: 45px solid rgba(255,250,240,.045); border-radius: 50%; content: ''; }
 .home-hero__brand, .home-hero__copy { position: relative; z-index: 1; min-width: 0; }
-.home-hero__brand { display: grid; place-items: center; }
+.home-hero__brand { display: grid; place-items: center; margin-top: -40px; }
 .home-hero__brand img { display: block; width: min(100%, 570px); max-height: 390px; object-fit: contain; }
 .home-hero__baseball { display: grid; grid-template-columns: minmax(30px,1fr) auto minmax(30px,1fr); gap: clamp(.75rem,2vw,1.25rem); align-items: center; width: min(93%,490px); margin-top: .25rem; color: #fffaf0; }
 .home-hero__baseball::before,.home-hero__baseball::after { height: 2px; background: linear-gradient(90deg,transparent,#fffaf0 32%,#fffaf0); content: ''; }
