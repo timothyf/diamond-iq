@@ -73,6 +73,24 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 - Player percentiles, sample sizes, prior-period values, and changes.
 - Read-only benchmark calculation for uncached custom player date ranges.
 
+### Acquisition Workflow
+
+- Private watchlists with notes, reusable organizational need profiles, weighted calculated acquisition fit, candidate discovery filters, and similar alternatives.
+- Watchlist and need-profile ownership is enforced per user, with audit history for changes and fit recalculations.
+
+### Accounts and Access
+
+- Account registration, sign-in, sign-out, bearer-token sessions, and current-user lookup.
+- Roles include administrator, analyst, coach, scout, and viewer. Legacy `admin` and `editor` values remain supported for compatibility.
+- Watchlists require a signed-in user. Admin pages and Admin APIs require an administrator role.
+- The frontend hides Watchlists for signed-out users and Admin for signed-out or non-administrator users; backend authorization remains authoritative.
+- Sign-ins, imports, workflow changes, and background task starts are attributed in audit history.
+
+### Trend Events and Alerts
+
+- Persisted alerts for velocity loss, pitch-mix changes, chase-rate movement, and related signals.
+- Events include severity, threshold, onset date, sample size, and supporting pitches; positive changes use green improvement styling.
+
 ### Data Administration
 
 The `/admin` page centralizes the application's data operations:
@@ -88,6 +106,8 @@ The `/admin` page centralizes the application's data operations:
 - Run or reopen the latest Data Health report for missing schedules, incomplete games, player/profile gaps, pitch-linkage issues, and analytics coverage.
 - View PostgreSQL storage details: total size, largest tables, data/index footprints, estimated live/dead rows, server version, and measurement time.
 - View PostgreSQL table-read activity: total, sequential, and index scans; rows read/fetched; last scan timestamps; and the statistics collection start time.
+- Long-running game-detail, Statcast, roster, and related synchronization workflows run through Solid Queue background jobs with queued/running/completed/failed/cancelled status, progress polling, safe cancellation, and orphaned-worker recovery.
+- Background task records include the initiating user and surfaced error/result details.
 
 ## Architecture
 
@@ -136,6 +156,8 @@ bin/rails server
 The Rails API runs at `http://127.0.0.1:3000` by default. Use `backend/.ruby-version` to select the expected Ruby version.
 In development, Puma also starts the Solid Queue worker used by tracked Admin tasks.
 
+After pulling migrations, run `bin/rails db:migrate` before starting the API. Pending migrations prevent Rails from serving API requests, including login and the Home briefing.
+
 For production, run the durable job worker as a separate process:
 
 ```bash
@@ -171,6 +193,8 @@ The main frontend routes are:
 - `/teams` — MLB Team Directory
 - `/teams/:id` — analytical Team Profile
 - `/admin` — imports, synchronization, data health, analytics, and database information
+- `/watchlists` — private watchlists, acquisition fit, candidate discovery, and audit history (signed-in users only)
+- `/login` — account sign-in and workspace registration
 
 ## Recommended Data Workflow
 
@@ -353,6 +377,20 @@ Game filters include team, start/end date, season, status, and game type. Collec
 - `POST /api/pitch_data/import`
 - `POST /api/pitch_data/download`
 
+Import and download writes require the configured Admin API token in production. When initiated by an authenticated user, the application records an `import_started` audit event.
+
+### Authentication and Private Resources
+
+- `POST /api/auth/register` — create the first workspace account; subsequent account creation requires an administrator
+- `POST /api/auth/login` — issue a bearer-token session
+- `GET /api/auth/me` — return the current signed-in user
+- `DELETE /api/auth/logout` — revoke the current session token
+- `GET /api/watchlists` and `GET /api/watchlists/:id` — owned watchlists (administrators can view all)
+- `GET /api/watchlists/:id/audit_history` — attributed watchlist and entry changes
+- `GET /api/need_profiles` — owned need profiles (administrators can view all)
+
+Send a session token as `Authorization: Bearer <user-session-token>`. The system Admin API token remains available for operational automation and maps to the system administrator account.
+
 ### Admin Tasks
 
 - `GET /api/admin/tasks` — task catalog plus dataset coverage and database metrics
@@ -363,6 +401,8 @@ Game filters include team, start/end date, season, status, and game type. Collec
 - `POST /api/admin/task_runs` — start a tracked background task
 - `POST /api/admin/task_runs/:id/cancel` — request safe cancellation
 - `GET /api/admin/data_health` — run the data-health evaluation; the Admin page retains the current report until the user explicitly refreshes it
+
+All Admin endpoints require an authenticated administrator or the configured system Admin API token.
 
 ## Admin API Token
 
