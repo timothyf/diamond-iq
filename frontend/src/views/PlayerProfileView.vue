@@ -228,6 +228,25 @@ function trendEventTitle(event) {
   return `${trendEventLabels[event.eventType] || event.eventType}${pitch}`
 }
 
+function trendEventIsFavorable(event) {
+  if (event.eventType !== 'chase_rate_movement') return false
+
+  return (event.role === 'pitcher' && event.direction === 'increase')
+    || (event.role === 'batter' && event.direction === 'decrease')
+}
+
+function trendEventTone(event) {
+  if (trendEventIsFavorable(event)) return 'favorable'
+  if (event.eventType === 'pitch_mix_change') return 'neutral'
+  return 'adverse'
+}
+
+function trendEventLabel(event) {
+  if (trendEventIsFavorable(event)) return 'improvement'
+  if (event.eventType === 'pitch_mix_change') return 'change'
+  return event.severity
+}
+
 function isTwoWayPlayer(playerData) {
   const primaryPositionType = playerData?.positions?.primary?.position_type
   if (primaryPositionType === 'two_way') return true
@@ -574,9 +593,13 @@ function formatTimestamp(value) {
 
         <div v-if="player.trendEvents?.events?.length" class="trend-events" data-test="trend-events">
           <article v-for="event in player.trendEvents.events" :key="event.id"
-            :class="[`trend-event--${event.severity}`, { 'trend-event--resolved': event.status === 'resolved' }]">
+            :class="[
+              `trend-event--${trendEventTone(event)}`,
+              `trend-event--${event.severity}`,
+              { 'trend-event--resolved': event.status === 'resolved' },
+            ]">
             <header>
-              <span>{{ event.severity }} · {{ event.status }}</span>
+              <span>{{ trendEventLabel(event) }} · {{ event.status }}</span>
               <time :datetime="event.onsetDate">Onset {{ formatDate(event.onsetDate) }}</time>
             </header>
             <strong>{{ trendEventTitle(event) }}</strong>
@@ -868,15 +891,28 @@ function formatTimestamp(value) {
 .trend-events article {
   padding: .85rem;
   border: 1px solid rgba(169, 54, 39, .22);
-  border-left: 4px solid #c37a28;
+  border-left: 4px solid #a93627;
   border-radius: 12px;
+  background: rgba(255, 241, 238, .86);
+}
+
+.trend-events article.trend-event--favorable {
+  border-color: rgba(23, 97, 61, .22);
+  border-left-color: #17613d;
+  background: rgba(235, 249, 240, .9);
+}
+
+.trend-events article.trend-event--neutral {
+  border-color: rgba(195, 122, 40, .24);
+  border-left-color: #c37a28;
   background: rgba(255, 248, 229, .86);
 }
 
-.trend-events article.trend-event--critical { border-left-color: #a93627; }
 .trend-events article.trend-event--resolved { opacity: .64; }
 .trend-events header { display: flex; justify-content: space-between; gap: .5rem; }
 .trend-events header span { color: #a93627; font-size: .64rem; font-weight: 900; text-transform: uppercase; }
+.trend-events .trend-event--favorable header span { color: #17613d; }
+.trend-events .trend-event--neutral header span { color: #8a5a1f; }
 .trend-events time, .trend-events small { color: #65747d; font-size: .68rem; }
 .trend-events strong { display: block; margin-top: .4rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.2rem; text-transform: uppercase; }
 .trend-events p { margin: .3rem 0; font-size: .78rem; }

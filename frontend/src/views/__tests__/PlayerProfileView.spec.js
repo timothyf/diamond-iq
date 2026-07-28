@@ -343,6 +343,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Performance trends')
     expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Batting · Exit velocity')
     expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Chase-rate movement')
+    expect(wrapper.get('[data-test="trend-events"]').text()).toContain('warning · active')
     expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Sample 32 vs 30 baseline')
     expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Onset Jul 1, 2026')
     expect(wrapper.get('[data-test="player-trends"] svg').attributes('aria-label')).toBe('Batting · Exit velocity rolling trend')
@@ -366,6 +367,34 @@ describe('PlayerProfileView', () => {
     expect(fetch).toHaveBeenLastCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
       headers: { Accept: 'application/json' },
     })
+  })
+
+  it('renders favorable pitcher chase movement as a green improvement', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.trend_events.events[0] = {
+        ...response.data.trend_events.events[0],
+        role: 'pitcher',
+        baseline_value: 38.9,
+        current_value: 51.8,
+        change_value: 12.9,
+        baseline_sample_size: 54,
+        sample_size: 56,
+        onset_date: '2026-07-18',
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+
+    const event = wrapper.get('[data-test="trend-events"] article')
+    expect(event.classes()).toContain('trend-event--favorable')
+    expect(event.text()).toContain('improvement · active')
+    expect(event.text()).not.toContain('warning · active')
+    expect(event.text()).toContain('38.9 pts → 51.8 pts')
   })
 
   it('shows pitching trends for primary pitchers', async () => {
