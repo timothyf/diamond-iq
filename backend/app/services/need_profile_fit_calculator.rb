@@ -1,10 +1,12 @@
 class NeedProfileFitCalculator
   RATE_STAT_KEYS = %w[avg obp slg ops era whip].freeze
 
-  def initialize(need_profile:, player:, on: Date.current)
+  def initialize(need_profile:, player:, on: Date.current, season_stats: nil, latest_season: nil)
     @need_profile = need_profile
     @player = player
     @on = on
+    @provided_season_stats = season_stats
+    @provided_latest_season = latest_season
   end
 
   def result
@@ -107,7 +109,9 @@ class NeedProfileFitCalculator
   end
 
   def stat_value(stat_key)
-    matching = season_stats.select { |row| row.stat_type.name.casecmp?(stat_key.to_s) }
+    matching = season_stats.select do |row|
+      row.stat_type.name.casecmp?(stat_key.to_s) && row.stat_type.category == performance_category
+    end
     combined = matching.find { |row| row.scope_type == "combined" }
     return combined.value.to_f if combined
 
@@ -119,7 +123,7 @@ class NeedProfileFitCalculator
   end
 
   def latest_season
-    @latest_season ||= if player.player_season_stats.loaded?
+    @latest_season ||= @provided_latest_season || if player.player_season_stats.loaded?
       player.player_season_stats.map(&:season).compact.max
     else
       PlayerSeasonStat.where(player: player).maximum(:season)
@@ -127,7 +131,9 @@ class NeedProfileFitCalculator
   end
 
   def season_stats
-    @season_stats ||= if latest_season
+    @season_stats ||= if @provided_season_stats
+      @provided_season_stats
+    elsif latest_season
       if player.player_season_stats.loaded?
         player.player_season_stats.select do |row|
           row.season == latest_season && row.scope_type != "league"
@@ -140,6 +146,13 @@ class NeedProfileFitCalculator
       end
     else
       []
+    end
+  end
+
+  def performance_category
+    @performance_category ||= begin
+      position_types = player.player_positions.map { |assignment| assignment.position.position_type }
+      position_types.include?("pitcher") && !position_types.include?("outfielder") ? "pitching" : "batting"
     end
   end
 

@@ -78,6 +78,25 @@ RSpec.describe "Acquisition discovery", type: :request do
     expect(json_body.fetch("data")).to eq([])
   end
 
+  it "honors the result limit while ranking candidates from the latest metric season" do
+    profile = NeedProfile.create!(
+      team: organization,
+      name: "Latest season outfield",
+      criteria: {
+        position_types: [ "outfielder" ],
+        performance: [ { stat_key: "ops", direction: "higher", target: 0.7 } ]
+      },
+      weights: { performance: 100 }
+    )
+    watchlist = Watchlist.create!(name: "Bounded discovery", need_profile: profile)
+
+    get discovery_api_watchlist_path(watchlist), params: { limit: 1 }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").length).to eq(1)
+    expect(json_body.dig("data", 0, "fit_breakdown", "season")).to eq(2026)
+  end
+
   private
 
   def candidate(first_name, last_name, position:, bats:, ops_value:, team: other_team)

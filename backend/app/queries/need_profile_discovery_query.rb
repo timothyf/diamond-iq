@@ -9,8 +9,15 @@ class NeedProfileDiscoveryQuery
   end
 
   def result
-    candidates = filtered_players.filter_map do |player|
-      fit = NeedProfileFitCalculator.new(need_profile: need_profile, player: player).result
+    players = filtered_players
+    stats_by_player = stats_by_player(players)
+    candidates = players.filter_map do |player|
+      fit = NeedProfileFitCalculator.new(
+        need_profile: need_profile,
+        player: player,
+        season_stats: stats_by_player.fetch(player.id, []),
+        latest_season: latest_season
+      ).result
       next if fit.fetch(:score) < minimum_fit
 
       serialize(player, fit)
@@ -23,8 +30,28 @@ class NeedProfileDiscoveryQuery
 
   attr_reader :need_profile, :filters, :excluded_player_ids
 
+  def performance_stat_keys
+    Array(need_profile.criteria["performance"]).filter_map { |target| target.to_h["stat_key"].to_s.presence }.map(&:downcase).uniq
+  end
+
+  def latest_season
+    @latest_season ||= PlayerSeasonStat.maximum(:season)
+  end
+
+  def stats_by_player(players)
+    return Hash.new { |hash, key| hash[key] = [] } if players.empty? || performance_stat_keys.empty? || latest_season.nil?
+
+    PlayerSeasonStat.joins(:stat_type)
+      .where(player_id: players.map(&:id), season: latest_season)
+      .where("lower(stat_types.name) IN (?)", performance_stat_keys)
+      .where.not(scope_type: "league")
+      .includes(:stat_type)
+      .to_a
+      .group_by(&:player_id)
+  end
+
   def filtered_players
-    scope = Player.includes(:team, :profile, { player_positions: :position }, { player_season_stats: :stat_type })
+    scope = Player.includes(:team, :profile, player_positions: :position)
       .where.not(id: excluded_player_ids)
     scope = scope.where.not(team_id: need_profile.team_id) unless filters[:include_organization].to_s == "true"
 
