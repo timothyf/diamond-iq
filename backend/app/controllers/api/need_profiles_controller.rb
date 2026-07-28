@@ -1,17 +1,25 @@
 module Api
   class NeedProfilesController < ApplicationController
+    before_action :require_authenticated_user
+
     def index
-      profiles = NeedProfile.joins(:team).includes(:team).order("teams.name", :name)
+      profiles = (current_user.admin? ? NeedProfile.all : NeedProfile.where(owner_id: current_user.id))
+        .joins(:team).includes(:team).order("teams.name", :name)
       profiles = profiles.where(team_id: params[:team_id]) if params[:team_id].present?
       render json: { data: profiles.map { |profile| serialize(profile) } }
     end
 
     def show
-      render json: { data: serialize(find_profile) }
+      profile = find_profile
+      require_read_access!(profile)
+      return if performed?
+      render json: { data: serialize(profile) }
     end
 
     def create
-      profile = NeedProfile.create!(profile_params)
+      profile = current_user.owned_need_profiles.build(profile_params)
+      profile.save!
+      AuditLog.record!(user: current_user, action: "created", record: profile, changes: profile.saved_changes)
       render json: { data: serialize(profile) }, status: :created
     rescue ActiveRecord::RecordInvalid => error
       render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
@@ -19,21 +27,29 @@ module Api
 
     def update
       profile = find_profile
+      require_write_access!(profile)
+      return if performed?
       profile.update!(profile_params)
+      AuditLog.record!(user: current_user, action: "updated", record: profile, changes: profile.saved_changes)
       render json: { data: serialize(profile) }
     rescue ActiveRecord::RecordInvalid => error
       render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
     end
 
     def destroy
-      find_profile.destroy!
+      profile = find_profile
+      require_write_access!(profile)
+      return if performed?
+      AuditLog.record!(user: current_user, action: "deleted", record: profile, changes: profile.attributes)
+      profile.destroy!
       head :no_content
     end
 
     private
 
     def find_profile
-      NeedProfile.includes(:team).find(params[:id])
+      scope = current_user.admin? ? NeedProfile.all : NeedProfile.where(owner_id: current_user.id)
+      scope.includes(:team).find(params[:id])
     end
 
     def profile_params

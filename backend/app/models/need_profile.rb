@@ -9,6 +9,7 @@ class NeedProfile < ApplicationRecord
   DIRECTIONS = %w[higher lower].freeze
 
   belongs_to :team
+  belongs_to :owner, class_name: "User", optional: true
   has_many :watchlists, dependent: :nullify
 
   validates :name, presence: true, uniqueness: { scope: :team_id, case_sensitive: false }

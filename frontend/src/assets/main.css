@@ -8,8 +8,9 @@
   position: sticky;
   z-index: 20;
   top: 0;
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto minmax(260px, 350px) minmax(0, 1fr) auto;
+  gap: 1.25rem;
   align-items: center;
   min-height: 74px;
   padding: 0.7rem max(1.25rem, calc((100vw - 1680px) / 2));
@@ -17,6 +18,27 @@
   color: #fff7e7;
   background: rgba(16, 38, 61, 0.96);
   backdrop-filter: blur(12px);
+}
+
+.app-primary-nav,
+.app-account {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.app-primary-nav {
+  justify-content: flex-start;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-primary-nav::-webkit-scrollbar { display: none; }
+
+.app-account {
+  justify-content: flex-end;
 }
 
 .app-brand {
@@ -68,13 +90,26 @@
   text-transform: uppercase;
 }
 
-.app-bar nav a {
+.app-bar nav a,
+.app-account a {
   padding: 0.45rem 0.8rem;
   border-radius: 999px;
   color: #dce4e9;
   font-size: 0.84rem;
   font-weight: 700;
   text-decoration: none;
+}
+
+.app-logout {
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  border-radius: 999px;
+  color: #10263d;
+  background: #f1d7a8;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .app-bar nav a.router-link-active {
@@ -95,7 +130,8 @@
 .player-search {
   position: relative;
   flex: 0 1 480px;
-  margin-inline: 2rem;
+  min-width: 0;
+  max-width: 350px;
 }
 
 .player-search__control {
@@ -871,8 +907,20 @@
 
 @media (max-width: 860px) {
   .app-bar {
+    display: flex;
     flex-wrap: wrap;
+    gap: 0.75rem;
   }
+
+  .app-primary-nav {
+    order: 4;
+    flex: 1 0 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 0.15rem;
+  }
+
+  .app-account { margin-left: auto; }
 
   .player-search {
     order: 3;
@@ -911,5 +959,18 @@
 
   .data-grid table {
     min-width: 760px;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1280px) {
+  .app-bar {
+    grid-template-columns: auto minmax(220px, 1fr) auto;
+  }
+
+  .app-primary-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+    overflow-x: auto;
   }
 }

@@ -1,4 +1,5 @@
 class ApplicationController < ActionController::API
+  include Authentication
   before_action :authenticate_unsafe_api_request
 
   private

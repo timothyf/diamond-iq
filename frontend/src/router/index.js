@@ -5,6 +5,7 @@ import AdminView from '../views/AdminView.vue'
 import GameSummaryView from '../views/GameSummaryView.vue'
 import HomeView from '../views/HomeView.vue'
 import LineupScenarioView from '../views/LineupScenarioView.vue'
+import LoginView from '../views/LoginView.vue'
 import OpponentReportView from '../views/OpponentReportView.vue'
 import PlayerProfileView from '../views/PlayerProfileView.vue'
 import PlayerComparisonView from '../views/PlayerComparisonView.vue'
@@ -67,6 +68,11 @@ const router = createRouter({
       path: '/watchlists',
       name: 'watchlists',
       component: WatchlistsView,
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: LoginView,
     },
     {
       path: '/teams/:id',

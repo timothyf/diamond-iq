@@ -1,6 +1,12 @@
 <script setup>
+import { onMounted } from 'vue'
+
 import PlayerSearch from './components/PlayerSearch.vue'
 import diamondIqLogo from './assets/diamondiq_logo.png'
+import { useAuth } from './composables/useAuth'
+
+const { user, loadCurrentUser, logout } = useAuth()
+onMounted(loadCurrentUser)
 </script>
 
 <template>
@@ -15,7 +21,7 @@ import diamondIqLogo from './assets/diamondiq_logo.png'
       </span>
     </RouterLink>
     <PlayerSearch />
-    <nav aria-label="Primary navigation">
+    <nav class="app-primary-nav" aria-label="Primary navigation">
       <RouterLink to="/">Home</RouterLink>
       <RouterLink to="/schedule">Schedule</RouterLink>
       <RouterLink to="/standings">Standings</RouterLink>
@@ -25,6 +31,10 @@ import diamondIqLogo from './assets/diamondiq_logo.png'
       <RouterLink to="/watchlists">Watchlists</RouterLink>
       <RouterLink to="/admin">Admin</RouterLink>
     </nav>
+    <div class="app-account">
+      <RouterLink v-if="!user" to="/login">Sign in</RouterLink>
+      <button v-else type="button" class="app-logout" @click="logout">{{ user.name }} · Sign out</button>
+    </div>
   </header>
   <RouterView />
 </template>

@@ -1,6 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Acquisition discovery", type: :request do
+  let(:user) { create_user }
+  let(:auth_headers) { user_headers(user) }
+
   let(:organization) { create_team(name: "Detroit Tigers", abbreviation: "DET") }
   let(:other_team) { create_team(name: "Seattle Mariners", abbreviation: "SEA") }
   let(:outfield) { create_position(abbreviation: "OF", name: "Outfield", position_type: "outfielder") }
@@ -26,7 +29,7 @@ RSpec.describe "Acquisition discovery", type: :request do
         performance: [ { stat_key: "ops", direction: "higher", target: 0.850 } ]
       },
       weights: { position: 20, handedness: 15, age: 10, performance: 55 }
-    }
+    }, headers: auth_headers
 
     expect(response).to have_http_status(:created)
     profile_id = json_body.dig("data", "id")
@@ -36,10 +39,10 @@ RSpec.describe "Acquisition discovery", type: :request do
       name: "Calculated deadline targets",
       description: "System-ranked candidates",
       need_profile_id: profile_id
-    }
+    }, headers: auth_headers
     watchlist_id = json_body.dig("data", "id")
 
-    get discovery_api_watchlist_path(watchlist_id), params: { min_fit: 80 }
+    get discovery_api_watchlist_path(watchlist_id), params: { min_fit: 80 }, headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     candidates = json_body.fetch("data")
@@ -48,14 +51,14 @@ RSpec.describe "Acquisition discovery", type: :request do
     expect(candidates.first.dig("fit_breakdown", "components", "performance", "targets", 0))
       .to include("actual" => 0.91, "target" => 0.85)
 
-    post api_watchlist_watchlist_entries_path(watchlist_id), params: { player_id: @best.id }
+    post api_watchlist_watchlist_entries_path(watchlist_id), params: { player_id: @best.id }, headers: auth_headers
 
     expect(response).to have_http_status(:created)
     entry_id = json_body.dig("data", "id")
     expect(json_body.dig("data", "calculated_fit_score")).to eq(100.0)
     expect(json_body.dig("data", "fit_calculated_at")).to be_present
 
-    get alternatives_api_watchlist_entry_path(entry_id)
+    get alternatives_api_watchlist_entry_path(entry_id), headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", 0, "player", "full_name")).to eq("Similar Option")
@@ -70,9 +73,9 @@ RSpec.describe "Acquisition discovery", type: :request do
       criteria: { position_types: [ "outfielder" ] },
       weights: {}
     )
-    watchlist = Watchlist.create!(name: "Filtered targets", need_profile: profile)
+    watchlist = Watchlist.create!(name: "Filtered targets", need_profile: profile, owner: user)
 
-    get discovery_api_watchlist_path(watchlist), params: { bats: "R" }
+    get discovery_api_watchlist_path(watchlist), params: { bats: "R" }, headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data")).to eq([])
@@ -88,9 +91,9 @@ RSpec.describe "Acquisition discovery", type: :request do
       },
       weights: { performance: 100 }
     )
-    watchlist = Watchlist.create!(name: "Bounded discovery", need_profile: profile)
+    watchlist = Watchlist.create!(name: "Bounded discovery", need_profile: profile, owner: user)
 
-    get discovery_api_watchlist_path(watchlist), params: { limit: 1 }
+    get discovery_api_watchlist_path(watchlist), params: { limit: 1 }, headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data").length).to eq(1)

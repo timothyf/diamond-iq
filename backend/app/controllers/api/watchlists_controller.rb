@@ -1,19 +1,28 @@
 module Api
   class WatchlistsController < ApplicationController
+    before_action :require_authenticated_user
+
     def index
       render json: {
-        data: Watchlist.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] })
+        data: accessible_watchlists.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] })
           .order(:name)
           .map { |watchlist| serialize_watchlist(watchlist) }
       }
     end
 
     def show
-      render json: { data: serialize_watchlist(find_watchlist) }
+      watchlist = find_watchlist
+      require_read_access!(watchlist)
+      return if performed?
+      render json: { data: serialize_watchlist(watchlist) }
     end
 
     def create
-      watchlist = Watchlist.create!(watchlist_params)
+      watchlist = current_user.owned_watchlists.build(watchlist_params)
+      validate_need_profile_access!(watchlist.need_profile)
+      return if performed?
+      watchlist.save!
+      AuditLog.record!(user: current_user, action: "created", record: watchlist, changes: watchlist.saved_changes)
       render json: { data: serialize_watchlist(watchlist) }, status: :created
     rescue ActiveRecord::RecordInvalid => error
       render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
@@ -21,8 +30,13 @@ module Api
 
     def update
       watchlist = find_watchlist
+      require_write_access!(watchlist)
+      return if performed?
+      validate_need_profile_access!(NeedProfile.find_by(id: watchlist_params[:need_profile_id])) if watchlist_params[:need_profile_id].present?
+      return if performed?
       watchlist.update!(watchlist_params)
       watchlist.entries.reload if watchlist.saved_change_to_need_profile_id?
+      AuditLog.record!(user: current_user, action: "updated", record: watchlist, changes: watchlist.saved_changes)
       render json: { data: serialize_watchlist(watchlist) }
     rescue ActiveRecord::RecordInvalid => error
       render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
@@ -30,6 +44,8 @@ module Api
 
     def discovery
       watchlist = find_watchlist
+      require_read_access!(watchlist)
+      return if performed?
       return render json: { message: "Attach a need profile before discovering candidates." },
         status: :unprocessable_content unless watchlist.need_profile
 
@@ -49,14 +65,37 @@ module Api
       }
     end
 
+    def audit_history
+      watchlist = find_watchlist
+      require_read_access!(watchlist)
+      return if performed?
+
+      ids = [ watchlist.id, *watchlist.entries.pluck(:id) ]
+      logs = AuditLog.includes(:user)
+        .where("(auditable_type = 'Watchlist' AND auditable_id = ?) OR (auditable_type = 'WatchlistEntry' AND auditable_id IN (?))", watchlist.id, ids)
+        .order(created_at: :desc)
+        .limit(100)
+      render json: { data: logs.map { |log| serialize_audit_log(log) } }
+    end
+
     private
 
     def find_watchlist
-      Watchlist.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] }).find(params[:id])
+      accessible_watchlists.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] }).find(params[:id])
+    end
+
+    def accessible_watchlists
+      current_user.admin? ? Watchlist.all : Watchlist.where(owner_id: current_user.id)
     end
 
     def watchlist_params
       params.permit(:name, :description, :need_profile_id)
+    end
+
+    def validate_need_profile_access!(profile)
+      return if profile.nil? || current_user.admin? || profile.owner_id == current_user.id
+
+      render json: { message: "You are not authorized to use this need profile" }, status: :forbidden
     end
 
     def discovery_params
@@ -70,6 +109,7 @@ module Api
     def serialize_watchlist(watchlist)
       {
         id: watchlist.id,
+        owner: serialize_user(watchlist.owner),
         name: watchlist.name,
         description: watchlist.description,
         need_profile: serialize_need_profile(watchlist.need_profile),
@@ -119,6 +159,25 @@ module Api
           name: profile.team.name,
           abbreviation: profile.team.abbreviation
         }
+      }
+    end
+
+    def serialize_user(user)
+      return nil unless user
+
+      { id: user.id, name: user.name, email: user.email, role: user.role }
+    end
+
+    def serialize_audit_log(log)
+      {
+        id: log.id,
+        action: log.action,
+        auditable_type: log.auditable_type,
+        auditable_id: log.auditable_id,
+        changes: log.change_set,
+        metadata: log.metadata,
+        created_at: log.created_at,
+        user: serialize_user(log.user)
       }
     end
   end

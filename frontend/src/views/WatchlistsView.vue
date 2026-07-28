@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 
-import { adminRequestHeaders } from '../composables/apiAuth'
+import { authRequestHeaders } from '../composables/apiAuth'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
@@ -19,6 +19,8 @@ const discovering = ref(false)
 const discoveryResults = ref([])
 const alternativesByEntry = ref({})
 const loadingAlternativesId = ref(null)
+const auditHistory = ref([])
+const loadingAuditHistory = ref(false)
 const discoveryFilters = ref({ name: '', positionType: '', bats: '', ageMin: '', ageMax: '', minFit: 60 })
 const newNeed = ref({
   name: '',
@@ -52,8 +54,8 @@ async function load() {
   error.value = ''
   try {
     const [loadedWatchlists, loadedProfiles, loadedTeams] = await Promise.all([
-      request('/api/watchlists', { headers: { Accept: 'application/json' } }),
-      request('/api/need_profiles', { headers: { Accept: 'application/json' } }),
+      request('/api/watchlists', { headers: authRequestHeaders({ Accept: 'application/json' }) }),
+      request('/api/need_profiles', { headers: authRequestHeaders({ Accept: 'application/json' }) }),
       request('/api/teams', { headers: { Accept: 'application/json' } }),
     ])
     watchlists.value = (loadedWatchlists || []).map((watchlist) => ({
@@ -79,7 +81,7 @@ async function createNeedProfile() {
   try {
     const profile = await request('/api/need_profiles', {
       method: 'POST',
-      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         team_id: Number(form.teamId),
         name: form.name.trim(),
@@ -115,7 +117,7 @@ async function attachNeedProfile(profileId) {
   try {
     const updated = await request(`/api/watchlists/${selectedWatchlist.value.id}`, {
       method: 'PATCH',
-      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
       body: JSON.stringify({ need_profile_id: profileId || null }),
     })
     const index = watchlists.value.findIndex((watchlist) => watchlist.id === updated.id)
@@ -168,12 +170,26 @@ async function loadAlternatives(entry) {
   }
 }
 
+async function loadAuditHistory() {
+  if (!selectedWatchlist.value) return
+  loadingAuditHistory.value = true
+  try {
+    auditHistory.value = await request(`/api/watchlists/${selectedWatchlist.value.id}/audit_history`, {
+      headers: authRequestHeaders({ Accept: 'application/json' }),
+    }) || []
+  } catch (requestError) {
+    error.value = requestError.message
+  } finally {
+    loadingAuditHistory.value = false
+  }
+}
+
 async function createWatchlist() {
   if (!newWatchlistName.value.trim()) return
   try {
     const watchlist = await request('/api/watchlists', {
       method: 'POST',
-      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name: newWatchlistName.value.trim(), description: newWatchlistDescription.value.trim() }),
     })
     watchlists.value.push(watchlist)
@@ -190,7 +206,7 @@ async function addPlayer(player) {
   try {
     const entry = await request(`/api/watchlists/${selectedWatchlist.value.id}/watchlist_entries`, {
       method: 'POST',
-      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
       body: JSON.stringify({ player_id: player.id }),
     })
     selectedWatchlist.value.entries.push(entry)
@@ -206,7 +222,7 @@ async function saveEvaluation(entry) {
     const tags = String(entry.tagsText || '').split(',').map((tag) => tag.trim()).filter(Boolean)
     const updated = await request(`/api/watchlist_entries/${entry.id}`, {
       method: 'PATCH',
-      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         priority: entry.priority,
         status: entry.status,
@@ -230,7 +246,7 @@ async function saveEvaluation(entry) {
 
 async function removeEntry(entry) {
   try {
-    await request(`/api/watchlist_entries/${entry.id}`, { method: 'DELETE', headers: adminRequestHeaders({ Accept: 'application/json' }) })
+    await request(`/api/watchlist_entries/${entry.id}`, { method: 'DELETE', headers: authRequestHeaders({ Accept: 'application/json' }) })
     selectedWatchlist.value.entries = selectedWatchlist.value.entries.filter((item) => item.id !== entry.id)
   } catch (requestError) {
     error.value = requestError.message
@@ -250,6 +266,7 @@ function chooseWatchlist(watchlist) {
   watchlist.entries = (watchlist.entries || []).map(normalizeEntry)
   discoveryResults.value = []
   alternativesByEntry.value = {}
+  auditHistory.value = []
 }
 
 function componentScore(entry, key) {
@@ -283,6 +300,18 @@ onMounted(load)
       </aside>
       <section v-if="selectedWatchlist" class="watchlist-main">
         <header><div><p>Active watchlist</p><h2>{{ selectedWatchlist.name }}</h2><span>{{ selectedWatchlist.description }}</span></div><span>{{ selectedWatchlist.entries.length }} targets</span></header>
+        <div class="watchlist-audit-bar">
+          <button type="button" class="audit-action" :disabled="loadingAuditHistory" @click="loadAuditHistory">
+            {{ loadingAuditHistory ? 'Loading history…' : 'View audit history' }}
+          </button>
+        </div>
+        <section v-if="auditHistory.length" class="audit-history" data-test="audit-history">
+          <h3>Change history</h3>
+          <article v-for="event in auditHistory" :key="event.id">
+            <div><strong>{{ event.action.replaceAll('_', ' ') }}</strong><span>{{ event.user?.name || event.user?.email || 'System' }}</span></div>
+            <time :datetime="event.created_at">{{ new Date(event.created_at).toLocaleString() }}</time>
+          </article>
+        </section>
 
         <section class="need-workspace" data-test="need-workspace">
           <header>
@@ -432,6 +461,14 @@ button { font: inherit; cursor: pointer; }
 .watchlist-sidebar form button,.evaluation-card footer button { padding: .55rem .7rem; border: 0; border-radius: 9px; color: #fffaf0; background: #20543c; font-size: .75rem; font-weight: 900; }
 .watchlist-main { padding: 1.4rem; }
 .watchlist-main > header,.evaluation-card header,.evaluation-card footer { display: flex; justify-content: space-between; gap: 1rem; align-items: start; }
+.watchlist-audit-bar { display: flex; justify-content: flex-end; margin-top: .7rem; }
+.audit-action,.secondary-action { padding: .5rem .7rem; border: 1px solid rgba(32,84,60,.28); border-radius: 9px; color: #20543c; background: transparent; font-size: .7rem; font-weight: 900; }
+.audit-action:disabled,.secondary-action:disabled { opacity: .6; cursor: wait; }
+.audit-history { margin-top: .7rem; padding: .8rem; border-radius: 12px; background: rgba(16,38,61,.045); }
+.audit-history h3 { margin: 0 0 .5rem; color: #173652; font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; }
+.audit-history article { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem 0; border-top: 1px solid rgba(16,38,61,.09); font-size: .7rem; }
+.audit-history article div span { display: block; color: #71808c; font-size: .65rem; }
+.audit-history time { color: #71808c; white-space: nowrap; }
 .watchlist-main h2 { margin: .25rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: 2.2rem; text-transform: uppercase; }
 .watchlist-main header > span,.watchlist-main header span { color: #71808c; font-size: .8rem; }
 .need-workspace,.discovery-workspace { margin-top: 1rem; padding: 1rem; border: 1px solid rgba(32,84,60,.18); border-radius: 16px; background: rgba(32,84,60,.055); }

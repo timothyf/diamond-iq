@@ -4,6 +4,7 @@ RSpec.describe "Phase 1 acceptance workflows", type: :request do
   let(:season) { Date.current.year }
   let(:tigers) { create_team(name: "Detroit Tigers", abbreviation: "DET", mlb_id: 116) }
   let(:guardians) { create_team(name: "Cleveland Guardians", abbreviation: "CLE", mlb_id: 114) }
+  let(:auth_headers) { user_headers(create_user) }
 
   it "compares representative positional peers with season production" do
     second_base = create_position(mlb_code: "4", abbreviation: "2B", name: "Second Base", position_type: "infielder")
@@ -92,11 +93,11 @@ RSpec.describe "Phase 1 acceptance workflows", type: :request do
       attributes: { mlb_id: 592206, first_name: "Aaron", last_name: "Judge" }
     )
 
-    post api_watchlists_path, params: { name: "Right-handed power targets", description: "External middle-order options" }
+    post api_watchlists_path, params: { name: "Right-handed power targets", description: "External middle-order options" }, headers: auth_headers
     expect(response).to have_http_status(:created)
     watchlist_id = json_body.dig("data", "id")
 
-    post api_watchlist_watchlist_entries_path(watchlist_id), params: { player_id: target.id }
+    post api_watchlist_watchlist_entries_path(watchlist_id), params: { player_id: target.id }, headers: auth_headers
     expect(response).to have_http_status(:created)
     entry_id = json_body.dig("data", "id")
 
@@ -104,10 +105,10 @@ RSpec.describe "Phase 1 acceptance workflows", type: :request do
       priority: "high", status: "active", recommendation: "pursue",
       fit_score: 5, need_score: 5, cost_score: 3, risk_score: 2,
       tags: [ "power", "middle order" ], notes: "Fits Detroit's right-handed power need."
-    }
+    }, headers: auth_headers
     expect(response).to have_http_status(:ok)
 
-    get api_watchlists_path
+    get api_watchlists_path, headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     entry = json_body.dig("data", 0, "entries", 0)

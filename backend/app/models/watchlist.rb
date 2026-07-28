@@ -1,4 +1,5 @@
 class Watchlist < ApplicationRecord
+  belongs_to :owner, class_name: "User", optional: true
   belongs_to :need_profile, optional: true
   has_many :entries, class_name: "WatchlistEntry", dependent: :destroy, inverse_of: :watchlist
 

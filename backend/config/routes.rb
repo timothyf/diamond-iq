@@ -1,5 +1,9 @@
 Rails.application.routes.draw do
   namespace :api do
+    post "auth/register", to: "auth#register"
+    post "auth/login", to: "auth#login"
+    get "auth/me", to: "auth#me"
+    delete "auth/logout", to: "auth#logout"
     namespace :admin do
       resource :data_health, only: :show
       resources :task_runs, only: [ :index, :show, :create ] do
@@ -29,6 +33,7 @@ Rails.application.routes.draw do
       resources :watchlist_entries, only: [ :create ]
       member do
         get :discovery
+        get :audit_history
       end
     end
     resources :watchlist_entries, only: [ :update, :destroy ] do

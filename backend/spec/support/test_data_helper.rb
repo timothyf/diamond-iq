@@ -16,6 +16,15 @@ module TestDataHelper
     { "Authorization" => "Bearer #{token}" }
   end
 
+  def create_user(attributes = {})
+    index = User.where(system_account: false).count + 1
+    User.create!({ email: "scout#{index}@example.test", name: "Scout #{index}", password: "password-#{index}-secure", role: "editor" }.merge(attributes))
+  end
+
+  def user_headers(user)
+    { "Authorization" => "Bearer #{user.issue_auth_token!}" }
+  end
+
   def create_team(attributes = {})
     index = Team.count + 1
 

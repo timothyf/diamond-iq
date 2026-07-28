@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_28_021000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -35,6 +35,20 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
     t.index ["created_at"], name: "index_admin_task_runs_on_created_at"
     t.index ["task_name", "status", "created_at"], name: "idx_admin_task_runs_active_lookup"
     t.index ["task_name"], name: "idx_admin_task_runs_one_active_per_task", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))"
+  end
+
+  create_table "audit_logs", force: :cascade do |t|
+    t.bigint "user_id"
+    t.string "action", null: false
+    t.string "auditable_type", null: false
+    t.bigint "auditable_id", null: false
+    t.jsonb "change_set", default: {}, null: false
+    t.jsonb "metadata", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["auditable_type", "auditable_id", "created_at"], name: "idx_audit_logs_auditable_history"
+    t.index ["user_id", "created_at"], name: "idx_audit_logs_user_history"
+    t.index ["user_id"], name: "index_audit_logs_on_user_id"
   end
 
   create_table "batter_split_summaries", force: :cascade do |t|
@@ -271,6 +285,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "owner_id"
+    t.index ["owner_id"], name: "index_need_profiles_on_owner_id"
     t.index ["team_id", "name"], name: "index_need_profiles_on_team_id_and_name", unique: true
     t.index ["team_id"], name: "index_need_profiles_on_team_id"
   end
@@ -1016,6 +1032,23 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  create_table "users", force: :cascade do |t|
+    t.string "email", null: false
+    t.string "name", null: false
+    t.string "role", default: "viewer", null: false
+    t.string "password_salt"
+    t.string "password_digest"
+    t.string "auth_token_digest"
+    t.datetime "last_signed_in_at"
+    t.datetime "disabled_at"
+    t.boolean "system_account", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((email)::text)", name: "idx_users_lower_email", unique: true
+    t.index ["auth_token_digest"], name: "index_users_on_auth_token_digest", unique: true
+    t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'editor'::character varying, 'viewer'::character varying]::text[])", name: "users_valid_role"
+  end
+
   create_table "watchlist_entries", force: :cascade do |t|
     t.bigint "watchlist_id", null: false
     t.bigint "player_id", null: false
@@ -1053,10 +1086,13 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "need_profile_id"
+    t.bigint "owner_id"
     t.index ["name"], name: "index_watchlists_on_name", unique: true
     t.index ["need_profile_id"], name: "index_watchlists_on_need_profile_id"
+    t.index ["owner_id"], name: "index_watchlists_on_owner_id"
   end
 
+  add_foreign_key "audit_logs", "users"
   add_foreign_key "batter_split_summaries", "players"
   add_foreign_key "batter_split_summaries", "teams"
   add_foreign_key "game_player_batting_lines", "games"
@@ -1079,6 +1115,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
   add_foreign_key "lineup_scenario_entries", "players"
   add_foreign_key "lineup_scenarios", "teams"
   add_foreign_key "need_profiles", "teams"
+  add_foreign_key "need_profiles", "users", column: "owner_id"
   add_foreign_key "opponent_reports", "teams"
   add_foreign_key "opponent_reports", "teams", column: "opponent_team_id"
   add_foreign_key "pitch_data", "games"
@@ -1124,4 +1161,5 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_010000) do
   add_foreign_key "watchlist_entries", "players"
   add_foreign_key "watchlist_entries", "watchlists"
   add_foreign_key "watchlists", "need_profiles"
+  add_foreign_key "watchlists", "users", column: "owner_id"
 end
