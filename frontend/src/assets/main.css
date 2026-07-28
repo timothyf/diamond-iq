@@ -38,6 +38,7 @@
 .app-primary-nav::-webkit-scrollbar { display: none; }
 
 .app-account {
+  position: relative;
   justify-content: flex-end;
 }
 
@@ -100,7 +101,7 @@
   text-decoration: none;
 }
 
-.app-logout {
+.app-account__trigger {
   padding: 0.45rem 0.75rem;
   border: 0;
   border-radius: 999px;
@@ -111,6 +112,46 @@
   font-weight: 800;
   white-space: nowrap;
 }
+
+.app-account__trigger span { margin-left: 0.25rem; font-size: 0.9rem; }
+
+.app-account__menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 0.55rem);
+  right: 0;
+  display: grid;
+  min-width: 190px;
+  padding: 0.4rem;
+  border: 1px solid rgba(16, 38, 61, 0.14);
+  border-radius: 12px;
+  background: #fffdf7;
+  box-shadow: 0 14px 30px rgba(2, 15, 28, 0.2);
+}
+
+.app-account__email {
+  overflow: hidden;
+  padding: 0.45rem 0.55rem;
+  color: #71808c;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-account__menu button {
+  padding: 0.55rem;
+  border: 0;
+  border-radius: 8px;
+  color: #8f2d24;
+  background: transparent;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: left;
+}
+
+.app-account__menu button:hover,
+.app-account__menu button:focus-visible { background: #f5e8cf; }
 
 .app-bar nav a.router-link-active {
   color: #10263d;

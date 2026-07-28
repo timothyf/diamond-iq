@@ -53,7 +53,7 @@ export function useRosterSync() {
     estimating.value = true; error.value = ''
     try {
       const query = new URLSearchParams(Object.entries({ task_name: TASK_NAME, ...parameters }).filter(([, value]) => value !== null && value !== undefined && value !== ''))
-      const payload = await request(`/api/admin/task_runs/estimate?${query}`, { headers: { Accept: 'application/json' } })
+      const payload = await request(`/api/admin/task_runs/estimate?${query}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) })
       const data = payload.data
       return {
         taskParameters: data.task_parameters || {}, teamCount: Number(data.team_count || 0),
@@ -68,14 +68,14 @@ export function useRosterSync() {
 
   async function poll() {
     if (!task.value?.id) return
-    try { const payload = await request(`/api/admin/task_runs/${encodeURIComponent(task.value.id)}`, { headers: { Accept: 'application/json' } }); error.value = ''; replaceTask(payload.data) }
+    try { const payload = await request(`/api/admin/task_runs/${encodeURIComponent(task.value.id)}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) }); error.value = ''; replaceTask(payload.data) }
     catch (caught) { error.value = caught.message || 'Unable to refresh roster synchronization progress.'; schedulePoll() }
   }
   async function loadActiveTask() {
     error.value = ''
     try {
       const query = new URLSearchParams({ task_name: TASK_NAME, active: 'true' })
-      const payload = await request(`/api/admin/task_runs?${query}`, { headers: { Accept: 'application/json' } })
+      const payload = await request(`/api/admin/task_runs?${query}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) })
       return payload?.data?.[0] ? replaceTask(payload.data[0]) : null
     } catch (caught) { error.value = caught.message || 'Unable to recover roster synchronization progress.'; return null }
   }

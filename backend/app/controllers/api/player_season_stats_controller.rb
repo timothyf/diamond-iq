@@ -41,6 +41,7 @@ module Api
     end
 
     def import
+      record_import_started("player_season_stats_import")
       uploaded_file = import_params[:file]
 
       if uploaded_file.blank?
@@ -63,6 +64,7 @@ module Api
     end
 
     def download
+      record_import_started("player_season_stats_download_import")
       download_result = PlayerStatsDownloader.call(
         category: download_params[:category],
         start_year: download_params[:start_year],
@@ -135,6 +137,13 @@ module Api
 
     def download_params
       params.permit(:category, :start_year, :end_year, :replace_season)
+    end
+
+    def record_import_started(task_name)
+      return unless current_user
+
+      AuditLog.record!(user: current_user, action: "import_started", record: current_user,
+        metadata: { "task_name" => task_name, "source_name" => import_params[:file]&.original_filename })
     end
 
     def serialize_player_season_stat(player_season_stat)

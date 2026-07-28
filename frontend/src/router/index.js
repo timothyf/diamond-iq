@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import PlayerSeasonStatsDashboard from '../components/PlayerSeasonStatsDashboard.vue'
 import AdminView from '../views/AdminView.vue'
+import AccessDeniedView from '../views/AccessDeniedView.vue'
 import GameSummaryView from '../views/GameSummaryView.vue'
 import HomeView from '../views/HomeView.vue'
 import LineupScenarioView from '../views/LineupScenarioView.vue'
@@ -14,6 +15,7 @@ import StandingsView from '../views/StandingsView.vue'
 import TeamDirectoryView from '../views/TeamDirectoryView.vue'
 import TeamProfileView from '../views/TeamProfileView.vue'
 import WatchlistsView from '../views/WatchlistsView.vue'
+import { useAuth } from '../composables/useAuth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -68,11 +70,18 @@ const router = createRouter({
       path: '/watchlists',
       name: 'watchlists',
       component: WatchlistsView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/login',
       name: 'login',
       component: LoginView,
+    },
+    {
+      path: '/access-denied',
+      name: 'access-denied',
+      component: AccessDeniedView,
+      meta: { requiresAuth: true },
     },
     {
       path: '/teams/:id',
@@ -96,9 +105,20 @@ const router = createRouter({
       path: '/admin',
       name: 'admin',
       component: AdminView,
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
   ],
   scrollBehavior: () => ({ top: 0 }),
+})
+
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth && !to.meta.requiresAdmin) return true
+
+  const auth = useAuth()
+  const currentUser = auth.user.value || await auth.loadCurrentUser()
+  if (!currentUser) return { name: 'login', query: { redirect: to.fullPath } }
+  if (to.meta.requiresAdmin && !['admin', 'administrator'].includes(currentUser.role)) return { name: 'access-denied' }
+  return true
 })
 
 export default router

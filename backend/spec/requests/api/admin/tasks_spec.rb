@@ -1,6 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Api::Admin::Tasks", type: :request do
+  around { |example| with_admin_api_token("test-admin-token", &example) }
   it "lists the admin tasks exposed through the API" do
     early_schedule = create_schedule(start_date: Date.new(2026, 3, 26), end_date: Date.new(2026, 4, 7))
     late_schedule = create_schedule(start_date: Date.new(2026, 5, 2), end_date: Date.new(2026, 5, 31))
@@ -21,7 +22,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     PitchDatum.create!(game_pk: 700_001, at_bat_number: 1, pitch_number: 1, game_date: Date.new(2026, 4, 1), raw_data: { "pitch" => 1 })
     PitchDatum.create!(game_pk: 700_002, at_bat_number: 1, pitch_number: 1, game_date: Date.new(2026, 5, 31), raw_data: { "pitch" => 2 })
 
-    get api_admin_tasks_path
+    get api_admin_tasks_path, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data").pluck("id")).to contain_exactly(
@@ -125,7 +126,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
   end
 
   it "returns an empty schedule date range when no games are stored" do
-    get api_admin_tasks_path
+    get api_admin_tasks_path, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("meta", "schedule_date_range")).to eq(
@@ -150,7 +151,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       data: { created_game_count: 12 }
     )
 
-    post run_api_admin_task_path("mlb_schedule_sync"),
+    post run_api_admin_task_path("mlb_schedule_sync"), headers: admin_headers,
          params: { start_date: "2026-07-15", end_date: "2026-07-17" }
 
     expect(response).to have_http_status(:created)
@@ -168,7 +169,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
   it "requires the configured admin token for task execution" do
     ENV["ADMIN_API_TOKEN"] = "secret-token"
 
-    post run_api_admin_task_path("player_positions_backfill")
+    post run_api_admin_task_path("player_positions_backfill"), headers: admin_headers
 
     expect(response).to have_http_status(:unauthorized)
     expect(json_body.fetch("message")).to eq("Admin API token is required")
@@ -182,7 +183,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
       data: { errors: [ "Start date is required" ] }
     )
 
-    post run_api_admin_task_path("mlb_schedule_sync")
+    post run_api_admin_task_path("mlb_schedule_sync"), headers: admin_headers
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("message")).to eq("Start date is required")

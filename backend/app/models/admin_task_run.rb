@@ -1,4 +1,5 @@
 class AdminTaskRun < ApplicationRecord
+  belongs_to :initiated_by, class_name: "User", optional: true
   STATUSES = %w[queued running completed failed cancelled].freeze
   ACTIVE_STATUSES = %w[queued running].freeze
   TERMINAL_STATUSES = %w[completed failed cancelled].freeze

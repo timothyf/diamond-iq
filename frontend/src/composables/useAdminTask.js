@@ -58,7 +58,7 @@ export function useAdminTask() {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/tasks`, {
-        headers: { Accept: 'application/json' },
+        headers: adminRequestHeaders({ Accept: 'application/json' }),
       })
       const payload = await response.json()
 
@@ -206,7 +206,7 @@ export function useAdminTask() {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/data_health`, {
-        headers: { Accept: 'application/json' },
+        headers: adminRequestHeaders({ Accept: 'application/json' }),
       })
       const payload = await response.json()
 

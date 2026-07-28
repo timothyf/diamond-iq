@@ -1,5 +1,5 @@
 class User < ApplicationRecord
-  ROLES = %w[admin editor viewer].freeze
+  ROLES = %w[administrator analyst coach scout viewer admin editor].freeze
   PASSWORD_ITERATIONS = 120_000
 
   has_many :owned_watchlists, class_name: "Watchlist", foreign_key: :owner_id, dependent: :nullify
@@ -42,11 +42,15 @@ class User < ApplicationRecord
   end
 
   def admin?
-    role == "admin"
+    role.in?(%w[admin administrator])
   end
 
   def can_write?
-    admin? || role == "editor"
+    admin? || role.in?(%w[analyst coach scout editor])
+  end
+
+  def role_label
+    { "admin" => "Administrator", "editor" => "Scout" }.fetch(role, role.to_s.titleize)
   end
 
   def can_manage?(record)

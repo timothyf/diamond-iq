@@ -2,12 +2,13 @@ require "rails_helper"
 
 RSpec.describe "Api::Admin::TaskRuns", type: :request do
   include ActiveJob::TestHelper
+  around { |example| with_admin_api_token("test-admin-token", &example) }
 
   it "estimates from the exact stored-game count before starting a task" do
     create_game(mlb_id: 810_001, official_date: Date.new(2026, 7, 15))
     create_game(mlb_id: 810_002, official_date: Date.new(2026, 7, 15))
 
-    get estimate_api_admin_task_runs_path, params: { start_date: "2026-07-15", end_date: "2026-07-15" }
+    get estimate_api_admin_task_runs_path, params: { start_date: "2026-07-15", end_date: "2026-07-15" }, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data")).to include(
@@ -26,7 +27,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
         task_name: "mlb_game_details_sync",
         start_date: "2026-07-15",
         end_date: "2026-07-15"
-      }
+      }, headers: admin_headers
     end.to have_enqueued_job(MlbGameDetailsSyncJob)
 
     expect(response).to have_http_status(:accepted)
@@ -44,7 +45,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
       task_name: "mlb_roster_sync",
       team_scope: "national",
       season: Date.current.year
-    }
+    }, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data")).to include(
@@ -58,7 +59,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
         task_name: "mlb_roster_sync",
         team_scope: "national",
         season: Date.current.year
-      }
+      }, headers: admin_headers
     end.to have_enqueued_job(MlbRosterBatchSyncJob)
 
     expect(response).to have_http_status(:accepted)
@@ -75,13 +76,13 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     completed = AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "completed", total_items: 1, completed_items: 1)
     active = AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "running", total_items: 10, completed_items: 4)
 
-    get api_admin_task_runs_path, params: { task_name: "mlb_game_details_sync", active: true }
+    get api_admin_task_runs_path, params: { task_name: "mlb_game_details_sync", active: true }, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data").pluck("id")).to eq([ active.id ])
     expect(json_body.fetch("data").pluck("id")).not_to include(completed.id)
 
-    post cancel_api_admin_task_run_path(active)
+    post cancel_api_admin_task_run_path(active), headers: admin_headers
 
     expect(response).to have_http_status(:accepted)
     expect(json_body.fetch("data")).to include("id" => active.id, "cancel_requested" => true, "status" => "running")
@@ -98,18 +99,18 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
       started_at: 1.minute.ago
     )
 
-    get api_admin_task_run_path(run)
+    get api_admin_task_run_path(run), headers: admin_headers
     expect(json_body.fetch("data")).to include(
       "progress_percentage" => 40.0,
       "current_item_mlb_id" => 810_005,
       "current_item_label" => "DET at CLE — July 15, 2026"
     )
 
-    post api_admin_task_runs_path, params: {
+      post api_admin_task_runs_path, params: {
       task_name: "mlb_game_details_sync",
       start_date: "2026-07-16",
       end_date: "2026-07-15"
-    }
+      }, headers: admin_headers
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("message")).to eq("End date must be on or after start date")
   end
@@ -136,7 +137,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     allow(failed_scope).to receive(:order).with(created_at: :desc).and_return(failed_scope)
     allow(failed_scope).to receive(:first).and_return(failed_execution)
 
-    get api_admin_task_run_path(run)
+    get api_admin_task_run_path(run), headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "status")).to eq("failed")
@@ -166,7 +167,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     allow(failed_scope).to receive(:order).with(created_at: :desc).and_return(failed_scope)
     allow(failed_scope).to receive(:first).and_return(failed_execution)
 
-    get api_admin_task_run_path(run)
+    get api_admin_task_run_path(run), headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "status")).to eq("failed")
@@ -201,7 +202,7 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     allow(failed_scope).to receive(:order).with(created_at: :desc).and_return(failed_scope)
     allow(failed_scope).to receive(:first).and_return(failed_execution)
 
-    get api_admin_task_run_path(run)
+    get api_admin_task_run_path(run), headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "status")).to eq("failed")
@@ -211,11 +212,11 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
   it "prevents concurrent game-detail synchronizations" do
     AdminTaskRun.create!(task_name: "mlb_game_details_sync", status: "running")
 
-    post api_admin_task_runs_path, params: {
+      post api_admin_task_runs_path, params: {
       task_name: "mlb_game_details_sync",
       start_date: "2026-07-15",
       end_date: "2026-07-15"
-    }
+      }, headers: admin_headers
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("message")).to eq("A game detail synchronization is already queued or running")

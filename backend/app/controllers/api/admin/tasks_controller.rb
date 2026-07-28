@@ -1,6 +1,9 @@
 module Api
   module Admin
     class TasksController < ApplicationController
+      before_action :require_authenticated_user
+      before_action :require_admin_user
+
       def index
         render json: {
           data: AdminTaskRunner.catalog,
@@ -20,6 +23,8 @@ module Api
       end
 
       def run
+        AuditLog.record!(user: current_user, action: "import_started", record: current_user,
+          metadata: { "task_name" => params[:task_name].to_s, "parameters" => params.to_unsafe_h.except("controller", "action") })
         result = AdminTaskRunner.call(task_name: params[:task_name], params: task_params)
 
         if result[:success]

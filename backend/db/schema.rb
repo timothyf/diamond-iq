@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_28_021000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_28_023000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -32,7 +32,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_021000) do
     t.datetime "last_heartbeat_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "initiated_by_id"
     t.index ["created_at"], name: "index_admin_task_runs_on_created_at"
+    t.index ["initiated_by_id"], name: "index_admin_task_runs_on_initiated_by_id"
     t.index ["task_name", "status", "created_at"], name: "idx_admin_task_runs_active_lookup"
     t.index ["task_name"], name: "idx_admin_task_runs_one_active_per_task", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))"
   end
@@ -1046,7 +1048,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_021000) do
     t.datetime "updated_at", null: false
     t.index "lower((email)::text)", name: "idx_users_lower_email", unique: true
     t.index ["auth_token_digest"], name: "index_users_on_auth_token_digest", unique: true
-    t.check_constraint "role::text = ANY (ARRAY['admin'::character varying, 'editor'::character varying, 'viewer'::character varying]::text[])", name: "users_valid_role"
+    t.check_constraint "role::text = ANY (ARRAY['admin'::character varying::text, 'administrator'::character varying::text, 'analyst'::character varying::text, 'coach'::character varying::text, 'scout'::character varying::text, 'editor'::character varying::text, 'viewer'::character varying::text])", name: "users_valid_role"
   end
 
   create_table "watchlist_entries", force: :cascade do |t|
@@ -1092,6 +1094,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_021000) do
     t.index ["owner_id"], name: "index_watchlists_on_owner_id"
   end
 
+  add_foreign_key "admin_task_runs", "users", column: "initiated_by_id"
   add_foreign_key "audit_logs", "users"
   add_foreign_key "batter_split_summaries", "players"
   add_foreign_key "batter_split_summaries", "teams"

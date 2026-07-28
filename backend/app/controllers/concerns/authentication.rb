@@ -17,6 +17,12 @@ module Authentication
     render json: { message: "Authentication is required" }, status: :unauthorized
   end
 
+  def require_admin_user
+    return if current_user&.admin?
+
+    render json: { message: "Administrator access is required" }, status: :forbidden
+  end
+
   def require_read_access!(record)
     return if current_user&.admin? || record.owner_id == current_user&.id
 
@@ -34,11 +40,24 @@ module Authentication
     token = request.authorization.to_s[/\ABearer\s+(.+)\z/i, 1].presence
     if token.present?
       user = User.active.find_by(auth_token_digest: Digest::SHA256.hexdigest(token))
+      user ||= system_account_user if admin_token_authenticated?
       Current.user = user
       user&.touch(:last_signed_in_at)
     elsif admin_token_authenticated?
-      Current.user = User.active.find_by(system_account: true)
+      Current.user = system_account_user
     end
+  end
+
+  def system_account_user
+    User.active.find_by(system_account: true) || User.create!(
+      email: "system@diamondiq.local",
+      name: "DiamondIQ System",
+      role: "admin",
+      password: SecureRandom.urlsafe_base64(24),
+      system_account: true
+    )
+  rescue ActiveRecord::RecordNotUnique
+    User.active.find_by!(system_account: true)
   end
 
   def admin_token_authenticated?

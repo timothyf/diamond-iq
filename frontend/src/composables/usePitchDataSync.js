@@ -85,7 +85,7 @@ export function usePitchDataSync() {
       const query = new URLSearchParams(
         Object.entries({ task_name: TASK_NAME, ...parameters }).filter(([, value]) => value !== null && value !== undefined && value !== ''),
       )
-      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs/estimate?${query}`, { headers: { Accept: 'application/json' } })
+      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs/estimate?${query}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.message || `Unable to estimate pitch synchronization (${response.status}).`)
       return normalizeEstimate(payload.data)
@@ -115,7 +115,7 @@ export function usePitchDataSync() {
   async function poll() {
     if (!task.value?.id) return
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs/${encodeURIComponent(task.value.id)}`, { headers: { Accept: 'application/json' } })
+      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs/${encodeURIComponent(task.value.id)}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.message || `Unable to load pitch synchronization progress (${response.status}).`)
       error.value = ''
@@ -130,7 +130,7 @@ export function usePitchDataSync() {
     error.value = ''
     try {
       const query = new URLSearchParams({ task_name: TASK_NAME, active: 'true' })
-      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs?${query}`, { headers: { Accept: 'application/json' } })
+      const response = await fetch(`${API_BASE_URL}/api/admin/task_runs?${query}`, { headers: adminRequestHeaders({ Accept: 'application/json' }) })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.message || `Unable to recover pitch synchronization progress (${response.status}).`)
       const activeTask = payload?.data?.[0]

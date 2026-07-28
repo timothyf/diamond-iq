@@ -1,8 +1,9 @@
 require "rails_helper"
 
 RSpec.describe "Api::Admin::DataHealth", type: :request do
+  around { |example| with_admin_api_token("test-admin-token", &example) }
   it "returns the current data-health report" do
-    get api_admin_data_health_path
+    get api_admin_data_health_path, headers: admin_headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data")).to include(

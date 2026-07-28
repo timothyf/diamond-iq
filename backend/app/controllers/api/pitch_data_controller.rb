@@ -33,6 +33,7 @@ module Api
     end
 
     def import
+      record_import_started("pitch_data_import")
       uploaded_file = import_params[:file]
 
       if uploaded_file.blank?
@@ -53,6 +54,7 @@ module Api
     end
 
     def download
+      record_import_started("pitch_data_download_import")
       permitted_params = download_params
 
       download_result = PitchDataDownloader.call(
@@ -96,6 +98,13 @@ module Api
 
     def download_params
       @download_params ||= params.permit(:start_date, :end_date, :game_types, :chunk_days)
+    end
+
+    def record_import_started(task_name)
+      return unless current_user
+
+      AuditLog.record!(user: current_user, action: "import_started", record: current_user,
+        metadata: { "task_name" => task_name, "source_name" => import_params[:file]&.original_filename })
     end
 
     def page_param

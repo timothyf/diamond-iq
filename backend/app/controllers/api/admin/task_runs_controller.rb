@@ -1,6 +1,9 @@
 module Api
   module Admin
     class TaskRunsController < ApplicationController
+      before_action :require_authenticated_user
+      before_action :require_admin_user
+
       ORPHANED_HEARTBEAT_SECONDS = 90
 
       def index
@@ -16,6 +19,8 @@ module Api
       end
 
       def create
+        AuditLog.record!(user: current_user, action: "import_started", record: current_user,
+          metadata: { "task_name" => params[:task_name].to_s, "parameters" => params.to_unsafe_h.except("controller", "action") })
         run = case params[:task_name]
         when MlbGameDetailsTaskLauncher::TASK_NAME
           MlbGameDetailsTaskLauncher.call(
@@ -36,6 +41,7 @@ module Api
         else
           raise ArgumentError, "Only tracked synchronization tasks support tracked execution"
         end
+        run.update!(initiated_by: current_user) if run.initiated_by_id.blank?
         render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
       rescue ArgumentError => error
         render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content

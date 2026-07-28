@@ -5,6 +5,12 @@ class AdminTaskRunSerializer
       task_name: task_run.task_name,
       status: task_run.status,
       task_parameters: task_run.task_parameters,
+      initiated_by: task_run.initiated_by && {
+        id: task_run.initiated_by.id,
+        name: task_run.initiated_by.name,
+        email: task_run.initiated_by.email,
+        role: task_run.initiated_by.role
+      },
       total_items: task_run.total_items,
       completed_items: task_run.completed_items,
       failed_items: task_run.failed_items,
