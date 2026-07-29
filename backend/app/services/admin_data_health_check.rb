@@ -9,6 +9,7 @@ class AdminDataHealthCheck
     checks = [
       final_games_missing_scores,
       final_games_missing_details,
+      final_games_missing_pitch_data,
       synchronized_games_missing_batting_lines,
       synchronized_games_missing_pitching_lines,
       synchronized_games_missing_plate_appearances,
@@ -70,6 +71,25 @@ class AdminDataHealthCheck
       scope: completed_games.where(details_last_synced_at: nil),
       description: "Final games need detailed synchronization before box scores and analytics are complete.",
       recommendation: "Run Synchronize game details for the affected dates."
+    )
+  end
+
+  def final_games_missing_pitch_data
+    games_without_linked_pitches = completed_games.where.not(
+      id: PitchDatum.where.not(game_id: nil).select(:game_id)
+    )
+    scope = games_without_linked_pitches
+      .or(completed_games.where(pitch_data_complete_at: nil))
+      .or(completed_games.where(pitch_data_row_count: 0))
+
+    game_check(
+      id: "final_games_missing_pitch_data",
+      category: "Pitch data",
+      name: "Final games have pitch data",
+      severity: "warning",
+      scope: scope,
+      description: "Finished games should have linked pitch rows and a completed pitch-data synchronization marker.",
+      recommendation: "Run the pitch-data download for the affected game dates, then re-run this health check."
     )
   end
 

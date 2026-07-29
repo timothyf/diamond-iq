@@ -274,6 +274,28 @@ async function handleTabKey(event, index) {
         data-test="game-panel-overview"
       >
 
+      <section class="game-panel" data-test="line-score">
+        <header class="game-panel__heading"><div><p>Inning by inning</p><h2>Line score</h2></div><span v-if="game.details.lineScore.currentInningOrdinal">{{ game.details.lineScore.inningState }} {{ game.details.lineScore.currentInningOrdinal }}</span></header>
+        <div class="box-table-wrap">
+          <table class="line-score-table">
+            <thead><tr><th>Team</th><th v-for="inning in innings" :key="inning.number">{{ inning.number }}</th><th>R</th><th>H</th><th>E</th></tr></thead>
+            <tbody>
+              <tr>
+                <th><RouterLink :to="{ name: 'team-profile', params: { id: game.awayTeam.id } }">{{ game.awayTeam.abbreviation }}</RouterLink></th>
+                <td v-for="inning in innings" :key="`away-${inning.number}`">{{ display(inning.away?.runs) }}</td>
+                <td><strong>{{ display(game.details.lineScore.totals.away?.runs) }}</strong></td><td>{{ display(game.details.lineScore.totals.away?.hits) }}</td><td>{{ display(game.details.lineScore.totals.away?.errors) }}</td>
+              </tr>
+              <tr>
+                <th><RouterLink :to="{ name: 'team-profile', params: { id: game.homeTeam.id } }">{{ game.homeTeam.abbreviation }}</RouterLink></th>
+                <td v-for="inning in innings" :key="`home-${inning.number}`">{{ display(inning.home?.runs) }}</td>
+                <td><strong>{{ display(game.details.lineScore.totals.home?.runs) }}</strong></td><td>{{ display(game.details.lineScore.totals.home?.hits) }}</td><td>{{ display(game.details.lineScore.totals.home?.errors) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-if="!innings.length" class="game-panel__note">Inning-by-inning data has not been synchronized; available game totals are shown.</p>
+      </section>
+
       <section class="game-insights" data-test="game-insights" aria-label="Game insights summary">
         <article class="game-insight game-insight--decisions">
           <span>Pitcher decisions</span>
@@ -398,27 +420,6 @@ async function handleTabKey(event, index) {
         </ol>
       </section>
 
-      <section class="game-panel" data-test="line-score">
-        <header class="game-panel__heading"><div><p>Inning by inning</p><h2>Line score</h2></div><span v-if="game.details.lineScore.currentInningOrdinal">{{ game.details.lineScore.inningState }} {{ game.details.lineScore.currentInningOrdinal }}</span></header>
-        <div class="box-table-wrap">
-          <table class="line-score-table">
-            <thead><tr><th>Team</th><th v-for="inning in innings" :key="inning.number">{{ inning.number }}</th><th>R</th><th>H</th><th>E</th></tr></thead>
-            <tbody>
-              <tr>
-                <th><RouterLink :to="{ name: 'team-profile', params: { id: game.awayTeam.id } }">{{ game.awayTeam.abbreviation }}</RouterLink></th>
-                <td v-for="inning in innings" :key="`away-${inning.number}`">{{ display(inning.away?.runs) }}</td>
-                <td><strong>{{ display(game.details.lineScore.totals.away?.runs) }}</strong></td><td>{{ display(game.details.lineScore.totals.away?.hits) }}</td><td>{{ display(game.details.lineScore.totals.away?.errors) }}</td>
-              </tr>
-              <tr>
-                <th><RouterLink :to="{ name: 'team-profile', params: { id: game.homeTeam.id } }">{{ game.homeTeam.abbreviation }}</RouterLink></th>
-                <td v-for="inning in innings" :key="`home-${inning.number}`">{{ display(inning.home?.runs) }}</td>
-                <td><strong>{{ display(game.details.lineScore.totals.home?.runs) }}</strong></td><td>{{ display(game.details.lineScore.totals.home?.hits) }}</td><td>{{ display(game.details.lineScore.totals.home?.errors) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-if="!innings.length" class="game-panel__note">Inning-by-inning data has not been synchronized; available game totals are shown.</p>
-      </section>
       </div>
 
       <div

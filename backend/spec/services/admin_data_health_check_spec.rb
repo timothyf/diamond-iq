@@ -27,6 +27,7 @@ RSpec.describe AdminDataHealthCheck do
 
     checks = result.fetch(:checks).index_by { |check| check.fetch(:id) }
     expect(checks.dig("final_games_missing_scores", :affected_count)).to eq(1)
+    expect(checks.dig("final_games_missing_pitch_data", :affected_count)).to eq(1)
     expect(checks.dig("synchronized_games_missing_batting_lines", :affected_count)).to eq(1)
     expect(checks.dig("synchronized_games_missing_pitching_lines", :affected_count)).to eq(1)
     expect(checks.dig("synchronized_games_missing_plate_appearances", :affected_count)).to eq(1)
@@ -43,5 +44,6 @@ RSpec.describe AdminDataHealthCheck do
 
     expect(checks.dig("final_games_missing_scores", :affected_count)).to eq(0)
     expect(checks.dig("final_games_missing_details", :affected_count)).to eq(0)
+    expect(checks.dig("final_games_missing_pitch_data", :affected_count)).to eq(0)
   end
 end

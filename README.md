@@ -118,7 +118,7 @@ The `/admin` page centralizes the application's data operations:
 - Capture dated active and 40-man roster snapshots.
 - Rebuild normalized current player positions.
 - Inspect currently stored date or season coverage for each major dataset.
-- Run or reopen the latest Data Health report for missing schedules, incomplete games, player/profile gaps, pitch-linkage issues, and analytics coverage.
+- Run or reopen the latest Data Health report for missing schedules, incomplete games, player/profile gaps, finished games without linked or completed pitch data, pitch-linkage issues, and analytics coverage.
 - View PostgreSQL storage details: total size, largest tables, data/index footprints, estimated live/dead rows, server version, and measurement time.
 - View PostgreSQL table-read activity: total, sequential, and index scans; rows read/fetched; last scan timestamps; and the statistics collection start time.
 - Every Admin synchronization, analytics refresh, download, and local CSV import runs through a persisted Solid Queue task with queued/running/completed/failed/cancelled status, progress polling, and orphaned-worker recovery.
