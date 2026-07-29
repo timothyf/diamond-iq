@@ -1,14 +1,15 @@
 class OpponentReportGenerator
   UPCOMING_GAME_LIMIT = 5
 
-  def self.call(team:, season:, on: Date.current)
-    new(team: team, season: season, on: on).call
+  def self.call(team:, season:, owner:, on: Date.current)
+    new(team: team, season: season, on: on, owner: owner).call
   end
 
-  def initialize(team:, season:, on:)
+  def initialize(team:, season:, on:, owner:)
     @team = team
     @season = Integer(season)
     @on = on
+    @owner = owner
   end
 
   def call
@@ -27,6 +28,7 @@ class OpponentReportGenerator
 
     OpponentReport.create!(
       team: team,
+      owner: owner,
       opponent_team: opponent,
       season: season,
       series_starts_on: games.first.official_date,
@@ -46,7 +48,7 @@ class OpponentReportGenerator
 
   private
 
-  attr_reader :team, :season, :on
+  attr_reader :team, :season, :on, :owner
 
   def upcoming_games
     @upcoming_games ||= Game.for_team(team)

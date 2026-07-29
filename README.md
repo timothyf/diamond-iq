@@ -85,6 +85,7 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 - Watchlists require a signed-in user. Admin pages and Admin APIs require an administrator role.
 - The frontend hides Watchlists for signed-out users and Admin for signed-out or non-administrator users; backend authorization remains authoritative.
 - Sign-ins, imports, workflow changes, and background task starts are attributed in audit history.
+- Saved lineup scenarios and opponent reports are private to their owner; administrators can oversee all records. Their direct APIs and team-profile summaries enforce the same policy, and creation or edits are attributed in audit history.
 
 ### Trend Events and Alerts
 
@@ -389,6 +390,10 @@ Import and download writes require an authenticated administrator or the configu
 - `GET /api/watchlists` and `GET /api/watchlists/:id` — owned watchlists (administrators can view all)
 - `GET /api/watchlists/:id/audit_history` — attributed watchlist and entry changes
 - `GET /api/need_profiles` — owned need profiles (administrators can view all)
+- `GET /api/teams/:team_id/opponent_reports` and `GET /api/opponent_reports/:id` — owned opponent reports
+- `PATCH /api/opponent_reports/:id` and `GET /api/opponent_reports/:id/audit_history` — edit and review attributed report history
+- `GET /api/teams/:team_id/lineup_scenarios` and `GET /api/lineup_scenarios/:id` — owned lineup scenarios
+- `PATCH /api/lineup_scenarios/:id` and `GET /api/lineup_scenarios/:id/audit_history` — edit and review attributed scenario history
 
 Send a session token as `Authorization: Bearer <user-session-token>`. The system Admin API token remains available for operational automation and maps to the system administrator account.
 

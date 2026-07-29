@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_29_010000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_29_021000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -286,6 +286,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_010000) do
     t.jsonb "evaluation_inputs", default: {}, null: false
     t.jsonb "score_breakdown", default: {}, null: false
     t.decimal "total_score", precision: 6, scale: 2
+    t.bigint "owner_id", null: false
+    t.index ["owner_id"], name: "index_lineup_scenarios_on_owner_id"
     t.index ["team_id", "season", "scenario_date"], name: "index_lineup_scenarios_on_team_season_date"
     t.index ["team_id"], name: "index_lineup_scenarios_on_team_id"
   end
@@ -316,7 +318,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_010000) do
     t.datetime "generated_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "owner_id", null: false
     t.index ["opponent_team_id"], name: "index_opponent_reports_on_opponent_team_id"
+    t.index ["owner_id"], name: "index_opponent_reports_on_owner_id"
     t.index ["team_id", "generated_at"], name: "index_opponent_reports_on_team_id_and_generated_at"
     t.index ["team_id", "opponent_team_id", "series_starts_on"], name: "index_opponent_reports_on_series"
     t.index ["team_id"], name: "index_opponent_reports_on_team_id"
@@ -1130,10 +1134,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_010000) do
   add_foreign_key "lineup_scenario_entries", "lineup_scenarios"
   add_foreign_key "lineup_scenario_entries", "players"
   add_foreign_key "lineup_scenarios", "teams"
+  add_foreign_key "lineup_scenarios", "users", column: "owner_id"
   add_foreign_key "need_profiles", "teams"
   add_foreign_key "need_profiles", "users", column: "owner_id"
   add_foreign_key "opponent_reports", "teams"
   add_foreign_key "opponent_reports", "teams", column: "opponent_team_id"
+  add_foreign_key "opponent_reports", "users", column: "owner_id"
   add_foreign_key "pitch_data", "games"
   add_foreign_key "pitch_data", "plate_appearances"
   add_foreign_key "pitcher_pitch_type_daily", "players"

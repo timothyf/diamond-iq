@@ -30,6 +30,43 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", 1, "logo_url")).to eq("https://www.mlbstatic.com/team-logos/116.svg")
   end
 
+  it "only embeds workflow summaries visible to the signed-in owner or an administrator" do
+    owner = create_user(role: "coach")
+    other_user = create_user(role: "scout")
+    report = OpponentReport.create!(
+      team: @tigers,
+      opponent_team: @guardians,
+      owner: owner,
+      season: Date.current.year,
+      series_starts_on: Date.current,
+      series_ends_on: Date.current,
+      title: "Private opponent report",
+      generated_at: Time.current
+    )
+    scenario = LineupScenario.create!(
+      team: @tigers,
+      owner: owner,
+      season: Date.current.year,
+      scenario_date: Date.current,
+      name: "Private lineup scenario"
+    )
+
+    get api_team_path(@tigers)
+    expect(json_body.fetch("data")).to include("opponent_reports" => [], "lineup_scenarios" => [])
+
+    get api_team_path(@tigers), headers: user_headers(other_user)
+    expect(json_body.fetch("data")).to include("opponent_reports" => [], "lineup_scenarios" => [])
+
+    get api_team_path(@tigers), headers: user_headers(owner)
+    expect(json_body.dig("data", "opponent_reports").pluck("id")).to eq([ report.id ])
+    expect(json_body.dig("data", "lineup_scenarios").pluck("id")).to eq([ scenario.id ])
+
+    admin = create_user(role: "administrator")
+    get api_team_path(@tigers), headers: user_headers(admin)
+    expect(json_body.dig("data", "opponent_reports").pluck("id")).to eq([ report.id ])
+    expect(json_body.dig("data", "lineup_scenarios").pluck("id")).to eq([ scenario.id ])
+  end
+
   it "returns a unified roster, record, and schedule profile" do
     player = create_player(team: @tigers, attributes: { mlb_id: 680_776, first_name: "Riley", last_name: "Greene" })
     create_player_profile(player: player, attributes: { headshot_id: "680776" })

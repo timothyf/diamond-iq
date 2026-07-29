@@ -45,7 +45,7 @@ RSpec.describe "Phase 1 acceptance workflows", type: :request do
       away_probable_pitcher: pitcher
     )
 
-    post api_team_opponent_reports_path(tigers), params: { season: season }
+    post api_team_opponent_reports_path(tigers), params: { season: season }, headers: auth_headers
 
     expect(response).to have_http_status(:created)
     expect(json_body.dig("data", "opponent", "abbreviation")).to eq("CLE")
@@ -74,11 +74,11 @@ RSpec.describe "Phase 1 acceptance workflows", type: :request do
         name: name,
         notes: "Representative MLB lineup scenario",
         entries: scenario_entries
-      }
+      }, headers: auth_headers
       expect(response).to have_http_status(:created)
     end
 
-    get api_team_lineup_scenarios_path(tigers), params: { season: season }
+    get api_team_lineup_scenarios_path(tigers), params: { season: season }, headers: auth_headers
 
     expect(response).to have_http_status(:ok)
     scenarios = json_body.fetch("data")

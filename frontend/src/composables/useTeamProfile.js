@@ -1,4 +1,5 @@
 import { computed, ref, watch } from 'vue'
+import { adminRequestHeaders } from './apiAuth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -80,6 +81,7 @@ function normalizeProfile(data) {
     },
     opponentReports: (data.opponent_reports || []).map((report) => ({
       id: report.id,
+      owner: report.owner || null,
       title: report.title,
       season: report.season,
       seriesStartsOn: report.series_starts_on,
@@ -90,6 +92,7 @@ function normalizeProfile(data) {
     })),
     lineupScenarios: (data.lineup_scenarios || []).map((scenario) => ({
       id: scenario.id,
+      owner: scenario.owner || null,
       name: scenario.name,
       scenarioDate: scenario.scenario_date,
       validatedAt: scenario.validated_at,
@@ -166,7 +169,7 @@ export function useTeamProfile(teamIdRef, seasonRef) {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/teams/${encodeURIComponent(teamId)}${query}`, {
-        headers: { Accept: 'application/json' },
+        headers: adminRequestHeaders({ Accept: 'application/json' }),
       })
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
 

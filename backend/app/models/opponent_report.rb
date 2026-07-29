@@ -1,6 +1,7 @@
 class OpponentReport < ApplicationRecord
   belongs_to :team
   belongs_to :opponent_team, class_name: "Team", inverse_of: :reports_as_opponent
+  belongs_to :owner, class_name: "User"
 
   validates :season, :series_starts_on, :series_ends_on, :title, :generated_at, presence: true
   validates :season, numericality: { only_integer: true, greater_than: 1800 }

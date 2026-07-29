@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
+import { adminRequestHeaders } from '../composables/apiAuth'
 
 const props = defineProps({ scenarioId: { type: [String, Number], required: true } })
 const scenario = ref(null)
@@ -8,7 +9,9 @@ const error = ref('')
 async function load() {
   error.value = ''
   try {
-    const response = await fetch(`/api/lineup_scenarios/${encodeURIComponent(props.scenarioId)}`, { headers: { Accept: 'application/json' } })
+    const response = await fetch(`/api/lineup_scenarios/${encodeURIComponent(props.scenarioId)}`, {
+      headers: adminRequestHeaders({ Accept: 'application/json' }),
+    })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(payload.message || 'Unable to load lineup scenario.')
     scenario.value = payload.data
@@ -35,6 +38,7 @@ watch(() => props.scenarioId, load)
         <p>Saved lineup scenario · constraint validated</p>
         <h1>{{ scenario.name }}</h1>
         <span>{{ formatDate(scenario.scenario_date) }}</span>
+        <small v-if="scenario.owner">Owned by {{ scenario.owner.name || scenario.owner.email }}</small>
         <p v-if="scenario.notes" class="scenario-notes">{{ scenario.notes }}</p>
         <section class="scenario-score" data-test="scenario-score">
           <header><strong>Transparent evaluation</strong><b>{{ scenario.total_score ?? '—' }}/100</b></header>

@@ -17,10 +17,11 @@ class TeamProfileSnapshotQuery
     ]
   }.freeze
 
-  def initialize(team:, season: nil, on: Date.current)
+  def initialize(team:, season: nil, on: Date.current, user: nil)
     @team = team
     @requested_season = season
     @on = on
+    @user = user
   end
 
   def result
@@ -56,12 +57,13 @@ class TeamProfileSnapshotQuery
 
   private
 
-  attr_reader :team, :requested_season, :on
+  attr_reader :team, :requested_season, :on, :user
 
   def opponent_report_summaries
-    team.opponent_reports.includes(:opponent_team).where(season: season).recent_first.limit(5).map do |report|
+    accessible_workflows(team.opponent_reports).includes(:owner, :opponent_team).where(season: season).recent_first.limit(5).map do |report|
       {
         id: report.id,
+        owner: serialize_workflow_owner(report.owner),
         title: report.title,
         season: report.season,
         series_starts_on: report.series_starts_on,
@@ -79,9 +81,10 @@ class TeamProfileSnapshotQuery
   end
 
   def lineup_scenario_summaries
-    team.lineup_scenarios.where(season: season).order(scenario_date: :desc, created_at: :desc).limit(5).map do |scenario|
+    accessible_workflows(team.lineup_scenarios).includes(:owner).where(season: season).order(scenario_date: :desc, created_at: :desc).limit(5).map do |scenario|
       {
         id: scenario.id,
+        owner: serialize_workflow_owner(scenario.owner),
         name: scenario.name,
         scenario_date: scenario.scenario_date,
         validated_at: scenario.validated_at,
@@ -91,6 +94,14 @@ class TeamProfileSnapshotQuery
         score_breakdown: scenario.score_breakdown || {}
       }
     end
+  end
+
+  def accessible_workflows(relation)
+    OwnedWorkflowPolicy::Scope.new(user, relation).resolve
+  end
+
+  def serialize_workflow_owner(owner)
+    { id: owner.id, name: owner.name, email: owner.email, role: owner.role }
   end
 
   def season

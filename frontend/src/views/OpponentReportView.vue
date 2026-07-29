@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
+import { adminRequestHeaders } from '../composables/apiAuth'
 
 const props = defineProps({
   reportId: { type: [String, Number], required: true },
@@ -16,7 +17,7 @@ async function load() {
   error.value = ''
   try {
     const response = await fetch(`/api/opponent_reports/${encodeURIComponent(props.reportId)}`, {
-      headers: { Accept: 'application/json' },
+      headers: adminRequestHeaders({ Accept: 'application/json' }),
     })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) throw new Error(payload.message || 'Unable to load opponent report.')
@@ -78,6 +79,7 @@ watch(() => props.reportId, load)
         <div class="report-stamp">
           <small>Generated</small>
           <strong>{{ formatTimestamp(report.generated_at) }}</strong>
+          <span v-if="report.owner">Owned by {{ report.owner.name || report.owner.email }}</span>
           <span>Data is preserved as of this time</span>
         </div>
         <button class="report-print" type="button" data-test="print-report" @click="printReport">Print / PDF</button>

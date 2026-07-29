@@ -31,8 +31,12 @@ Rails.application.routes.draw do
       resources :opponent_reports, only: [ :index, :create ]
       resources :lineup_scenarios, only: [ :index, :create ]
     end
-    resources :opponent_reports, only: [ :show ]
-    resources :lineup_scenarios, only: [ :show ]
+    resources :opponent_reports, only: [ :show, :update ] do
+      member { get :audit_history }
+    end
+    resources :lineup_scenarios, only: [ :show, :update ] do
+      member { get :audit_history }
+    end
     resources :need_profiles
     resources :watchlists, only: [ :index, :show, :create, :update ] do
       resources :watchlist_entries, only: [ :create ]

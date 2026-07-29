@@ -1,5 +1,6 @@
 class LineupScenario < ApplicationRecord
   belongs_to :team
+  belongs_to :owner, class_name: "User"
   has_many :entries, class_name: "LineupScenarioEntry", dependent: :destroy, inverse_of: :lineup_scenario
 
   validates :season, :scenario_date, :name, presence: true

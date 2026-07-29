@@ -3,6 +3,8 @@ require "rails_helper"
 RSpec.describe "Api::LineupScenarios", type: :request do
   let(:team) { create_team(name: "Detroit Tigers", abbreviation: "DET") }
   let(:season) { Date.current.year }
+  let(:owner) { create_user(role: "coach") }
+  let(:headers) { user_headers(owner) }
 
   def active_players
     @active_players ||= 9.times.map do |index|
@@ -33,10 +35,11 @@ RSpec.describe "Api::LineupScenarios", type: :request do
         reliability: 88
       },
       entries: valid_entries
-    }
+    }, headers: headers
 
     expect(response).to have_http_status(:created)
     scenario_id = json_body.dig("data", "id")
+    expect(json_body.dig("data", "owner", "id")).to eq(owner.id)
     expect(json_body.dig("data", "entries").map { |entry| entry.fetch("batting_slot") }).to eq((1..9).to_a)
     expect(json_body.dig("data", "entries").map { |entry| entry.fetch("defensive_position") }).to match_array(LineupScenarioEntry::DEFENSIVE_POSITIONS)
     expect(json_body.dig("data", "evaluation_inputs", "opponent")).to eq("Cleveland Guardians")
@@ -45,16 +48,25 @@ RSpec.describe "Api::LineupScenarios", type: :request do
       "opponent", "park", "platoon", "recent_performance", "reliability"
     )
 
-    get api_team_lineup_scenarios_path(team), params: { season: season }
+    get api_team_lineup_scenarios_path(team), params: { season: season }, headers: headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", 0, "id")).to eq(scenario_id)
     expect(json_body.dig("data", 0, "total_score")).to be_between(0, 100)
 
-    get api_lineup_scenario_path(scenario_id)
+    get api_lineup_scenario_path(scenario_id), headers: headers
 
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "name")).to eq("Vs right-handed starter")
+
+    patch api_lineup_scenario_path(scenario_id), params: { notes: "Updated game-plan notes." }, headers: headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "notes")).to eq("Updated game-plan notes.")
+
+    get audit_history_api_lineup_scenario_path(scenario_id), headers: headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").pluck("action")).to eq(%w[updated created])
+    expect(json_body.dig("data", 0, "user", "id")).to eq(owner.id)
   end
 
   it "rejects duplicate players, invalid defensive coverage, and unavailable players" do
@@ -67,13 +79,56 @@ RSpec.describe "Api::LineupScenarios", type: :request do
       scenario_date: Date.current.iso8601,
       name: "Invalid scenario",
       entries: entries
-    }
+    }, headers: headers
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("violations")).to include(
       "Each player can appear only once in a lineup.",
       "Assign exactly one C, 1B, 2B, 3B, SS, LF, CF, RF, and DH."
     )
+    expect(LineupScenario.count).to eq(0)
+  end
+
+  it "requires authentication and isolates scenarios by owner while allowing administrator oversight" do
+    scenario = LineupScenario.create!(
+      team: team,
+      owner: owner,
+      season: season,
+      scenario_date: Date.current,
+      name: "Private lineup"
+    )
+
+    get api_lineup_scenario_path(scenario)
+    expect(response).to have_http_status(:unauthorized)
+
+    other_user = create_user(role: "scout")
+    get api_team_lineup_scenarios_path(team), headers: user_headers(other_user)
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data")).to be_empty
+
+    get api_lineup_scenario_path(scenario), headers: user_headers(other_user)
+    expect(response).to have_http_status(:forbidden)
+
+    patch api_lineup_scenario_path(scenario), params: { notes: "Unauthorized change" }, headers: user_headers(other_user)
+    expect(response).to have_http_status(:forbidden)
+    expect(scenario.reload.notes).to be_nil
+
+    admin = create_user(role: "administrator")
+    get api_lineup_scenario_path(scenario), headers: user_headers(admin)
+    expect(response).to have_http_status(:ok)
+  end
+
+  it "does not allow viewers to create lineup scenarios" do
+    viewer = create_user(role: "viewer")
+
+    post api_team_lineup_scenarios_path(team), params: {
+      season: season,
+      scenario_date: Date.current.iso8601,
+      name: "Viewer lineup",
+      entries: valid_entries
+    }, headers: user_headers(viewer)
+
+    expect(response).to have_http_status(:forbidden)
     expect(LineupScenario.count).to eq(0)
   end
 end
