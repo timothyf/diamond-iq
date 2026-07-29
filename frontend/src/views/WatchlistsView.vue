@@ -72,15 +72,6 @@ const { suggestions, loading: searching } = usePlayerSuggestions(searchQuery)
 const { user: currentUser } = useAuth()
 const availableOwners = ref([])
 const selectedWatchlist = computed(() => watchlists.value.find((watchlist) => watchlist.id === selectedId.value) || null)
-const reviewTransitions = {
-  initial_review: ['analyst_review', 'no_longer_pursuing'],
-  analyst_review: ['initial_review', 'scout_review', 'no_longer_pursuing'],
-  scout_review: ['analyst_review', 'medical_review', 'no_longer_pursuing'],
-  medical_review: ['scout_review', 'discuss_internally', 'no_longer_pursuing'],
-  discuss_internally: ['medical_review', 'contact_club_or_agent', 'no_longer_pursuing'],
-  contact_club_or_agent: ['discuss_internally', 'no_longer_pursuing'],
-  no_longer_pursuing: ['initial_review'],
-}
 const reviewLabels = {
   initial_review: 'Initial review',
   analyst_review: 'Analyst review',
@@ -350,7 +341,7 @@ function normalizeEntry(entry) {
 }
 
 function reviewOptions(status) {
-  return [status, ...(reviewTransitions[status] || [])].filter((value, index, values) => value && values.indexOf(value) === index)
+  return Object.keys(reviewLabels)
 }
 
 function reviewLabel(status) {
@@ -531,7 +522,7 @@ watch(
             <div class="evaluation-selects">
               <label>Priority<select v-model="entry.priority"><option>high</option><option>medium</option><option>low</option></select></label>
               <label>Review status
-                <select :value="entry.reviewStatus" :disabled="savingEntryId === entry.id" @change="transitionReviewStatus(entry, $event.target.value)">
+                <select data-test="review-status-select" :value="entry.reviewStatus" :disabled="savingEntryId === entry.id" @change="transitionReviewStatus(entry, $event.target.value)">
                   <option v-for="status in reviewOptions(entry.reviewStatus)" :key="status" :value="status">{{ reviewLabel(status) }}</option>
                 </select>
               </label>

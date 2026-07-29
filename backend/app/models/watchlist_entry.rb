@@ -10,15 +10,6 @@ class WatchlistEntry < ApplicationRecord
     contact_club_or_agent
     no_longer_pursuing
   ].freeze
-  REVIEW_TRANSITIONS = {
-    "initial_review" => %w[analyst_review no_longer_pursuing],
-    "analyst_review" => %w[initial_review scout_review no_longer_pursuing],
-    "scout_review" => %w[analyst_review medical_review no_longer_pursuing],
-    "medical_review" => %w[scout_review discuss_internally no_longer_pursuing],
-    "discuss_internally" => %w[medical_review contact_club_or_agent no_longer_pursuing],
-    "contact_club_or_agent" => %w[discuss_internally no_longer_pursuing],
-    "no_longer_pursuing" => %w[initial_review]
-  }.freeze
   AVAILABILITIES = %w[available potentially_available under_contract unavailable unknown].freeze
   RECOMMENDATIONS = %w[pursue monitor pass].freeze
 
@@ -57,9 +48,9 @@ class WatchlistEntry < ApplicationRecord
 
   def review_status_transition_is_allowed
     return unless will_save_change_to_review_status?
-    return if REVIEW_TRANSITIONS.fetch(review_status_was, []).include?(review_status)
+    return if REVIEW_STATUSES.include?(review_status)
 
-    errors.add(:review_status, "cannot move from #{review_status_was.humanize} to #{review_status.humanize}")
+    errors.add(:review_status, "must be one of: #{REVIEW_STATUSES.join(', ')}")
   end
 
   def normalize_tags

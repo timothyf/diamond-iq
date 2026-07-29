@@ -26,6 +26,7 @@ describe('WatchlistsView', () => {
     expect(wrapper.text()).toContain('Trade targets')
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Recommendation')
+    expect(wrapper.get('[data-test="review-status-select"]').findAll('option')).toHaveLength(7)
     expect(wrapper.get('[data-test="evaluation-notes"]').element.value).toBe('Fits the middle of the order.')
     expect(wrapper.getComponent('.evaluation-card a').props('to')).toEqual({ name: 'player-profile', params: { id: 42 } })
   })

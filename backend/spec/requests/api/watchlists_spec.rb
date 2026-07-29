@@ -62,6 +62,10 @@ RSpec.describe "Api::Watchlists", type: :request do
     expect(json_body.dig("data", "review_status")).to eq("analyst_review")
 
     post transition_api_watchlist_entry_path(entry_id), params: { review_status: "contact_club_or_agent" }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "review_status")).to eq("contact_club_or_agent")
+
+    post transition_api_watchlist_entry_path(entry_id), params: { review_status: "not_a_review_status" }, headers: auth_headers
     expect(response).to have_http_status(:unprocessable_content)
 
     get audit_history_api_watchlist_entry_path(entry_id), headers: auth_headers
