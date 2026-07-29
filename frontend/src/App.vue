@@ -1,13 +1,19 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 import PlayerSearch from './components/PlayerSearch.vue'
 import diamondIqLogo from './assets/diamondiq_logo.png'
 import { useAuth } from './composables/useAuth'
 
 const { user, loadCurrentUser, logout } = useAuth()
+const route = useRoute()
 const accountMenuOpen = ref(false)
 const isAdministrator = computed(() => ['admin', 'administrator'].includes(user.value?.role))
+const signInTarget = computed(() => ({
+  name: 'login',
+  query: route.name === 'login' ? {} : { redirect: route.fullPath },
+}))
 
 function closeAccountMenu(event) {
   if (!event?.target?.closest?.('.app-account')) accountMenuOpen.value = false
@@ -48,7 +54,7 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
       <RouterLink v-if="isAdministrator" to="/admin">Admin</RouterLink>
     </nav>
     <div class="app-account">
-      <RouterLink v-if="!user" to="/login">Sign in</RouterLink>
+      <RouterLink v-if="!user" :to="signInTarget">Sign in</RouterLink>
       <template v-else>
         <button
           type="button"

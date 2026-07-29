@@ -1,10 +1,11 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import { useAuth } from '../composables/useAuth'
 
 const router = useRouter()
+const route = useRoute()
 const { login, register, loading, error } = useAuth()
 const mode = ref('login')
 const name = ref('')
@@ -15,8 +16,22 @@ async function submit() {
   try {
     if (mode.value === 'register') await register(name.value, email.value, password.value)
     else await login(email.value, password.value)
-    router.push({ name: 'watchlists' })
+    await router.replace(returnDestination())
   } catch (_error) {}
+}
+
+function returnDestination() {
+  const destination = route.query.redirect
+  if (
+    typeof destination === 'string'
+    && destination.startsWith('/')
+    && !destination.startsWith('//')
+    && !destination.startsWith('/login')
+  ) {
+    return destination
+  }
+
+  return { name: 'home' }
 }
 </script>
 
