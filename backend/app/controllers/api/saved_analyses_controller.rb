@@ -1,3 +1,6 @@
+require_dependency Rails.root.join("app/models/saved_analysis.rb").to_s
+require_dependency Rails.root.join("app/policies/saved_analysis_policy.rb").to_s
+
 module Api
   class SavedAnalysesController < ApplicationController
     skip_before_action :authenticate_unsafe_api_request, only: [ :create, :update, :destroy ]
