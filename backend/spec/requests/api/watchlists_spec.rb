@@ -36,6 +36,39 @@ RSpec.describe "Api::Watchlists", type: :request do
     expect(json_body.dig("data", 0, "entries", 0, "recommendation")).to eq("pursue")
   end
 
+  it "assigns candidates and supports the review-status workflow with acquisition details" do
+    team = create_team
+    player = create_player(team: team)
+    candidate_owner = create_user(role: "scout")
+    watchlist = Watchlist.create!(name: "Workflow targets", owner: owner)
+
+    post api_watchlist_watchlist_entries_path(watchlist), params: {
+      player_id: player.id,
+      candidate_owner_id: candidate_owner.id,
+      acquisition_rationale: "Adds left-handed impact and defensive flexibility.",
+      estimated_cost: 12_500_000,
+      availability: "potentially_available",
+      concerns: "Would require a medical review."
+    }, headers: auth_headers
+
+    expect(response).to have_http_status(:created)
+    entry_id = json_body.dig("data", "id")
+    expect(json_body.dig("data", "candidate_owner", "id")).to eq(candidate_owner.id)
+    expect(json_body.dig("data", "review_status")).to eq("initial_review")
+    expect(json_body.dig("data", "estimated_cost")).to eq(12_500_000.0)
+
+    post transition_api_watchlist_entry_path(entry_id), params: { review_status: "analyst_review" }, headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "review_status")).to eq("analyst_review")
+
+    post transition_api_watchlist_entry_path(entry_id), params: { review_status: "contact_club_or_agent" }, headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_content)
+
+    get audit_history_api_watchlist_entry_path(entry_id), headers: auth_headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data").map { |event| event.fetch("action") }).to include("review_status_changed")
+  end
+
   it "prevents duplicate targets and rejects out-of-range evaluation scores" do
     watchlist = Watchlist.create!(name: "Free agents", owner: owner)
     entry = watchlist.entries.create!(player: create_player)

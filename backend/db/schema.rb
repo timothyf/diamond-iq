@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_29_040000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_29_050000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -1150,16 +1150,25 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_040000) do
     t.decimal "calculated_fit_score", precision: 5, scale: 2
     t.jsonb "fit_breakdown", default: {}, null: false
     t.datetime "fit_calculated_at"
+    t.bigint "candidate_owner_id"
+    t.text "acquisition_rationale"
+    t.decimal "estimated_cost", precision: 12, scale: 2
+    t.string "availability", default: "unknown", null: false
+    t.text "concerns"
+    t.string "review_status", default: "initial_review", null: false
     t.index ["calculated_fit_score"], name: "index_watchlist_entries_on_calculated_fit_score"
+    t.index ["candidate_owner_id"], name: "index_watchlist_entries_on_candidate_owner_id"
     t.index ["player_id"], name: "index_watchlist_entries_on_player_id"
     t.index ["watchlist_id", "player_id"], name: "index_watchlist_entries_on_watchlist_id_and_player_id", unique: true
     t.index ["watchlist_id"], name: "index_watchlist_entries_on_watchlist_id"
     t.check_constraint "calculated_fit_score IS NULL OR calculated_fit_score >= 0::numeric AND calculated_fit_score <= 100::numeric", name: "watchlist_entries_calculated_fit_range"
     t.check_constraint "cost_score IS NULL OR cost_score >= 1 AND cost_score <= 5", name: "watchlist_entries_cost_score_range"
+    t.check_constraint "estimated_cost IS NULL OR estimated_cost >= 0::numeric", name: "watchlist_entries_estimated_cost_nonnegative"
     t.check_constraint "fit_score IS NULL OR fit_score >= 1 AND fit_score <= 5", name: "watchlist_entries_fit_score_range"
     t.check_constraint "need_score IS NULL OR need_score >= 1 AND need_score <= 5", name: "watchlist_entries_need_score_range"
     t.check_constraint "priority::text = ANY (ARRAY['low'::character varying, 'medium'::character varying, 'high'::character varying]::text[])", name: "watchlist_entries_valid_priority"
     t.check_constraint "recommendation::text = ANY (ARRAY['pursue'::character varying, 'monitor'::character varying, 'pass'::character varying]::text[])", name: "watchlist_entries_valid_recommendation"
+    t.check_constraint "review_status::text = ANY (ARRAY['initial_review'::character varying, 'analyst_review'::character varying, 'scout_review'::character varying, 'medical_review'::character varying, 'discuss_internally'::character varying, 'contact_club_or_agent'::character varying, 'no_longer_pursuing'::character varying]::text[])", name: "watchlist_entries_valid_review_status"
     t.check_constraint "risk_score IS NULL OR risk_score >= 1 AND risk_score <= 5", name: "watchlist_entries_risk_score_range"
     t.check_constraint "status::text = ANY (ARRAY['scouting'::character varying, 'active'::character varying, 'paused'::character varying, 'closed'::character varying]::text[])", name: "watchlist_entries_valid_status"
   end
@@ -1255,6 +1264,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_040000) do
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"
   add_foreign_key "watchlist_entries", "players"
+  add_foreign_key "watchlist_entries", "users", column: "candidate_owner_id"
   add_foreign_key "watchlist_entries", "watchlists"
   add_foreign_key "watchlists", "need_profiles"
   add_foreign_key "watchlists", "users", column: "owner_id"

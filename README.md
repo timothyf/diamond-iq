@@ -76,6 +76,7 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 ### Acquisition Workflow
 
 - Private watchlists with notes, reusable organizational need profiles, weighted calculated acquisition fit, candidate discovery filters, and similar alternatives.
+- Acquisition candidates support assignment to a staff owner, rationale, estimated cost, availability, concerns, and an audited review pipeline from initial review through contact or no longer pursuing.
 - Watchlist and need-profile ownership is enforced per user, with audit history for changes and fit recalculations.
 
 ### Saved Views and Analyses
@@ -402,6 +403,9 @@ Import and download writes require an authenticated administrator or the configu
 - `DELETE /api/auth/logout` — revoke the current session token
 - `GET /api/watchlists` and `GET /api/watchlists/:id` — owned watchlists (administrators can view all)
 - `GET /api/watchlists/:id/audit_history` — attributed watchlist and entry changes
+- `POST /api/watchlist_entries/:id/transition` — advance an owned candidate through the review workflow
+- `GET /api/watchlist_entries/:id/audit_history` — review candidate status and evaluation changes
+- `GET /api/users` — active staff available for candidate assignment
 - `GET /api/need_profiles` — owned need profiles (administrators can view all)
 - `GET /api/teams/:team_id/opponent_reports` and `GET /api/opponent_reports/:id` — owned opponent reports
 - `PATCH /api/opponent_reports/:id` and `GET /api/opponent_reports/:id/audit_history` — edit and review attributed report history

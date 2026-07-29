@@ -4,7 +4,7 @@ module Api
 
     def index
       render json: {
-        data: accessible_watchlists.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] })
+        data: accessible_watchlists.includes({ need_profile: :team }, entries: [ :candidate_owner, { player: [ :team, :profile ] } ])
           .order(:name)
           .map { |watchlist| serialize_watchlist(watchlist) }
       }
@@ -81,7 +81,7 @@ module Api
     private
 
     def find_watchlist
-      accessible_watchlists.includes({ need_profile: :team }, entries: { player: [ :team, :profile ] }).find(params[:id])
+      accessible_watchlists.includes({ need_profile: :team }, entries: [ :candidate_owner, { player: [ :team, :profile ] } ]).find(params[:id])
     end
 
     def accessible_watchlists
@@ -132,6 +132,13 @@ module Api
         need_score: entry.need_score,
         cost_score: entry.cost_score,
         risk_score: entry.risk_score,
+        review_status: entry.review_status,
+        review_statuses: WatchlistEntry::REVIEW_STATUSES,
+        candidate_owner: serialize_user(entry.candidate_owner),
+        acquisition_rationale: entry.acquisition_rationale,
+        estimated_cost: entry.estimated_cost&.to_f,
+        availability: entry.availability,
+        concerns: entry.concerns,
         tags: entry.tags,
         notes: entry.notes,
         updated_at: entry.updated_at,

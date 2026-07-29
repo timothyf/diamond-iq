@@ -27,6 +27,7 @@ Rails.application.routes.draw do
     end
 
     resources :players, only: [:index, :show]
+    resources :users, only: [ :index ]
     resources :teams, only: [:index, :show] do
       resources :opponent_reports, only: [ :index, :create ]
       resources :lineup_scenarios, only: [ :index, :create ]
@@ -53,7 +54,9 @@ Rails.application.routes.draw do
     resources :watchlist_entries, only: [ :update, :destroy ] do
       member do
         post :recalculate
+        post :transition
         get :alternatives
+        get :audit_history
       end
     end
     resource :home, only: [:show], controller: :home

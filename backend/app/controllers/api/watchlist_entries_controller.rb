@@ -6,7 +6,9 @@ module Api
       watchlist = accessible_watchlists.find(params[:watchlist_id])
       require_write_access!(watchlist)
       return if performed?
-      entry = watchlist.entries.create!(entry_params)
+      attributes = entry_params.to_h
+      attributes["candidate_owner_id"] ||= current_user.id
+      entry = watchlist.entries.create!(attributes)
       AuditLog.record!(user: current_user, action: "created", record: entry, changes: entry.saved_changes)
       render json: { data: serialize_entry(entry) }, status: :created
     rescue ActiveRecord::RecordInvalid => error
@@ -22,6 +24,29 @@ module Api
       render json: { data: serialize_entry(entry) }
     rescue ActiveRecord::RecordInvalid => error
       render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
+    end
+
+    def transition
+      entry = accessible_entries.includes(player: [ :team, :profile ]).find(params[:id])
+      require_write_access!(entry.watchlist)
+      return if performed?
+
+      before = entry.review_status
+      entry.update!(review_status: params.require(:review_status))
+      AuditLog.record!(user: current_user, action: "review_status_changed", record: entry,
+        changes: { "review_status" => [ before, entry.review_status ] })
+      render json: { data: serialize_entry(entry) }
+    rescue ActionController::ParameterMissing, ActiveRecord::RecordInvalid => error
+      message = error.respond_to?(:record) ? error.record.errors.full_messages.to_sentence : error.message
+      render json: { message: message }, status: :unprocessable_content
+    end
+
+    def audit_history
+      entry = accessible_entries.find(params[:id])
+      logs = AuditLog.includes(:user)
+        .where(auditable_type: "WatchlistEntry", auditable_id: entry.id)
+        .order(created_at: :desc).limit(100)
+      render json: { data: logs.map { |log| serialize_audit_log(log) } }
     end
 
     def destroy
@@ -56,7 +81,11 @@ module Api
     private
 
     def entry_params
-      params.permit(:player_id, :priority, :status, :recommendation, :fit_score, :need_score, :cost_score, :risk_score, :notes, tags: [])
+      params.permit(
+        :player_id, :candidate_owner_id, :priority, :status, :review_status, :recommendation,
+        :fit_score, :need_score, :cost_score, :risk_score, :acquisition_rationale,
+        :estimated_cost, :availability, :concerns, :notes, tags: []
+      )
     end
 
     def accessible_watchlists
@@ -80,6 +109,13 @@ module Api
         need_score: entry.need_score,
         cost_score: entry.cost_score,
         risk_score: entry.risk_score,
+        review_status: entry.review_status,
+        review_statuses: WatchlistEntry::REVIEW_STATUSES,
+        candidate_owner: serialize_user(entry.candidate_owner),
+        acquisition_rationale: entry.acquisition_rationale,
+        estimated_cost: entry.estimated_cost&.to_f,
+        availability: entry.availability,
+        concerns: entry.concerns,
         tags: entry.tags,
         notes: entry.notes,
         updated_at: entry.updated_at,
@@ -90,6 +126,22 @@ module Api
           headshot_url: entry.player.profile&.headshot_url,
           team: entry.player.team && { id: entry.player.team.id, name: entry.player.team.name, abbreviation: entry.player.team.abbreviation }
         }
+      }
+    end
+
+    def serialize_user(user)
+      return nil unless user
+
+      { id: user.id, name: user.name, email: user.email, role: user.role }
+    end
+
+    def serialize_audit_log(log)
+      {
+        id: log.id,
+        action: log.action,
+        changes: log.change_set,
+        created_at: log.created_at,
+        user: serialize_user(log.user)
       }
     end
   end

@@ -6,6 +6,7 @@ import { authRequestHeaders } from '../composables/apiAuth'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import NotesPanel from '../components/NotesPanel.vue'
+import { useAuth } from '../composables/useAuth'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const route = inject(routeLocationKey, { query: {}, fullPath: '/watchlists' })
@@ -68,7 +69,27 @@ const newNeed = ref({
 })
 const searchQuery = computed(() => ({ name: playerQuery.value, perPage: 6 }))
 const { suggestions, loading: searching } = usePlayerSuggestions(searchQuery)
+const { user: currentUser } = useAuth()
+const availableOwners = ref([])
 const selectedWatchlist = computed(() => watchlists.value.find((watchlist) => watchlist.id === selectedId.value) || null)
+const reviewTransitions = {
+  initial_review: ['analyst_review', 'no_longer_pursuing'],
+  analyst_review: ['initial_review', 'scout_review', 'no_longer_pursuing'],
+  scout_review: ['analyst_review', 'medical_review', 'no_longer_pursuing'],
+  medical_review: ['scout_review', 'discuss_internally', 'no_longer_pursuing'],
+  discuss_internally: ['medical_review', 'contact_club_or_agent', 'no_longer_pursuing'],
+  contact_club_or_agent: ['discuss_internally', 'no_longer_pursuing'],
+  no_longer_pursuing: ['initial_review'],
+}
+const reviewLabels = {
+  initial_review: 'Initial review',
+  analyst_review: 'Analyst review',
+  scout_review: 'Scout review',
+  medical_review: 'Medical review',
+  discuss_internally: 'Discuss internally',
+  contact_club_or_agent: 'Contact club or agent',
+  no_longer_pursuing: 'No longer pursuing',
+}
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, options)
@@ -81,10 +102,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [loadedWatchlists, loadedProfiles, loadedTeams] = await Promise.all([
+    const [loadedWatchlists, loadedProfiles, loadedTeams, loadedOwners] = await Promise.all([
       request('/api/watchlists', { headers: authRequestHeaders({ Accept: 'application/json' }) }),
       request('/api/need_profiles', { headers: authRequestHeaders({ Accept: 'application/json' }) }),
       request('/api/teams', { headers: { Accept: 'application/json' } }),
+      request('/api/users', { headers: authRequestHeaders({ Accept: 'application/json' }) }),
     ])
     watchlists.value = (loadedWatchlists || []).map((watchlist) => ({
       ...watchlist,
@@ -92,6 +114,10 @@ async function load() {
     }))
     needProfiles.value = loadedProfiles || []
     teams.value = loadedTeams || []
+    availableOwners.value = (loadedOwners || []).map((owner) => owner)
+    if (currentUser.value && !availableOwners.value.some((owner) => owner.id === currentUser.value.id)) {
+      availableOwners.value.push(currentUser.value)
+    }
     if (!watchlists.value.some((watchlist) => watchlist.id === selectedId.value)) {
       selectedId.value = watchlists.value[0]?.id || null
     }
@@ -263,7 +289,30 @@ async function saveEvaluation(entry) {
         risk_score: score(entry.risk_score),
         tags,
         notes: entry.notes || '',
+        candidate_owner_id: entry.candidateOwnerId || null,
+        acquisition_rationale: entry.acquisitionRationale || '',
+        estimated_cost: score(entry.estimatedCost),
+        availability: entry.availability || 'unknown',
+        concerns: entry.concerns || '',
       }),
+    })
+    const index = selectedWatchlist.value.entries.findIndex((item) => item.id === entry.id)
+    selectedWatchlist.value.entries[index] = normalizeEntry(updated)
+  } catch (requestError) {
+    error.value = requestError.message
+  } finally {
+    savingEntryId.value = null
+  }
+}
+
+async function transitionReviewStatus(entry, nextStatus) {
+  if (!nextStatus || nextStatus === entry.reviewStatus) return
+  savingEntryId.value = entry.id
+  try {
+    const updated = await request(`/api/watchlist_entries/${entry.id}/transition`, {
+      method: 'POST',
+      headers: authRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ review_status: nextStatus }),
     })
     const index = selectedWatchlist.value.entries.findIndex((item) => item.id === entry.id)
     selectedWatchlist.value.entries[index] = normalizeEntry(updated)
@@ -288,7 +337,24 @@ function score(value) {
 }
 
 function normalizeEntry(entry) {
-  return { ...entry, tagsText: (entry.tags || []).join(', ') }
+  return {
+    ...entry,
+    candidateOwnerId: entry.candidate_owner?.id || '',
+    acquisitionRationale: entry.acquisition_rationale || '',
+    estimatedCost: entry.estimated_cost ?? '',
+    availability: entry.availability || 'unknown',
+    concerns: entry.concerns || '',
+    reviewStatus: entry.review_status || 'initial_review',
+    tagsText: (entry.tags || []).join(', '),
+  }
+}
+
+function reviewOptions(status) {
+  return [status, ...(reviewTransitions[status] || [])].filter((value, index, values) => value && values.indexOf(value) === index)
+}
+
+function reviewLabel(status) {
+  return reviewLabels[status] || String(status || '').replaceAll('_', ' ')
 }
 
 function chooseWatchlist(watchlist) {
@@ -464,7 +530,11 @@ watch(
             </section>
             <div class="evaluation-selects">
               <label>Priority<select v-model="entry.priority"><option>high</option><option>medium</option><option>low</option></select></label>
-              <label>Stage<select v-model="entry.status"><option>scouting</option><option>active</option><option>paused</option><option>closed</option></select></label>
+              <label>Review status
+                <select :value="entry.reviewStatus" :disabled="savingEntryId === entry.id" @change="transitionReviewStatus(entry, $event.target.value)">
+                  <option v-for="status in reviewOptions(entry.reviewStatus)" :key="status" :value="status">{{ reviewLabel(status) }}</option>
+                </select>
+              </label>
               <label>Recommendation<select v-model="entry.recommendation"><option>pursue</option><option>monitor</option><option>pass</option></select></label>
             </div>
             <div class="evaluation-scores">
@@ -473,8 +543,28 @@ watch(
               <label>Cost<input v-model="entry.cost_score" min="1" max="5" type="number" /></label>
               <label>Risk<input v-model="entry.risk_score" min="1" max="5" type="number" /></label>
             </div>
+            <div class="evaluation-selects">
+              <label>Candidate owner
+                <select v-model="entry.candidateOwnerId">
+                  <option value="">Unassigned</option>
+                  <option v-for="owner in availableOwners" :key="owner.id" :value="owner.id">{{ owner.name }} · {{ owner.role }}</option>
+                </select>
+              </label>
+              <label>Availability
+                <select v-model="entry.availability">
+                  <option value="unknown">Unknown</option>
+                  <option value="available">Available</option>
+                  <option value="potentially_available">Potentially available</option>
+                  <option value="under_contract">Under contract</option>
+                  <option value="unavailable">Unavailable</option>
+                </select>
+              </label>
+              <label>Estimated cost<input v-model="entry.estimatedCost" min="0" step="1000" type="number" placeholder="Optional dollars" /></label>
+            </div>
+            <label class="evaluation-notes">Acquisition rationale<textarea v-model="entry.acquisitionRationale" placeholder="Why should the organization pursue this candidate?"></textarea></label>
+            <label class="evaluation-notes">Concerns<textarea v-model="entry.concerns" placeholder="Medical, performance, cost, fit, or availability concerns…"></textarea></label>
             <label class="evaluation-notes">Tags<input v-model="entry.tagsText" placeholder="e.g. power, platoon, trade target" /></label>
-            <label class="evaluation-notes">Evaluation notes<textarea v-model="entry.notes" placeholder="Why this player fits, what acquisition would require, and open questions…"></textarea></label>
+            <label class="evaluation-notes">Evaluation notes<textarea data-test="evaluation-notes" v-model="entry.notes" placeholder="Why this player fits, what acquisition would require, and open questions…"></textarea></label>
             <NotesPanel target-type="acquisition_candidate" :target-id="entry.id" title="Candidate note history" lazy compact />
             <footer>
               <small>Manual scouting scores: 1 low · 5 high</small>
