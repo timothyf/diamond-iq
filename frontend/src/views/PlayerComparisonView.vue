@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import PlayerComparisonPicker from '../components/PlayerComparisonPicker.vue'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
+import NotesPanel from '../components/NotesPanel.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
@@ -26,6 +27,10 @@ const ready = computed(() => Boolean(
   rightPlayer.value &&
   String(leftPlayer.value.id) !== String(rightPlayer.value.id)
 ))
+const comparisonNoteKey = computed(() => {
+  if (!ready.value) return ''
+  return [Number(leftId.value), Number(rightId.value)].sort((a, b) => a - b).join(':')
+})
 const sameCategory = computed(() =>
   ready.value && leftPlayer.value.seasonOverview.category === rightPlayer.value.seasonOverview.category,
 )
@@ -148,6 +153,8 @@ function comparisonClass(row, side, scope) {
           <small>{{ player.positions?.primary?.abbreviation || '—' }} · Age {{ player.profile?.age || '—' }}</small>
         </article>
       </section>
+
+      <NotesPanel target-type="comparison" :target-id="comparisonNoteKey" title="Comparison notes" />
 
       <p v-if="!sameCategory" class="comparison-note">
         These players have different primary roles; unmatched statistics are shown as unavailable.

@@ -7,6 +7,9 @@ class User < ApplicationRecord
   has_many :owned_lineup_scenarios, class_name: "LineupScenario", foreign_key: :owner_id, dependent: :restrict_with_error
   has_many :owned_opponent_reports, class_name: "OpponentReport", foreign_key: :owner_id, dependent: :restrict_with_error
   has_many :saved_analyses, foreign_key: :owner_id, dependent: :destroy
+  has_many :authored_notes, class_name: "Note", foreign_key: :author_id, dependent: :restrict_with_error
+  has_many :note_revisions, foreign_key: :editor_id, dependent: :restrict_with_error
+  has_many :created_tags, class_name: "Tag", foreign_key: :created_by_id, dependent: :restrict_with_error
   has_many :audit_logs, dependent: :nullify
 
   validates :email, presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }

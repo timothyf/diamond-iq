@@ -4,6 +4,7 @@ import { routeLocationKey, routerKey } from 'vue-router'
 
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
+import NotesPanel from '../components/NotesPanel.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
@@ -519,6 +520,8 @@ function formatTimestamp(value) {
           </div>
         </dl>
       </section>
+
+      <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
 
       <section class="profile-panel profile-career-table">
         <header class="profile-section-heading">

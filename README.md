@@ -84,6 +84,13 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 - Every saved analysis stores normalized state plus a canonical in-app URL so it can be reopened with the same filters, players, dates, rolling windows, and dashboard context.
 - Sharing controls support private, organization-wide, and public-link visibility. Owners can change sharing or delete their named views; administrators can manage all views.
 
+### Notes and Tags
+
+- Attributed, dated staff notes can be attached to players, games, plate appearances, individual pitches, player comparisons, lineup scenarios, and acquisition candidates.
+- Reusable organization-wide tags provide consistent classification across note targets.
+- Every edit and archive creates an immutable note revision with editor, timestamp, body, date, and tag snapshot.
+- Lineup and acquisition notes inherit their parent resource ownership rules; other baseball-intelligence notes are visible to authenticated staff.
+
 ### Accounts and Access
 
 - Account registration, sign-in, sign-out, bearer-token sessions, and current-user lookup.
@@ -404,6 +411,9 @@ Import and download writes require an authenticated administrator or the configu
 - `POST /api/saved_analyses` — save a named analysis with state, visibility, and a reproducible URL
 - `PATCH /api/saved_analyses/:id` and `DELETE /api/saved_analyses/:id` — manage an owned saved analysis
 - `GET /api/saved_analyses/:id` — resolve an accessible saved analysis; public links use `/saved/:id`
+- `GET /api/notes?target_type=...&target_id=...` and `POST /api/notes` — list and create attributed notes
+- `PATCH /api/notes/:id`, `DELETE /api/notes/:id`, and `GET /api/notes/:id/history` — edit, archive, and inspect immutable note history
+- `GET /api/tags` and `POST /api/tags` — list and create reusable note tags
 
 Send a session token as `Authorization: Bearer <user-session-token>`. The system Admin API token remains available for operational automation and maps to the system administrator account.
 

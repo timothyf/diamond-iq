@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, toRef, watch } from 'vue'
 
 import { useGameSummary } from '../composables/useGameSummary'
+import NotesPanel from '../components/NotesPanel.vue'
 
 const props = defineProps({ gameId: { type: [String, Number], required: true } })
 const { game, loading, error, refresh } = useGameSummary(toRef(props, 'gameId'))
@@ -241,6 +242,8 @@ async function handleTabKey(event, index) {
           </RouterLink>
         </div>
       </section>
+
+      <NotesPanel target-type="game" :target-id="game.id" title="Game notes" />
 
       <nav class="game-tabs" aria-label="Game summary sections">
         <div role="tablist" aria-label="Game summary views">
@@ -668,9 +671,16 @@ async function handleTabKey(event, index) {
                   </div>
                 </summary>
                 <div class="plate-appearance__pitches">
+                  <NotesPanel
+                    target-type="plate_appearance"
+                    :target-id="appearance.id"
+                    title="Plate appearance notes"
+                    lazy
+                    compact
+                  />
                   <div v-if="appearance.pitches.length" class="box-table-wrap">
                     <table class="pitch-sequence-table">
-                      <thead><tr><th>#</th><th>Count</th><th>Pitch</th><th>Velocity</th><th>Result</th><th>Exit velo</th><th>Launch</th><th>Distance</th><th>xwOBA</th></tr></thead>
+                      <thead><tr><th>#</th><th>Count</th><th>Pitch</th><th>Velocity</th><th>Result</th><th>Exit velo</th><th>Launch</th><th>Distance</th><th>xwOBA</th><th>Notes</th></tr></thead>
                       <tbody>
                         <tr v-for="pitch in appearance.pitches" :id="pitch.id ? `pitch-${pitch.id}` : undefined" :key="pitch.id || pitch.pitchNumber">
                           <td>{{ pitch.pitchNumber }}</td>
@@ -682,6 +692,7 @@ async function handleTabKey(event, index) {
                           <td>{{ angle(pitch.launchAngle) }}</td>
                           <td>{{ distance(pitch.hitDistance) }}</td>
                           <td>{{ rate(pitch.estimatedWoba, 3, true) }}</td>
+                          <td><NotesPanel target-type="pitch" :target-id="pitch.id" title="Pitch notes" lazy compact /></td>
                         </tr>
                       </tbody>
                     </table>

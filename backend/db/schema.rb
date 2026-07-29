@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_29_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -305,6 +305,48 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
     t.index ["owner_id"], name: "index_need_profiles_on_owner_id"
     t.index ["team_id", "name"], name: "index_need_profiles_on_team_id_and_name", unique: true
     t.index ["team_id"], name: "index_need_profiles_on_team_id"
+  end
+
+  create_table "note_revisions", force: :cascade do |t|
+    t.bigint "note_id", null: false
+    t.bigint "editor_id", null: false
+    t.integer "version", null: false
+    t.string "action", default: "updated", null: false
+    t.text "body", null: false
+    t.date "note_date", null: false
+    t.jsonb "tag_names", default: [], null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["editor_id"], name: "index_note_revisions_on_editor_id"
+    t.index ["note_id", "version"], name: "index_note_revisions_on_note_id_and_version", unique: true
+    t.index ["note_id"], name: "index_note_revisions_on_note_id"
+  end
+
+  create_table "note_taggings", force: :cascade do |t|
+    t.bigint "note_id", null: false
+    t.bigint "tag_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["note_id", "tag_id"], name: "index_note_taggings_on_note_id_and_tag_id", unique: true
+    t.index ["note_id"], name: "index_note_taggings_on_note_id"
+    t.index ["tag_id"], name: "index_note_taggings_on_tag_id"
+  end
+
+  create_table "notes", force: :cascade do |t|
+    t.bigint "author_id", null: false
+    t.bigint "last_edited_by_id", null: false
+    t.string "target_type", null: false
+    t.string "target_key", null: false
+    t.text "body", null: false
+    t.date "note_date", null: false
+    t.jsonb "target_metadata", default: {}, null: false
+    t.datetime "archived_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["archived_at"], name: "index_notes_on_archived_at"
+    t.index ["author_id"], name: "index_notes_on_author_id"
+    t.index ["last_edited_by_id"], name: "index_notes_on_last_edited_by_id"
+    t.index ["target_type", "target_key", "note_date"], name: "index_notes_on_target_and_date"
   end
 
   create_table "opponent_reports", force: :cascade do |t|
@@ -1005,6 +1047,16 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
     t.index ["name", "category"], name: "index_stat_types_on_name_and_category", unique: true
   end
 
+  create_table "tags", force: :cascade do |t|
+    t.bigint "created_by_id", null: false
+    t.string "name", null: false
+    t.string "color", default: "#20543c", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index "lower((name)::text)", name: "index_tags_on_lower_name", unique: true
+    t.index ["created_by_id"], name: "index_tags_on_created_by_id"
+  end
+
   create_table "team_daily_metrics", force: :cascade do |t|
     t.bigint "team_id", null: false
     t.date "metric_date", null: false
@@ -1151,6 +1203,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
   add_foreign_key "lineup_scenarios", "users", column: "owner_id"
   add_foreign_key "need_profiles", "teams"
   add_foreign_key "need_profiles", "users", column: "owner_id"
+  add_foreign_key "note_revisions", "notes"
+  add_foreign_key "note_revisions", "users", column: "editor_id"
+  add_foreign_key "note_taggings", "notes"
+  add_foreign_key "note_taggings", "tags"
+  add_foreign_key "notes", "users", column: "author_id"
+  add_foreign_key "notes", "users", column: "last_edited_by_id"
   add_foreign_key "opponent_reports", "teams"
   add_foreign_key "opponent_reports", "teams", column: "opponent_team_id"
   add_foreign_key "opponent_reports", "users", column: "owner_id"
@@ -1192,6 +1250,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "tags", "users", column: "created_by_id"
   add_foreign_key "team_daily_metrics", "teams"
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"

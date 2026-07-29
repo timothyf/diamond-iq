@@ -1,6 +1,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { adminRequestHeaders } from '../composables/apiAuth'
+import NotesPanel from '../components/NotesPanel.vue'
 
 const props = defineProps({ scenarioId: { type: [String, Number], required: true } })
 const scenario = ref(null)
@@ -40,6 +41,7 @@ watch(() => props.scenarioId, load)
         <span>{{ formatDate(scenario.scenario_date) }}</span>
         <small v-if="scenario.owner">Owned by {{ scenario.owner.name || scenario.owner.email }}</small>
         <p v-if="scenario.notes" class="scenario-notes">{{ scenario.notes }}</p>
+        <NotesPanel target-type="lineup_scenario" :target-id="scenario.id" title="Scenario notes" />
         <section class="scenario-score" data-test="scenario-score">
           <header><strong>Transparent evaluation</strong><b>{{ scenario.total_score ?? '—' }}/100</b></header>
           <p>

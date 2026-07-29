@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import NotesPanel from './NotesPanel.vue'
 
 const emit = defineEmits(['page-change'])
 
@@ -106,6 +107,7 @@ function goToLastPage() {
             <th>Inning</th>
             <th>Description</th>
             <th>Events</th>
+            <th>Notes</th>
           </tr>
         </thead>
 
@@ -141,12 +143,15 @@ function goToLastPage() {
             <td class="value-cell">{{ row.inningDisplay || row.inning }}</td>
             <td class="value-cell">{{ row.description }}</td>
             <td class="value-cell">{{ row.events }}</td>
+            <td class="value-cell notes-cell">
+              <NotesPanel target-type="pitch" :target-id="row.id" title="Pitch notes" lazy compact />
+            </td>
           </tr>
         </tbody>
 
         <tbody v-else>
           <tr>
-            <td class="empty-state" colspan="14">
+            <td class="empty-state" colspan="15">
               <span v-if="loading">Loading pitch data…</span>
               <span v-else>No pitch rows have been imported yet.</span>
             </td>

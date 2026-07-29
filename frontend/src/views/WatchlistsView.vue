@@ -5,6 +5,7 @@ import { routeLocationKey, routerKey } from 'vue-router'
 import { authRequestHeaders } from '../composables/apiAuth'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
+import NotesPanel from '../components/NotesPanel.vue'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const route = inject(routeLocationKey, { query: {}, fullPath: '/watchlists' })
@@ -474,6 +475,7 @@ watch(
             </div>
             <label class="evaluation-notes">Tags<input v-model="entry.tagsText" placeholder="e.g. power, platoon, trade target" /></label>
             <label class="evaluation-notes">Evaluation notes<textarea v-model="entry.notes" placeholder="Why this player fits, what acquisition would require, and open questions…"></textarea></label>
+            <NotesPanel target-type="acquisition_candidate" :target-id="entry.id" title="Candidate note history" lazy compact />
             <footer>
               <small>Manual scouting scores: 1 low · 5 high</small>
               <div>

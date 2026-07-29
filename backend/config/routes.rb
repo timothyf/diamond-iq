@@ -39,6 +39,10 @@ Rails.application.routes.draw do
     end
     resources :need_profiles
     resources :saved_analyses
+    resources :notes, only: [ :index, :show, :create, :update, :destroy ] do
+      member { get :history }
+    end
+    resources :tags, only: [ :index, :create ]
     resources :watchlists, only: [ :index, :show, :create, :update ] do
       resources :watchlist_entries, only: [ :create ]
       member do
