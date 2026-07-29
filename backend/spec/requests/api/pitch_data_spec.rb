@@ -2,6 +2,16 @@ require "rails_helper"
 require "tempfile"
 
 RSpec.describe "Api::PitchData", type: :request do
+  include ActiveJob::TestHelper
+
+  def post_as_admin(path, params: {}, as: nil)
+    with_admin_api_token("test-admin-token") do
+      options = { params: params, headers: admin_headers }
+      options[:as] = as if as
+      post path, **options
+    end
+  end
+
   it "returns the canonical game id when a pitch is linked" do
     game = create_game(mlb_id: 823_443)
     pitch = PitchDatum.create!(
@@ -274,12 +284,15 @@ RSpec.describe "Api::PitchData", type: :request do
     uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "pitch-data.csv")
 
     expect do
-      post import_api_pitch_data_path, params: { file: uploaded_file }
-    end.to change(PitchDatum, :count).by(1)
+      post_as_admin import_api_pitch_data_path, params: { file: uploaded_file }
+    end.to have_enqueued_job(AdminImportJob)
 
-    expect(response).to have_http_status(:created)
-    expect(json_body.fetch("message")).to eq("Imported 1 pitch data rows")
-    expect(json_body.dig("data", "imported_count")).to eq(1)
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    expect(run.admin_task_upload.original_filename).to eq("pitch-data.csv")
+    expect { perform_enqueued_jobs }.to change(PitchDatum, :count).by(1)
+    expect(run.reload.status).to eq("completed")
+    expect(run.result_data.dig("data", "imported_count")).to eq(1)
     expect(PitchDatum.last.description).to eq("Called Strike")
   ensure
     csv_file.close!
@@ -330,12 +343,12 @@ RSpec.describe "Api::PitchData", type: :request do
            as: :json
     end
 
-    expect(response).to have_http_status(:unprocessable_content)
+    expect(response).to have_http_status(:accepted)
     expect(response).not_to have_http_status(:unauthorized)
   end
 
   it "returns an error when import is missing a file" do
-    post import_api_pitch_data_path
+    post_as_admin import_api_pitch_data_path
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("errors")).to include("CSV file is required")
@@ -351,10 +364,13 @@ RSpec.describe "Api::PitchData", type: :request do
 
     uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "pitch-data-invalid.csv")
 
-    post import_api_pitch_data_path, params: { file: uploaded_file }
+    post_as_admin import_api_pitch_data_path, params: { file: uploaded_file }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(json_body.fetch("message")).to include("Missing required columns")
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    perform_enqueued_jobs
+    expect(run.reload.status).to eq("failed")
+    expect(run.error_message).to include("Missing required columns")
   ensure
     csv_file.close!
   end
@@ -380,27 +396,28 @@ RSpec.describe "Api::PitchData", type: :request do
       }
     )
 
-    expect do
-      post download_api_pitch_data_path,
-           params: {
-             start_date: "2026-04-01",
-             end_date: "2026-04-01",
-             game_types: "R",
-             chunk_days: 7
-           },
-           as: :json
-    end.to change(PitchDatum, :count).by(1)
+    post_as_admin download_api_pitch_data_path,
+                  params: {
+                    start_date: "2026-04-01",
+                    end_date: "2026-04-01",
+                    game_types: "R",
+                    chunk_days: 7
+                  },
+                  as: :json
 
-    expect(response).to have_http_status(:created)
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    expect { perform_enqueued_jobs }.to change(PitchDatum, :count).by(1)
     expect(PitchDataDownloader).to have_received(:call).with(
       start_date: "2026-04-01",
       end_date: "2026-04-01",
       game_types: "R",
       chunk_days: 7
     )
-    expect(json_body.dig("data", "downloaded_count")).to eq(1)
-    expect(json_body.dig("data", "downloaded_start_date")).to eq("2026-04-01")
-    expect(json_body.dig("data", "downloaded_game_types")).to eq(["R"])
+    expect(run.reload.status).to eq("completed")
+    expect(run.result_data.dig("data", "downloaded_count")).to eq(1)
+    expect(run.result_data.dig("data", "downloaded_start_date")).to eq("2026-04-01")
+    expect(run.result_data.dig("data", "downloaded_game_types")).to eq(["R"])
     expect(PitchDatum.last.pitch_type).to eq("FF")
   end
 
@@ -409,12 +426,14 @@ RSpec.describe "Api::PitchData", type: :request do
       { success: false, message: "No pitch data rows returned from Baseball Savant", data: {} }
     )
 
-    post download_api_pitch_data_path,
-         params: { start_date: "2026-04-01", end_date: "2026-04-01" },
-         as: :json
+    post_as_admin download_api_pitch_data_path,
+                  params: { start_date: "2026-04-01", end_date: "2026-04-01" },
+                  as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(json_body["message"]).to eq("No pitch data rows returned from Baseball Savant")
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    perform_enqueued_jobs
+    expect(run.reload).to have_attributes(status: "failed", error_message: "No pitch data rows returned from Baseball Savant")
   end
 
   it "does not wrap pitch data download json params into an unpermitted pitch_datum key" do
@@ -426,17 +445,18 @@ RSpec.describe "Api::PitchData", type: :request do
     )
 
     expect do
-      post download_api_pitch_data_path,
-           params: {
-             start_date: "2026-05-20",
-             end_date: "2026-05-31",
-             game_types: "R",
-             chunk_days: 7
-           },
-           as: :json
+      post_as_admin download_api_pitch_data_path,
+                    params: {
+                      start_date: "2026-05-20",
+                      end_date: "2026-05-31",
+                      game_types: "R",
+                      chunk_days: 7
+                    },
+                    as: :json
     end.not_to raise_error
 
-    expect(response).to have_http_status(:unprocessable_content)
+    expect(response).to have_http_status(:accepted)
+    perform_enqueued_jobs
     expect(PitchDataDownloader).to have_received(:call).with(
       start_date: "2026-05-20",
       end_date: "2026-05-31",

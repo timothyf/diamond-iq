@@ -40,6 +40,25 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
     )
   end
 
+  it "enqueues remaining admin operations with initiator attribution" do
+    expect do
+      post api_admin_task_runs_path, params: {
+        task_name: "player_positions_backfill"
+      }, headers: admin_headers
+    end.to have_enqueued_job(AdminTaskJob)
+
+    expect(response).to have_http_status(:accepted)
+    expect(json_body.fetch("data")).to include(
+      "task_name" => "player_positions_backfill",
+      "status" => "queued",
+      "total_items" => 1,
+      "progress_percentage" => 0.0
+    )
+    expect(json_body.dig("data", "initiated_by")).to include(
+      "role" => "admin"
+    )
+  end
+
   it "estimates and enqueues a tracked roster synchronization by team count" do
     get estimate_api_admin_task_runs_path, params: {
       task_name: "mlb_roster_sync",

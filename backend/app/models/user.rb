@@ -45,6 +45,10 @@ class User < ApplicationRecord
     role.in?(%w[admin administrator])
   end
 
+  def active_for_sign_in?
+    disabled_at.nil?
+  end
+
   def can_write?
     admin? || role.in?(%w[analyst coach scout editor])
   end

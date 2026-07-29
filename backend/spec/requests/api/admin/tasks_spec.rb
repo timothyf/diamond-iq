@@ -1,6 +1,7 @@
 require "rails_helper"
 
 RSpec.describe "Api::Admin::Tasks", type: :request do
+  include ActiveJob::TestHelper
   around { |example| with_admin_api_token("test-admin-token", &example) }
   it "lists the admin tasks exposed through the API" do
     early_schedule = create_schedule(start_date: Date.new(2026, 3, 26), end_date: Date.new(2026, 4, 7))
@@ -143,26 +144,21 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     )
   end
 
-  it "runs an allowlisted admin task and returns its summary" do
-    allow(AdminTaskRunner).to receive(:call).and_return(
-      success: true,
-      task: "mlb_schedule_sync",
-      message: "Synchronized 12 MLB games",
-      data: { created_game_count: 12 }
-    )
+  it "queues an allowlisted admin task and returns its persisted run" do
+    expect do
+      post run_api_admin_task_path("mlb_schedule_sync"), headers: admin_headers,
+           params: { start_date: "2026-07-15", end_date: "2026-07-17" }
+    end.to have_enqueued_job(AdminTaskJob)
 
-    post run_api_admin_task_path("mlb_schedule_sync"), headers: admin_headers,
-         params: { start_date: "2026-07-15", end_date: "2026-07-17" }
-
-    expect(response).to have_http_status(:created)
-    expect(json_body).to include(
-      "task" => "mlb_schedule_sync",
-      "success" => true,
-      "message" => "Synchronized 12 MLB games"
-    )
-    expect(AdminTaskRunner).to have_received(:call).with(
-      task_name: "mlb_schedule_sync",
-      params: instance_of(ActionController::Parameters)
+    expect(response).to have_http_status(:accepted)
+    expect(json_body.fetch("data")).to include(
+      "task_name" => "mlb_schedule_sync",
+      "status" => "queued",
+      "task_parameters" => include(
+        "start_date" => "2026-07-15",
+        "end_date" => "2026-07-17"
+      ),
+      "initiated_by" => include("email" => "system@diamondiq.local")
     )
   end
 
@@ -175,17 +171,17 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
     expect(json_body.fetch("message")).to eq("Admin API token is required")
   end
 
-  it "returns validation failures without starting a task" do
-    allow(AdminTaskRunner).to receive(:call).and_return(
-      success: false,
-      task: "mlb_schedule_sync",
-      message: "Start date is required",
-      data: { errors: [ "Start date is required" ] }
-    )
-
+  it "persists validation failures from the background worker" do
     post run_api_admin_task_path("mlb_schedule_sync"), headers: admin_headers
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(json_body.fetch("message")).to eq("Start date is required")
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    perform_enqueued_jobs
+
+    expect(run.reload).to have_attributes(
+      status: "failed",
+      error_message: "Start date is required",
+      failed_items: 1
+    )
   end
 end

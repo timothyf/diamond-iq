@@ -1,6 +1,8 @@
 module Api
   class PlayerSeasonStatsController < ApplicationController
     before_action :set_player_season_stat, only: [:show, :update, :destroy]
+    before_action :require_authenticated_user, only: [:import, :download]
+    before_action :require_admin_user, only: [:import, :download]
 
     def index
       if params[:view] == "leaderboard"
@@ -49,51 +51,34 @@ module Api
         return
       end
 
-      result = PlayerStatsImporter.call(
-        csv_data: uploaded_file.read,
-        source_name: uploaded_file.original_filename,
-        required_stat_columns: import_params[:required_stat_columns],
-        replace_season: import_params[:replace_season]
+      run = AdminImportTaskLauncher.call(
+        task_name: "player_season_stats_import",
+        uploaded_file:,
+        initiated_by: current_user,
+        params: {
+          required_stat_columns: import_params[:required_stat_columns],
+          replace_season: import_params[:replace_season]
+        }
       )
-
-      if result[:success]
-        render json: { message: result[:message], data: result[:data] }, status: :created
-      else
-        render json: { message: result[:message], errors: Array(result.dig(:data, :errors)) }, status: :unprocessable_content
-      end
+      render_task_run(run)
+    rescue ArgumentError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+    rescue AdminImportTaskLauncher::EnqueueFailure, SolidQueue::Job::EnqueueError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
     end
 
     def download
       record_import_started("player_season_stats_download_import")
-      download_result = PlayerStatsDownloader.call(
-        category: download_params[:category],
-        start_year: download_params[:start_year],
-        end_year: download_params[:end_year]
+      run = AdminImportTaskLauncher.call(
+        task_name: "player_season_stats_download",
+        initiated_by: current_user,
+        params: download_params.to_h
       )
-
-      unless download_result[:success]
-        render json: { message: download_result[:message] }, status: :unprocessable_content
-        return
-      end
-
-      import_result = PlayerStatsImporter.call(
-        csv_data: download_result.dig(:data, :csv_data),
-        source_name: "MLB #{download_result.dig(:data, :category)} #{download_result.dig(:data, :seasons).join('-')}",
-        replace_season: download_params[:replace_season]
-      )
-
-      if import_result[:success]
-        render json: {
-          message: import_result[:message],
-          data: import_result[:data].merge(
-            downloaded_count: download_result.dig(:data, :row_count),
-            downloaded_category: download_result.dig(:data, :category),
-            downloaded_seasons: download_result.dig(:data, :seasons)
-          )
-        }, status: :created
-      else
-        render json: { message: import_result[:message], errors: Array(import_result.dig(:data, :errors)) }, status: :unprocessable_content
-      end
+      render_task_run(run)
+    rescue ArgumentError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+    rescue AdminImportTaskLauncher::EnqueueFailure, SolidQueue::Job::EnqueueError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
     end
 
     def update
@@ -143,7 +128,11 @@ module Api
       return unless current_user
 
       AuditLog.record!(user: current_user, action: "import_started", record: current_user,
-        metadata: { "task_name" => task_name, "source_name" => import_params[:file]&.original_filename })
+        metadata: { "task_name" => task_name, "source_name" => params[:file]&.original_filename })
+    end
+
+    def render_task_run(run)
+      render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
     end
 
     def serialize_player_season_stat(player_season_stat)

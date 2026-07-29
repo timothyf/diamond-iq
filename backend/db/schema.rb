@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_28_023000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_29_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -37,6 +37,18 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_023000) do
     t.index ["initiated_by_id"], name: "index_admin_task_runs_on_initiated_by_id"
     t.index ["task_name", "status", "created_at"], name: "idx_admin_task_runs_active_lookup"
     t.index ["task_name"], name: "idx_admin_task_runs_one_active_per_task", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'running'::character varying])::text[]))"
+  end
+
+  create_table "admin_task_uploads", force: :cascade do |t|
+    t.bigint "admin_task_run_id", null: false
+    t.string "original_filename", null: false
+    t.string "content_type"
+    t.bigint "byte_size", null: false
+    t.string "checksum", null: false
+    t.binary "contents", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_task_run_id"], name: "index_admin_task_uploads_on_admin_task_run_id", unique: true
   end
 
   create_table "audit_logs", force: :cascade do |t|
@@ -1095,6 +1107,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_28_023000) do
   end
 
   add_foreign_key "admin_task_runs", "users", column: "initiated_by_id"
+  add_foreign_key "admin_task_uploads", "admin_task_runs"
   add_foreign_key "audit_logs", "users"
   add_foreign_key "batter_split_summaries", "players"
   add_foreign_key "batter_split_summaries", "teams"

@@ -1,7 +1,6 @@
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { adminRequestHeaders } from './apiAuth'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { taskRunAttribution, useBackgroundTaskRun } from './useBackgroundTaskRun'
 
 function buildSuccessMessage(payload) {
   const data = payload.data || {}
@@ -22,22 +21,11 @@ function buildSuccessMessage(payload) {
   return messageParts.join(' ')
 }
 
-function buildErrorMessage(payload, status) {
-  if (payload?.message) return payload.message
-  return `MLB download failed with status ${status}.`
-}
-
 export function usePlayerSeasonStatsDownload() {
-  const downloading = ref(false)
-  const error = ref('')
-  const summary = ref('')
+  const backgroundTask = useBackgroundTaskRun('player_season_stats_download')
 
   async function downloadStats(options = {}) {
-    downloading.value = true
-    error.value = ''
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/player_season_stats/download`, {
+    return backgroundTask.start('/api/player_season_stats/download', {
         method: 'POST',
         headers: adminRequestHeaders({
           Accept: 'application/json',
@@ -50,29 +38,19 @@ export function usePlayerSeasonStatsDownload() {
           replace_season: options.replaceSeason ? '1' : '0',
         }),
       })
-
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(buildErrorMessage(payload, response.status))
-      }
-
-      summary.value = buildSuccessMessage(payload)
-      return payload
-    } catch (downloadError) {
-      summary.value = ''
-      error.value = downloadError.message || 'Unable to download MLB stats.'
-      console.error(downloadError)
-      return null
-    } finally {
-      downloading.value = false
-    }
   }
 
   return {
-    downloading: computed(() => downloading.value),
-    error: computed(() => error.value),
-    summary: computed(() => summary.value),
+    downloading: computed(() => backgroundTask.starting.value || backgroundTask.active.value),
+    error: backgroundTask.error,
+    summary: computed(() => {
+      const result = backgroundTask.task.value?.resultData
+      return backgroundTask.task.value?.status === 'completed'
+        ? `${buildSuccessMessage(result)}${taskRunAttribution(backgroundTask.task.value)}`
+        : backgroundTask.summary.value
+    }),
+    task: backgroundTask.task,
+    loadLatest: backgroundTask.loadLatest,
     downloadStats,
   }
 }

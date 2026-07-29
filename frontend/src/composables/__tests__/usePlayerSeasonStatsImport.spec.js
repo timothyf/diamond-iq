@@ -7,13 +7,17 @@ describe('usePlayerSeasonStatsImport', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        message: 'Imported 10 player season stats',
         data: {
-          created_player_count: 3,
-          created_team_count: 2,
-          skipped_count: 0,
-          replace_season: true,
-          replaced_rows_count: 22,
+          id: 15,
+          task_name: 'player_season_stats_import',
+          status: 'queued',
+          total_items: 1,
+          completed_items: 0,
+          failed_items: 0,
+          processed_items: 0,
+          progress_percentage: 0,
+          initiated_by: { id: 1, name: 'Admin User', email: 'admin@example.com', role: 'administrator' },
+          result_data: {},
         },
       }),
     })
@@ -34,10 +38,10 @@ describe('usePlayerSeasonStatsImport', () => {
     })
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData)
     expect(fetchMock.mock.calls[0][1].body.get('replace_season')).toBe('1')
-    expect(payload.message).toBe('Imported 10 player season stats')
-    expect(uploading.value).toBe(false)
+    expect(payload).toMatchObject({ id: 15, status: 'queued' })
+    expect(uploading.value).toBe(true)
     expect(error.value).toBe('')
-    expect(summary.value).toBe('Imported 10 player season stats Created 3 players and 2 teams. Replaced 22 existing season rows before import.')
+    expect(summary.value).toBe('Queued by Admin User · waiting for a background worker.')
   })
 
   it('surfaces an import error when the request fails', async () => {

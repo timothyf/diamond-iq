@@ -201,18 +201,26 @@ describe('useAdminTask', () => {
     expect(overviewError.value).toBe('')
   })
 
-  it('runs an allowlisted backend task and stores its result', async () => {
+  it('queues an allowlisted backend task and exposes its persisted run', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        task: 'mlb_schedule_sync',
-        success: true,
-        message: 'Synchronized 12 MLB games',
-        data: { created_game_count: 12 },
+        data: {
+          id: 42,
+          task_name: 'mlb_schedule_sync',
+          status: 'queued',
+          total_items: 1,
+          completed_items: 0,
+          failed_items: 0,
+          processed_items: 0,
+          progress_percentage: 0,
+          initiated_by: { id: 1, name: 'Admin User', email: 'admin@example.com', role: 'administrator' },
+          result_data: {},
+        },
       }),
     })
     vi.stubGlobal('fetch', fetchMock)
-    const { runTask, lastResult, error } = useAdminTask()
+    const { runTask, runningTask, currentTask, lastResult, error } = useAdminTask()
 
     const response = await runTask('mlb_schedule_sync', {
       start_date: '2026-07-15',
@@ -220,16 +228,21 @@ describe('useAdminTask', () => {
     })
     await flushPromises()
 
-    expect(response.success).toBe(true)
+    expect(response).toMatchObject({ id: 42, taskName: 'mlb_schedule_sync', status: 'queued' })
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/admin/tasks/mlb_schedule_sync/run',
+      '/api/admin/task_runs',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ start_date: '2026-07-15', end_date: '2026-07-17' }),
+        body: JSON.stringify({
+          task_name: 'mlb_schedule_sync',
+          start_date: '2026-07-15',
+          end_date: '2026-07-17',
+        }),
       }),
     )
-    expect(lastResult.value.message).toBe('Synchronized 12 MLB games')
-    expect(lastResult.value.finishedAt).toBeTruthy()
+    expect(runningTask.value).toBe('mlb_schedule_sync')
+    expect(currentTask.value.initiatedBy.name).toBe('Admin User')
+    expect(lastResult.value).toBeNull()
     expect(error.value).toBe('')
   })
 

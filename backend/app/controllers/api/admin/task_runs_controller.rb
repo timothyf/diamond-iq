@@ -9,6 +9,7 @@ module Api
       def index
         scope = AdminTaskRun.recent_first
         scope = scope.where(task_name: params[:task_name]) if params[:task_name].present?
+        scope = scope.where(task_name: params[:task_names]) if params[:task_names].present?
         scope = scope.active if ActiveModel::Type::Boolean.new.cast(params[:active])
 
         render json: { data: scope.limit(10).map { |task_run| AdminTaskRunSerializer.call(reconcile_orphaned_task_run!(task_run)) } }
@@ -26,7 +27,8 @@ module Api
           MlbGameDetailsTaskLauncher.call(
             start_date: params[:start_date],
             end_date: params[:end_date],
-            mlb_game_id: params[:mlb_game_id]
+            mlb_game_id: params[:mlb_game_id],
+            initiated_by: current_user
           )
         when PitchDataSyncTaskLauncher::TASK_NAME
           PitchDataSyncTaskLauncher.call(
@@ -34,14 +36,14 @@ module Api
             end_date: params[:end_date],
             game_types: params[:game_types],
             chunk_days: params[:chunk_days],
-            replace_existing: params[:replace_existing]
+            replace_existing: params[:replace_existing],
+            initiated_by: current_user
           )
         when MlbRosterSyncTaskLauncher::TASK_NAME
-          MlbRosterSyncTaskLauncher.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season])
+          MlbRosterSyncTaskLauncher.call(team_scope: params[:team_scope], team_mlb_id: params[:team_mlb_id], season: params[:season], initiated_by: current_user)
         else
-          raise ArgumentError, "Only tracked synchronization tasks support tracked execution"
+          AdminTaskLauncher.call(task_name: params[:task_name], params: generic_task_params, initiated_by: current_user)
         end
-        run.update!(initiated_by: current_user) if run.initiated_by_id.blank?
         render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
       rescue ArgumentError => error
         render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
@@ -135,7 +137,15 @@ module Api
       end
 
       def tracked_task_name?(task_name)
-        task_name.in?([ MlbGameDetailsTaskLauncher::TASK_NAME, PitchDataSyncTaskLauncher::TASK_NAME, MlbRosterSyncTaskLauncher::TASK_NAME ])
+        task_name.in?(
+          AdminTaskRunner::TASKS.keys +
+            AdminImportTaskLauncher::TASK_NAMES +
+            [
+              MlbGameDetailsTaskLauncher::TASK_NAME,
+              PitchDataSyncTaskLauncher::TASK_NAME,
+              MlbRosterSyncTaskLauncher::TASK_NAME
+            ]
+        )
       end
 
       def legacy_queue_job_for(task_run, stale_heartbeat:)
@@ -145,11 +155,32 @@ module Api
           MlbGameDetailsTaskLauncher::TASK_NAME => "MlbGameDetailsSyncJob",
           PitchDataSyncTaskLauncher::TASK_NAME => "PitchDataSyncJob",
           MlbRosterSyncTaskLauncher::TASK_NAME => "MlbRosterBatchSyncJob"
-        }.fetch(task_run.task_name)
+        }.fetch(task_run.task_name) do
+          task_run.task_name.in?(AdminImportTaskLauncher::TASK_NAMES) ? "AdminImportJob" : "AdminTaskJob"
+        end
 
         SolidQueue::Job.where(class_name: job_class).order(created_at: :desc).find do |job|
           Array(job.arguments.to_h["arguments"]).first.to_i == task_run.id
         end
+      end
+
+      def generic_task_params
+        params.permit(
+          :start_date,
+          :end_date,
+          :game_types,
+          :sport_id,
+          :only_missing,
+          :batch_size,
+          :limit,
+          :mlb_ids,
+          :team_scope,
+          :team_mlb_id,
+          :season,
+          :snapshot_on,
+          :mlb_game_id,
+          :calculation_version
+        ).to_h
       end
     end
   end

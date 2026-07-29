@@ -7,11 +7,17 @@ describe('usePitchDataImport', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        message: 'Imported 120 pitch data rows',
         data: {
-          imported_count: 120,
-          duplicate_count: 4,
-          skipped_count: 2,
+          id: 16,
+          task_name: 'pitch_data_import',
+          status: 'queued',
+          total_items: 1,
+          completed_items: 0,
+          failed_items: 0,
+          processed_items: 0,
+          progress_percentage: 0,
+          initiated_by: { id: 1, name: 'Admin User', email: 'admin@example.com', role: 'administrator' },
+          result_data: {},
         },
       }),
     })
@@ -31,10 +37,10 @@ describe('usePitchDataImport', () => {
       headers: { Accept: 'application/json' },
     })
     expect(fetchMock.mock.calls[0][1].body).toBeInstanceOf(FormData)
-    expect(payload.message).toBe('Imported 120 pitch data rows')
-    expect(uploading.value).toBe(false)
+    expect(payload).toMatchObject({ id: 16, status: 'queued' })
+    expect(uploading.value).toBe(true)
     expect(error.value).toBe('')
-    expect(summary.value).toBe('Imported 120 pitch data rows Collapsed 4 duplicate pitch rows. Skipped 2 invalid rows.')
+    expect(summary.value).toBe('Queued by Admin User · waiting for a background worker.')
   })
 
   it('surfaces an import error when the request fails', async () => {

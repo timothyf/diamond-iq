@@ -6,6 +6,7 @@ class ApplicationController < ActionController::API
 
   def authenticate_unsafe_api_request
     return if safe_api_request?
+    return if current_user&.admin?
 
     expected_token = ENV["ADMIN_API_TOKEN"].to_s
     return if expected_token.blank? && !Rails.env.production?

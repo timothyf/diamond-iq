@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 
 import CsvImportPicker from '../components/CsvImportPicker.vue'
 import AdminDataHealthPanel from '../components/admin/AdminDataHealthPanel.vue'
@@ -14,6 +14,7 @@ import AdminScheduleSyncCard from '../components/admin/AdminScheduleSyncCard.vue
 import AdminSyncConfirmationDialog from '../components/admin/AdminSyncConfirmationDialog.vue'
 import AdminTaskCard from '../components/admin/AdminTaskCard.vue'
 import AdminTaskResult from '../components/admin/AdminTaskResult.vue'
+import AdminUserManagement from '../components/admin/AdminUserManagement.vue'
 import { useAdminSyncWorkflows } from '../composables/useAdminSyncWorkflows'
 import { useAdminTask } from '../composables/useAdminTask'
 import { usePitchDataImport } from '../composables/usePitchDataImport'
@@ -34,6 +35,7 @@ const databaseDetailsButton = ref(null)
 const adminTabs = [
   { id: 'operations', label: 'Daily in-season' },
   { id: 'local-imports', label: 'Local File Imports' },
+  { id: 'users', label: 'User Access' },
 ]
 const activeAdminTab = ref('operations')
 
@@ -96,6 +98,7 @@ const contextualBenchmarkOptions = reactive({
 const {
   runningTask,
   error: taskError,
+  currentTask,
   lastResult,
   overviewLoading,
   overviewError,
@@ -112,6 +115,7 @@ const {
   gameDetailsMetrics,
   contextualBenchmarkMetrics,
   loadOverview,
+  loadLatestTask,
   loadDataHealth,
   runTask,
 } = useAdminTask()
@@ -158,12 +162,14 @@ const {
   downloading: statsDownloading,
   error: statsDownloadError,
   summary: statsDownloadSummary,
+  loadLatest: loadLatestStatsDownload,
   downloadStats,
 } = usePlayerSeasonStatsDownload()
 const {
   uploading: statsUploading,
   error: statsImportError,
   summary: statsImportSummary,
+  loadLatest: loadLatestStatsImport,
   importFile: importStatsFile,
 } = usePlayerSeasonStatsImport()
 const {
@@ -176,6 +182,7 @@ const {
   uploading: pitchUploading,
   error: pitchImportError,
   summary: pitchImportSummary,
+  loadLatest: loadLatestPitchImport,
   importFile: importPitchFile,
 } = usePitchDataImport()
 
@@ -198,7 +205,24 @@ const anyActionRunning = computed(
     rosterSnapshotsLoading.value,
 )
 
-onMounted(loadOverview)
+onMounted(() =>
+  Promise.all([
+    loadOverview(),
+    loadLatestTask?.(),
+    loadLatestStatsDownload?.(),
+    loadLatestStatsImport?.(),
+    loadLatestPitchImport?.(),
+  ]),
+)
+
+watch(
+  () => currentTask?.value?.status,
+  (status, previousStatus) => {
+    if (['completed', 'failed', 'cancelled'].includes(status) && ['queued', 'running'].includes(previousStatus)) {
+      loadOverview()
+    }
+  },
+)
 
 function normalizeYearRange(options) {
   if (Number(options.startYear) > Number(options.endYear)) options.endYear = options.startYear
@@ -390,7 +414,7 @@ async function closeDatabaseDetails() {
       </button>
     </nav>
 
-    <aside class="admin-runbook" data-test="daily-task-runbook" aria-labelledby="daily-task-runbook-title">
+    <aside v-show="activeAdminTab === 'operations'" class="admin-runbook" data-test="daily-task-runbook" aria-labelledby="daily-task-runbook-title">
       <header>
         <div>
           <p class="eyebrow">Recommended operating cadence</p>
@@ -437,6 +461,8 @@ async function closeDatabaseDetails() {
       </ol>
       <p class="admin-runbook__note"><strong>Not daily:</strong> local CSV imports, dated roster snapshots, and rebuilding player positions are maintenance tools to use when data needs correction or verification.</p>
     </aside>
+
+    <AdminUserManagement v-if="activeAdminTab === 'users'" />
 
     <section
       v-show="activeAdminTab === 'local-imports'"
@@ -645,7 +671,7 @@ async function closeDatabaseDetails() {
         @load="handleRosterSnapshotLoad"
       />
 
-      <AdminTaskResult :error="taskError" :result="lastResult" />
+      <AdminTaskResult :error="taskError" :result="lastResult" :task="currentTask" />
     </section>
   </main>
 </template>

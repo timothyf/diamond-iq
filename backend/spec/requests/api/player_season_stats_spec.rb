@@ -2,6 +2,16 @@ require "rails_helper"
 require "tempfile"
 
 RSpec.describe "Api::PlayerSeasonStats", type: :request do
+  include ActiveJob::TestHelper
+
+  def post_as_admin(path, params: {}, as: nil)
+    with_admin_api_token("test-admin-token") do
+      options = { params: params, headers: admin_headers }
+      options[:as] = as if as
+      post path, **options
+    end
+  end
+
   before do
     @team = create_team(
       mlb_id: 116,
@@ -499,26 +509,32 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
     uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "player-season-stats.csv")
 
     expect do
-      post import_api_player_season_stats_path,
-           params: {
-             file: uploaded_file,
-             required_stat_columns: ["gamesPlayed"]
-           }
-    end.to change(PlayerSeasonStat, :count).by(1)
+      post_as_admin import_api_player_season_stats_path,
+                    params: {
+                      file: uploaded_file,
+                      required_stat_columns: ["gamesPlayed"]
+                    }
+    end.to have_enqueued_job(AdminImportJob)
 
-    expect(response).to have_http_status(:created)
-    expect(json_body["message"]).to eq("Imported 1 player season stats")
-    expect(json_body.dig("data", "imported_count")).to eq(1)
-    expect(json_body.dig("data", "created_player_count")).to eq(1)
-    expect(json_body.dig("data", "created_team_count")).to eq(1)
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    expect(run).to have_attributes(task_name: "player_season_stats_import", status: "queued")
+    expect(run.initiated_by).to be_present
+    expect(run.admin_task_upload.original_filename).to eq("player-season-stats.csv")
+
+    expect { perform_enqueued_jobs }.to change(PlayerSeasonStat, :count).by(1)
+
+    expect(run.reload).to have_attributes(status: "completed", completed_items: 1)
+    expect(run.result_data.dig("data", "imported_count")).to eq(1)
+    expect(run.admin_task_upload).to be_nil
     expect(Player.find_by!(mlb_id: 123456).last_name).to eq("Bonds")
   ensure
     csv_file.close!
   end
 
   it "returns an error when the upload request is missing a csv file" do
-    post import_api_player_season_stats_path,
-         params: { required_stat_columns: ["gamesPlayed"] }
+    post_as_admin import_api_player_season_stats_path,
+                  params: { required_stat_columns: ["gamesPlayed"] }
 
     expect(response).to have_http_status(:unprocessable_content)
     expect(json_body.fetch("errors")).to include("CSV file is required")
@@ -534,14 +550,17 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
 
     uploaded_file = Rack::Test::UploadedFile.new(csv_file.path, "text/csv", original_filename: "invalid-player-season-stats.csv")
 
-    post import_api_player_season_stats_path,
-         params: {
-           file: uploaded_file,
-           required_stat_columns: ["gamesPlayed"]
-         }
+    post_as_admin import_api_player_season_stats_path,
+                  params: {
+                    file: uploaded_file,
+                    required_stat_columns: ["gamesPlayed"]
+                  }
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(json_body["message"]).to include("Missing required stat columns: gamesPlayed")
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    perform_enqueued_jobs
+    expect(run.reload).to have_attributes(status: "failed", failed_items: 1)
+    expect(run.error_message).to include("Missing required stat columns: gamesPlayed")
   ensure
     csv_file.close!
   end
@@ -568,22 +587,24 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
       }
     )
 
-    expect do
-      post download_api_player_season_stats_path,
-           params: {
-             category: "batting",
-             start_year: 2026,
-             end_year: 2026,
-             replace_season: "1"
-           },
-           as: :json
-    end.to change(PlayerSeasonStat, :count).by(2)
+    post_as_admin download_api_player_season_stats_path,
+                  params: {
+                    category: "batting",
+                    start_year: 2026,
+                    end_year: 2026,
+                    replace_season: "1"
+                  },
+                  as: :json
 
-    expect(response).to have_http_status(:created)
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    expect { perform_enqueued_jobs }.to change(PlayerSeasonStat, :count).by(2)
+
     expect(PlayerStatsDownloader).to have_received(:call).with(category: "batting", start_year: 2026, end_year: 2026)
-    expect(json_body.dig("data", "downloaded_count")).to eq(1)
-    expect(json_body.dig("data", "downloaded_category")).to eq("batting")
-    expect(json_body.dig("data", "downloaded_seasons")).to eq([2026])
+    expect(run.reload.status).to eq("completed")
+    expect(run.result_data.dig("data", "downloaded_count")).to eq(1)
+    expect(run.result_data.dig("data", "downloaded_category")).to eq("batting")
+    expect(run.result_data.dig("data", "downloaded_seasons")).to eq([2026])
     expect(Player.find_by!(mlb_id: 123456).last_name).to eq("Bonds")
   end
 
@@ -592,12 +613,14 @@ RSpec.describe "Api::PlayerSeasonStats", type: :request do
       { success: false, message: "No batting rows returned from MLB", data: {} }
     )
 
-    post download_api_player_season_stats_path,
-         params: { category: "batting", start_year: 2026, end_year: 2026 },
-         as: :json
+    post_as_admin download_api_player_season_stats_path,
+                  params: { category: "batting", start_year: 2026, end_year: 2026 },
+                  as: :json
 
-    expect(response).to have_http_status(:unprocessable_content)
-    expect(json_body["message"]).to eq("No batting rows returned from MLB")
+    expect(response).to have_http_status(:accepted)
+    run = AdminTaskRun.find(json_body.dig("data", "id"))
+    perform_enqueued_jobs
+    expect(run.reload).to have_attributes(status: "failed", error_message: "No batting rows returned from MLB")
   end
 
   it "updates a player season stat" do

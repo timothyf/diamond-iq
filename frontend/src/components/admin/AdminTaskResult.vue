@@ -5,6 +5,7 @@ import { formatTimestamp, humanize } from '../../utils/adminFormatting'
 const props = defineProps({
   error: { type: String, default: '' },
   result: { type: Object, default: null },
+  task: { type: Object, default: null },
 })
 
 const resultEntries = computed(() => {
@@ -21,11 +22,37 @@ const resultEntries = computed(() => {
     <strong>Task could not be completed</strong>
     <p>{{ error }}</p>
   </div>
+  <div v-else-if="task && ['queued', 'running'].includes(task.status)" class="admin-result" data-test="task-progress" aria-live="polite">
+    <div>
+      <p class="eyebrow">Background task</p>
+      <h3>{{ task.status === 'queued' ? 'Queued for processing' : 'Task in progress' }}</h3>
+      <small>
+        {{ humanize(task.taskName) }}
+        <template v-if="task.initiatedBy"> · Started by {{ task.initiatedBy.name || task.initiatedBy.email }}</template>
+      </small>
+    </div>
+    <div class="admin-result__progress">
+      <div
+        class="admin-result__progress-track"
+        role="progressbar"
+        :aria-valuenow="task.progressPercentage"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
+        <i :style="{ width: `${task.progressPercentage}%` }"></i>
+      </div>
+      <strong>{{ task.progressPercentage.toFixed(1) }}%</strong>
+      <small>{{ task.currentItemLabel || (task.status === 'queued' ? 'Waiting for a worker' : 'Processing') }}</small>
+    </div>
+  </div>
   <div v-else-if="result" class="admin-result" data-test="task-result">
     <div>
       <p class="eyebrow">Latest task result</p>
       <h3>{{ result.message }}</h3>
-      <small>{{ humanize(result.task) }} · {{ formatTimestamp(result.finishedAt, '', false) }}</small>
+      <small>
+        {{ humanize(result.task) }} · {{ formatTimestamp(result.finishedAt, '', false) }}
+        <template v-if="task?.initiatedBy"> · Started by {{ task.initiatedBy.name || task.initiatedBy.email }}</template>
+      </small>
     </div>
     <dl v-if="resultEntries.length">
       <div v-for="([key, value]) in resultEntries" :key="key">
@@ -83,6 +110,31 @@ const resultEntries = computed(() => {
   color: #244531;
   font-size: 1.08rem;
   font-weight: 900;
+}
+
+.admin-result__progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem 0.75rem;
+  align-items: center;
+}
+
+.admin-result__progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 38, 61, 0.12);
+}
+
+.admin-result__progress-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #176087, #2f7d32);
+}
+
+.admin-result__progress small {
+  grid-column: 1 / -1;
 }
 
 .admin-result--error {

@@ -1,13 +1,21 @@
 import { computed, ref } from 'vue'
 
 import { adminRequestHeaders } from './apiAuth'
+import { useBackgroundTaskRun } from './useBackgroundTaskRun'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const GENERIC_ADMIN_TASKS = [
+  'mlb_schedule_sync',
+  'mlb_player_profiles_sync',
+  'mlb_player_team_histories_sync',
+  'mlb_roster_snapshots_sync',
+  'player_positions_backfill',
+  'daily_analytics_refresh',
+  'contextual_benchmarks_refresh',
+]
 
 export function useAdminTask() {
-  const runningTask = ref('')
-  const error = ref('')
-  const lastResult = ref(null)
+  const backgroundTask = useBackgroundTaskRun(GENERIC_ADMIN_TASKS)
   const overviewLoading = ref(false)
   const overviewError = ref('')
   const dataHealth = ref(null)
@@ -169,35 +177,14 @@ export function useAdminTask() {
   }
 
   async function runTask(taskName, parameters = {}) {
-    runningTask.value = taskName
-    error.value = ''
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/tasks/${encodeURIComponent(taskName)}/run`, {
+    return backgroundTask.start('/api/admin/task_runs', {
         method: 'POST',
         headers: adminRequestHeaders({
           Accept: 'application/json',
           'Content-Type': 'application/json',
         }),
-        body: JSON.stringify(parameters),
+        body: JSON.stringify({ task_name: taskName, ...parameters }),
       })
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload?.message || `Admin task failed with status ${response.status}.`)
-      }
-
-      lastResult.value = {
-        ...payload,
-        finishedAt: new Date().toISOString(),
-      }
-      return payload
-    } catch (taskError) {
-      error.value = taskError.message || 'Unable to run the admin task.'
-      return null
-    } finally {
-      runningTask.value = ''
-    }
   }
 
   async function loadDataHealth() {
@@ -248,9 +235,21 @@ export function useAdminTask() {
   }
 
   return {
-    runningTask: computed(() => runningTask.value),
-    error: computed(() => error.value),
-    lastResult: computed(() => lastResult.value),
+    runningTask: computed(() => (backgroundTask.active.value ? backgroundTask.task.value?.taskName || '' : '')),
+    error: backgroundTask.error,
+    currentTask: backgroundTask.task,
+    lastResult: computed(() => {
+      const task = backgroundTask.task.value
+      if (task?.status !== 'completed') return null
+      const result = task.resultData || {}
+      return {
+        task: task.taskName,
+        success: result.success,
+        message: result.message || 'Background task completed',
+        data: result.data || {},
+        finishedAt: task.finishedAt,
+      }
+    }),
     overviewLoading: computed(() => overviewLoading.value),
     overviewError: computed(() => overviewError.value),
     dataHealth: computed(() => dataHealth.value),
@@ -266,6 +265,7 @@ export function useAdminTask() {
     gameDetailsMetrics: computed(() => gameDetailsMetrics.value),
     contextualBenchmarkMetrics: computed(() => contextualBenchmarkMetrics.value),
     loadOverview,
+    loadLatestTask: backgroundTask.loadLatest,
     loadDataHealth,
     runTask,
   }

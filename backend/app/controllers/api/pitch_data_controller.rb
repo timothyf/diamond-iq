@@ -1,6 +1,8 @@
 module Api
   class PitchDataController < ApplicationController
     wrap_parameters false
+    before_action :require_authenticated_user, only: [:import, :download]
+    before_action :require_admin_user, only: [:import, :download]
 
     DEFAULT_PER_PAGE = 20
     MAX_PER_PAGE = 500
@@ -41,53 +43,32 @@ module Api
         return
       end
 
-      result = PitchDataImporter.call(
-        csv_data: uploaded_file.read,
-        source_name: uploaded_file.original_filename
+      run = AdminImportTaskLauncher.call(
+        task_name: "pitch_data_import",
+        uploaded_file:,
+        initiated_by: current_user
       )
-
-      if result[:success]
-        render json: { message: result[:message], data: result[:data] }, status: :created
-      else
-        render json: { message: result[:message], errors: Array(result.dig(:data, :errors)) }, status: :unprocessable_content
-      end
+      render_task_run(run)
+    rescue ArgumentError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+    rescue AdminImportTaskLauncher::EnqueueFailure, SolidQueue::Job::EnqueueError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
     end
 
     def download
       record_import_started("pitch_data_download_import")
       permitted_params = download_params
 
-      download_result = PitchDataDownloader.call(
-        start_date: permitted_params[:start_date],
-        end_date: permitted_params[:end_date],
-        game_types: permitted_params[:game_types],
-        chunk_days: permitted_params[:chunk_days]
+      run = AdminImportTaskLauncher.call(
+        task_name: "pitch_data_download",
+        initiated_by: current_user,
+        params: permitted_params.to_h
       )
-
-      unless download_result[:success]
-        render json: { message: download_result[:message] }, status: :unprocessable_content
-        return
-      end
-
-      import_result = PitchDataImporter.call(
-        csv_data: download_result.dig(:data, :csv_data),
-        source_name: "Baseball Savant pitch data #{download_result.dig(:data, :start_date)}-#{download_result.dig(:data, :end_date)}"
-      )
-
-      if import_result[:success]
-        render json: {
-          message: import_result[:message],
-          data: import_result[:data].merge(
-            downloaded_count: download_result.dig(:data, :row_count),
-            downloaded_start_date: download_result.dig(:data, :start_date),
-            downloaded_end_date: download_result.dig(:data, :end_date),
-            downloaded_game_types: download_result.dig(:data, :game_types),
-            downloaded_chunk_days: download_result.dig(:data, :chunk_days)
-          )
-        }, status: :created
-      else
-        render json: { message: import_result[:message], errors: Array(import_result.dig(:data, :errors)) }, status: :unprocessable_content
-      end
+      render_task_run(run)
+    rescue ArgumentError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+    rescue AdminImportTaskLauncher::EnqueueFailure, SolidQueue::Job::EnqueueError => error
+      render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
     end
 
     private
@@ -104,7 +85,11 @@ module Api
       return unless current_user
 
       AuditLog.record!(user: current_user, action: "import_started", record: current_user,
-        metadata: { "task_name" => task_name, "source_name" => import_params[:file]&.original_filename })
+        metadata: { "task_name" => task_name, "source_name" => params[:file]&.original_filename })
+    end
+
+    def render_task_run(run)
+      render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
     end
 
     def page_param

@@ -25,12 +25,15 @@ module Api
       def run
         AuditLog.record!(user: current_user, action: "import_started", record: current_user,
           metadata: { "task_name" => params[:task_name].to_s, "parameters" => params.to_unsafe_h.except("controller", "action") })
-        result = AdminTaskRunner.call(task_name: params[:task_name], params: task_params)
-
-        if result[:success]
-          render json: serialize_result(result), status: :created
+        run = launch_task
+        render json: { data: AdminTaskRunSerializer.call(run) }, status: :accepted
+      rescue ArgumentError => error
+        render json: { message: error.message, errors: [ error.message ] }, status: :unprocessable_content
+      rescue StandardError => error
+        if enqueue_error?(error)
+          render json: { message: error.message, errors: [ error.message ] }, status: :service_unavailable
         else
-          render json: serialize_result(result), status: result[:error] == :not_found ? :not_found : :unprocessable_content
+          raise
         end
       end
 
@@ -41,6 +44,8 @@ module Api
           :start_date,
           :end_date,
           :game_types,
+          :chunk_days,
+          :replace_existing,
           :sport_id,
           :only_missing,
           :batch_size,
@@ -55,13 +60,40 @@ module Api
         )
       end
 
-      def serialize_result(result)
-        {
-          task: result[:task],
-          success: result[:success],
-          message: result[:message],
-          data: result[:data]
-        }
+      def launch_task
+        case params[:task_name]
+        when MlbGameDetailsTaskLauncher::TASK_NAME
+          MlbGameDetailsTaskLauncher.call(
+            start_date: task_params[:start_date],
+            end_date: task_params[:end_date],
+            mlb_game_id: task_params[:mlb_game_id],
+            initiated_by: current_user
+          )
+        when PitchDataSyncTaskLauncher::TASK_NAME
+          PitchDataSyncTaskLauncher.call(
+            start_date: task_params[:start_date],
+            end_date: task_params[:end_date],
+            game_types: task_params[:game_types],
+            chunk_days: task_params[:chunk_days],
+            replace_existing: task_params[:replace_existing],
+            initiated_by: current_user
+          )
+        when MlbRosterSyncTaskLauncher::TASK_NAME
+          MlbRosterSyncTaskLauncher.call(
+            team_scope: task_params[:team_scope],
+            team_mlb_id: task_params[:team_mlb_id],
+            season: task_params[:season],
+            initiated_by: current_user
+          )
+        else
+          AdminTaskLauncher.call(task_name: params[:task_name], params: task_params.to_h, initiated_by: current_user)
+        end
+      end
+
+      def enqueue_error?(error)
+        error.is_a?(SolidQueue::Job::EnqueueError) ||
+          error.class.name == "ActiveJob::EnqueueError" ||
+          error.class.name.end_with?("::EnqueueFailure")
       end
 
       def schedule_date_range

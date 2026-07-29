@@ -106,8 +106,9 @@ The `/admin` page centralizes the application's data operations:
 - Run or reopen the latest Data Health report for missing schedules, incomplete games, player/profile gaps, pitch-linkage issues, and analytics coverage.
 - View PostgreSQL storage details: total size, largest tables, data/index footprints, estimated live/dead rows, server version, and measurement time.
 - View PostgreSQL table-read activity: total, sequential, and index scans; rows read/fetched; last scan timestamps; and the statistics collection start time.
-- Long-running game-detail, Statcast, roster, and related synchronization workflows run through Solid Queue background jobs with queued/running/completed/failed/cancelled status, progress polling, safe cancellation, and orphaned-worker recovery.
-- Background task records include the initiating user and surfaced error/result details.
+- Every Admin synchronization, analytics refresh, download, and local CSV import runs through a persisted Solid Queue task with queued/running/completed/failed/cancelled status, progress polling, and orphaned-worker recovery.
+- Local CSV files are staged durably before enqueueing and removed after the worker completes; a browser request no longer has to remain open while parsing or importing.
+- Background task records consistently include the initiating user, timestamps, progress, completion summary, and surfaced error/result details.
 
 ## Architecture
 
@@ -377,7 +378,7 @@ Game filters include team, start/end date, season, status, and game type. Collec
 - `POST /api/pitch_data/import`
 - `POST /api/pitch_data/download`
 
-Import and download writes require the configured Admin API token in production. When initiated by an authenticated user, the application records an `import_started` audit event.
+Import and download writes require an authenticated administrator or the configured system Admin API token. They return `202 Accepted` with a persisted task run; clients can poll `GET /api/admin/task_runs/:id` for progress and the final result. The application records an attributed `import_started` audit event.
 
 ### Authentication and Private Resources
 
@@ -393,8 +394,11 @@ Send a session token as `Authorization: Bearer <user-session-token>`. The system
 
 ### Admin Tasks
 
+- `GET /api/admin/users` — list user accounts, roles, status, and last sign-in
+- `PATCH /api/admin/users/:id` — assign a role or disable/enable an account
+- `POST /api/admin/users/:id/reset_access` — revoke sessions and issue a one-time temporary password
 - `GET /api/admin/tasks` — task catalog plus dataset coverage and database metrics
-- `POST /api/admin/tasks/:task_name/run` — run an allowed synchronization or analytics task
+- `POST /api/admin/tasks/:task_name/run` — enqueue an allowed synchronization or analytics task (compatibility route)
 - `GET /api/admin/task_runs` — recent tracked task executions
 - `GET /api/admin/task_runs/:id` — current task progress and result details
 - `GET /api/admin/task_runs/estimate` — estimate a supported task before starting it
