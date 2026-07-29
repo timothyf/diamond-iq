@@ -364,7 +364,7 @@ describe('PlayerProfileView', () => {
 
     await wrapper.get('.range-presets button:nth-child(2)').trigger('click')
     await flushPromises()
-    expect(fetch).toHaveBeenLastCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
+    expect(fetch).toHaveBeenCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
       headers: { Accept: 'application/json' },
     })
   })

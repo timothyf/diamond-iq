@@ -78,6 +78,12 @@ DiamondIQ is a local-first baseball intelligence application built with a Ruby o
 - Private watchlists with notes, reusable organizational need profiles, weighted calculated acquisition fit, candidate discovery filters, and similar alternatives.
 - Watchlist and need-profile ownership is enforced per user, with audit history for changes and fit recalculations.
 
+### Saved Views and Analyses
+
+- Named saved views are available for Stat Explorer filters, player comparisons, team dashboard tabs and seasons, acquisition discovery searches, and player date-range analyses.
+- Every saved analysis stores normalized state plus a canonical in-app URL so it can be reopened with the same filters, players, dates, rolling windows, and dashboard context.
+- Sharing controls support private, organization-wide, and public-link visibility. Owners can change sharing or delete their named views; administrators can manage all views.
+
 ### Accounts and Access
 
 - Account registration, sign-in, sign-out, bearer-token sessions, and current-user lookup.
@@ -394,6 +400,10 @@ Import and download writes require an authenticated administrator or the configu
 - `PATCH /api/opponent_reports/:id` and `GET /api/opponent_reports/:id/audit_history` — edit and review attributed report history
 - `GET /api/teams/:team_id/lineup_scenarios` and `GET /api/lineup_scenarios/:id` — owned lineup scenarios
 - `PATCH /api/lineup_scenarios/:id` and `GET /api/lineup_scenarios/:id/audit_history` — edit and review attributed scenario history
+- `GET /api/saved_analyses?analysis_type=...` — list saved analyses visible to the current user
+- `POST /api/saved_analyses` — save a named analysis with state, visibility, and a reproducible URL
+- `PATCH /api/saved_analyses/:id` and `DELETE /api/saved_analyses/:id` — manage an owned saved analysis
+- `GET /api/saved_analyses/:id` — resolve an accessible saved analysis; public links use `/saved/:id`
 
 Send a session token as `Authorization: Bearer <user-session-token>`. The system Admin API token remains available for operational automation and maps to the system administrator account.
 

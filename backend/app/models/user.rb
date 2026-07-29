@@ -6,6 +6,7 @@ class User < ApplicationRecord
   has_many :owned_need_profiles, class_name: "NeedProfile", foreign_key: :owner_id, dependent: :nullify
   has_many :owned_lineup_scenarios, class_name: "LineupScenario", foreign_key: :owner_id, dependent: :restrict_with_error
   has_many :owned_opponent_reports, class_name: "OpponentReport", foreign_key: :owner_id, dependent: :restrict_with_error
+  has_many :saved_analyses, foreign_key: :owner_id, dependent: :destroy
   has_many :audit_logs, dependent: :nullify
 
   validates :email, presence: true, uniqueness: { case_sensitive: false }, format: { with: URI::MailTo::EMAIL_REGEXP }

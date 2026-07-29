@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_29_021000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_29_031000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -844,6 +844,20 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_021000) do
     t.index ["team_id"], name: "index_rosters_on_team_id"
   end
 
+  create_table "saved_analyses", force: :cascade do |t|
+    t.bigint "owner_id", null: false
+    t.string "name", null: false
+    t.string "analysis_type", null: false
+    t.string "visibility", default: "private", null: false
+    t.text "reproducible_url", null: false
+    t.jsonb "state", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["analysis_type", "visibility", "updated_at"], name: "idx_saved_analyses_discovery"
+    t.index ["owner_id", "analysis_type", "name"], name: "idx_saved_analyses_owner_type_name", unique: true
+    t.index ["owner_id"], name: "index_saved_analyses_on_owner_id"
+  end
+
   create_table "schedules", force: :cascade do |t|
     t.integer "season", null: false
     t.string "schedule_type", default: "regular", null: false
@@ -1171,6 +1185,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_021000) do
   add_foreign_key "roster_snapshot_players", "roster_snapshots"
   add_foreign_key "roster_snapshots", "teams"
   add_foreign_key "rosters", "teams"
+  add_foreign_key "saved_analyses", "users", column: "owner_id"
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_claimed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_failed_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

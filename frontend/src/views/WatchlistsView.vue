@@ -1,14 +1,18 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
+import { routeLocationKey, routerKey } from 'vue-router'
 
 import { authRequestHeaders } from '../composables/apiAuth'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
+import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+const route = inject(routeLocationKey, { query: {}, fullPath: '/watchlists' })
+const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const watchlists = ref([])
 const needProfiles = ref([])
 const teams = ref([])
-const selectedId = ref(null)
+const selectedId = ref(route.query.watchlist ? Number(route.query.watchlist) : null)
 const loading = ref(false)
 const error = ref('')
 const newWatchlistName = ref('')
@@ -21,7 +25,30 @@ const alternativesByEntry = ref({})
 const loadingAlternativesId = ref(null)
 const auditHistory = ref([])
 const loadingAuditHistory = ref(false)
-const discoveryFilters = ref({ name: '', positionType: '', bats: '', ageMin: '', ageMax: '', minFit: 60 })
+const discoveryFilters = ref({
+  name: route.query.name || '',
+  positionType: route.query.position_type || '',
+  bats: route.query.bats || '',
+  ageMin: route.query.age_min || '',
+  ageMax: route.query.age_max || '',
+  minFit: route.query.min_fit ?? 60,
+})
+const savedAnalysisState = computed(() => ({
+  watchlistId: selectedId.value,
+  filters: { ...discoveryFilters.value },
+}))
+const savedAnalysisUrl = computed(() => {
+  const filters = discoveryFilters.value
+  const query = new URLSearchParams()
+  if (selectedId.value) query.set('watchlist', String(selectedId.value))
+  if (filters.name) query.set('name', filters.name)
+  if (filters.positionType) query.set('position_type', filters.positionType)
+  if (filters.bats) query.set('bats', filters.bats)
+  if (filters.ageMin !== '') query.set('age_min', String(filters.ageMin))
+  if (filters.ageMax !== '') query.set('age_max', String(filters.ageMax))
+  if (filters.minFit !== '' && Number(filters.minFit) !== 60) query.set('min_fit', String(filters.minFit))
+  return `/watchlists${query.size ? `?${query}` : ''}`
+})
 const newNeed = ref({
   name: '',
   teamId: '',
@@ -64,7 +91,9 @@ async function load() {
     }))
     needProfiles.value = loadedProfiles || []
     teams.value = loadedTeams || []
-    if (!selectedId.value && watchlists.value[0]) selectedId.value = watchlists.value[0].id
+    if (!watchlists.value.some((watchlist) => watchlist.id === selectedId.value)) {
+      selectedId.value = watchlists.value[0]?.id || null
+    }
   } catch (requestError) {
     error.value = requestError.message
   } finally {
@@ -143,7 +172,7 @@ async function discoverCandidates() {
     if (discoveryFilters.value.minFit !== '') query.set('min_fit', discoveryFilters.value.minFit)
     discoveryResults.value = await request(
       `/api/watchlists/${selectedWatchlist.value.id}/discovery?${query.toString()}`,
-      { headers: { Accept: 'application/json' } },
+      { headers: authRequestHeaders({ Accept: 'application/json' }) },
     ) || []
   } catch (requestError) {
     error.value = requestError.message
@@ -161,7 +190,7 @@ async function loadAlternatives(entry) {
   loadingAlternativesId.value = entry.id
   try {
     alternativesByEntry.value[entry.id] = await request(`/api/watchlist_entries/${entry.id}/alternatives`, {
-      headers: { Accept: 'application/json' },
+      headers: authRequestHeaders({ Accept: 'application/json' }),
     }) || []
   } catch (requestError) {
     error.value = requestError.message
@@ -269,6 +298,13 @@ function chooseWatchlist(watchlist) {
   auditHistory.value = []
 }
 
+function openSavedAnalysis(item) {
+  const state = item.state || {}
+  if (state.watchlistId) selectedId.value = Number(state.watchlistId)
+  if (state.filters) discoveryFilters.value = { ...discoveryFilters.value, ...state.filters }
+  router.push(item.reproducibleUrl)
+}
+
 function componentScore(entry, key) {
   return entry.fit_breakdown?.components?.[key]?.score
 }
@@ -278,6 +314,22 @@ function formatFit(value) {
 }
 
 onMounted(load)
+
+watch(
+  [selectedId, discoveryFilters],
+  ([watchlistId, filters]) => {
+    const query = {}
+    if (watchlistId) query.watchlist = String(watchlistId)
+    if (filters.name) query.name = filters.name
+    if (filters.positionType) query.position_type = filters.positionType
+    if (filters.bats) query.bats = filters.bats
+    if (filters.ageMin !== '') query.age_min = String(filters.ageMin)
+    if (filters.ageMax !== '') query.age_max = String(filters.ageMax)
+    if (filters.minFit !== '' && Number(filters.minFit) !== 60) query.min_fit = String(filters.minFit)
+    router.replace({ name: 'watchlists', query })
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -358,6 +410,13 @@ onMounted(load)
 
         <section v-if="selectedWatchlist.need_profile" class="discovery-workspace" data-test="candidate-discovery">
           <header><div><p>Candidate discovery</p><h3>Players matching this need</h3></div></header>
+          <SavedAnalysisControls
+            analysis-type="acquisition_search"
+            :state="savedAnalysisState"
+            :reproducible-url="savedAnalysisUrl"
+            compact
+            @apply="openSavedAnalysis"
+          />
           <form class="discovery-filters" @submit.prevent="discoverCandidates">
             <label>Name<input v-model="discoveryFilters.name" type="search" placeholder="Optional player filter" /></label>
             <label>Position<select v-model="discoveryFilters.positionType"><option value="">Profile default</option><option>pitcher</option><option>catcher</option><option>infielder</option><option>outfielder</option><option>designated_hitter</option><option>two_way</option></select></label>

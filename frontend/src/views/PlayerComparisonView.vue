@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import PlayerComparisonPicker from '../components/PlayerComparisonPicker.vue'
+import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
@@ -10,6 +11,13 @@ const route = useRoute()
 const router = useRouter()
 const leftId = ref(route.query.left ? String(route.query.left) : '')
 const rightId = ref(route.query.right ? String(route.query.right) : '')
+const savedAnalysisState = computed(() => ({ leftPlayerId: leftId.value, rightPlayerId: rightId.value }))
+const savedAnalysisUrl = computed(() => {
+  const query = new URLSearchParams()
+  if (leftId.value) query.set('left', leftId.value)
+  if (rightId.value) query.set('right', rightId.value)
+  return `/compare${query.size ? `?${query}` : ''}`
+})
 const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId)
 const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId)
 
@@ -39,6 +47,14 @@ watch([leftId, rightId], () => {
   router.replace({ name: 'player-comparison', query })
 })
 
+watch(
+  () => [route.query.left, route.query.right],
+  ([left, right]) => {
+    leftId.value = left ? String(left) : ''
+    rightId.value = right ? String(right) : ''
+  },
+)
+
 function alignedRows(scope) {
   if (!ready.value) return []
   const leftStats = scope === 'season' ? leftPlayer.value.seasonOverview.stats : leftPlayer.value.careerOverview.stats
@@ -60,6 +76,10 @@ function selectPlayer(side, player) {
 function clearPlayer(side) {
   if (side === 'left') leftId.value = ''
   else rightId.value = ''
+}
+
+function openSavedAnalysis(item) {
+  router.push(item.reproducibleUrl)
 }
 
 function statValue(key, value) {
@@ -101,6 +121,14 @@ function comparisonClass(row, side, scope) {
       <h1>Side-by-side comparison</h1>
       <span>Select two players to align current-season and career performance.</span>
     </header>
+
+    <SavedAnalysisControls
+      analysis-type="player_comparison"
+      :state="savedAnalysisState"
+      :reproducible-url="savedAnalysisUrl"
+      compact
+      @apply="openSavedAnalysis"
+    />
 
     <section class="comparison-selectors" aria-label="Players to compare">
       <PlayerComparisonPicker label="Player A" :selected-player="leftPlayer" :excluded-player-id="rightId" @select="selectPlayer('left', $event)" @clear="clearPlayer('left')" />

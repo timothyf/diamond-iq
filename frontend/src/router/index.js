@@ -11,6 +11,7 @@ import OpponentReportView from '../views/OpponentReportView.vue'
 import PlayerProfileView from '../views/PlayerProfileView.vue'
 import PlayerComparisonView from '../views/PlayerComparisonView.vue'
 import ScheduleView from '../views/ScheduleView.vue'
+import SavedAnalysisRedirectView from '../views/SavedAnalysisRedirectView.vue'
 import StandingsView from '../views/StandingsView.vue'
 import TeamDirectoryView from '../views/TeamDirectoryView.vue'
 import TeamProfileView from '../views/TeamProfileView.vue'
@@ -60,6 +61,12 @@ const router = createRouter({
       path: '/compare',
       name: 'player-comparison',
       component: PlayerComparisonView,
+    },
+    {
+      path: '/saved/:id',
+      name: 'saved-analysis',
+      component: SavedAnalysisRedirectView,
+      props: (route) => ({ savedAnalysisId: route.params.id }),
     },
     {
       path: '/teams',

@@ -1,25 +1,42 @@
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
+import { routeLocationKey, routerKey } from 'vue-router'
 
 import { useTeamProfile } from '../composables/useTeamProfile'
 import { adminRequestHeaders } from '../composables/apiAuth'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
+import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import TeamLeadersCard from '../components/TeamLeadersCard.vue'
 
 const props = defineProps({
   teamId: { type: [String, Number], required: true },
 })
 
+const route = inject(routeLocationKey, { query: {}, fullPath: `/teams/${props.teamId}` })
+const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const teamId = computed(() => props.teamId)
-const selectedSeason = ref(null)
-const selectedProfileTab = ref('overview')
-const selectedRosterView = ref('active')
 const profileTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
   { id: 'opponent', label: 'Opponent Preparation' },
   { id: 'lineup', label: 'Lineup Planner' },
 ]
+const selectedSeason = ref(Number(route.query.season) || null)
+const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
+const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
+const savedAnalysisState = computed(() => ({
+  teamId: teamId.value,
+  season: selectedSeason.value,
+  tab: selectedProfileTab.value,
+  rosterView: selectedRosterView.value,
+}))
+const savedAnalysisUrl = computed(() => {
+  const query = new URLSearchParams()
+  if (selectedSeason.value) query.set('season', String(selectedSeason.value))
+  if (selectedProfileTab.value !== 'overview') query.set('tab', selectedProfileTab.value)
+  if (selectedRosterView.value !== 'active') query.set('roster', selectedRosterView.value)
+  return `/teams/${encodeURIComponent(teamId.value)}${query.size ? `?${query}` : ''}`
+})
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
 const savingReport = ref(false)
 const reportSaveError = ref('')
@@ -55,6 +72,29 @@ watch(teamId, () => {
   lineupError.value = ''
 })
 
+watch(
+  () => [route.query.season, route.query.tab, route.query.roster],
+  ([season, tab, roster]) => {
+    selectedSeason.value = Number(season) || selectedSeason.value
+    selectedProfileTab.value = profileTabs.some((entry) => entry.id === tab) ? tab : 'overview'
+    selectedRosterView.value = ['active', 'injured', 'fortyMan'].includes(roster) ? roster : 'active'
+  },
+)
+
+watch(
+  [selectedSeason, selectedProfileTab, selectedRosterView],
+  ([season, tab, roster]) => {
+    const query = { ...route.query }
+    if (season) query.season = String(season)
+    else delete query.season
+    if (tab !== 'overview') query.tab = tab
+    else delete query.tab
+    if (roster !== 'active') query.roster = roster
+    else delete query.roster
+    router.replace({ name: 'team-profile', params: { id: teamId.value }, query })
+  },
+)
+
 async function loadAvailableTeams() {
   try {
     const response = await fetch('/api/teams', { headers: { Accept: 'application/json' } })
@@ -68,6 +108,10 @@ async function loadAvailableTeams() {
   } catch {
     availableTeams.value = []
   }
+}
+
+function openSavedAnalysis(item) {
+  router.push(item.reproducibleUrl)
 }
 
 onMounted(loadAvailableTeams)
@@ -396,6 +440,14 @@ async function saveLineupScenario() {
           <span v-if="tab.id === 'roster'">{{ team.rosters.active.length }}</span>
         </button>
       </nav>
+
+      <SavedAnalysisControls
+        analysis-type="team_dashboard"
+        :state="savedAnalysisState"
+        :reproducible-url="savedAnalysisUrl"
+        compact
+        @apply="openSavedAnalysis"
+      />
 
       <div
         v-show="selectedProfileTab === 'opponent'"

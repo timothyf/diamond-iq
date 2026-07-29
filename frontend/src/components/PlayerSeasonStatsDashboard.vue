@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 
 import PitchDataTable from './PitchDataTable.vue'
 import PlayerSeasonStatsTable from './PlayerSeasonStatsTable.vue'
+import SavedAnalysisControls from './SavedAnalysisControls.vue'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import { usePitchData } from '../composables/usePitchData'
 import { usePlayerSeasonStats } from '../composables/usePlayerSeasonStats'
@@ -45,6 +46,20 @@ const pitchDataFilters = reactive({
 
 const sort = reactive({
   value: DEFAULT_SORT_BY_CATEGORY.batting,
+})
+
+const savedAnalysisState = computed(() => ({
+  category: filters.category,
+  filters: { ...filters },
+  pitchDataFilters: { ...pitchDataFilters },
+  pagination: { ...pagination },
+  pitchDataOptions: { ...pitchDataOptions },
+  sort: sort.value,
+}))
+const savedAnalysisUrl = computed(() => {
+  void savedAnalysisState.value
+  if (typeof window === 'undefined') return '/explore'
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 })
 
 const playerInputFocused = ref(false)
@@ -409,6 +424,10 @@ function updateSort(nextSort) {
   sort.value = nextSort
 }
 
+function openSavedAnalysis(item) {
+  if (typeof window !== 'undefined') window.location.assign(item.reproducibleUrl)
+}
+
 function updatePage(nextPage) {
   pagination.page = nextPage
 }
@@ -558,6 +577,13 @@ function resetFilters() {
         </p>
       </div>
     </section>
+
+    <SavedAnalysisControls
+      analysis-type="stat_explorer"
+      :state="savedAnalysisState"
+      :reproducible-url="savedAnalysisUrl"
+      @apply="openSavedAnalysis"
+    />
 
     <section class="control-deck">
       <div class="control-deck__header">

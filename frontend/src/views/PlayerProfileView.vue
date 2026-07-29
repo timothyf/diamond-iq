@@ -1,7 +1,9 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
+import { routeLocationKey, routerKey } from 'vue-router'
 
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
+import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
@@ -12,12 +14,73 @@ const props = defineProps({
   },
 })
 
+const route = inject(routeLocationKey, { query: {}, fullPath: `/players/${props.playerId}` })
+const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const playerId = computed(() => props.playerId)
-const analysisOptions = ref({ range: 'season', paWindow: 50, pitchWindow: 100 })
-const customStartDate = ref('')
-const customEndDate = ref('')
+const analysisOptions = ref({
+  range: ['season', '7', '14', '30', 'custom'].includes(route.query.range) ? route.query.range : 'season',
+  paWindow: [25, 50, 100].includes(Number(route.query.pa_window)) ? Number(route.query.pa_window) : 50,
+  pitchWindow: [50, 100, 250].includes(Number(route.query.pitch_window)) ? Number(route.query.pitch_window) : 100,
+  startDate: route.query.start_date || null,
+  endDate: route.query.end_date || null,
+})
+const customStartDate = ref(route.query.start_date || '')
+const customEndDate = ref(route.query.end_date || '')
+const savedAnalysisState = computed(() => ({ playerId: playerId.value, ...analysisOptions.value }))
+const savedAnalysisUrl = computed(() => {
+  const options = analysisOptions.value
+  const query = new URLSearchParams()
+  if (options.range !== 'season') query.set('range', options.range)
+  if (options.paWindow !== 50) query.set('pa_window', String(options.paWindow))
+  if (options.pitchWindow !== 100) query.set('pitch_window', String(options.pitchWindow))
+  if (options.range === 'custom' && options.startDate && options.endDate) {
+    query.set('start_date', options.startDate)
+    query.set('end_date', options.endDate)
+  }
+  return `/players/${encodeURIComponent(playerId.value)}${query.size ? `?${query}` : ''}`
+})
 const { player, loading, error, refresh } = usePlayerProfile(playerId, analysisOptions)
 const headshotFailed = ref(false)
+
+watch(
+  analysisOptions,
+  (options) => {
+    const query = {}
+    if (options.range !== 'season') query.range = options.range
+    if (options.paWindow !== 50) query.pa_window = String(options.paWindow)
+    if (options.pitchWindow !== 100) query.pitch_window = String(options.pitchWindow)
+    if (options.range === 'custom' && options.startDate && options.endDate) {
+      query.start_date = options.startDate
+      query.end_date = options.endDate
+    }
+    router.replace({ name: 'player-profile', params: { id: playerId.value }, query })
+  },
+  { deep: true },
+)
+
+watch(
+  () => [
+    route.query.range,
+    route.query.pa_window,
+    route.query.pitch_window,
+    route.query.start_date,
+    route.query.end_date,
+  ],
+  ([range, paWindow, pitchWindow, startDate, endDate]) => {
+    const nextRange = ['season', '7', '14', '30', 'custom'].includes(range) ? range : 'season'
+    const nextPaWindow = [25, 50, 100].includes(Number(paWindow)) ? Number(paWindow) : 50
+    const nextPitchWindow = [50, 100, 250].includes(Number(pitchWindow)) ? Number(pitchWindow) : 100
+    analysisOptions.value = {
+      range: nextRange,
+      paWindow: nextPaWindow,
+      pitchWindow: nextPitchWindow,
+      startDate: startDate || null,
+      endDate: endDate || null,
+    }
+    customStartDate.value = startDate || ''
+    customEndDate.value = endDate || ''
+  },
+)
 
 watch(
   () => player.value?.profile?.headshotUrl,
@@ -277,6 +340,20 @@ function applyCustomRange() {
 
 function updateWindow(key, value) {
   analysisOptions.value = { ...analysisOptions.value, [key]: Number(value) }
+}
+
+function openSavedAnalysis(item) {
+  const state = item.state || {}
+  analysisOptions.value = {
+    range: state.range || 'season',
+    paWindow: Number(state.paWindow || 50),
+    pitchWindow: Number(state.pitchWindow || 100),
+    startDate: state.startDate || null,
+    endDate: state.endDate || null,
+  }
+  customStartDate.value = state.startDate || ''
+  customEndDate.value = state.endDate || ''
+  router.push(item.reproducibleUrl)
 }
 
 function titleize(value) {
@@ -579,6 +656,14 @@ function formatTimestamp(value) {
           </label>
         </div>
       </section>
+
+      <SavedAnalysisControls
+        analysis-type="player_date_range"
+        :state="savedAnalysisState"
+        :reproducible-url="savedAnalysisUrl"
+        compact
+        @apply="openSavedAnalysis"
+      />
 
       <section class="profile-panel trend-panel" data-test="player-trends">
         <header class="profile-section-heading">

@@ -38,6 +38,7 @@ Rails.application.routes.draw do
       member { get :audit_history }
     end
     resources :need_profiles
+    resources :saved_analyses
     resources :watchlists, only: [ :index, :show, :create, :update ] do
       resources :watchlist_entries, only: [ :create ]
       member do
