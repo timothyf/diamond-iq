@@ -57,7 +57,7 @@ watch(() => props.scenarioId, load)
         <section v-if="scenario.recommendation_data?.explanation?.length" class="scenario-recommendation" data-test="scenario-recommendation">
           <header><strong>Recommended order rationale</strong><span>{{ scenario.recommendation_data.alternatives?.length || 0 }} alternatives</span></header>
           <ul><li v-for="reason in scenario.recommendation_data.explanation" :key="reason">{{ reason }}</li></ul>
-          <details v-if="scenario.recommendation_data.alternatives?.length"><summary>View alternative orders</summary><ol v-for="(alternative, index) in scenario.recommendation_data.alternatives" :key="index"><li v-for="entry in alternative" :key="`${index}-${entry.batting_slot}`">{{ entry.batting_slot }}. {{ entry.player_name }}</li></ol></details>
+          <details v-if="scenario.recommendation_data.alternatives?.length"><summary>View alternative orders</summary><ol v-for="(alternative, index) in scenario.recommendation_data.alternatives" :key="index"><li v-for="entry in alternative" :key="entry.batting_slot">{{ entry.batting_slot }}. {{ entry.player_name || ('Player ' + entry.player_id) }} {{entry.defensive_position}}</li></ol></details>
         </section>
         <table>
           <thead><tr><th>Order</th><th>Player</th><th>Defense</th></tr></thead>

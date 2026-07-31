@@ -157,7 +157,7 @@ const nextSeriesGames = computed(() => {
 })
 const nextOpponent = computed(() => nextSeriesGames.value.length ? opponent(nextSeriesGames.value[0]) : null)
 const opponentPrep = computed(() => team.value?.opponentPreparation || {})
-const lineupPlayers = computed(() => team.value?.rosters?.active || [])
+const lineupPlayers = computed(() => (team.value?.rosters?.active || []).filter((membership) => !['P', 'SP', 'RP', 'PITCHER'].includes(String(membership.primaryPosition || '').toUpperCase())))
 watch(nextOpponent, (opponent) => {
   if (!lineupEvaluation.opponent && opponent?.name) lineupEvaluation.opponent = opponent.name
 })

@@ -1,6 +1,7 @@
 class LineupDecisionSupport
   DEFAULT_WEIGHTS = { production: 0.45, platoon: 0.25, recent: 0.15, reliability: 0.15 }.freeze
   POSITIONS = LineupScenarioEntry::DEFENSIVE_POSITIONS.freeze
+  PITCHER_CODES = %w[P SP RP].freeze
 
   def self.call(team:, season:, on: Date.current, constraints: {}, weights: {}, alternatives: 3)
     new(team: team, season: season, on: on, constraints: constraints, weights: weights, alternatives: alternatives).call
@@ -45,9 +46,19 @@ class LineupDecisionSupport
   def eligible_players
     excluded = ids("excluded_player_ids") | ids("unavailable_player_ids")
     memberships = team.team_memberships.active_on(on).where(roster_status: "active").includes(player: :profile)
-    memberships.filter_map(&:player).uniq(&:id).reject do |player|
-      excluded.include?(player.id) || resting?(player)
-    end
+    memberships.filter_map do |membership|
+      player = membership.player
+      next if pitcher?(membership, player)
+      next if excluded.include?(player.id) || resting?(player)
+
+      player
+    end.uniq(&:id)
+  end
+
+  def pitcher?(membership, player)
+    return true if PITCHER_CODES.include?(membership.primary_position.to_s.upcase)
+
+    player.primary_position(season: season)&.position_type.to_s == "pitcher"
   end
 
   def build_order(players)
@@ -81,16 +92,29 @@ class LineupDecisionSupport
   end
 
   def serialize_lineup(lineup)
+    assignments = position_assignments(lineup)
     lineup.each_with_index.map do |player, index|
-      { player_id: player.id, player_name: player.full_name, batting_slot: index + 1, defensive_position: position_for(player, lineup) }
+      { player_id: player.id, player_name: player.full_name, batting_slot: index + 1, defensive_position: assignments.fetch(player.id) }
     end
   end
 
-  def position_for(player, lineup)
-    preferred = player.primary_position(season: season)&.abbreviation.to_s.upcase
-    return preferred if POSITIONS.include?(preferred) && lineup.count { |candidate| candidate.primary_position(season: season)&.abbreviation.to_s.upcase == preferred } == 1
+  def position_assignments(lineup)
+    assignments = {}
+    used = []
+    lineup.each do |player|
+      preferred = player.primary_position(season: season)&.abbreviation.to_s.upcase
+      next unless POSITIONS.include?(preferred) && !used.include?(preferred)
 
-    POSITIONS.find { |position| lineup.none? { |candidate| candidate.primary_position(season: season)&.abbreviation.to_s.upcase == position } } || "DH"
+      assignments[player.id] = preferred
+      used << preferred
+    end
+    (POSITIONS - used).each do |position|
+      player = lineup.find { |candidate| !assignments.key?(candidate.id) }
+      break unless player
+
+      assignments[player.id] = position
+    end
+    assignments
   end
 
   def player_score(player)

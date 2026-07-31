@@ -44,7 +44,11 @@ class LineupScenarioValidator
 
     active_ids = team.team_memberships.active_on(on).where(roster_status: "active").where(player_id: player_ids).pluck(:player_id)
     unavailable_ids = player_ids - active_ids
-    unavailable_ids.empty? ? [] : [ "Every lineup player must be active and available on the team roster." ]
+    violations = []
+    violations << "Every lineup player must be active and available on the team roster." if unavailable_ids.any?
+    pitcher_ids = team.team_memberships.active_on(on).where(roster_status: "active", player_id: player_ids, primary_position: %w[P SP RP]).pluck(:player_id)
+    violations << "Pitchers cannot be included in batting lineups." if pitcher_ids.any?
+    violations
   end
 
   def integer(value)

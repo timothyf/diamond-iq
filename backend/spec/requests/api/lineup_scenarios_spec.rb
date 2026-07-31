@@ -90,10 +90,28 @@ RSpec.describe "Api::LineupScenarios", type: :request do
     expect(response).to have_http_status(:ok)
     data = json_body.fetch("data")
     expect(data.fetch("recommended").length).to eq(9)
+    expect(data.fetch("recommended").map { |entry| entry.fetch("defensive_position") }).to match_array(LineupScenarioEntry::DEFENSIVE_POSITIONS)
     expect(data.dig("recommended", 0, "player_id")).to eq(players[0].id)
     expect(data.fetch("recommended").map { |entry| entry.fetch("player_id") }).not_to include(players[8].id)
     expect(data.fetch("alternatives").length).to eq(2)
     expect(data.fetch("explanation").join(" ")).to include("production")
+  end
+
+  it "excludes pitchers from recommendations and rejects them in saved lineups" do
+    active_players
+    pitcher = create_player(team: team, attributes: { first_name: "Starting", last_name: "Pitcher" })
+    create_team_membership(player: pitcher, team: team, starts_on: Date.current - 1.day, roster_status: "active", attributes: { primary_position: "P" })
+    post recommend_api_team_lineup_scenarios_path(team), params: { season: season, scenario_date: Date.current.iso8601 }, headers: headers
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "recommended").map { |entry| entry.fetch("player_id") }).not_to include(pitcher.id)
+
+    entries = valid_entries
+    entries[0][:player_id] = pitcher.id
+    post api_team_lineup_scenarios_path(team), params: { season: season, scenario_date: Date.current.iso8601, name: "Pitcher lineup", entries: entries }, headers: headers
+
+    expect(response).to have_http_status(:unprocessable_content)
+    expect(json_body.fetch("violations")).to include("Pitchers cannot be included in batting lineups.")
   end
 
   it "rejects duplicate players, invalid defensive coverage, and unavailable players" do
