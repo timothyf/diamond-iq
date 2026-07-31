@@ -69,6 +69,33 @@ RSpec.describe "Api::LineupScenarios", type: :request do
     expect(json_body.dig("data", 0, "user", "id")).to eq(owner.id)
   end
 
+  it "recommends an explainable order while honoring locks and exclusions" do
+    players = active_players
+    extra = create_player(team: team, attributes: { first_name: "Extra", last_name: "Player" })
+    create_team_membership(player: extra, team: team, starts_on: Date.current - 1.day, roster_status: "active")
+    players << extra
+    post recommend_api_team_lineup_scenarios_path(team), params: {
+      season: season,
+      scenario_date: Date.current.iso8601,
+      evaluation_inputs: { pitcher_hand: "R" },
+      decision_constraints: {
+        locked_batting_order: { players[0].id.to_s => 1 },
+        excluded_player_ids: [ players[8].id ],
+        required_starter_ids: [ players[0].id ]
+      },
+      decision_weights: { production: 60, platoon: 20, recent: 10, reliability: 10 },
+      alternative_count: 2
+    }, headers: headers
+
+    expect(response).to have_http_status(:ok)
+    data = json_body.fetch("data")
+    expect(data.fetch("recommended").length).to eq(9)
+    expect(data.dig("recommended", 0, "player_id")).to eq(players[0].id)
+    expect(data.fetch("recommended").map { |entry| entry.fetch("player_id") }).not_to include(players[8].id)
+    expect(data.fetch("alternatives").length).to eq(2)
+    expect(data.fetch("explanation").join(" ")).to include("production")
+  end
+
   it "rejects duplicate players, invalid defensive coverage, and unavailable players" do
     entries = valid_entries
     entries[1][:player_id] = entries[0][:player_id]

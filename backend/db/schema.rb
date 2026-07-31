@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_29_050000) do
+ActiveRecord::Schema[7.1].define(version: 2026_07_30_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -287,6 +287,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_29_050000) do
     t.jsonb "score_breakdown", default: {}, null: false
     t.decimal "total_score", precision: 6, scale: 2
     t.bigint "owner_id", null: false
+    t.jsonb "decision_constraints", default: {}, null: false
+    t.jsonb "decision_weights", default: {}, null: false
+    t.jsonb "recommendation_data", default: {}, null: false
     t.index ["owner_id"], name: "index_lineup_scenarios_on_owner_id"
     t.index ["team_id", "season", "scenario_date"], name: "index_lineup_scenarios_on_team_season_date"
     t.index ["team_id"], name: "index_lineup_scenarios_on_team_id"

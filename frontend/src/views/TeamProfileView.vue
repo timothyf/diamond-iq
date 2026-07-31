@@ -52,6 +52,13 @@ const lineupEvaluation = reactive({
   recentPerformance: 50,
   reliability: 50,
 })
+const lineupDecision = reactive({
+  excludedPlayerIds: [],
+  requiredStarterIds: [],
+  weights: { production: 45, platoon: 25, recent: 15, reliability: 15 },
+  alternativeCount: 3,
+})
+const recommendingLineup = ref(false)
 const availableTeams = ref([])
 const lineupRows = ref(Array.from({ length: 9 }, (_, index) => ({ battingSlot: index + 1, playerId: '', defensivePosition: '' })))
 const lineupPositions = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH']
@@ -338,8 +345,46 @@ function populateLineup() {
       battingSlot: index + 1,
       playerId: membership?.player?.id ? String(membership.player.id) : '',
       defensivePosition: suggestedPosition(membership),
+      lockOrder: false,
     }
   })
+}
+
+function decisionConstraints() {
+  return {
+    locked_player_ids: lineupRows.value.filter((row) => row.lockOrder && row.playerId).map((row) => Number(row.playerId)),
+    locked_batting_order: Object.fromEntries(lineupRows.value.filter((row) => row.lockOrder && row.playerId).map((row) => [row.playerId, row.battingSlot])),
+    excluded_player_ids: lineupDecision.excludedPlayerIds.map(Number),
+    required_starter_ids: lineupDecision.requiredStarterIds.map(Number),
+    unavailable_player_ids: [],
+  }
+}
+
+function applyRecommendedEntries(entries) {
+  lineupRows.value = Array.from({ length: 9 }, (_, index) => {
+    const entry = entries[index] || {}
+    return { battingSlot: index + 1, playerId: entry.player_id ? String(entry.player_id) : '', defensivePosition: entry.defensive_position || '', lockOrder: false }
+  })
+}
+
+async function recommendLineup() {
+  if (!team.value?.id || recommendingLineup.value) return
+  recommendingLineup.value = true
+  lineupError.value = ''
+  try {
+    const response = await fetch(`/api/teams/${encodeURIComponent(team.value.id)}/lineup_scenarios/recommend`, {
+      method: 'POST',
+      headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ season: team.value.season, scenario_date: new Date().toISOString().slice(0, 10), evaluation_inputs: { pitcher_hand: lineupEvaluation.pitcherHand }, decision_constraints: decisionConstraints(), decision_weights: Object.fromEntries(Object.entries(lineupDecision.weights).map(([key, value]) => [key, Number(value)])), alternative_count: lineupDecision.alternativeCount }),
+    })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error((payload.data?.errors || [payload.message || 'Unable to recommend a lineup.']).join(' '))
+    applyRecommendedEntries(payload.data.recommended)
+  } catch (requestError) {
+    lineupError.value = requestError.message
+  } finally {
+    recommendingLineup.value = false
+  }
 }
 
 async function saveLineupScenario() {
@@ -364,10 +409,13 @@ async function saveLineupScenario() {
           recent_performance: Number(lineupEvaluation.recentPerformance),
           reliability: Number(lineupEvaluation.reliability),
         },
+        decision_constraints: decisionConstraints(),
+        decision_weights: Object.fromEntries(Object.entries(lineupDecision.weights).map(([key, value]) => [key, Number(value)])),
+        alternative_count: lineupDecision.alternativeCount,
         entries: lineupRows.value.map((row) => ({
           player_id: row.playerId,
           batting_slot: row.battingSlot,
-          defensive_position: row.defensivePosition,
+            defensive_position: row.defensivePosition,
         })),
       }),
     })
@@ -671,8 +719,24 @@ async function saveLineupScenario() {
           <label>Recent performance (0–100)<input v-model.number="lineupEvaluation.recentPerformance" type="number" min="0" max="100" /></label>
           <label>Reliability (0–100)<input v-model.number="lineupEvaluation.reliability" type="number" min="0" max="100" /></label>
         </fieldset>
+        <fieldset class="lineup-decision" data-test="lineup-decision-support">
+          <legend>Decision support</legend>
+          <label v-for="(weight, key) in lineupDecision.weights" :key="key">{{ key }} weight (%)<input v-model.number="lineupDecision.weights[key]" type="number" min="0" max="100" /></label>
+          <label>Alternatives<input v-model.number="lineupDecision.alternativeCount" type="number" min="0" max="5" /></label>
+          <label class="lineup-decision__wide">Required starters
+            <select v-model="lineupDecision.requiredStarterIds" multiple>
+              <option v-for="membership in lineupPlayers" :key="membership.player.id" :value="String(membership.player.id)">{{ membership.player.fullName }}</option>
+            </select>
+          </label>
+          <label class="lineup-decision__wide">Exclude / unavailable players
+            <select v-model="lineupDecision.excludedPlayerIds" multiple>
+              <option v-for="membership in lineupPlayers" :key="membership.player.id" :value="String(membership.player.id)">{{ membership.player.fullName }}</option>
+            </select>
+          </label>
+          <button type="button" :disabled="recommendingLineup" data-test="recommend-lineup" @click="recommendLineup">{{ recommendingLineup ? 'Recommending…' : 'Recommend batting order' }}</button>
+        </fieldset>
         <div class="lineup-grid" role="table" aria-label="Lineup scenario editor">
-          <div class="lineup-grid__header" role="row"><span>Order</span><span>Player</span><span>Defense</span></div>
+          <div class="lineup-grid__header" role="row"><span>Order</span><span>Player</span><span>Defense</span><span>Lock</span></div>
           <label v-for="row in lineupRows" :key="row.battingSlot" class="lineup-row" :data-test="`lineup-row-${row.battingSlot}`">
             <strong>{{ row.battingSlot }}</strong>
             <select v-model="row.playerId" :aria-label="`Batting slot ${row.battingSlot} player`">
@@ -685,6 +749,7 @@ async function saveLineupScenario() {
               <option value="">Position</option>
               <option v-for="position in lineupPositions" :key="position" :value="position">{{ position }}</option>
             </select>
+            <input v-model="row.lockOrder" type="checkbox" :aria-label="`Lock batting slot ${row.battingSlot}`" />
           </label>
         </div>
         <p v-if="lineupError" class="lineup-scenarios__error" role="alert">{{ lineupError }}</p>
@@ -1059,11 +1124,18 @@ async function saveLineupScenario() {
 .lineup-evaluation input,.lineup-evaluation select { min-width: 0; padding: .55rem .65rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; }
 .lineup-scenarios input,.lineup-row select { min-width: 0; padding: .55rem .65rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; }
 .lineup-grid { display: grid; gap: .35rem; margin-top: .9rem; }
-.lineup-grid__header,.lineup-row { display: grid; grid-template-columns: 64px minmax(0,1fr) 120px; gap: .55rem; align-items: center; }
+.lineup-grid__header,.lineup-row { display: grid; grid-template-columns: 64px minmax(0,1fr) 120px 42px; gap: .55rem; align-items: center; }
 .lineup-grid__header { padding: 0 .4rem; color: #71808c; font-size: .65rem; font-weight: 900; letter-spacing: .07em; text-transform: uppercase; }
 .lineup-row { padding: .38rem; border-radius: 10px; background: rgba(255,255,255,.74); }
 .lineup-row > strong { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fffaf0; background: #173652; font-size: .78rem; }
 .lineup-scenarios__error { margin: .8rem 0 0; padding: .65rem .8rem; border-radius: 10px; color: #7d291f; background: #f5ddd5; font-size: .78rem; font-weight: 800; }
+.lineup-decision { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: .65rem; margin: .9rem 0 0; padding: .8rem; border: 1px solid rgba(32,84,60,.2); border-radius: 14px; background: rgba(237,247,240,.72); }
+.lineup-decision legend { grid-column: 1 / -1; color: #20543c; font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.lineup-decision label { display: grid; gap: .25rem; color: #526572; font-size: .64rem; font-weight: 900; text-transform: uppercase; }
+.lineup-decision input,.lineup-decision select { min-width: 0; padding: .45rem; border: 1px solid rgba(16,38,61,.15); border-radius: 8px; background: #fffdf7; font: inherit; }
+.lineup-decision select[multiple] { min-height: 4.5rem; }
+.lineup-decision__wide { grid-column: span 2; }
+.lineup-decision button { align-self: end; padding: .55rem .7rem; border: 0; border-radius: 9px; color: #fffaf0; background: #20543c; font: inherit; font-weight: 900; cursor: pointer; }
 .lineup-scenarios__footer { margin-top: .9rem; color: #667680; font-size: .75rem; }
 .lineup-scenario-history { margin-top: 1rem; padding-top: .8rem; border-top: 1px solid rgba(16,38,61,.1); }
 .lineup-scenario-history strong { color: #173652; font-size: .78rem; text-transform: uppercase; }
@@ -1218,5 +1290,5 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 @media (max-width: 900px) { .scouting-layout { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .opponent-prep__overview,.starter-scouting > header { align-items: flex-start; flex-direction: column; } .opponent-prep__venue { max-width: none; text-align: left; } .opponent-recent dl { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 560px) { .lineup-evaluation { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .lineup-evaluation,.lineup-decision { grid-template-columns: 1fr; } .lineup-decision__wide { grid-column: auto; } .lineup-grid__header,.lineup-row { grid-template-columns: 36px minmax(0,1fr) 80px 32px; } }
 </style>

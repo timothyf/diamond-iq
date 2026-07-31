@@ -30,7 +30,9 @@ Rails.application.routes.draw do
     resources :users, only: [ :index ]
     resources :teams, only: [:index, :show] do
       resources :opponent_reports, only: [ :index, :create ]
-      resources :lineup_scenarios, only: [ :index, :create ]
+      resources :lineup_scenarios, only: [ :index, :create ] do
+        collection { post :recommend }
+      end
     end
     resources :opponent_reports, only: [ :show, :update ] do
       member { get :audit_history }

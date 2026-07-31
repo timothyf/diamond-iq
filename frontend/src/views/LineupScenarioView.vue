@@ -54,6 +54,11 @@ watch(() => props.scenarioId, load)
           <small>Weights: 20% opponent · 15% park · 25% platoon · 20% recent · 20% reliability</small>
           <small>Inputs: {{ scenario.evaluation_inputs?.opponent || 'Opponent not specified' }} · {{ scenario.evaluation_inputs?.pitcher_hand || '—' }}HP · park {{ scenario.evaluation_inputs?.park_factor ?? '—' }}</small>
         </section>
+        <section v-if="scenario.recommendation_data?.explanation?.length" class="scenario-recommendation" data-test="scenario-recommendation">
+          <header><strong>Recommended order rationale</strong><span>{{ scenario.recommendation_data.alternatives?.length || 0 }} alternatives</span></header>
+          <ul><li v-for="reason in scenario.recommendation_data.explanation" :key="reason">{{ reason }}</li></ul>
+          <details v-if="scenario.recommendation_data.alternatives?.length"><summary>View alternative orders</summary><ol v-for="(alternative, index) in scenario.recommendation_data.alternatives" :key="index"><li v-for="entry in alternative" :key="`${index}-${entry.batting_slot}`">{{ entry.batting_slot }}. {{ entry.player_id }}</li></ol></details>
+        </section>
         <table>
           <thead><tr><th>Order</th><th>Player</th><th>Defense</th></tr></thead>
           <tbody>
@@ -81,6 +86,11 @@ h1 { margin: .3rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size
 .scenario-score header { display: flex; justify-content: space-between; gap: 1rem; }
 .scenario-score b { color: #20543c; font-size: 1.2rem; }
 .scenario-score p,.scenario-score small { display: block; margin: .35rem 0 0; color: #526572; font-size: .78rem; }
+.scenario-recommendation { padding: .9rem !important; background: #f4f1df !important; }
+.scenario-recommendation header { display: flex; justify-content: space-between; gap: 1rem; color: #20543c; }
+.scenario-recommendation ul { margin: .55rem 0; padding-left: 1.2rem; color: #526572; font-size: .78rem; }
+.scenario-recommendation summary { color: #20543c; cursor: pointer; font-size: .76rem; font-weight: 900; }
+.scenario-recommendation ol { display: inline-block; margin: .6rem 1.2rem 0 0; padding-left: 1.2rem; color: #526572; font-size: .72rem; vertical-align: top; }
 table { width: 100%; margin-top: 1.2rem; border-collapse: collapse; }
 th,td { padding: .7rem; border-bottom: 1px solid #e4e1d9; text-align: left; }
 thead { color: #68747e; font-size: .7rem; text-transform: uppercase; }
