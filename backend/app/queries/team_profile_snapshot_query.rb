@@ -4,15 +4,17 @@ class TeamProfileSnapshotQuery
   MIN_PITCHING_OUTS_FOR_RATE = 9
   TEAM_LEADER_DEFINITIONS = {
     batting: [
+      { key: "WAR", label: "Wins above replacement", abbreviation: "WAR", aliases: %w[WAR war], direction: :desc },
       { key: "avg", label: "Batting average", abbreviation: "AVG", aliases: %w[avg AVG], direction: :desc, qualifier: :at_bats },
       { key: "ops", label: "On-base plus slugging", abbreviation: "OPS", aliases: %w[ops OPS], direction: :desc, qualifier: :at_bats },
       { key: "homeRuns", label: "Home runs", abbreviation: "HR", aliases: %w[homeRuns HR], direction: :desc },
       { key: "rbi", label: "Runs batted in", abbreviation: "RBI", aliases: %w[rbi RBI], direction: :desc }
     ],
     pitching: [
-      { key: "W", label: "Wins", abbreviation: "W", aliases: %w[W wins], direction: :desc },
+      { key: "WAR", label: "Wins above replacement", abbreviation: "WAR", aliases: %w[WAR war], direction: :desc },
       { key: "ERA", label: "Earned run average", abbreviation: "ERA", aliases: %w[ERA era], direction: :asc, qualifier: :innings },
       { key: "whip", label: "Walks and hits per inning", abbreviation: "WHIP", aliases: %w[whip WHIP], direction: :asc, qualifier: :innings },
+      { key: "W", label: "Wins", abbreviation: "W", aliases: %w[W wins], direction: :desc },
       { key: "strikeOuts", label: "Strikeouts", abbreviation: "SO", aliases: %w[strikeOuts SO], direction: :desc }
     ]
   }.freeze
@@ -150,15 +152,15 @@ class TeamProfileSnapshotQuery
   end
 
   def team_leaders
-    TEAM_LEADER_DEFINITIONS.transform_values do |definitions|
-      definitions.map { |definition| team_leader(definition) }
+    TEAM_LEADER_DEFINITIONS.to_h do |category, definitions|
+      [ category, definitions.map { |definition| team_leader(definition, category) } ]
     end
   end
 
-  def team_leader(definition)
+  def team_leader(definition, category)
     candidates = leader_stat_rows.group_by(&:player).filter_map do |player, rows|
       stat = definition.fetch(:aliases).filter_map do |alias_name|
-        rows.find { |row| row.stat_type.name == alias_name && row.stat_type.category == leader_category(definition) }
+        rows.find { |row| row.stat_type.name == alias_name && row.stat_type.category == category.to_s }
       end.first
       next unless stat
       next unless qualified_team_leader?(rows, definition[:qualifier])
@@ -183,10 +185,6 @@ class TeamProfileSnapshotQuery
         headshot_url: player.profile&.headshot_url
       }
     }
-  end
-
-  def leader_category(definition)
-    TEAM_LEADER_DEFINITIONS.fetch(:batting).include?(definition) ? "batting" : "pitching"
   end
 
   def qualified_team_leader?(rows, qualifier)

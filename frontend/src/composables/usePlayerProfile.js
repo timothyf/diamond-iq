@@ -52,6 +52,7 @@ function normalizeProfile(data = {}) {
     : null
   const season = data.season_overview || {}
   const career = data.career_overview || {}
+  const advancedStats = data.advanced_stats || {}
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
   const analysis = data.analysis || {}
@@ -95,6 +96,16 @@ function normalizeProfile(data = {}) {
       })),
       stats: career.stats || [],
       statValues: Object.fromEntries((career.stats || []).map((stat) => [stat.key, stat.value])),
+    },
+    advancedStats: {
+      category: advancedStats.category,
+      groups: advancedStats.groups || [],
+      seasons: (advancedStats.seasons || []).map((seasonRow) => ({
+        season: seasonRow.season,
+        teams: (seasonRow.teams || []).map(normalizeTeam),
+        values: seasonRow.values || {},
+      })),
+      career: advancedStats.career || { values: {} },
     },
     similarPlayers: {
       season: similarPlayers.season,

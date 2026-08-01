@@ -5,6 +5,7 @@ import { routeLocationKey, routerKey } from 'vue-router'
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import NotesPanel from '../components/NotesPanel.vue'
+import AddToWatchlistControl from '../components/AddToWatchlistControl.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 
@@ -18,6 +19,11 @@ const props = defineProps({
 const route = inject(routeLocationKey, { query: {}, fullPath: `/players/${props.playerId}` })
 const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const playerId = computed(() => props.playerId)
+const profileTabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'advanced-stats', label: 'Advanced Stats' },
+]
+const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
 const analysisOptions = ref({
   range: ['season', '7', '14', '30', 'custom'].includes(route.query.range) ? route.query.range : 'season',
   paWindow: [25, 50, 100].includes(Number(route.query.pa_window)) ? Number(route.query.pa_window) : 50,
@@ -44,9 +50,10 @@ const { player, loading, error, refresh } = usePlayerProfile(playerId, analysisO
 const headshotFailed = ref(false)
 
 watch(
-  analysisOptions,
-  (options) => {
+  [analysisOptions, selectedProfileTab],
+  ([options, tab]) => {
     const query = {}
+    if (tab !== 'overview') query.tab = tab
     if (options.range !== 'season') query.range = options.range
     if (options.paWindow !== 50) query.pa_window = String(options.paWindow)
     if (options.pitchWindow !== 100) query.pitch_window = String(options.pitchWindow)
@@ -61,13 +68,15 @@ watch(
 
 watch(
   () => [
+    route.query.tab,
     route.query.range,
     route.query.pa_window,
     route.query.pitch_window,
     route.query.start_date,
     route.query.end_date,
   ],
-  ([range, paWindow, pitchWindow, startDate, endDate]) => {
+  ([tab, range, paWindow, pitchWindow, startDate, endDate]) => {
+    selectedProfileTab.value = profileTabs.some((entry) => entry.id === tab) ? tab : 'overview'
     const nextRange = ['season', '7', '14', '30', 'custom'].includes(range) ? range : 'season'
     const nextPaWindow = [25, 50, 100].includes(Number(paWindow)) ? Number(paWindow) : 50
     const nextPitchWindow = [50, 100, 250].includes(Number(pitchWindow)) ? Number(pitchWindow) : 100
@@ -114,6 +123,14 @@ const positionLabel = computed(() => {
   return position ? `${position.abbreviation} · ${position.name}` : 'Position unavailable'
 })
 
+const savantStatsMode = computed(() => {
+  const positionType = player.value?.positions?.primary?.position_type
+  const primaryRole = player.value?.pitchIndicators?.primaryRole
+  return positionType === 'pitcher' || (!positionType && primaryRole === 'pitcher')
+    ? 'statcast-r-pitching-mlb'
+    : 'statcast-r-hitting-mlb'
+})
+
 const careerRangeLabel = computed(() => {
   const career = player.value?.careerOverview
   if (!career?.firstSeason) return 'No seasons stored'
@@ -156,7 +173,11 @@ const externalProfileLinks = computed(() => {
         ? `https://www.baseball-reference.com/players/${baseballReferenceId.charAt(0)}/${baseballReferenceId}.shtml`
         : `https://www.baseball-reference.com/search/search.fcgi?search=${encodedName}`,
     },
-    { key: 'baseball-savant', label: 'Baseball Savant', href: `https://baseballsavant.mlb.com/savant-player/${slug}-${mlbId}` },
+    {
+      key: 'baseball-savant',
+      label: 'Baseball Savant',
+      href: `https://baseballsavant.mlb.com/savant-player/${slug}-${mlbId}?stats=${savantStatsMode.value}`,
+    },
   ]
 })
 
@@ -282,6 +303,20 @@ const trendEventLabels = {
   chase_rate_movement: 'Chase-rate movement',
 }
 
+const percentileColorStops = [
+  [0, '#b0000a'],
+  [10, '#f25549'],
+  [20, '#ff9a86'],
+  [30, '#ffd0b3'],
+  [40, '#fff0d6'],
+  [50, '#f9fafb'],
+  [60, '#f5f3b5'],
+  [70, '#dce994'],
+  [80, '#a8d66d'],
+  [90, '#4eaa3f'],
+  [100, '#006429'],
+]
+
 function trendEventValue(event, value) {
   const suffix = event.unit === 'mph' ? ' mph' : ' pts'
   return `${Number(value).toFixed(1)}${suffix}`
@@ -343,6 +378,19 @@ function updateWindow(key, value) {
   analysisOptions.value = { ...analysisOptions.value, [key]: Number(value) }
 }
 
+function selectAdjacentTab(event, index) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+
+  let nextIndex = index
+  if (event.key === 'ArrowRight') nextIndex = (index + 1) % profileTabs.length
+  if (event.key === 'ArrowLeft') nextIndex = (index - 1 + profileTabs.length) % profileTabs.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = profileTabs.length - 1
+  selectedProfileTab.value = profileTabs[nextIndex].id
+  event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
+}
+
 function openSavedAnalysis(item) {
   const state = item.state || {}
   analysisOptions.value = {
@@ -389,6 +437,30 @@ function signedContextualValue(value, unit) {
   return `${prefix}${contextualValue(value, unit)}`
 }
 
+function percentileStyle(value) {
+  const percentile = Math.round(Math.min(100, Math.max(0, Number(value) || 0)))
+  const upperIndex = percentileColorStops.findIndex(([stop]) => stop >= percentile)
+  const upper = percentileColorStops[upperIndex]
+  const lower = percentileColorStops[Math.max(0, upperIndex - 1)]
+  const progress = upper[0] === lower[0] ? 0 : (percentile - lower[0]) / (upper[0] - lower[0])
+
+  return {
+    '--percentile-background': interpolateHexColor(lower[1], upper[1], progress),
+    '--percentile-foreground': percentile <= 31 || percentile >= 81 ? '#f9fafb' : '#1f2937',
+  }
+}
+
+function interpolateHexColor(start, end, progress) {
+  const channels = [1, 3, 5].map((offset) => {
+    const startChannel = Number.parseInt(start.slice(offset, offset + 2), 16)
+    const endChannel = Number.parseInt(end.slice(offset, offset + 2), 16)
+    return Math.round(startChannel + ((endChannel - startChannel) * progress))
+      .toString(16)
+      .padStart(2, '0')
+  })
+  return `#${channels.join('')}`
+}
+
 function peerAverage(metric) {
   return metric.positionAverage ?? metric.pitcherRoleAverage
 }
@@ -408,6 +480,18 @@ function similarityValue(metric, value) {
   if (value === null || value === undefined) return '—'
   if (metric.key.endsWith('_rate')) return `${Number(value).toFixed(1)}%`
   return formatBaseballStatValue(metric.key, value)
+}
+
+function advancedStatValue(column, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return value
+  if (column.unit === 'percent') return `${(numericValue * 100).toFixed(1)}%`
+  if (column.unit === 'index') return numericValue.toFixed(0)
+  if (column.unit === 'ratio') return numericValue.toFixed(2)
+  if (column.unit === 'runs' || column.unit === 'war') return numericValue.toFixed(1)
+  if (column.unit === 'pitching_rate') return numericValue.toFixed(2)
+  return numericValue.toFixed(3).replace(/^0(?=\.)/, '')
 }
 
 function formatDate(value) {
@@ -479,6 +563,7 @@ function formatTimestamp(value) {
             {{ rosterLabel }}
           </div>
           <nav class="external-profile-links" aria-label="External player profiles">
+            <AddToWatchlistControl :player-id="player.id" :player-name="player.fullName" />
             <RouterLink
               class="compare-player-link"
               :to="{ name: 'player-comparison', query: { left: player.id } }"
@@ -523,7 +608,33 @@ function formatTimestamp(value) {
 
       <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
 
-      <section class="profile-panel profile-career-table">
+      <nav class="profile-tabs" aria-label="Player profile sections">
+        <div role="tablist">
+          <button
+            v-for="(tab, index) in profileTabs"
+            :id="`player-profile-tab-${tab.id}`"
+            :key="tab.id"
+            type="button"
+            role="tab"
+            :aria-controls="`player-profile-panel-${tab.id}`"
+            :aria-selected="selectedProfileTab === tab.id"
+            :tabindex="selectedProfileTab === tab.id ? 0 : -1"
+            :data-test="`player-profile-tab-${tab.id}`"
+            @click="selectedProfileTab = tab.id"
+            @keydown="selectAdjacentTab($event, index)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+      </nav>
+
+      <section
+        v-show="selectedProfileTab === 'overview'"
+        id="player-profile-panel-overview"
+        class="profile-panel profile-career-table"
+        role="tabpanel"
+        aria-labelledby="player-profile-tab-overview"
+      >
         <header class="profile-section-heading">
           <div>
             <p class="eyebrow">Career ledger</p>
@@ -564,6 +675,64 @@ function formatTimestamp(value) {
           </table>
         </div>
         <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
+      </section>
+
+      <section
+        v-show="selectedProfileTab === 'advanced-stats'"
+        id="player-profile-panel-advanced-stats"
+        class="profile-panel advanced-stats-panel"
+        role="tabpanel"
+        aria-labelledby="player-profile-tab-advanced-stats"
+        data-test="advanced-stats-panel"
+      >
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Plate-discipline & production</p>
+            <h2>Advanced Stats</h2>
+          </div>
+          <span>{{ careerRangeLabel }}</span>
+        </header>
+
+        <div v-if="player.advancedStats.seasons.length" class="advanced-stat-groups">
+          <article
+            v-for="group in player.advancedStats.groups"
+            :key="group.key"
+            class="advanced-stat-group"
+            :data-test="`advanced-stat-group-${group.key}`"
+          >
+            <h3>{{ group.label }}</h3>
+            <div class="advanced-table-wrap">
+              <table class="advanced-table">
+                <thead>
+                  <tr>
+                    <th>Season</th>
+                    <th>Team</th>
+                    <th v-for="column in group.columns" :key="column.key">{{ column.label }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="seasonRow in player.advancedStats.seasons" :key="seasonRow.season">
+                    <th>{{ seasonRow.season }}</th>
+                    <td>{{ seasonTeamLabel(seasonRow) }}</td>
+                    <td v-for="column in group.columns" :key="column.key">
+                      {{ advancedStatValue(column, seasonRow.values[column.key]) }}
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th>Career</th>
+                    <td>Total</td>
+                    <td v-for="column in group.columns" :key="column.key">
+                      {{ advancedStatValue(column, player.advancedStats.career.values[column.key]) }}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </article>
+        </div>
+        <p v-else class="profile-empty">No advanced statistics have been imported for this player yet.</p>
       </section>
 
       <section class="profile-panel similar-players-panel" data-test="similar-players">
@@ -758,7 +927,9 @@ function formatTimestamp(value) {
                   <small>{{ peerLabel(metric) }}</small>
                 </td>
                 <td>
-                  <span class="percentile-pill">P{{ Math.round(metric.percentile) }}</span>
+                  <span class="percentile-pill" :style="percentileStyle(metric.percentile)">
+                    P{{ Math.round(metric.percentile) }}
+                  </span>
                 </td>
                 <td>
                   {{ signedContextualValue(metric.changeValue, metric.unit) }}
@@ -887,6 +1058,54 @@ function formatTimestamp(value) {
   color: #6d2a25;
   font-weight: 700;
   text-decoration: none;
+}
+
+.profile-tabs {
+  position: sticky;
+  z-index: 8;
+  top: 0.5rem;
+  margin-top: 1.25rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 15px;
+  background: rgba(247, 246, 241, 0.94);
+  box-shadow: 0 8px 24px rgba(16, 38, 61, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.profile-tabs [role='tablist'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.profile-tabs button {
+  min-height: 42px;
+  padding: 0.65rem 0.85rem;
+  border: 0;
+  border-radius: 11px;
+  color: #65747e;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.profile-tabs button[aria-selected='true'] {
+  color: #fffaf0;
+  background: #173652;
+  box-shadow: 0 5px 14px rgba(16, 38, 61, 0.18);
+}
+
+.profile-tabs button:focus-visible {
+  outline: 3px solid rgba(169, 54, 39, 0.32);
+  outline-offset: 2px;
+}
+
+[role='tabpanel']:focus {
+  outline: none;
 }
 
 .profile-hero,
@@ -1445,6 +1664,70 @@ function formatTimestamp(value) {
   background: #10263d;
 }
 
+.advanced-stat-groups {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.advanced-stat-group h3 {
+  margin-bottom: 0.65rem;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.35rem;
+  text-transform: uppercase;
+}
+
+.advanced-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+  background: #fffdf7;
+}
+
+.advanced-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #243b50;
+  font-variant-numeric: tabular-nums;
+}
+
+.advanced-table th,
+.advanced-table td {
+  padding: 0.78rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.advanced-table th:first-child,
+.advanced-table td:nth-child(2) {
+  text-align: left;
+}
+
+.advanced-table thead th {
+  color: #697784;
+  background: #e7edf1;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.advanced-table tbody tr:nth-child(even) th,
+.advanced-table tbody tr:nth-child(even) td {
+  background: #faf5ea;
+}
+
+.advanced-table tfoot th,
+.advanced-table tfoot td {
+  border-bottom: 0;
+  color: #fffaf0;
+  background: #10263d;
+  font-weight: 900;
+}
+
 .context-table-wrap {
   overflow-x: auto;
   border: 1px solid rgba(16, 38, 61, 0.1);
@@ -1505,8 +1788,10 @@ function formatTimestamp(value) {
   justify-content: center;
   padding: 0.32rem 0.55rem;
   border-radius: 999px;
-  color: #fffaf0;
-  background: #8f2d24;
+  border: 1px solid rgba(16, 38, 61, 0.08);
+  color: var(--percentile-foreground);
+  background: var(--percentile-background);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
   font-weight: 900;
 }
 

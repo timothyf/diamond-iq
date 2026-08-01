@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { vi } from 'vitest'
 
 import PlayerProfileView from '../PlayerProfileView.vue'
+import AddToWatchlistControl from '../../components/AddToWatchlistControl.vue'
 
 function apiPayload() {
   return {
@@ -80,6 +81,79 @@ function apiPayload() {
           { key: 'ops', label: 'OPS', value: '0.821' },
           { key: 'WAR', label: 'WAR', value: '12.4' },
         ],
+      },
+      advanced_stats: {
+        category: 'batting',
+        groups: [
+          {
+            key: 'rate_statistics',
+            label: 'Rate statistics',
+            columns: [
+              { key: 'bb_percentage', label: 'BB%', unit: 'percent' },
+              { key: 'k_percentage', label: 'K%', unit: 'percent' },
+              { key: 'bb_per_k', label: 'BB/K', unit: 'ratio' },
+              { key: 'iso', label: 'ISO', unit: 'rate' },
+              { key: 'babip', label: 'BABIP', unit: 'rate' },
+            ],
+          },
+          {
+            key: 'run_creation',
+            label: 'Run creation',
+            columns: [
+              { key: 'woba', label: 'wOBA', unit: 'rate' },
+              { key: 'wrc_plus', label: 'wRC+', unit: 'index' },
+              { key: 'ops_plus', label: 'OPS+', unit: 'index' },
+            ],
+          },
+          {
+            key: 'value',
+            label: 'Value',
+            columns: [
+              { key: 'offensive_runs', label: 'Offensive Runs', unit: 'runs' },
+              { key: 'baserunning_runs', label: 'Baserunning Runs', unit: 'runs' },
+              { key: 'defensive_value', label: 'Defensive Value', unit: 'runs' },
+              { key: 'war', label: 'WAR', unit: 'war' },
+            ],
+          },
+          {
+            key: 'batted_ball_profile',
+            label: 'Batted-ball profile',
+            columns: [
+              { key: 'ground_ball_percentage', label: 'GB%', unit: 'percent' },
+              { key: 'fly_ball_percentage', label: 'FB%', unit: 'percent' },
+              { key: 'line_drive_percentage', label: 'LD%', unit: 'percent' },
+              { key: 'pull_percentage', label: 'Pull%', unit: 'percent' },
+              { key: 'center_percentage', label: 'Center%', unit: 'percent' },
+              { key: 'opposite_field_percentage', label: 'Opposite-field%', unit: 'percent' },
+            ],
+          },
+          {
+            key: 'plate_discipline',
+            label: 'Plate discipline',
+            columns: [
+              { key: 'swing_percentage', label: 'Swing%', unit: 'percent' },
+              { key: 'chase_percentage', label: 'Chase%', unit: 'percent' },
+              { key: 'contact_percentage', label: 'Contact%', unit: 'percent' },
+              { key: 'zone_contact_percentage', label: 'Zone Contact%', unit: 'percent' },
+              { key: 'swinging_strike_percentage', label: 'SwStr%', unit: 'percent' },
+            ],
+          },
+        ],
+        seasons: [
+          {
+            season: 2022,
+            teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
+            values: { bb_percentage: 0.086, k_percentage: 0.287, bb_per_k: 0.3, iso: 0.141, babip: 0.354, woba: 0.326, wrc_plus: 98, ops_plus: 101, offensive_runs: -0.8, baserunning_runs: 0.4, defensive_value: 1.2, war: 1.0, ground_ball_percentage: 0.421, fly_ball_percentage: 0.355, line_drive_percentage: 0.224, pull_percentage: 0.401, center_percentage: 0.347, opposite_field_percentage: 0.252, swing_percentage: 0.521, chase_percentage: 0.298, contact_percentage: 0.741, zone_contact_percentage: 0.812, swinging_strike_percentage: 0.135 },
+          },
+          {
+            season: 2026,
+            teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
+            values: { bb_percentage: 0.102, k_percentage: 0.241, bb_per_k: 0.42, iso: 0.218, babip: 0.331, woba: 0.368, wrc_plus: 132, ops_plus: 128, offensive_runs: 18.4, baserunning_runs: 1.7, defensive_value: -2.3, war: 4.6, ground_ball_percentage: 0.389, fly_ball_percentage: 0.401, line_drive_percentage: 0.21, pull_percentage: 0.428, center_percentage: 0.321, opposite_field_percentage: 0.251, swing_percentage: 0.487, chase_percentage: 0.263, contact_percentage: 0.782, zone_contact_percentage: 0.845, swinging_strike_percentage: 0.106 },
+          },
+        ],
+        career: {
+          values: { bb_percentage: 0.094, k_percentage: 0.262, bb_per_k: 0.36, iso: 0.181, babip: 0.342, woba: 0.348, wrc_plus: 115, ops_plus: 114, offensive_runs: 17.6, baserunning_runs: 2.1, defensive_value: -1.1, war: 5.6, ground_ball_percentage: 0.4, fly_ball_percentage: 0.385, line_drive_percentage: 0.215, pull_percentage: 0.417, center_percentage: 0.331, opposite_field_percentage: 0.252, swing_percentage: 0.499, chase_percentage: 0.276, contact_percentage: 0.768, zone_contact_percentage: 0.833, swinging_strike_percentage: 0.116 },
+        },
       },
       similar_players: {
         season: 2026,
@@ -308,6 +382,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('Active')
+    expect(wrapper.findComponent(AddToWatchlistControl).exists()).toBe(true)
     expect(wrapper.get('[data-test="compare-player-link"]').text()).toContain('Compare player')
     expect(wrapper.get('[data-test="external-profile-mlb"]').attributes()).toMatchObject({
       href: 'https://www.mlb.com/player/riley-greene-680776',
@@ -321,7 +396,7 @@ describe('PlayerProfileView', () => {
       'https://www.baseball-reference.com/players/g/greenri03.shtml',
     )
     expect(wrapper.get('[data-test="external-profile-baseball-savant"]').attributes('href')).toBe(
-      'https://baseballsavant.mlb.com/savant-player/riley-greene-680776',
+      'https://baseballsavant.mlb.com/savant-player/riley-greene-680776?stats=statcast-r-hitting-mlb',
     )
     expect(wrapper.text()).toContain('Batting by season')
     expect(wrapper.text()).toContain('2022–2026 · 5 seasons')
@@ -397,6 +472,129 @@ describe('PlayerProfileView', () => {
     expect(event.text()).toContain('38.9 pts → 51.8 pts')
   })
 
+  it('uses adaptive red-to-green percentile colors with readable text contrast', async () => {
+    const payload = apiPayloadWith((response) => {
+      const benchmark = response.data.contextual_benchmarks.metrics[0]
+      response.data.contextual_benchmarks.metrics = [
+        { ...benchmark, metric_key: 'low', display_name: 'Low', percentile: 10 },
+        { ...benchmark, metric_key: 'middle', display_name: 'Middle', percentile: 50 },
+        { ...benchmark, metric_key: 'high', display_name: 'High', percentile: 90 },
+      ]
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const pills = wrapper.findAll('.percentile-pill')
+    expect(pills.map((pill) => pill.text())).toEqual(['P10', 'P50', 'P90'])
+    expect(pills[0].attributes('style')).toContain('--percentile-background: #f25549')
+    expect(pills[0].attributes('style')).toContain('--percentile-foreground: #f9fafb')
+    expect(pills[1].attributes('style')).toContain('--percentile-background: #f9fafb')
+    expect(pills[1].attributes('style')).toContain('--percentile-foreground: #1f2937')
+    expect(pills[2].attributes('style')).toContain('--percentile-background: #4eaa3f')
+    expect(pills[2].attributes('style')).toContain('--percentile-foreground: #f9fafb')
+  })
+
+  it('shows grouped rate and run-creation tables on the Advanced Stats tab', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => apiPayload() }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    const advancedTab = wrapper.get('[data-test="player-profile-tab-advanced-stats"]')
+    expect(advancedTab.attributes('role')).toBe('tab')
+    expect(advancedTab.attributes('aria-selected')).toBe('false')
+    const profileRequestCount = fetch.mock.calls.length
+
+    await advancedTab.trigger('click')
+
+    expect(advancedTab.attributes('aria-selected')).toBe('true')
+    expect(fetch).toHaveBeenCalledTimes(profileRequestCount)
+    expect(wrapper.get('#player-profile-panel-overview').isVisible()).toBe(false)
+    const panel = wrapper.get('[data-test="advanced-stats-panel"]')
+    expect(panel.isVisible()).toBe(true)
+    expect(wrapper.get('[data-test="similar-players"]').isVisible()).toBe(true)
+    expect(wrapper.get('[data-test="player-trends"]').isVisible()).toBe(true)
+    expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('BB%')
+    expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('10.2%')
+    expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('.331')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('wRC+')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('132')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('Career')
+    expect(panel.get('[data-test="advanced-stat-group-value"]').text()).toContain('Offensive Runs')
+    expect(panel.get('[data-test="advanced-stat-group-value"]').text()).toContain('18.4')
+    expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('Opposite-field%')
+    expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('42.8%')
+    expect(panel.get('[data-test="advanced-stat-group-plate_discipline"]').text()).toContain('Zone Contact%')
+    expect(panel.get('[data-test="advanced-stat-group-plate_discipline"]').text()).toContain('10.6%')
+  })
+
+  it('shows pitcher rate and outcome statistics on the Advanced Stats tab', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.positions = {
+        primary: { abbreviation: 'SP', name: 'Starting Pitcher', position_type: 'pitcher' },
+        secondary: [],
+        assignments: [],
+      }
+      response.data.advanced_stats = {
+        category: 'pitching',
+        groups: [
+          {
+            key: 'rate_and_outcome_statistics',
+            label: 'Rate and outcome statistics',
+            columns: [
+              { key: 'k_percentage', label: 'K%', unit: 'percent' },
+              { key: 'bb_percentage', label: 'BB%', unit: 'percent' },
+              { key: 'k_minus_bb_percentage', label: 'K-BB%', unit: 'percent' },
+              { key: 'k_per_bb', label: 'K/BB', unit: 'ratio' },
+              { key: 'hbp_percentage', label: 'HBP%', unit: 'percent' },
+              { key: 'hr_percentage', label: 'HR%', unit: 'percent' },
+              { key: 'babip', label: 'BABIP', unit: 'rate' },
+              { key: 'lob_percentage', label: 'LOB%', unit: 'percent' },
+              { key: 'era', label: 'ERA', unit: 'pitching_rate' },
+              { key: 'fip', label: 'FIP', unit: 'pitching_rate' },
+              { key: 'xfip', label: 'xFIP', unit: 'pitching_rate' },
+            ],
+          },
+        ],
+        seasons: [
+          {
+            season: 2026,
+            teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
+            values: { k_percentage: 0.3, bb_percentage: 0.05, k_minus_bb_percentage: 0.25, k_per_bb: 6, hbp_percentage: 0.01, hr_percentage: 0.025, babip: 0.25, lob_percentage: 0.8, era: 1.8, fip: 3, xfip: 3.2 },
+          },
+        ],
+        career: {
+          values: { k_percentage: 0.267, bb_percentage: 0.083, k_minus_bb_percentage: 0.184, k_per_bb: 3.2, hbp_percentage: 0.012, hr_percentage: 0.042, babip: 0.283, lob_percentage: 0.747, era: 2.4, fip: 3.67, xfip: 3.87 },
+        },
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-test="player-profile-tab-advanced-stats"]').trigger('click')
+
+    const table = wrapper.get('[data-test="advanced-stat-group-rate_and_outcome_statistics"]')
+    expect(table.text()).toContain('K-BB%')
+    expect(table.text()).toContain('HBP%')
+    expect(table.text()).toContain('BABIP')
+    expect(table.text()).toContain('xFIP')
+    expect(table.text()).toContain('30.0%')
+    expect(table.text()).toContain('1.80')
+    expect(table.text()).toContain('3.20')
+  })
+
   it('shows pitching trends for primary pitchers', async () => {
     vi.stubGlobal(
       'fetch',
@@ -448,6 +646,9 @@ describe('PlayerProfileView', () => {
     expect(trends.find('svg').attributes('aria-label')).toBe('Pitching · Velocity rolling trend')
     expect(wrapper.find('[data-test="indicator-card-batting"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
+    expect(wrapper.get('[data-test="external-profile-baseball-savant"]').attributes('href')).toBe(
+      'https://baseballsavant.mlb.com/savant-player/riley-greene-680776?stats=statcast-r-pitching-mlb',
+    )
   })
 
   it('shows both batting and pitching trends for two-way players', async () => {

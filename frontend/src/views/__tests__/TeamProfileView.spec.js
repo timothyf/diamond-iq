@@ -169,6 +169,7 @@ const payload = {
       batting: [
         { key: 'avg', label: 'Batting average', abbreviation: 'AVG', value: '0.287', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
         { key: 'ops', label: 'On-base plus slugging', abbreviation: 'OPS', value: '0.842', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
+        { key: 'WAR', label: 'Wins above replacement', abbreviation: 'WAR', value: '4.2', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
         { key: 'homeRuns', label: 'Home runs', abbreviation: 'HR', value: '24', player: { id: 43, full_name: 'Spencer Torkelson', first_name: 'Spencer', last_name: 'Torkelson', headshot_url: null } },
         { key: 'rbi', label: 'Runs batted in', abbreviation: 'RBI', value: '68', player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null } },
       ],
@@ -176,6 +177,7 @@ const payload = {
         { key: 'W', label: 'Wins', abbreviation: 'W', value: '11', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
         { key: 'ERA', label: 'Earned run average', abbreviation: 'ERA', value: '2.01', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
         { key: 'whip', label: 'Walks and hits per inning', abbreviation: 'WHIP', value: '0.99', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
+        { key: 'WAR', label: 'Wins above replacement', abbreviation: 'WAR', value: '5.6', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
         { key: 'strikeOuts', label: 'Strikeouts', abbreviation: 'SO', value: '162', player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null } },
       ],
     },
@@ -412,6 +414,8 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-leader-ERA"]').text()).toContain('2.01')
     expect(wrapper.get('[data-test="team-leader-ops"]').text()).toContain('.842')
     expect(wrapper.get('[data-test="team-leader-whip"]').text()).toContain('0.99')
+    expect(wrapper.get('[data-test="team-leader-WAR"][data-category="batting"]').text()).toContain('4.2')
+    expect(wrapper.get('[data-test="team-leader-WAR"][data-category="pitching"]').text()).toContain('5.6')
   })
 
   it('sizes ranking bars from empty to full using the 30-team comparison', async () => {

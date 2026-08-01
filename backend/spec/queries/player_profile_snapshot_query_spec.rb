@@ -283,4 +283,152 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(seasons.fetch(2025).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "10.2"))
     expect(seasons.fetch(2026).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "5.1"))
   end
+
+  it "returns grouped advanced batting rates by season and for the career" do
+    player = create_player
+    definitions = {
+      pa: create_stat_type(name: "plateAppearances", label: "PA", category: "batting"),
+      ab: create_stat_type(name: "atBats", label: "AB", category: "batting"),
+      hits: create_stat_type(name: "hits", label: "H", category: "batting"),
+      home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "batting"),
+      walks: create_stat_type(name: "baseOnBalls", label: "BB", category: "batting"),
+      strikeouts: create_stat_type(name: "strikeOuts", label: "SO", category: "batting"),
+      sacrifice_flies: create_stat_type(name: "sacFlies", label: "SF", category: "batting"),
+      average: create_stat_type(name: "avg", label: "AVG", category: "batting"),
+      slugging: create_stat_type(name: "slg", label: "SLG", category: "batting"),
+      woba: create_stat_type(name: "wOBA", label: "wOBA", category: "batting"),
+      wrc_plus: create_stat_type(name: "wRC+", label: "wRC+", category: "batting"),
+      ops_plus: create_stat_type(name: "OPS+", label: "OPS+", category: "batting"),
+      offense: create_stat_type(name: "Offense", label: "Off", category: "batting"),
+      baserunning: create_stat_type(name: "BaseRunning", label: "BsR", category: "batting"),
+      defense: create_stat_type(name: "Defense", label: "Def", category: "batting"),
+      war: create_stat_type(name: "WAR", label: "WAR", category: "batting"),
+      balls_in_play: create_stat_type(name: "ballsInPlay", label: "BIP", category: "batting"),
+      ground_ball_percentage: create_stat_type(name: "GB%", label: "GB%", category: "batting"),
+      fly_ball_percentage: create_stat_type(name: "FB%", label: "FB%", category: "batting"),
+      line_drive_percentage: create_stat_type(name: "LD%", label: "LD%", category: "batting"),
+      pull_percentage: create_stat_type(name: "Pull%", label: "Pull%", category: "batting"),
+      center_percentage: create_stat_type(name: "Cent%", label: "Center%", category: "batting"),
+      opposite_field_percentage: create_stat_type(name: "Oppo%", label: "Opposite-field%", category: "batting"),
+      pitches: create_stat_type(name: "numberOfPitches", label: "P", category: "batting"),
+      swing_percentage: create_stat_type(name: "Swing%", label: "Swing%", category: "batting"),
+      chase_percentage: create_stat_type(name: "O-Swing%", label: "Chase%", category: "batting"),
+      contact_percentage: create_stat_type(name: "Contact%", label: "Contact%", category: "batting"),
+      zone_contact_percentage: create_stat_type(name: "Z-Contact%", label: "Zone Contact%", category: "batting"),
+      swinging_strike_percentage: create_stat_type(name: "SwStr%", label: "SwStr%", category: "batting")
+    }
+    values = {
+      2025 => { pa: 100, ab: 85, hits: 25, home_runs: 5, walks: 10, strikeouts: 20, sacrifice_flies: 2, average: 0.294, slugging: 0.529, woba: 0.370, wrc_plus: 130, ops_plus: 125, offense: 12, baserunning: 2, defense: -1, war: 3, balls_in_play: 60, ground_ball_percentage: 0.4, fly_ball_percentage: 0.35, line_drive_percentage: 0.25, pull_percentage: 0.42, center_percentage: 0.33, opposite_field_percentage: 0.25, pitches: 400, swing_percentage: 0.5, chase_percentage: 0.3, contact_percentage: 0.75, zone_contact_percentage: 0.82, swinging_strike_percentage: 0.125 },
+      2026 => { pa: 200, ab: 170, hits: 45, home_runs: 10, walks: 20, strikeouts: 50, sacrifice_flies: 4, average: 0.265, slugging: 0.500, woba: 0.350, wrc_plus: 115, ops_plus: 112, offense: 18, baserunning: -1, defense: 3, war: 4, balls_in_play: 120, ground_ball_percentage: 0.45, fly_ball_percentage: 0.3, line_drive_percentage: 0.25, pull_percentage: 0.46, center_percentage: 0.31, opposite_field_percentage: 0.23, pitches: 800, swing_percentage: 0.47, chase_percentage: 0.25, contact_percentage: 0.8, zone_contact_percentage: 0.86, swinging_strike_percentage: 0.094 }
+    }
+
+    values.each do |season, season_values|
+      season_values.each do |key, value|
+        create_player_season_stat(player: player, stat_type: definitions.fetch(key), attributes: { season: season, value: value })
+      end
+    end
+
+    advanced = described_class.new(player: player).result.fetch(:advanced_stats)
+
+    expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq(
+      [ "Rate statistics", "Run creation", "Value", "Batted-ball profile", "Plate discipline" ]
+    )
+    expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
+      bb_percentage: 0.1,
+      k_percentage: 0.25,
+      bb_per_k: 0.4,
+      iso: 0.235,
+      woba: 0.35,
+      wrc_plus: 115.0,
+      ops_plus: 112.0,
+      offensive_runs: 18.0,
+      baserunning_runs: -1.0,
+      defensive_value: 3.0,
+      war: 4.0,
+      ground_ball_percentage: 0.45,
+      opposite_field_percentage: 0.23,
+      swing_percentage: 0.47,
+      chase_percentage: 0.25,
+      swinging_strike_percentage: 0.094
+    )
+    expect(advanced.dig(:career, :values)).to include(
+      bb_percentage: 0.1,
+      k_percentage: (70.0 / 300),
+      bb_per_k: (30.0 / 70),
+      woba: ((0.370 * 100 + 0.350 * 200) / 300),
+      wrc_plus: 120.0,
+      ops_plus: (349.0 / 3),
+      offensive_runs: 30.0,
+      baserunning_runs: 1.0,
+      defensive_value: 2.0,
+      war: 7.0,
+      ground_ball_percentage: ((0.4 * 60 + 0.45 * 120) / 180),
+      opposite_field_percentage: ((0.25 * 60 + 0.23 * 120) / 180),
+      swing_percentage: ((0.5 * 400 + 0.47 * 800) / 1200),
+      chase_percentage: ((0.3 * 400 + 0.25 * 800) / 1200),
+      contact_percentage: ((0.75 * 400 + 0.8 * 800) / 1200),
+      zone_contact_percentage: ((0.82 * 400 + 0.86 * 800) / 1200),
+      swinging_strike_percentage: ((0.125 * 400 + 0.094 * 800) / 1200)
+    )
+  end
+
+  it "returns pitcher rate and outcome statistics by season and for the career" do
+    player = create_player
+    pitcher = create_position(mlb_code: "1", abbreviation: "P", name: "Pitcher", position_type: "pitcher")
+    create_player_position(player: player, position: pitcher, attributes: { is_primary: true })
+    definitions = {
+      innings: create_stat_type(name: "inningsPitched", label: "IP", category: "pitching"),
+      batters_faced: create_stat_type(name: "battersFaced", label: "BF", category: "pitching"),
+      strikeouts: create_stat_type(name: "strikeOuts", label: "SO", category: "pitching"),
+      walks: create_stat_type(name: "baseOnBalls", label: "BB", category: "pitching"),
+      hit_batters: create_stat_type(name: "hitByPitch", label: "HBP", category: "pitching"),
+      home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "pitching"),
+      earned_runs: create_stat_type(name: "ER", label: "ER", category: "pitching"),
+      babip: create_stat_type(name: "BABIP", label: "BABIP", category: "pitching"),
+      lob_percentage: create_stat_type(name: "LOB%", label: "LOB%", category: "pitching"),
+      fip: create_stat_type(name: "FIP", label: "FIP", category: "pitching"),
+      xfip: create_stat_type(name: "xFIP", label: "xFIP", category: "pitching")
+    }
+    values = {
+      2025 => { innings: 100.0, batters_faced: 400, strikeouts: 100, walks: 40, hit_batters: 5, home_runs: 20, earned_runs: 30, babip: 0.300, lob_percentage: 0.720, fip: 4.00, xfip: 4.20 },
+      2026 => { innings: 50.0, batters_faced: 200, strikeouts: 60, walks: 10, hit_batters: 2, home_runs: 5, earned_runs: 10, babip: 0.250, lob_percentage: 0.800, fip: 3.00, xfip: 3.20 }
+    }
+
+    values.each do |season, season_values|
+      season_values.each do |key, value|
+        create_player_season_stat(player: player, stat_type: definitions.fetch(key), attributes: { season: season, value: value })
+      end
+    end
+
+    advanced = described_class.new(player: player).result.fetch(:advanced_stats)
+
+    expect(advanced).to include(category: "pitching")
+    expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq([ "Rate and outcome statistics" ])
+    expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
+      k_percentage: 0.3,
+      bb_percentage: 0.05,
+      k_minus_bb_percentage: 0.25,
+      k_per_bb: 6.0,
+      hbp_percentage: 0.01,
+      hr_percentage: 0.025,
+      babip: 0.25,
+      lob_percentage: 0.8,
+      era: 1.8,
+      fip: 3.0,
+      xfip: 3.2
+    )
+    expect(advanced.dig(:career, :values)).to include(
+      k_percentage: (160.0 / 600),
+      bb_percentage: (50.0 / 600),
+      k_minus_bb_percentage: (110.0 / 600),
+      k_per_bb: 3.2,
+      hbp_percentage: (7.0 / 600),
+      hr_percentage: (25.0 / 600),
+      babip: ((0.3 * 400 + 0.25 * 200) / 600),
+      lob_percentage: ((0.72 * 100 + 0.8 * 50) / 150),
+      era: 2.4,
+      fip: (11.0 / 3),
+      xfip: (58.0 / 15)
+    )
+  end
 end

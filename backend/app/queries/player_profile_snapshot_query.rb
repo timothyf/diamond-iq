@@ -3,6 +3,80 @@ class PlayerProfileSnapshotQuery
   SEASON_CATEGORIES = %w[batting pitching].freeze
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
+  ADVANCED_BATTING_GROUPS = [
+    {
+      key: "rate_statistics",
+      label: "Rate statistics",
+      columns: [
+        { key: "bb_percentage", label: "BB%", unit: "percent" },
+        { key: "k_percentage", label: "K%", unit: "percent" },
+        { key: "bb_per_k", label: "BB/K", unit: "ratio" },
+        { key: "iso", label: "ISO", unit: "rate" },
+        { key: "babip", label: "BABIP", unit: "rate" }
+      ]
+    },
+    {
+      key: "run_creation",
+      label: "Run creation",
+      columns: [
+        { key: "woba", label: "wOBA", unit: "rate" },
+        { key: "wrc_plus", label: "wRC+", unit: "index" },
+        { key: "ops_plus", label: "OPS+", unit: "index" }
+      ]
+    },
+    {
+      key: "value",
+      label: "Value",
+      columns: [
+        { key: "offensive_runs", label: "Offensive Runs", unit: "runs" },
+        { key: "baserunning_runs", label: "Baserunning Runs", unit: "runs" },
+        { key: "defensive_value", label: "Defensive Value", unit: "runs" },
+        { key: "war", label: "WAR", unit: "war" }
+      ]
+    },
+    {
+      key: "batted_ball_profile",
+      label: "Batted-ball profile",
+      columns: [
+        { key: "ground_ball_percentage", label: "GB%", unit: "percent" },
+        { key: "fly_ball_percentage", label: "FB%", unit: "percent" },
+        { key: "line_drive_percentage", label: "LD%", unit: "percent" },
+        { key: "pull_percentage", label: "Pull%", unit: "percent" },
+        { key: "center_percentage", label: "Center%", unit: "percent" },
+        { key: "opposite_field_percentage", label: "Opposite-field%", unit: "percent" }
+      ]
+    },
+    {
+      key: "plate_discipline",
+      label: "Plate discipline",
+      columns: [
+        { key: "swing_percentage", label: "Swing%", unit: "percent" },
+        { key: "chase_percentage", label: "Chase%", unit: "percent" },
+        { key: "contact_percentage", label: "Contact%", unit: "percent" },
+        { key: "zone_contact_percentage", label: "Zone Contact%", unit: "percent" },
+        { key: "swinging_strike_percentage", label: "SwStr%", unit: "percent" }
+      ]
+    }
+  ].freeze
+  ADVANCED_PITCHING_GROUPS = [
+    {
+      key: "rate_and_outcome_statistics",
+      label: "Rate and outcome statistics",
+      columns: [
+        { key: "k_percentage", label: "K%", unit: "percent" },
+        { key: "bb_percentage", label: "BB%", unit: "percent" },
+        { key: "k_minus_bb_percentage", label: "K-BB%", unit: "percent" },
+        { key: "k_per_bb", label: "K/BB", unit: "ratio" },
+        { key: "hbp_percentage", label: "HBP%", unit: "percent" },
+        { key: "hr_percentage", label: "HR%", unit: "percent" },
+        { key: "babip", label: "BABIP", unit: "rate" },
+        { key: "lob_percentage", label: "LOB%", unit: "percent" },
+        { key: "era", label: "ERA", unit: "pitching_rate" },
+        { key: "fip", label: "FIP", unit: "pitching_rate" },
+        { key: "xfip", label: "xFIP", unit: "pitching_rate" }
+      ]
+    }
+  ].freeze
   TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
 
   def initialize(player:, on: Date.current, analysis_range: nil)
@@ -15,6 +89,7 @@ class PlayerProfileSnapshotQuery
     {
       season_overview: season_overview,
       career_overview: career_overview,
+      advanced_stats: advanced_stats,
       similar_players: SimilarPlayersQuery.new(
         player: player,
         season: latest_season,
@@ -124,6 +199,183 @@ class PlayerProfileSnapshotQuery
       seasons: [],
       stats: []
     }
+  end
+
+  def advanced_stats
+    category = career_category
+    groups = advanced_groups(category)
+    return empty_advanced_stats if groups.empty?
+
+    seasons = career_rows_by_season(category).sort.map do |season, rows|
+      {
+        season: season,
+        teams: rows.filter_map(&:team).uniq(&:id).map { |team| serialize_team(team) },
+        values: advanced_values(category, rows)
+      }
+    end
+
+    {
+      category: category,
+      groups: groups,
+      seasons: seasons,
+      career: { values: advanced_values(category, career_rows(category), career: true) }
+    }
+  end
+
+  def empty_advanced_stats
+    { category: preferred_category, groups: advanced_groups(preferred_category), seasons: [], career: { values: {} } }
+  end
+
+  def advanced_groups(category)
+    return ADVANCED_BATTING_GROUPS if category == "batting"
+    return ADVANCED_PITCHING_GROUPS if category == "pitching"
+
+    []
+  end
+
+  def advanced_values(category, rows, career: false)
+    return advanced_batting_values(rows, career: career) if category == "batting"
+
+    advanced_pitching_values(rows, career: career)
+  end
+
+  def advanced_batting_values(rows, career: false)
+    plate_appearances = advanced_count(rows, %w[plateAppearances PA], career: career) ||
+      derived_plate_appearances(rows, career: career)
+    walks = advanced_count(rows, %w[baseOnBalls BB], career: career)
+    strikeouts = advanced_count(rows, %w[strikeOuts SO], career: career)
+    hits = advanced_count(rows, %w[hits H], career: career)
+    home_runs = advanced_count(rows, %w[homeRuns HR], career: career)
+    at_bats = advanced_count(rows, %w[atBats AB], career: career)
+    sacrifice_flies = advanced_count(rows, %w[sacFlies SF], career: career)
+    average = advanced_rate(rows, %w[avg AVG], %w[atBats AB], career: career)
+    slugging = advanced_rate(rows, %w[slg SLG], %w[atBats AB], career: career)
+
+    {
+      bb_percentage: numeric_advanced_value(
+        divide(walks, plate_appearances) || normalized_percentage_rate(advanced_rate(rows, [ "BB%", "walksPerPlateAppearance" ], %w[plateAppearances PA], career: career))
+      ),
+      k_percentage: numeric_advanced_value(
+        divide(strikeouts, plate_appearances) || normalized_percentage_rate(advanced_rate(rows, [ "K%", "strikeoutsPerPlateAppearance" ], %w[plateAppearances PA], career: career))
+      ),
+      bb_per_k: numeric_advanced_value(
+        divide(walks, strikeouts) || advanced_rate(rows, [ "BB/K", "walksPerStrikeout" ], %w[plateAppearances PA], career: career)
+      ),
+      iso: numeric_advanced_value(slugging && average ? slugging - average : advanced_rate(rows, %w[ISO iso], %w[plateAppearances PA], career: career)),
+      babip: numeric_advanced_value(
+        divide(hits && home_runs ? hits - home_runs : nil, at_bats && strikeouts && home_runs && sacrifice_flies ? at_bats - strikeouts - home_runs + sacrifice_flies : nil) ||
+          advanced_rate(rows, %w[BABIP babip BAbip], %w[atBats AB], career: career)
+      ),
+      woba: numeric_advanced_value(advanced_rate(rows, %w[wOBA woba], %w[plateAppearances PA], career: career)),
+      wrc_plus: numeric_advanced_value(advanced_rate(rows, [ "wRC+", "wrc+", "wRCPlus", "wrcPlus" ], %w[plateAppearances PA], career: career)),
+      ops_plus: numeric_advanced_value(advanced_rate(rows, [ "OPS+", "ops+", "OPSPlus", "opsPlus" ], %w[plateAppearances PA], career: career)),
+      offensive_runs: numeric_advanced_value(advanced_count(rows, %w[Offense offensiveRuns], career: career)),
+      baserunning_runs: numeric_advanced_value(advanced_count(rows, %w[BaseRunning baserunningRuns], career: career)),
+      defensive_value: numeric_advanced_value(advanced_count(rows, %w[Defense defensiveValue], career: career)),
+      war: numeric_advanced_value(advanced_count(rows, %w[WAR war], career: career)),
+      ground_ball_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "GB%", "groundBallPercentage" ], career: career)),
+      fly_ball_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "FB%", "flyBallPercentage" ], career: career)),
+      line_drive_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "LD%", "lineDrivePercentage" ], career: career)),
+      pull_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "Pull%", "pullPercentage" ], career: career)),
+      center_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "Cent%", "Center%", "centerPercentage" ], career: career)),
+      opposite_field_percentage: numeric_advanced_value(advanced_batted_ball_rate(rows, [ "Oppo%", "oppositeFieldPercentage" ], career: career)),
+      swing_percentage: numeric_advanced_value(advanced_plate_discipline_rate(rows, [ "Swing%", "swingPercentage" ], career: career)),
+      chase_percentage: numeric_advanced_value(advanced_plate_discipline_rate(rows, [ "O-Swing%", "Chase%", "chasePercentage" ], career: career)),
+      contact_percentage: numeric_advanced_value(advanced_plate_discipline_rate(rows, [ "Contact%", "contactPercentage" ], career: career)),
+      zone_contact_percentage: numeric_advanced_value(advanced_plate_discipline_rate(rows, [ "Z-Contact%", "zoneContactPercentage" ], career: career)),
+      swinging_strike_percentage: numeric_advanced_value(advanced_plate_discipline_rate(rows, [ "SwStr%", "swingingStrikePercentage" ], career: career))
+    }
+  end
+
+  def advanced_pitching_values(rows, career: false)
+    batters_faced = advanced_count(rows, %w[battersFaced TBF], career: career)
+    strikeouts = advanced_count(rows, %w[strikeOuts SO], career: career)
+    walks = advanced_count(rows, %w[baseOnBalls BB], career: career)
+    hit_batters = advanced_count(rows, %w[hitByPitch hitBatsmen HBP], career: career)
+    home_runs = advanced_count(rows, %w[homeRuns HR], career: career)
+    k_percentage = divide(strikeouts, batters_faced) ||
+      normalized_percentage_rate(advanced_rate(rows, [ "K%", "strikeoutPercentage" ], %w[battersFaced TBF], career: career))
+    bb_percentage = divide(walks, batters_faced) ||
+      normalized_percentage_rate(advanced_rate(rows, [ "BB%", "walkPercentage" ], %w[battersFaced TBF], career: career))
+
+    {
+      k_percentage: numeric_advanced_value(k_percentage),
+      bb_percentage: numeric_advanced_value(bb_percentage),
+      k_minus_bb_percentage: numeric_advanced_value(
+        k_percentage && bb_percentage ? k_percentage - bb_percentage : advanced_rate(rows, [ "K-BB%" ], %w[battersFaced TBF], career: career)
+      ),
+      k_per_bb: numeric_advanced_value(
+        divide(strikeouts, walks) || advanced_rate(rows, [ "K/BB", "strikeoutWalkRatio" ], %w[battersFaced TBF], career: career)
+      ),
+      hbp_percentage: numeric_advanced_value(divide(hit_batters, batters_faced)),
+      hr_percentage: numeric_advanced_value(divide(home_runs, batters_faced)),
+      babip: numeric_advanced_value(advanced_rate(rows, %w[BABIP babip BAbip], %w[battersFaced TBF], career: career)),
+      lob_percentage: numeric_advanced_value(
+        advanced_rate(rows, [ "LOB%", "leftOnBasePercentage" ], %w[inningsPitched IP], career: career, innings_weight: true)
+      ),
+      era: numeric_advanced_value(career ? pitching_era : season_pitching_era(rows)),
+      fip: numeric_advanced_value(advanced_rate(rows, %w[FIP fip], %w[inningsPitched IP], career: career, innings_weight: true)),
+      xfip: numeric_advanced_value(advanced_rate(rows, %w[xFIP xfip], %w[inningsPitched IP], career: career, innings_weight: true))
+    }
+  end
+
+  def advanced_batted_ball_rate(rows, aliases, career:)
+    value = advanced_rate(rows, aliases, %w[ballsInPlay BIP], career: career)
+    value || advanced_rate(rows, aliases, %w[plateAppearances PA], career: career)
+  end
+
+  def advanced_plate_discipline_rate(rows, aliases, career:)
+    value = advanced_rate(rows, aliases, %w[numberOfPitches Pitches], career: career)
+    value || advanced_rate(rows, aliases, %w[plateAppearances PA], career: career)
+  end
+
+  def derived_plate_appearances(rows, career:)
+    components = [
+      advanced_count(rows, %w[atBats AB], career: career),
+      advanced_count(rows, %w[baseOnBalls BB], career: career),
+      advanced_count(rows, %w[hitByPitch HBP], career: career),
+      advanced_count(rows, %w[sacFlies SF], career: career),
+      advanced_count(rows, %w[sacBunts SH], career: career)
+    ]
+    return if components.first.nil?
+
+    components.compact.sum(0.to_d)
+  end
+
+  def advanced_count(rows, aliases, career:)
+    return season_additive_value(rows, aliases) unless career
+
+    rows.group_by(&:season).values.filter_map { |season_rows| season_additive_value(season_rows, aliases) }.presence&.sum(0.to_d)
+  end
+
+  def advanced_rate(rows, aliases, weight_aliases, career:, innings_weight: false)
+    return best_stat_row_from(rows, aliases)&.value unless career
+
+    weighted_values = rows.group_by(&:season).values.filter_map do |season_rows|
+      value = best_stat_row_from(season_rows, aliases)&.value
+      weight = season_additive_value(season_rows, weight_aliases)
+      weight ||= derived_plate_appearances(season_rows, career: false) if (weight_aliases & %w[plateAppearances PA]).any?
+      next if value.nil? || weight.nil? || !weight.positive?
+
+      normalized_weight = innings_weight ? innings_as_decimal(innings_to_outs(weight)) : weight
+      [ value, normalized_weight ]
+    end
+    return if weighted_values.empty?
+
+    divide(
+      weighted_values.sum(0.to_d) { |value, weight| value * weight },
+      weighted_values.sum(0.to_d) { |_value, weight| weight }
+    )
+  end
+
+  def numeric_advanced_value(value)
+    value.nil? ? nil : value.to_f
+  end
+
+  def normalized_percentage_rate(value)
+    return if value.nil?
+
+    value > 1 ? value / 100 : value
   end
 
   def career_columns(category)

@@ -1,4 +1,6 @@
 <script setup>
+import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
+
 defineProps({
   leaders: { type: Object, required: true },
   season: { type: Number, required: true },
@@ -9,7 +11,7 @@ function formatValue(entry) {
   const value = Number(entry.value)
   if (!Number.isFinite(value)) return '—'
   if (['avg', 'ops'].includes(entry.key)) return value.toFixed(3).replace(/^0/, '')
-  if (['ERA', 'whip'].includes(entry.key)) return value.toFixed(2)
+  if (['ERA', 'whip', 'WAR'].includes(entry.key)) return formatBaseballStatValue(entry.key, value)
   return Math.round(value).toLocaleString()
 }
 
@@ -28,7 +30,7 @@ function initials(player) {
       <article v-for="category in ['batting', 'pitching']" :key="category">
         <h3>{{ category }}</h3>
         <div class="team-leaders-card__grid">
-          <div v-for="entry in leaders[category] || []" :key="entry.key" class="team-leader" :data-test="`team-leader-${entry.key}`">
+          <div v-for="entry in leaders[category] || []" :key="entry.key" class="team-leader" :data-test="`team-leader-${entry.key}`" :data-category="category">
             <span class="team-leader__metric">{{ entry.abbreviation }}</span>
             <template v-if="entry.player">
               <RouterLink class="team-leader__player" :to="{ name: 'player-profile', params: { id: entry.player.id } }">

@@ -66,6 +66,32 @@ class PlayerStatsDownloader
     "obp",
     "slg",
     "ops",
+    "wOBA",
+    "wRC+",
+    "OPS+",
+    "Offense",
+    "BaseRunning",
+    "Defense",
+    "GB%",
+    "FB%",
+    "LD%",
+    "Pull%",
+    "Cent%",
+    "Oppo%",
+    "Swing%",
+    "O-Swing%",
+    "Contact%",
+    "Z-Contact%",
+    "SwStr%",
+    "K%",
+    "BB%",
+    "K-BB%",
+    "K/BB",
+    "BABIP",
+    "LOB%",
+    "FIP",
+    "xFIP",
+    "ballsInPlay",
     "WAR",
     "totalBases",
     "hitByPitch",
@@ -171,22 +197,24 @@ class PlayerStatsDownloader
       sleep(delay) if delay.positive?
     end
 
-    merge_war_values(rows, year)
+    merge_fangraphs_values(rows, year)
     rows
   end
 
-  def merge_war_values(rows, year)
-    war_values = fetch_war_values(year)
+  def merge_fangraphs_values(rows, year)
+    fangraphs_values = fetch_fangraphs_values(year)
     rows.each do |row|
       player_id = row["mlb_id"].to_i
-      row["WAR"] = war_values[player_id] if war_values.key?(player_id)
+      next unless fangraphs_values.key?(player_id)
+
+      row.merge!(fangraphs_values.fetch(player_id))
     end
   rescue StandardError => e
-    Rails.logger.warn("Unable to download FanGraphs WAR for #{category} #{year}: #{e.class}: #{e.message}")
+    Rails.logger.warn("Unable to download FanGraphs values for #{category} #{year}: #{e.class}: #{e.message}")
     rows
   end
 
-  def fetch_war_values(year)
+  def fetch_fangraphs_values(year)
     uri = URI("https://www.fangraphs.com/api/leaders/major-league/data")
     query = {
       pos: "all",
@@ -216,9 +244,44 @@ class PlayerStatsDownloader
     payload = JSON.parse(response.body)
     Array(payload["data"]).each_with_object({}) do |row, values|
       mlb_id = Integer(row["xMLBAMID"], exception: false)
-      war = row["WAR"]
-      values[mlb_id] = war if mlb_id && war.present?
+      next unless mlb_id
+
+      player_values = { "WAR" => row["WAR"] }.compact
+      if category == "batting"
+        player_values["wOBA"] = row["wOBA"] if row["wOBA"].present?
+        player_values["wRC+"] = row["wRC+"] if row["wRC+"].present?
+        player_values["Offense"] = row["Offense"] if row["Offense"].present?
+        player_values["BaseRunning"] = row["BaseRunning"] if row["BaseRunning"].present?
+        player_values["Defense"] = row["Defense"] if row["Defense"].present?
+        player_values["GB%"] = row["GB%"] if row["GB%"].present?
+        player_values["FB%"] = row["FB%"] if row["FB%"].present?
+        player_values["LD%"] = row["LD%"] if row["LD%"].present?
+        player_values["Pull%"] = row["Pull%"] if row["Pull%"].present?
+        player_values["Cent%"] = row["Cent%"] if row["Cent%"].present?
+        player_values["Oppo%"] = row["Oppo%"] if row["Oppo%"].present?
+        player_values["Swing%"] = row["Swing%"] if row["Swing%"].present?
+        player_values["O-Swing%"] = row["O-Swing%"] if row["O-Swing%"].present?
+        player_values["Contact%"] = row["Contact%"] if row["Contact%"].present?
+        player_values["Z-Contact%"] = row["Z-Contact%"] if row["Z-Contact%"].present?
+        player_values["SwStr%"] = row["SwStr%"] if row["SwStr%"].present?
+        player_values["ballsInPlay"] = row["bipCount"] if row["bipCount"].present?
+        ops_plus = calculated_ops_plus(row)
+        player_values["OPS+"] = ops_plus if ops_plus
+      else
+        %w[K% BB% K-BB% K/BB BABIP LOB% FIP xFIP].each do |key|
+          player_values[key] = row[key] if row[key].present?
+        end
+      end
+      values[mlb_id] = player_values if player_values.any?
     end
+  end
+
+  def calculated_ops_plus(row)
+    obp_plus = Float(row["OBP+"], exception: false)
+    slg_plus = Float(row["SLG+"], exception: false)
+    return if obp_plus.nil? || slg_plus.nil?
+
+    obp_plus + slg_plus - 100
   end
 
   def build_url(year, offset)
@@ -286,7 +349,7 @@ class PlayerStatsDownloader
     case value
     when Hash
       value.each_with_object({}) do |(key, nested_value), flattened|
-        nested_key = [prefix, key].compact.join(".")
+        nested_key = [ prefix, key ].compact.join(".")
         flattened.merge!(flatten(nested_value, nested_key))
       end
     when Array
