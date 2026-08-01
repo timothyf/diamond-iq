@@ -75,6 +75,45 @@ class PlayerProfileSnapshotQuery
         { key: "fip", label: "FIP", unit: "pitching_rate" },
         { key: "xfip", label: "xFIP", unit: "pitching_rate" }
       ]
+    },
+    {
+      key: "run_prevention_and_expected_performance",
+      label: "Run prevention and expected performance",
+      columns: [
+        { key: "era", label: "ERA", unit: "pitching_rate" },
+        { key: "era_minus", label: "ERA-", unit: "index" },
+        { key: "era_plus", label: "ERA+", unit: "index" },
+        { key: "fip", label: "FIP", unit: "pitching_rate" },
+        { key: "fip_minus", label: "FIP-", unit: "index" },
+        { key: "xfip", label: "xFIP", unit: "pitching_rate" },
+        { key: "xfip_minus", label: "xFIP-", unit: "index" },
+        { key: "siera", label: "SIERA", unit: "pitching_rate" },
+        { key: "xera", label: "xERA", unit: "pitching_rate" },
+        { key: "ra9", label: "RA9", unit: "pitching_rate" },
+        { key: "runs_allowed_per_nine", label: "Runs allowed per 9", unit: "pitching_rate" },
+        { key: "earned_runs_allowed_per_nine", label: "Earned runs allowed per 9", unit: "pitching_rate" },
+        { key: "expected_woba_allowed", label: "Expected wOBA allowed", unit: "rate" },
+        { key: "woba_allowed", label: "wOBA allowed", unit: "rate" }
+      ]
+    },
+    {
+      key: "pitcher_value",
+      label: "Pitcher value",
+      description: "A high-level summary of how much value the pitcher produced.",
+      columns: [
+        { key: "war", label: "WAR", unit: "war" },
+        { key: "ra9_war", label: "RA9-WAR", unit: "war" },
+        { key: "wpa", label: "WPA", unit: "war" },
+        { key: "wpa_per_li", label: "WPA/LI", unit: "war" },
+        { key: "re24", label: "RE24", unit: "runs" },
+        { key: "clutch", label: "Clutch", unit: "ratio" },
+        { key: "runs_above_replacement", label: "Runs above replacement", unit: "runs" },
+        { key: "runs_above_average", label: "Runs above average", unit: "runs" },
+        { key: "pitching_runs", label: "Pitching runs", unit: "runs" },
+        { key: "leverage_index", label: "Leverage index", unit: "ratio" },
+        { key: "shutdowns", label: "Shutdowns", unit: "count" },
+        { key: "meltdowns", label: "Meltdowns", unit: "count" }
+      ]
     }
   ].freeze
   TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
@@ -297,6 +336,13 @@ class PlayerProfileSnapshotQuery
       normalized_percentage_rate(advanced_rate(rows, [ "K%", "strikeoutPercentage" ], %w[battersFaced TBF], career: career))
     bb_percentage = divide(walks, batters_faced) ||
       normalized_percentage_rate(advanced_rate(rows, [ "BB%", "walkPercentage" ], %w[battersFaced TBF], career: career))
+    innings = advanced_pitching_innings(rows)
+    runs = advanced_count(rows, %w[runs R], career: career)
+    earned_runs = advanced_count(rows, %w[earnedRuns ER], career: career)
+    era_minus = advanced_rate(rows, [ "ERA-", "eraMinus" ], %w[inningsPitched IP], career: career, innings_weight: true)
+    era = career ? pitching_era : season_pitching_era(rows)
+    runs_per_nine = divide(runs && innings ? runs * 9 : nil, innings)
+    earned_runs_per_nine = divide(earned_runs && innings ? earned_runs * 9 : nil, innings)
 
     {
       k_percentage: numeric_advanced_value(k_percentage),
@@ -313,10 +359,46 @@ class PlayerProfileSnapshotQuery
       lob_percentage: numeric_advanced_value(
         advanced_rate(rows, [ "LOB%", "leftOnBasePercentage" ], %w[inningsPitched IP], career: career, innings_weight: true)
       ),
-      era: numeric_advanced_value(career ? pitching_era : season_pitching_era(rows)),
+      era: numeric_advanced_value(era),
+      era_minus: numeric_advanced_value(era_minus),
+      era_plus: numeric_advanced_value(
+        advanced_rate(rows, [ "ERA+", "eraPlus" ], %w[inningsPitched IP], career: career, innings_weight: true) ||
+          divide(10_000, era_minus)
+      ),
       fip: numeric_advanced_value(advanced_rate(rows, %w[FIP fip], %w[inningsPitched IP], career: career, innings_weight: true)),
-      xfip: numeric_advanced_value(advanced_rate(rows, %w[xFIP xfip], %w[inningsPitched IP], career: career, innings_weight: true))
+      fip_minus: numeric_advanced_value(advanced_rate(rows, [ "FIP-", "fipMinus" ], %w[inningsPitched IP], career: career, innings_weight: true)),
+      xfip: numeric_advanced_value(advanced_rate(rows, %w[xFIP xfip], %w[inningsPitched IP], career: career, innings_weight: true)),
+      xfip_minus: numeric_advanced_value(advanced_rate(rows, [ "xFIP-", "xfipMinus" ], %w[inningsPitched IP], career: career, innings_weight: true)),
+      siera: numeric_advanced_value(advanced_rate(rows, %w[SIERA siera], %w[inningsPitched IP], career: career, innings_weight: true)),
+      xera: numeric_advanced_value(advanced_rate(rows, %w[xERA xera], %w[inningsPitched IP], career: career, innings_weight: true)),
+      ra9: numeric_advanced_value(runs_per_nine),
+      runs_allowed_per_nine: numeric_advanced_value(runs_per_nine),
+      earned_runs_allowed_per_nine: numeric_advanced_value(earned_runs_per_nine || era),
+      expected_woba_allowed: numeric_advanced_value(advanced_rate(rows, %w[xwOBAAllowed xwOBA], %w[battersFaced TBF], career: career)),
+      woba_allowed: numeric_advanced_value(advanced_rate(rows, %w[wOBAAllowed wOBA], %w[battersFaced TBF], career: career)),
+      war: numeric_advanced_value(advanced_count(rows, %w[WAR war], career: career)),
+      ra9_war: numeric_advanced_value(advanced_count(rows, [ "RA9-Wins", "RA9-WAR", "ra9War" ], career: career)),
+      wpa: numeric_advanced_value(advanced_count(rows, %w[WPA wpa], career: career)),
+      wpa_per_li: numeric_advanced_value(advanced_count(rows, [ "WPA/LI", "wpaPerLi" ], career: career)),
+      re24: numeric_advanced_value(advanced_count(rows, %w[RE24 re24], career: career)),
+      clutch: numeric_advanced_value(advanced_count(rows, %w[Clutch clutch], career: career)),
+      runs_above_replacement: numeric_advanced_value(advanced_count(rows, %w[RAR rar], career: career)),
+      runs_above_average: numeric_advanced_value(advanced_count(rows, %w[RAA raa], career: career)),
+      pitching_runs: numeric_advanced_value(advanced_count(rows, [ "PitchingRuns", "pitchingRuns" ], career: career)),
+      leverage_index: numeric_advanced_value(advanced_rate(rows, %w[pLI leverageIndex], %w[battersFaced TBF], career: career)),
+      shutdowns: numeric_advanced_value(advanced_count(rows, %w[SD shutdowns], career: career)),
+      meltdowns: numeric_advanced_value(advanced_count(rows, %w[MD meltdowns], career: career))
     }
+  end
+
+  def advanced_pitching_innings(rows)
+    outs = rows.group_by(&:season).values.filter_map do |season_rows|
+      innings = season_additive_value(season_rows, %w[inningsPitched IP])
+      innings_to_outs(innings) if innings
+    end.sum
+    return if outs.zero?
+
+    innings_as_decimal(outs)
   end
 
   def advanced_batted_ball_rate(rows, aliases, career:)

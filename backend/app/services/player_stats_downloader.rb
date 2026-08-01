@@ -4,6 +4,7 @@ require "net/http"
 
 class PlayerStatsDownloader
   BASE_URL = "https://bdfed.stitch.mlbinfra.com/bdfed/stats/player"
+  BASEBALL_REFERENCE_WAR_URL = "https://www.baseball-reference.com/data/war_daily_pitch.txt"
   LIMIT = 1_000
   DEFAULT_TIMEOUT_SECONDS = 60
   USER_AGENT = "Mozilla/5.0 (compatible; shopify-prep-project-mlb-season-stats/1.0)"
@@ -89,8 +90,26 @@ class PlayerStatsDownloader
     "K/BB",
     "BABIP",
     "LOB%",
+    "ERA-",
+    "FIP-",
     "FIP",
     "xFIP",
+    "xFIP-",
+    "SIERA",
+    "xERA",
+    "wOBAAllowed",
+    "xwOBAAllowed",
+    "RA9-Wins",
+    "WPA",
+    "WPA/LI",
+    "RE24",
+    "Clutch",
+    "RAR",
+    "RAA",
+    "PitchingRuns",
+    "pLI",
+    "SD",
+    "MD",
     "ballsInPlay",
     "WAR",
     "totalBases",
@@ -198,6 +217,10 @@ class PlayerStatsDownloader
     end
 
     merge_fangraphs_values(rows, year)
+    if category == "pitching"
+      merge_baseball_reference_values(rows, year)
+      merge_statcast_values(rows, year)
+    end
     rows
   end
 
@@ -268,12 +291,124 @@ class PlayerStatsDownloader
         ops_plus = calculated_ops_plus(row)
         player_values["OPS+"] = ops_plus if ops_plus
       else
-        %w[K% BB% K-BB% K/BB BABIP LOB% FIP xFIP].each do |key|
+        %w[
+          K% BB% K-BB% K/BB BABIP LOB% ERA- FIP FIP- xFIP xFIP- SIERA xERA
+          RA9-Wins WPA WPA/LI RE24 Clutch RAR RAA PitchingRuns pLI SD MD
+        ].each do |key|
           player_values[key] = row[key] if row[key].present?
         end
       end
       values[mlb_id] = player_values if player_values.any?
     end
+  end
+
+  def merge_statcast_values(rows, year)
+    statcast_values = fetch_statcast_values(year).merge(fetch_statcast_run_values(year)) do |_player_id, expected_values, run_values|
+      expected_values.merge(run_values)
+    end
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless statcast_values.key?(player_id)
+
+      row.merge!(statcast_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download Statcast values for pitching #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def merge_baseball_reference_values(rows, year)
+    year_values = fetch_baseball_reference_values.fetch(year, {})
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless year_values.key?(player_id)
+
+      row.merge!(year_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download Baseball-Reference values for pitching #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def fetch_baseball_reference_values
+    @fetch_baseball_reference_values ||= begin
+      uri = URI(BASEBALL_REFERENCE_WAR_URL)
+      response = request_csv(uri)
+      csv_body = utf8_csv_body(response.body)
+      values = Hash.new { |hash, year| hash[year] = {} }
+
+      CSV.parse(csv_body, headers: true).each do |row|
+        year = Integer(row["year_ID"], exception: false)
+        player_id = Integer(row["mlb_ID"], exception: false)
+        next unless year && player_id && year.between?(start_year, end_year)
+
+        values[year][player_id] = { "RAA" => Float(row["runs_above_avg"], exception: false) }.compact
+      end
+      values
+    end
+  end
+
+  def fetch_statcast_values(year)
+    uri = URI("https://baseballsavant.mlb.com/leaderboard/custom")
+    uri.query = {
+      year: year,
+      type: "pitcher",
+      min: 1,
+      selections: "player_id,player_name,woba,xwoba",
+      csv: "true"
+    }.to_query
+
+    response = request_csv(uri)
+    csv_body = utf8_csv_body(response.body)
+    CSV.parse(csv_body, headers: true).each_with_object({}) do |row, values|
+      player_id = Integer(row["player_id"], exception: false)
+      next unless player_id
+
+      values[player_id] = {
+        "wOBAAllowed" => Float(row["woba"], exception: false),
+        "xwOBAAllowed" => Float(row["xwoba"], exception: false)
+      }.compact
+    end
+  end
+
+  def fetch_statcast_run_values(year)
+    uri = URI("https://baseballsavant.mlb.com/leaderboard/swing-take")
+    uri.query = {
+      year: year,
+      type: "All",
+      group: "Pitcher",
+      sub_type: "All",
+      min: 1,
+      csv: "true"
+    }.to_query
+
+    response = request_csv(uri)
+    CSV.parse(utf8_csv_body(response.body), headers: true).each_with_object({}) do |row, values|
+      player_id = Integer(row["player_id"], exception: false)
+      next unless player_id
+
+      pitching_runs = Float(row["runs_all"], exception: false)
+      values[player_id] = { "PitchingRuns" => pitching_runs } if pitching_runs
+    end
+  end
+
+  def request_csv(uri)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request["User-Agent"] = USER_AGENT
+    request["Accept"] = "text/csv,*/*"
+
+    response = http.request(request)
+    raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+    response
+  end
+
+  def utf8_csv_body(body)
+    body.dup.force_encoding(Encoding::UTF_8).delete_prefix("\uFEFF")
   end
 
   def calculated_ops_plus(row)

@@ -563,16 +563,55 @@ describe('PlayerProfileView', () => {
               { key: 'xfip', label: 'xFIP', unit: 'pitching_rate' },
             ],
           },
+          {
+            key: 'run_prevention_and_expected_performance',
+            label: 'Run prevention and expected performance',
+            columns: [
+              { key: 'era', label: 'ERA', unit: 'pitching_rate' },
+              { key: 'era_minus', label: 'ERA-', unit: 'index' },
+              { key: 'era_plus', label: 'ERA+', unit: 'index' },
+              { key: 'fip', label: 'FIP', unit: 'pitching_rate' },
+              { key: 'fip_minus', label: 'FIP-', unit: 'index' },
+              { key: 'xfip', label: 'xFIP', unit: 'pitching_rate' },
+              { key: 'xfip_minus', label: 'xFIP-', unit: 'index' },
+              { key: 'siera', label: 'SIERA', unit: 'pitching_rate' },
+              { key: 'xera', label: 'xERA', unit: 'pitching_rate' },
+              { key: 'ra9', label: 'RA9', unit: 'pitching_rate' },
+              { key: 'runs_allowed_per_nine', label: 'Runs allowed per 9', unit: 'pitching_rate' },
+              { key: 'earned_runs_allowed_per_nine', label: 'Earned runs allowed per 9', unit: 'pitching_rate' },
+              { key: 'expected_woba_allowed', label: 'Expected wOBA allowed', unit: 'rate' },
+              { key: 'woba_allowed', label: 'wOBA allowed', unit: 'rate' },
+            ],
+          },
+          {
+            key: 'pitcher_value',
+            label: 'Pitcher value',
+            description: 'A high-level summary of how much value the pitcher produced.',
+            columns: [
+              { key: 'war', label: 'WAR', unit: 'war' },
+              { key: 'ra9_war', label: 'RA9-WAR', unit: 'war' },
+              { key: 'wpa', label: 'WPA', unit: 'war' },
+              { key: 'wpa_per_li', label: 'WPA/LI', unit: 'war' },
+              { key: 're24', label: 'RE24', unit: 'runs' },
+              { key: 'clutch', label: 'Clutch', unit: 'ratio' },
+              { key: 'runs_above_replacement', label: 'Runs above replacement', unit: 'runs' },
+              { key: 'runs_above_average', label: 'Runs above average', unit: 'runs' },
+              { key: 'pitching_runs', label: 'Pitching runs', unit: 'runs' },
+              { key: 'leverage_index', label: 'Leverage index', unit: 'ratio' },
+              { key: 'shutdowns', label: 'Shutdowns', unit: 'count' },
+              { key: 'meltdowns', label: 'Meltdowns', unit: 'count' },
+            ],
+          },
         ],
         seasons: [
           {
             season: 2026,
             teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
-            values: { k_percentage: 0.3, bb_percentage: 0.05, k_minus_bb_percentage: 0.25, k_per_bb: 6, hbp_percentage: 0.01, hr_percentage: 0.025, babip: 0.25, lob_percentage: 0.8, era: 1.8, fip: 3, xfip: 3.2 },
+            values: { k_percentage: 0.3, bb_percentage: 0.05, k_minus_bb_percentage: 0.25, k_per_bb: 6, hbp_percentage: 0.01, hr_percentage: 0.025, babip: 0.25, lob_percentage: 0.8, era: 1.8, era_minus: 60, era_plus: 167, fip: 3, fip_minus: 70, xfip: 3.2, xfip_minus: 75, siera: 2.9, xera: 2.7, ra9: 2.7, runs_allowed_per_nine: 2.7, earned_runs_allowed_per_nine: 1.8, expected_woba_allowed: 0.27, woba_allowed: 0.25, war: 2, ra9_war: 2.5, wpa: 1, wpa_per_li: 1.5, re24: 15, clutch: 0.2, runs_above_replacement: 20, runs_above_average: 10, pitching_runs: 9, leverage_index: 1.1, shutdowns: 2, meltdowns: 1 },
           },
         ],
         career: {
-          values: { k_percentage: 0.267, bb_percentage: 0.083, k_minus_bb_percentage: 0.184, k_per_bb: 3.2, hbp_percentage: 0.012, hr_percentage: 0.042, babip: 0.283, lob_percentage: 0.747, era: 2.4, fip: 3.67, xfip: 3.87 },
+          values: { k_percentage: 0.267, bb_percentage: 0.083, k_minus_bb_percentage: 0.184, k_per_bb: 3.2, hbp_percentage: 0.012, hr_percentage: 0.042, babip: 0.283, lob_percentage: 0.747, era: 2.4, era_minus: 73, era_plus: 136, fip: 3.67, fip_minus: 80, xfip: 3.87, xfip_minus: 85, siera: 3.5, xera: 3.3, ra9: 3.3, runs_allowed_per_nine: 3.3, earned_runs_allowed_per_nine: 2.4, expected_woba_allowed: 0.29, woba_allowed: 0.29, war: 6, ra9_war: 7, wpa: 4, wpa_per_li: 5, re24: 45, clutch: -0.3, runs_above_replacement: 60, runs_above_average: 35, pitching_runs: 32, leverage_index: 0.97, shutdowns: 5, meltdowns: 3 },
         },
       }
     })
@@ -593,6 +632,19 @@ describe('PlayerProfileView', () => {
     expect(table.text()).toContain('30.0%')
     expect(table.text()).toContain('1.80')
     expect(table.text()).toContain('3.20')
+    const preventionTable = wrapper.get('[data-test="advanced-stat-group-run_prevention_and_expected_performance"]')
+    expect(preventionTable.text()).toContain('ERA-')
+    expect(preventionTable.text()).toContain('SIERA')
+    expect(preventionTable.text()).toContain('Expected wOBA allowed')
+    expect(preventionTable.text()).toContain('167')
+    expect(preventionTable.text()).toContain('0.270')
+    const valueTable = wrapper.get('[data-test="advanced-stat-group-pitcher_value"]')
+    expect(valueTable.text()).toContain('A high-level summary of how much value the pitcher produced.')
+    expect(valueTable.text()).toContain('RA9-WAR')
+    expect(valueTable.text()).toContain('WPA/LI')
+    expect(valueTable.text()).toContain('Runs above replacement')
+    expect(valueTable.text()).toContain('Shutdowns')
+    expect(valueTable.text()).toContain('2.5')
   })
 
   it('shows pitching trends for primary pitchers', async () => {

@@ -383,15 +383,35 @@ RSpec.describe PlayerProfileSnapshotQuery do
       walks: create_stat_type(name: "baseOnBalls", label: "BB", category: "pitching"),
       hit_batters: create_stat_type(name: "hitByPitch", label: "HBP", category: "pitching"),
       home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "pitching"),
+      runs: create_stat_type(name: "runs", label: "R", category: "pitching"),
       earned_runs: create_stat_type(name: "ER", label: "ER", category: "pitching"),
       babip: create_stat_type(name: "BABIP", label: "BABIP", category: "pitching"),
       lob_percentage: create_stat_type(name: "LOB%", label: "LOB%", category: "pitching"),
       fip: create_stat_type(name: "FIP", label: "FIP", category: "pitching"),
-      xfip: create_stat_type(name: "xFIP", label: "xFIP", category: "pitching")
+      era_minus: create_stat_type(name: "ERA-", label: "ERA-", category: "pitching"),
+      fip_minus: create_stat_type(name: "FIP-", label: "FIP-", category: "pitching"),
+      xfip: create_stat_type(name: "xFIP", label: "xFIP", category: "pitching"),
+      xfip_minus: create_stat_type(name: "xFIP-", label: "xFIP-", category: "pitching"),
+      siera: create_stat_type(name: "SIERA", label: "SIERA", category: "pitching"),
+      xera: create_stat_type(name: "xERA", label: "xERA", category: "pitching"),
+      woba_allowed: create_stat_type(name: "wOBAAllowed", label: "wOBA allowed", category: "pitching"),
+      expected_woba_allowed: create_stat_type(name: "xwOBAAllowed", label: "Expected wOBA allowed", category: "pitching"),
+      war: create_stat_type(name: "WAR", label: "WAR", category: "pitching"),
+      ra9_war: create_stat_type(name: "RA9-Wins", label: "RA9-WAR", category: "pitching"),
+      wpa: create_stat_type(name: "WPA", label: "WPA", category: "pitching"),
+      wpa_per_li: create_stat_type(name: "WPA/LI", label: "WPA/LI", category: "pitching"),
+      re24: create_stat_type(name: "RE24", label: "RE24", category: "pitching"),
+      clutch: create_stat_type(name: "Clutch", label: "Clutch", category: "pitching"),
+      rar: create_stat_type(name: "RAR", label: "RAR", category: "pitching"),
+      raa: create_stat_type(name: "RAA", label: "RAA", category: "pitching"),
+      pitching_runs: create_stat_type(name: "PitchingRuns", label: "Pitching runs", category: "pitching"),
+      leverage_index: create_stat_type(name: "pLI", label: "pLI", category: "pitching"),
+      shutdowns: create_stat_type(name: "SD", label: "SD", category: "pitching"),
+      meltdowns: create_stat_type(name: "MD", label: "MD", category: "pitching")
     }
     values = {
-      2025 => { innings: 100.0, batters_faced: 400, strikeouts: 100, walks: 40, hit_batters: 5, home_runs: 20, earned_runs: 30, babip: 0.300, lob_percentage: 0.720, fip: 4.00, xfip: 4.20 },
-      2026 => { innings: 50.0, batters_faced: 200, strikeouts: 60, walks: 10, hit_batters: 2, home_runs: 5, earned_runs: 10, babip: 0.250, lob_percentage: 0.800, fip: 3.00, xfip: 3.20 }
+      2025 => { innings: 100.0, batters_faced: 400, strikeouts: 100, walks: 40, hit_batters: 5, home_runs: 20, runs: 40, earned_runs: 30, babip: 0.300, lob_percentage: 0.720, era_minus: 80, fip: 4.00, fip_minus: 85, xfip: 4.20, xfip_minus: 90, siera: 3.8, xera: 3.6, woba_allowed: 0.31, expected_woba_allowed: 0.30, war: 4, ra9_war: 4.5, wpa: 3, wpa_per_li: 3.5, re24: 30, clutch: -0.5, rar: 40, raa: 25, pitching_runs: 23, leverage_index: 0.9, shutdowns: 3, meltdowns: 2 },
+      2026 => { innings: 50.0, batters_faced: 200, strikeouts: 60, walks: 10, hit_batters: 2, home_runs: 5, runs: 15, earned_runs: 10, babip: 0.250, lob_percentage: 0.800, era_minus: 60, fip: 3.00, fip_minus: 70, xfip: 3.20, xfip_minus: 75, siera: 2.9, xera: 2.7, woba_allowed: 0.25, expected_woba_allowed: 0.27, war: 2, ra9_war: 2.5, wpa: 1, wpa_per_li: 1.5, re24: 15, clutch: 0.2, rar: 20, raa: 10, pitching_runs: 9, leverage_index: 1.1, shutdowns: 2, meltdowns: 1 }
     }
 
     values.each do |season, season_values|
@@ -403,7 +423,9 @@ RSpec.describe PlayerProfileSnapshotQuery do
     advanced = described_class.new(player: player).result.fetch(:advanced_stats)
 
     expect(advanced).to include(category: "pitching")
-    expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq([ "Rate and outcome statistics" ])
+    expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq(
+      [ "Rate and outcome statistics", "Run prevention and expected performance", "Pitcher value" ]
+    )
     expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
       k_percentage: 0.3,
       bb_percentage: 0.05,
@@ -414,8 +436,24 @@ RSpec.describe PlayerProfileSnapshotQuery do
       babip: 0.25,
       lob_percentage: 0.8,
       era: 1.8,
+      era_minus: 60.0,
+      era_plus: (10_000.0 / 60),
       fip: 3.0,
-      xfip: 3.2
+      fip_minus: 70.0,
+      xfip: 3.2,
+      xfip_minus: 75.0,
+      siera: 2.9,
+      xera: 2.7,
+      ra9: 2.7,
+      runs_allowed_per_nine: 2.7,
+      earned_runs_allowed_per_nine: 1.8,
+      expected_woba_allowed: 0.27,
+      woba_allowed: 0.25
+    )
+    expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
+      war: 2.0, ra9_war: 2.5, wpa: 1.0, wpa_per_li: 1.5, re24: 15.0,
+      clutch: 0.2, runs_above_replacement: 20.0, runs_above_average: 10.0,
+      pitching_runs: 9.0, leverage_index: 1.1, shutdowns: 2.0, meltdowns: 1.0
     )
     expect(advanced.dig(:career, :values)).to include(
       k_percentage: (160.0 / 600),
@@ -427,8 +465,25 @@ RSpec.describe PlayerProfileSnapshotQuery do
       babip: ((0.3 * 400 + 0.25 * 200) / 600),
       lob_percentage: ((0.72 * 100 + 0.8 * 50) / 150),
       era: 2.4,
+      era_minus: (220.0 / 3),
+      era_plus: (10_000.0 / (220.0 / 3)),
       fip: (11.0 / 3),
-      xfip: (58.0 / 15)
+      fip_minus: 80.0,
+      xfip: (58.0 / 15),
+      xfip_minus: 85.0,
+      siera: 3.5,
+      xera: 3.3,
+      ra9: 3.3,
+      runs_allowed_per_nine: 3.3,
+      earned_runs_allowed_per_nine: 2.4,
+      expected_woba_allowed: 0.29,
+      woba_allowed: 0.29
+    )
+    expect(advanced.dig(:career, :values)).to include(
+      war: 6.0, ra9_war: 7.0, wpa: 4.0, wpa_per_li: 5.0, re24: 45.0,
+      clutch: -0.3, runs_above_replacement: 60.0, runs_above_average: 35.0,
+      pitching_runs: 32.0, leverage_index: ((0.9 * 400 + 1.1 * 200) / 600),
+      shutdowns: 5.0, meltdowns: 3.0
     )
   end
 end

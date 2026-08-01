@@ -491,6 +491,7 @@ function advancedStatValue(column, value) {
   if (column.unit === 'ratio') return numericValue.toFixed(2)
   if (column.unit === 'runs' || column.unit === 'war') return numericValue.toFixed(1)
   if (column.unit === 'pitching_rate') return numericValue.toFixed(2)
+  if (column.unit === 'count') return Math.round(numericValue).toLocaleString()
   return numericValue.toFixed(3).replace(/^0(?=\.)/, '')
 }
 
@@ -701,6 +702,7 @@ function formatTimestamp(value) {
             :data-test="`advanced-stat-group-${group.key}`"
           >
             <h3>{{ group.label }}</h3>
+            <p v-if="group.description" class="advanced-stat-group__description">{{ group.description }}</p>
             <div class="advanced-table-wrap">
               <table class="advanced-table">
                 <thead>
@@ -1675,6 +1677,11 @@ function formatTimestamp(value) {
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 1.35rem;
   text-transform: uppercase;
+}
+
+.advanced-stat-group__description {
+  margin: -0.35rem 0 0.75rem;
+  color: #607184;
 }
 
 .advanced-table-wrap {

@@ -73,8 +73,20 @@ RSpec.describe PlayerStatsDownloader, type: :service do
     allow(downloader).to receive(:fetch_fangraphs_values).and_return(
       669373 => {
         "WAR" => 6.6, "K%" => 0.322, "BB%" => 0.044, "K-BB%" => 0.278, "K/BB" => 7.3,
-        "BABIP" => 0.273, "LOB%" => 0.806, "FIP" => 2.45, "xFIP" => 2.66
+        "BABIP" => 0.273, "LOB%" => 0.806, "ERA-" => 54, "FIP" => 2.45,
+        "FIP-" => 58, "xFIP" => 2.66, "xFIP-" => 63, "SIERA" => 2.71, "xERA" => 2.70,
+        "RA9-Wins" => 7.1, "WPA" => 4.0, "WPA/LI" => 5.2, "RE24" => 43.6,
+        "Clutch" => -1.0, "RAR" => 59.1, "pLI" => 0.95, "SD" => 2, "MD" => 1
       }
+    )
+    allow(downloader).to receive(:fetch_statcast_values).and_return(
+      669373 => { "wOBAAllowed" => 0.246, "xwOBAAllowed" => 0.266 }
+    )
+    allow(downloader).to receive(:fetch_statcast_run_values).and_return(
+      669373 => { "PitchingRuns" => 51.4 }
+    )
+    allow(downloader).to receive(:fetch_baseball_reference_values).and_return(
+      2026 => { 669373 => { "RAA" => 19.3 } }
     )
     allow(downloader).to receive(:fetch_json).and_return(
       {
@@ -93,7 +105,58 @@ RSpec.describe PlayerStatsDownloader, type: :service do
 
     expect(row).to include(
       "K%" => "0.322", "BB%" => "0.044", "K-BB%" => "0.278", "K/BB" => "7.3",
-      "BABIP" => "0.273", "LOB%" => "0.806", "FIP" => "2.45", "xFIP" => "2.66"
+      "BABIP" => "0.273", "LOB%" => "0.806", "ERA-" => "54", "FIP" => "2.45",
+      "FIP-" => "58", "xFIP" => "2.66", "xFIP-" => "63", "SIERA" => "2.71",
+      "xERA" => "2.7", "wOBAAllowed" => "0.246", "xwOBAAllowed" => "0.266",
+      "RA9-Wins" => "7.1", "WPA" => "4.0", "WPA/LI" => "5.2", "RE24" => "43.6",
+      "Clutch" => "-1.0", "RAR" => "59.1", "RAA" => "19.3", "PitchingRuns" => "51.4",
+      "pLI" => "0.95", "SD" => "2", "MD" => "1"
+    )
+  end
+
+  it "parses Statcast pitcher wOBA allowed values" do
+    downloader = described_class.new(category: "pitching", start_year: 2025, end_year: 2025)
+    csv_body = "\uFEFF" + <<~CSV
+      "last_name, first_name","player_id","year","player_id","player_name","woba","xwoba"
+      "Skubal, Tarik",669373,2025,669373,"Skubal, Tarik",".246",".266"
+    CSV
+    response = instance_double(Net::HTTPSuccess, body: csv_body.b)
+    allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
+    allow_any_instance_of(Net::HTTP).to receive(:request).and_return(response)
+
+    expect(downloader.send(:fetch_statcast_values, 2025)).to eq(
+      669373 => { "wOBAAllowed" => 0.246, "xwOBAAllowed" => 0.266 }
+    )
+  end
+
+  it "parses Baseball-Reference pitcher runs above average values" do
+    downloader = described_class.new(category: "pitching", start_year: 2025, end_year: 2026)
+    csv_body = <<~CSV
+      name_common,mlb_ID,year_ID,runs_above_avg
+      Tarik Skubal,669373,2025,42.455
+      Tarik Skubal,669373,2026,19.317
+      Old Season,123456,2024,10.0
+    CSV
+    response = instance_double(Net::HTTPSuccess, body: csv_body)
+    allow(downloader).to receive(:request_csv).and_return(response)
+
+    expect(downloader.send(:fetch_baseball_reference_values)).to eq(
+      2025 => { 669373 => { "RAA" => 42.455 } },
+      2026 => { 669373 => { "RAA" => 19.317 } }
+    )
+  end
+
+  it "parses Statcast pitcher run values" do
+    downloader = described_class.new(category: "pitching", start_year: 2025, end_year: 2025)
+    csv_body = "\uFEFF" + <<~CSV
+      "year","last_name, first_name","player_id","runs_all"
+      "2025","Skubal, Tarik","669373",51.4083
+    CSV
+    response = instance_double(Net::HTTPSuccess, body: csv_body.b)
+    allow(downloader).to receive(:request_csv).and_return(response)
+
+    expect(downloader.send(:fetch_statcast_run_values, 2025)).to eq(
+      669373 => { "PitchingRuns" => 51.4083 }
     )
   end
 
