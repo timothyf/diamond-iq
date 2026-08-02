@@ -36,7 +36,8 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
       "status" => "queued",
       "total_items" => 2,
       "processed_items" => 0,
-      "progress_percentage" => 0.0
+      "progress_percentage" => 0.0,
+      "estimated_remaining_seconds" => 100
     )
   end
 
@@ -87,7 +88,8 @@ RSpec.describe "Api::Admin::TaskRuns", type: :request do
       "status" => "queued",
       "total_items" => 15,
       "processed_items" => 0,
-      "progress_percentage" => 0.0
+      "progress_percentage" => 0.0,
+      "estimated_remaining_seconds" => 120
     )
   end
 

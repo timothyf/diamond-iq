@@ -69,9 +69,9 @@ export function useAuth() {
 
   async function logout() {
     const token = localStorage.getItem(USER_TOKEN_STORAGE_KEY)
-    if (token) await request('/api/auth/logout', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
     localStorage.removeItem(USER_TOKEN_STORAGE_KEY)
     user.value = null
+    if (token) await request('/api/auth/logout', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }).catch(() => {})
   }
 
   return { user: computed(() => user.value), loading, error, login, register, loadCurrentUser, logout }

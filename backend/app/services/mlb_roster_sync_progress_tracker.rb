@@ -5,7 +5,8 @@ class MlbRosterSyncProgressTracker
     execution_id = task_run.result_data.to_h["active_execution_job_id"]
     task_run.update!(status: "running", total_items: total, completed_items: 0, failed_items: 0,
       result_data: execution_id ? { "active_execution_job_id" => execution_id } : {}, error_message: nil,
-      started_at: task_run.started_at || Time.current, finished_at: nil, last_heartbeat_at: Time.current)
+      remaining_time_anchor_at: nil, started_at: task_run.started_at || Time.current,
+      finished_at: nil, last_heartbeat_at: Time.current)
   end
 
   def team_started!(team_mlb_id)
@@ -19,7 +20,7 @@ class MlbRosterSyncProgressTracker
 
   def team_finished!(success:)
     task_run.reload
-    task_run.update!(completed_items: task_run.completed_items + (success ? 1 : 0), failed_items: task_run.failed_items + (success ? 0 : 1), last_heartbeat_at: Time.current)
+    task_run.update!(completed_items: task_run.completed_items + (success ? 1 : 0), failed_items: task_run.failed_items + (success ? 0 : 1), remaining_time_anchor_at: Time.current, last_heartbeat_at: Time.current)
   end
 
   def cancel_requested? = task_run.reload.cancel_requested?

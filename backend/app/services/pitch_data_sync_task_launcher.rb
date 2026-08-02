@@ -20,7 +20,7 @@ class PitchDataSyncTaskLauncher
     attributes = estimate.fetch(:task_parameters)
     raise ArgumentError, "A Statcast pitch data synchronization is already queued or running" if AdminTaskRun.active.exists?(task_name: TASK_NAME)
 
-    task_run = AdminTaskRun.create!(task_name: TASK_NAME, task_parameters: attributes, total_items: estimate.fetch(:game_count), initiated_by: @initiated_by)
+    task_run = AdminTaskRun.create!(task_name: TASK_NAME, task_parameters: attributes, total_items: estimate.fetch(:game_count), estimated_duration_seconds: estimate.fetch(:estimated_seconds), initiated_by: @initiated_by)
     enqueued_job = PitchDataSyncJob.perform_later(task_run.id)
     raise EnqueueFailure, "Statcast pitch data synchronization could not be enqueued" unless enqueued_job
 

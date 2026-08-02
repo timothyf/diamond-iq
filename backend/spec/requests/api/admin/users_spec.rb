@@ -19,6 +19,35 @@ RSpec.describe "Api::Admin::Users", type: :request do
     expect(response).to have_http_status(:forbidden)
   end
 
+  it "lets an administrator create a user without replacing the administrator session" do
+    post api_admin_users_path,
+      params: { name: "New Analyst", email: "new.analyst@example.test", role: "analyst" },
+      headers: headers
+
+    expect(response).to have_http_status(:created)
+    created = User.find_by!(email: "new.analyst@example.test")
+    temporary_password = json_body.dig("data", "temporary_password")
+    expect(created).to have_attributes(name: "New Analyst", role: "analyst")
+    expect(created.authenticate_password(temporary_password)).to be(true)
+    expect(administrator.reload.auth_token_digest).to be_present
+
+    audit = AuditLog.order(:id).last
+    expect(audit).to have_attributes(user_id: administrator.id, action: "user_created",
+      auditable_type: "User", auditable_id: created.id)
+    expect(audit.change_set.to_s).not_to include(temporary_password)
+  end
+
+  it "rejects user creation by a non-administrator" do
+    scout = create_user(role: "scout")
+
+    post api_admin_users_path,
+      params: { name: "No Access", email: "no.access@example.test", role: "viewer" },
+      headers: user_headers(scout)
+
+    expect(response).to have_http_status(:forbidden)
+    expect(User.find_by(email: "no.access@example.test")).to be_nil
+  end
+
   it "changes roles and records the administrator who made the change" do
     target = create_user(role: "viewer")
 

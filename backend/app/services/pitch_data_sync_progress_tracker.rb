@@ -15,6 +15,7 @@ class PitchDataSyncProgressTracker
       error_message: nil,
       current_item_mlb_id: nil,
       current_item_label: nil,
+      remaining_time_anchor_at: nil,
       started_at: task_run.started_at || Time.current,
       finished_at: nil,
       last_heartbeat_at: Time.current
@@ -55,6 +56,7 @@ class PitchDataSyncProgressTracker
         completed_items: task_run.completed_items + (success ? processed_game_count : 0),
         failed_items: task_run.failed_items + (success ? 0 : processed_game_count),
         result_data: merged_result,
+        remaining_time_anchor_at: Time.current,
         last_heartbeat_at: Time.current
       )
     end

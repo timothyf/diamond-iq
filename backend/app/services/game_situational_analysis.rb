@@ -142,20 +142,37 @@ class GameSituationalAnalysis
   end
 
   def turning_point
-    wpa_candidate = appearances.filter_map do |appearance|
+    wpa_candidates = appearances.filter_map do |appearance|
       delta = terminal_pitch(appearance)&.delta_home_win_exp
       [ appearance, delta ] if delta.present?
-    end.max_by { |_appearance, delta| delta.abs }
+    end
+    if winning_team
+      wpa_candidates.select! { |_appearance, delta| wpa_benefits_winner?(delta) }
+    end
+    wpa_candidate = wpa_candidates.max_by { |_appearance, delta| delta.abs }
 
     if wpa_candidate
       appearance, delta = wpa_candidate
       return turning_point_json(appearance, type: "win_probability", wpa_change: delta)
     end
 
-    appearance = appearances.max_by { |candidate| [ runs_scored(candidate), candidate.inning.to_i ] }
+    scoring_candidates = winning_team ? appearances.select { |candidate| candidate.batting_team_id == winning_team.id } : appearances
+    appearance = scoring_candidates.max_by { |candidate| [ runs_scored(candidate), candidate.inning.to_i ] }
     return if appearance.nil? || runs_scored(appearance).zero?
 
     turning_point_json(appearance, type: "scoring_play", wpa_change: nil)
+  end
+
+  def winning_team
+    @winning_team ||= if game.home_score.to_i > game.away_score.to_i
+      game.home_team
+    elsif game.away_score.to_i > game.home_score.to_i
+      game.away_team
+    end
+  end
+
+  def wpa_benefits_winner?(delta)
+    winning_team.id == game.home_team_id ? delta.positive? : delta.negative?
   end
 
   def turning_point_json(appearance, type:, wpa_change:)

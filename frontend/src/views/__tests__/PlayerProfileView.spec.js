@@ -532,6 +532,11 @@ describe('PlayerProfileView', () => {
     expect(panel.get('[data-test="advanced-stat-group-value"]').text()).toContain('18.4')
     expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('Opposite-field%')
     expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('42.8%')
+    const battingLongHeader = panel
+      .get('[data-test="advanced-stat-group-batted_ball_profile"]')
+      .findAll('thead th')
+      .find((header) => header.text() === 'Opposite-field%')
+    expect(battingLongHeader.classes()).toContain('advanced-table__metric-heading')
     expect(panel.get('[data-test="advanced-stat-group-plate_discipline"]').text()).toContain('Zone Contact%')
     expect(panel.get('[data-test="advanced-stat-group-plate_discipline"]').text()).toContain('10.6%')
   })
@@ -645,6 +650,10 @@ describe('PlayerProfileView', () => {
     expect(valueTable.text()).toContain('Runs above replacement')
     expect(valueTable.text()).toContain('Shutdowns')
     expect(valueTable.text()).toContain('2.5')
+    const pitcherLongHeader = valueTable
+      .findAll('thead th')
+      .find((header) => header.text() === 'Runs above replacement')
+    expect(pitcherLongHeader.classes()).toContain('advanced-table__metric-heading')
   })
 
   it('shows pitching trends for primary pitchers', async () => {

@@ -709,7 +709,13 @@ function formatTimestamp(value) {
                   <tr>
                     <th>Season</th>
                     <th>Team</th>
-                    <th v-for="column in group.columns" :key="column.key">{{ column.label }}</th>
+                    <th
+                      v-for="column in group.columns"
+                      :key="column.key"
+                      class="advanced-table__metric-heading"
+                    >
+                      {{ column.label }}
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1720,6 +1726,14 @@ function formatTimestamp(value) {
   font-weight: 900;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.advanced-table thead .advanced-table__metric-heading {
+  width: 6.5rem;
+  max-width: 7.5rem;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+  white-space: normal;
 }
 
 .advanced-table tbody tr:nth-child(even) th,

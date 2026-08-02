@@ -18,6 +18,7 @@ export function useAdminUsers() {
   const loading = ref(false)
   const error = ref('')
   const actionUserId = ref(null)
+  const creating = ref(false)
   const temporaryAccess = ref(null)
 
   async function loadUsers() {
@@ -64,6 +65,32 @@ export function useAdminUsers() {
     }
   }
 
+  async function createUser(attributes) {
+    creating.value = true
+    error.value = ''
+    temporaryAccess.value = null
+    try {
+      const payload = await request('/api/admin/users', {
+        method: 'POST',
+        headers: adminRequestHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }),
+        body: JSON.stringify(attributes),
+      })
+      temporaryAccess.value = {
+        userName: payload.data.name,
+        email: payload.data.email,
+        password: payload.data.temporary_password,
+        message: payload.meta?.message || '',
+      }
+      await loadUsers()
+      return payload.data
+    } catch (requestError) {
+      error.value = requestError.message
+      return null
+    } finally {
+      creating.value = false
+    }
+  }
+
   async function resetAccess(user) {
     actionUserId.value = user.id
     error.value = ''
@@ -105,8 +132,10 @@ export function useAdminUsers() {
     loading: computed(() => loading.value),
     error: computed(() => error.value),
     actionUserId: computed(() => actionUserId.value),
+    creating: computed(() => creating.value),
     temporaryAccess: computed(() => temporaryAccess.value),
     loadUsers,
+    createUser,
     updateUser,
     resetAccess,
     clearTemporaryAccess,

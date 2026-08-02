@@ -111,4 +111,46 @@ describe('AdminUserManagement', () => {
     expect(wrapper.get('[data-test="temporary-access"]').text()).toContain('temporary-access-123')
     expect(wrapper.get('[data-test="temporary-access"]').text()).toContain('Shown only once.')
   })
+
+  it('creates a user and shows the generated initial password', async () => {
+    const roles = ['administrator', 'analyst', 'coach', 'scout', 'viewer']
+      .map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }))
+    const users = []
+    const fetchMock = vi.fn(async (_url, options = {}) => {
+      if (options.method === 'POST') {
+        const attributes = JSON.parse(options.body)
+        const created = { id: 3, ...attributes, disabled: false, system_account: false, current_user: false }
+        users.push(created)
+        return {
+          ok: true,
+          json: async () => ({
+            data: { ...created, temporary_password: 'initial-access-456' },
+            meta: { message: 'Shown only once.' },
+          }),
+        }
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          data: users,
+          meta: { active_count: users.length, disabled_count: 0, administrator_count: 0, roles },
+        }),
+      }
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(AdminUserManagement)
+    await flushPromises()
+    const form = wrapper.get('[data-test="create-user-form"]')
+    await form.get('input[name="name"]').setValue('New Coach')
+    await form.get('input[name="email"]').setValue('coach@example.test')
+    await form.get('select[name="role"]').setValue('coach')
+    await form.trigger('submit')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users', expect.objectContaining({ method: 'POST' }))
+    expect(wrapper.text()).toContain('New Coach')
+    expect(wrapper.get('[data-test="temporary-access"]').text()).toContain('initial-access-456')
+    expect(form.get('input[name="name"]').element.value).toBe('')
+  })
 })

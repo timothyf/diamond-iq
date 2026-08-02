@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import PlayerSearch from './components/PlayerSearch.vue'
 import diamondIqLogo from './assets/diamondiq_logo.png'
@@ -8,6 +8,7 @@ import { useAuth } from './composables/useAuth'
 
 const { user, loadCurrentUser, logout } = useAuth()
 const route = useRoute()
+const router = useRouter()
 const accountMenuOpen = ref(false)
 const isAdministrator = computed(() => ['admin', 'administrator'].includes(user.value?.role))
 const signInTarget = computed(() => ({
@@ -21,7 +22,12 @@ function closeAccountMenu(event) {
 
 async function signOut() {
   accountMenuOpen.value = false
-  await logout()
+  const signedOutFrom = route.fullPath
+  const logoutRequest = logout()
+  if (route.meta.requiresAuth || route.meta.requiresAdmin) {
+    await router.replace({ name: 'login', query: { redirect: signedOutFrom } })
+  }
+  await logoutRequest
 }
 
 onMounted(() => {

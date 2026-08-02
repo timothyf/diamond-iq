@@ -6,7 +6,7 @@ Rails.application.routes.draw do
     delete "auth/logout", to: "auth#logout"
     namespace :admin do
       resource :data_health, only: :show
-      resources :users, only: [ :index, :update ] do
+      resources :users, only: [ :index, :create, :update ] do
         member do
           post :reset_access
         end

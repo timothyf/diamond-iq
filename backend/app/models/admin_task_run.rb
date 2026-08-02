@@ -9,6 +9,8 @@ class AdminTaskRun < ApplicationRecord
   validates :status, inclusion: { in: STATUSES }
   validates :total_items, :completed_items, :failed_items,
     numericality: { only_integer: true, greater_than_or_equal_to: 0 }
+  validates :estimated_duration_seconds,
+    numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
   scope :active, -> { where(status: ACTIVE_STATUSES) }
   scope :recent_first, -> { order(created_at: :desc) }
@@ -43,8 +45,24 @@ class AdminTaskRun < ApplicationRecord
   end
 
   def estimated_remaining_seconds
-    return unless active? && started_at && processed_items.positive? && processed_items < total_items
+    return unless active? && processed_items < total_items
 
-    (elapsed_seconds.to_f / processed_items * (total_items - processed_items)).round
+    # Keep the estimate stable while an item is in flight. The baseline is
+    # recalculated when an item completes, then simply counts down until the
+    # next completion moves the anchor.
+    anchor_at = remaining_time_anchor_at || (processed_items.positive? ? updated_at : started_at)
+    return estimated_duration_seconds if anchor_at.nil?
+
+    baseline_seconds = if processed_items.positive?
+      return unless started_at
+
+      elapsed_at_anchor = anchor_at - started_at
+      elapsed_at_anchor.to_f / processed_items * (total_items - processed_items)
+    else
+      estimated_duration_seconds
+    end
+    return unless baseline_seconds
+
+    [ baseline_seconds - (Time.current - anchor_at), 0 ].max.round
   end
 end

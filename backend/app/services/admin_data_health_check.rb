@@ -75,12 +75,16 @@ class AdminDataHealthCheck
   end
 
   def final_games_missing_pitch_data
-    games_without_linked_pitches = completed_games.where.not(
+    current_year = Date.current.year
+    current_season_games = completed_games.where(
+      "EXTRACT(YEAR FROM official_date) = ?", current_year
+    )
+    games_without_linked_pitches = current_season_games.where.not(
       id: PitchDatum.where.not(game_id: nil).select(:game_id)
     )
     scope = games_without_linked_pitches
-      .or(completed_games.where(pitch_data_complete_at: nil))
-      .or(completed_games.where(pitch_data_row_count: 0))
+      .or(current_season_games.where(pitch_data_complete_at: nil))
+      .or(current_season_games.where(pitch_data_row_count: 0))
 
     game_check(
       id: "final_games_missing_pitch_data",

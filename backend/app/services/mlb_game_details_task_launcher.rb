@@ -28,6 +28,7 @@ class MlbGameDetailsTaskLauncher
       task_name: TASK_NAME,
       task_parameters: attributes,
       total_items: estimate.fetch(:game_count),
+      estimated_duration_seconds: estimate.fetch(:estimated_seconds),
       initiated_by: @initiated_by
     )
     enqueued_job = MlbGameDetailsSyncJob.perform_later(task_run.id)

@@ -13,7 +13,7 @@ RSpec.describe GameSituationalAnalysis do
     add_batting_line(game, away_hitter, away_team, home_team, home: false, starter: true, batting_order: 100)
 
     add_appearance(game, away_hitter, away_team, 1, event_type: "single", inning: 1, half: "top",
-      away_score: 1, home_score: 0, outs: 2, on_2b: 9001, delta_wpa: -0.12, prior_appearances: 0, rbi: 1)
+      away_score: 1, home_score: 0, outs: 2, on_2b: 9001, delta_wpa: -0.45, prior_appearances: 0, rbi: 1)
     add_appearance(game, leadoff, home_team, 2, event_type: "walk", inning: 1, half: "bottom",
       away_score: 1, home_score: 0, outs: 0, delta_wpa: 0.02, prior_appearances: 0)
     turning_point = add_appearance(game, pinch_hitter, home_team, 3, event_type: "home_run", inning: 8, half: "bottom",
@@ -42,6 +42,28 @@ RSpec.describe GameSituationalAnalysis do
       inning_label: "Bottom 8th",
       description: turning_point.description,
       home_win_probability_change: 0.35,
+      benefiting_team: include(abbreviation: "DET")
+    )
+  end
+
+  it "uses a scoring play by the eventual winner when WPA data is unavailable" do
+    home_team = create_team(name: "Oakland Athletics", abbreviation: "OAK")
+    away_team = create_team(name: "Detroit Tigers", abbreviation: "DET")
+    game = create_game(home_team: home_team, away_team: away_team, home_score: 6, away_score: 8)
+    detroit_hitter = create_player(team: away_team, attributes: { first_name: "Colt", last_name: "Keith" })
+    oakland_hitter = create_player(team: home_team, attributes: { first_name: "Henry", last_name: "Bolte" })
+
+    detroit_play = add_appearance(game, detroit_hitter, away_team, 1, event_type: "double", inning: 5, half: "top",
+      away_score: 2, home_score: 0, outs: 1, delta_wpa: nil, prior_appearances: 0, rbi: 2,
+      description: "Colt Keith doubles. Two runs score.")
+    add_appearance(game, oakland_hitter, home_team, 2, event_type: "home_run", inning: 8, half: "bottom",
+      away_score: 8, home_score: 5, outs: 1, delta_wpa: nil, prior_appearances: 0, rbi: 3,
+      description: "Henry Bolte homers. Three runs score.")
+
+    expect(described_class.call(game).fetch(:turning_point)).to include(
+      type: "scoring_play",
+      description: detroit_play.description,
+      batting_team: include(abbreviation: "DET"),
       benefiting_team: include(abbreviation: "DET")
     )
   end

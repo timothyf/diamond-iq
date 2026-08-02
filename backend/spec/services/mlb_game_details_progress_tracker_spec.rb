@@ -58,7 +58,11 @@ RSpec.describe MlbGameDetailsProgressTracker do
 
     expect { tracker.game_finished!(game: game, success: true) }.not_to raise_error
 
-    expect(task_run.reload).to have_attributes(completed_items: 1, failed_items: 0)
+    expect(task_run.reload).to have_attributes(
+      completed_items: 1,
+      failed_items: 0,
+      remaining_time_anchor_at: be_present
+    )
   end
 
   it "records failed game details on unsuccessful completion" do

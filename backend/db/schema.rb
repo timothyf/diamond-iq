@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_07_30_010000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_02_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -33,6 +33,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_07_30_010000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "initiated_by_id"
+    t.integer "estimated_duration_seconds"
+    t.datetime "remaining_time_anchor_at"
     t.index ["created_at"], name: "index_admin_task_runs_on_created_at"
     t.index ["initiated_by_id"], name: "index_admin_task_runs_on_initiated_by_id"
     t.index ["task_name", "status", "created_at"], name: "idx_admin_task_runs_active_lookup"

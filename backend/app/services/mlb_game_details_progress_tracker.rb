@@ -57,6 +57,7 @@ class MlbGameDetailsProgressTracker
         completed_items: run.completed_items + (success ? 1 : 0),
         failed_items: run.failed_items + (success ? 0 : 1),
         result_data: result_data,
+        remaining_time_anchor_at: Time.current,
         last_heartbeat_at: Time.current
       )
     end

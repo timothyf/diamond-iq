@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { onMounted, reactive } from 'vue'
 
 import { useAdminUsers } from '../../composables/useAdminUsers'
 import { formatTimestamp } from '../../utils/adminFormatting'
@@ -11,12 +11,16 @@ const {
   loading,
   error,
   actionUserId,
+  creating,
   temporaryAccess,
   loadUsers,
+  createUser,
   updateUser,
   resetAccess,
   clearTemporaryAccess,
 } = useAdminUsers()
+
+const newUser = reactive({ name: '', email: '', role: 'viewer' })
 
 onMounted(loadUsers)
 
@@ -36,6 +40,15 @@ function requestReset(user) {
   if (!window.confirm(`Reset access for ${user.name}? Their current session will be revoked.`)) return
   resetAccess(user)
 }
+
+async function submitNewUser() {
+  const created = await createUser(newUser)
+  if (!created) return
+
+  newUser.name = ''
+  newUser.email = ''
+  newUser.role = 'viewer'
+}
 </script>
 
 <template>
@@ -54,6 +67,28 @@ function requestReset(user) {
       <article><strong>{{ summary.administratorCount }}</strong><span>Administrators</span></article>
       <article><strong>{{ summary.disabledCount }}</strong><span>Disabled accounts</span></article>
     </div>
+
+    <form class="create-user" data-test="create-user-form" @submit.prevent="submitNewUser">
+      <div class="create-user__heading">
+        <strong>Create user</strong>
+        <span>An initial temporary password will be generated and shown once.</span>
+      </div>
+      <label>
+        <span>Name</span>
+        <input v-model.trim="newUser.name" name="name" type="text" autocomplete="off" required />
+      </label>
+      <label>
+        <span>Email</span>
+        <input v-model.trim="newUser.email" name="email" type="email" autocomplete="off" required />
+      </label>
+      <label>
+        <span>Role</span>
+        <select v-model="newUser.role" name="role" required>
+          <option v-for="role in roles" :key="role.value" :value="role.value">{{ role.label }}</option>
+        </select>
+      </label>
+      <button type="submit" :disabled="creating || loading">{{ creating ? 'Creating…' : 'Create user' }}</button>
+    </form>
 
     <p v-if="error" class="user-management__error" role="alert">{{ error }}</p>
 
@@ -124,11 +159,13 @@ function requestReset(user) {
 .user-management__header { display: flex; justify-content: space-between; gap: 1.5rem; align-items: end; }
 .user-management__header h2 { margin: .2rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: 2rem; line-height: 1; text-transform: uppercase; }
 .user-management__header p:last-child { margin: 0; color: #657580; font-size: .82rem; }
-.user-management__header button,.user-actions button,.temporary-access button { padding: .55rem .75rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; font-size: .72rem; font-weight: 900; cursor: pointer; }
+.user-management__header button,.user-actions button,.temporary-access button,.create-user button { padding: .55rem .75rem; border: 1px solid rgba(16,38,61,.16); border-radius: 9px; color: #173652; background: #fffdf7; font: inherit; font-size: .72rem; font-weight: 900; cursor: pointer; }
 .user-management button:disabled,.user-management select:disabled { opacity: .5; cursor: not-allowed; }
 .user-management__summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: .7rem; margin-top: 1rem; }
 .user-management__summary article { padding: .8rem; border-radius: 12px; background: rgba(23,54,82,.06); }
 .user-management__summary strong,.user-management__summary span { display: block; }.user-management__summary strong { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.7rem; }.user-management__summary span { color: #687985; font-size: .7rem; font-weight: 800; text-transform: uppercase; }
+.create-user { display: grid; grid-template-columns: minmax(220px,1.3fr) repeat(3,minmax(140px,1fr)) auto; gap: .75rem; align-items: end; margin-top: 1rem; padding: 1rem; border: 1px solid rgba(16,38,61,.1); border-radius: 14px; background: rgba(23,54,82,.035); }
+.create-user__heading strong,.create-user__heading span,.create-user label span { display: block; }.create-user__heading strong { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.25rem; text-transform: uppercase; }.create-user__heading span { margin-top: .2rem; color: #687985; font-size: .68rem; line-height: 1.35; }.create-user label span { margin-bottom: .3rem; color: #687985; font-size: .62rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase; }.create-user input,.create-user select { width: 100%; min-height: 38px; padding: .5rem; border: 1px solid rgba(16,38,61,.16); border-radius: 8px; color: #10263d; background: #fffdf7; font: inherit; font-size: .75rem; box-sizing: border-box; }
 .user-management__error { padding: .7rem; border-radius: 10px; color: #8f2d24; background: #f5ddd5; font-size: .78rem; font-weight: 800; }
 .temporary-access { display: grid; grid-template-columns: 1fr auto; gap: .55rem 1rem; align-items: center; margin-top: 1rem; padding: 1rem; border: 1px solid rgba(181,120,31,.3); border-radius: 14px; background: #fbefce; }
 .temporary-access p,.temporary-access strong,.temporary-access span { display: block; margin: 0; }.temporary-access div p { color: #8f621c; font-size: .64rem; font-weight: 900; text-transform: uppercase; }.temporary-access span { color: #6d7880; font-size: .72rem; }.temporary-access code { grid-row: span 2; padding: .55rem .75rem; border-radius: 8px; color: #10263d; background: #fffdf7; font-size: .9rem; }.temporary-access > p { grid-column: 1 / -1; color: #705722; font-size: .7rem; }.temporary-access > button { grid-column: 1 / -1; justify-self: start; }
@@ -142,5 +179,6 @@ function requestReset(user) {
 .user-status { display: inline-block; padding: .25rem .48rem; border-radius: 999px; color: #17613d; background: rgba(42,145,91,.13); font-size: .64rem; font-weight: 900; text-transform: uppercase; }.user-status--disabled { color: #8f2d24; background: rgba(181,61,48,.12); }
 .user-actions { display: flex; justify-content: flex-end; gap: .4rem; }.user-actions button:last-child { color: #8f2d24; }
 .user-management__empty { padding: 2rem; color: #697984; text-align: center; }
-@media (max-width: 720px) { .user-management__header { align-items: stretch; flex-direction: column; }.user-management__summary { grid-template-columns: 1fr; }.temporary-access { grid-template-columns: 1fr; }.temporary-access code { grid-row: auto; }.temporary-access > p,.temporary-access > button { grid-column: auto; } }
+@media (max-width: 1050px) { .create-user { grid-template-columns: repeat(2,minmax(0,1fr)); }.create-user__heading { grid-column: 1 / -1; } }
+@media (max-width: 720px) { .user-management__header { align-items: stretch; flex-direction: column; }.user-management__summary,.create-user { grid-template-columns: 1fr; }.create-user__heading { grid-column: auto; }.temporary-access { grid-template-columns: 1fr; }.temporary-access code { grid-row: auto; }.temporary-access > p,.temporary-access > button { grid-column: auto; } }
 </style>

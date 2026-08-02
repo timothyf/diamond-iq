@@ -21,6 +21,31 @@ module Api
         }
       end
 
+      def create
+        role = create_user_params[:role].presence || "viewer"
+        validate_role!(role)
+        return if performed?
+
+        temporary_password = SecureRandom.urlsafe_base64(15)
+        user = User.new(create_user_params.except(:role).merge(role:, password: temporary_password))
+        user.save!
+
+        AuditLog.record!(
+          user: current_user,
+          action: "user_created",
+          record: user,
+          changes: user.saved_changes.except("auth_token_digest", "password_digest", "password_salt"),
+          metadata: { "request_id" => request.request_id }
+        )
+
+        render json: {
+          data: serialize_user(user).merge(temporary_password: temporary_password),
+          meta: { message: "Share this temporary password securely; it is shown only once." }
+        }, status: :created
+      rescue ActiveRecord::RecordInvalid => error
+        render json: { message: error.record.errors.full_messages.to_sentence }, status: :unprocessable_content
+      end
+
       def update
         reject_system_account!
         return if performed?
@@ -95,6 +120,10 @@ module Api
 
       def user_params
         params.permit(:role, :disabled)
+      end
+
+      def create_user_params
+        params.permit(:name, :email, :role)
       end
 
       def validate_role!(role)
