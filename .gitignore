@@ -67,5 +67,6 @@ ingest_data_from_postgres*
 /docs/
 .cloudflare-dev/logs
 *cloudflare*
-
+output/*
+output/pdf/*
 
