@@ -1,15 +1,10 @@
 class PitchDataSyncTaskEstimate
   TASK_NAME = "pitch_data_sync"
-  DEFAULT_SECONDS_PER_GAME = 45.0
-  LOW_RANGE_FACTOR = 0.8
-  HIGH_RANGE_FACTOR = 1.35
-  DEFAULT_CHUNK_DAYS = PitchDataDownloader::DEFAULT_CHUNK_DAYS
-
-  def self.call(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, replace_existing: false)
+  def self.call(start_date:, end_date:, game_types: "R", chunk_days: nil, replace_existing: false)
     new(start_date: start_date, end_date: end_date, game_types: game_types, chunk_days: chunk_days, replace_existing: replace_existing).call
   end
 
-  def initialize(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, replace_existing: false)
+  def initialize(start_date:, end_date:, game_types: "R", chunk_days: nil, replace_existing: false)
     @start_date_input = start_date
     @end_date_input = end_date
     @game_types_input = game_types
@@ -21,15 +16,15 @@ class PitchDataSyncTaskEstimate
     attributes = normalized_attributes
     game_count = selected_games(attributes).count
     timing = historical_timing
-    seconds_per_game = timing.fetch(:seconds_per_game, DEFAULT_SECONDS_PER_GAME)
+    seconds_per_game = timing.fetch(:seconds_per_game, estimate_config.fetch(:pitch_data_seconds_per_game).to_f)
 
     {
       task_parameters: attributes,
       game_count: game_count,
       already_complete_game_count: already_complete_games(attributes).count,
       estimated_seconds: (game_count * seconds_per_game).round,
-      low_estimated_seconds: (game_count * seconds_per_game * LOW_RANGE_FACTOR).ceil,
-      high_estimated_seconds: (game_count * seconds_per_game * HIGH_RANGE_FACTOR).ceil,
+      low_estimated_seconds: (game_count * seconds_per_game * estimate_config.fetch(:pitch_data_low_range_factor)).ceil,
+      high_estimated_seconds: (game_count * seconds_per_game * estimate_config.fetch(:pitch_data_high_range_factor)).ceil,
       seconds_per_game: seconds_per_game.round(1),
       timing_sample_game_count: timing.fetch(:game_count),
       timing_sample_run_count: timing.fetch(:run_count),
@@ -41,13 +36,19 @@ class PitchDataSyncTaskEstimate
 
   attr_reader :start_date_input, :end_date_input, :game_types_input, :chunk_days_input, :replace_existing_input
 
+  def estimate_config
+    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates).merge(
+      default_chunk_days: DiamondIqConfig.fetch(:operations, :pitch_data, :default_chunk_days)
+    )
+  end
+
   def normalized_attributes
     start_date = parse_required_date(:start_date, start_date_input)
     end_date = parse_required_date(:end_date, end_date_input)
     raise ArgumentError, "Statcast pitch data is not available before 2008" if start_date < Date.new(2008, 1, 1)
     raise ArgumentError, "End date must be on or after start date" if end_date < start_date
 
-    chunk_days = Integer(chunk_days_input.presence || DEFAULT_CHUNK_DAYS, exception: false)
+    chunk_days = Integer(chunk_days_input.presence || estimate_config.fetch(:default_chunk_days), exception: false)
     raise ArgumentError, "Chunk days must be at least 1" if chunk_days.nil? || chunk_days < 1
 
     game_types = Array(game_types_input.to_s.split(",")).map { |item| item.strip.upcase }.reject(&:blank?).uniq

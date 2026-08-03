@@ -2,10 +2,6 @@ require "json"
 require "net/http"
 
 class MlbGameDetailsDownloader
-  BASE_URL = "https://statsapi.mlb.com/api"
-  DEFAULT_TIMEOUT_SECONDS = 60
-  USER_AGENT = "DiamondIQ/1.0 (MLB game detail synchronization)"
-
   def self.call(mlb_id:)
     new(mlb_id: mlb_id).call
   end
@@ -18,8 +14,9 @@ class MlbGameDetailsDownloader
     return failure("MLB game id must be a positive integer") unless mlb_id&.positive?
 
     fetched_at = Time.current.utc.iso8601
-    boxscore_url = "#{BASE_URL}/v1/game/#{mlb_id}/boxscore"
-    live_feed_url = "#{BASE_URL}/v1.1/game/#{mlb_id}/feed/live"
+    base_url = service_config.fetch(:base_url)
+    boxscore_url = "#{base_url}/api/v1/game/#{mlb_id}/boxscore"
+    live_feed_url = "#{base_url}/api/v1.1/game/#{mlb_id}/feed/live"
     boxscore = fetch_json(boxscore_url)
     live_feed = fetch_json(live_feed_url)
 
@@ -46,16 +43,20 @@ class MlbGameDetailsDownloader
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agents).fetch(:game_details)
     request["Accept"] = "application/json"
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
     JSON.parse(response.body)
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
   end
 
   def success(message, data)

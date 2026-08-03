@@ -2,10 +2,6 @@ require "csv"
 require "net/http"
 
 class PitchDataDownloader
-  BASE_URL = "https://baseballsavant.mlb.com/statcast_search/csv"
-  DEFAULT_CHUNK_DAYS = 7
-  DEFAULT_TIMEOUT_SECONDS = 120
-  USER_AGENT = "Mozilla/5.0 (compatible; shopify-prep-project-mlb-pitch-data/1.0)"
   VALID_GAME_TYPES = %w[R S F D L W].freeze
 
   METADATA_COLUMNS = %w[
@@ -64,7 +60,7 @@ class PitchDataDownloader
 
   attr_reader :start_date, :end_date, :game_types, :chunk_days, :delay
 
-  def self.call(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, delay: 0.0)
+  def self.call(start_date:, end_date:, game_types: "R", chunk_days: nil, delay: 0.0)
     new(
       start_date: start_date,
       end_date: end_date,
@@ -74,11 +70,11 @@ class PitchDataDownloader
     ).call
   end
 
-  def initialize(start_date:, end_date:, game_types: "R", chunk_days: DEFAULT_CHUNK_DAYS, delay: 0.0)
+  def initialize(start_date:, end_date:, game_types: "R", chunk_days: nil, delay: 0.0)
     @start_date = parse_date(start_date)
     @end_date = parse_date(end_date)
     @game_types = parse_game_types(game_types)
-    @chunk_days = Integer(chunk_days.presence || DEFAULT_CHUNK_DAYS, exception: false)
+    @chunk_days = Integer(chunk_days.presence || service_config.fetch(:default_chunk_days), exception: false)
     @delay = delay.to_f
   end
 
@@ -159,20 +155,20 @@ class PitchDataDownloader
       hfGT: game_types.map { |game_type| "#{game_type}|" }.join
     }.to_query
 
-    "#{BASE_URL}?#{query}"
+    "#{service_config.fetch(:statcast_url)}?#{query}"
   end
 
   def fetch_csv(url)
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == "https"
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:statcast_user_agent)
     request["Accept"] = "text/csv,text/plain,*/*"
-    request["Referer"] = "https://baseballsavant.mlb.com/statcast_search"
+    request["Referer"] = service_config.fetch(:statcast_referer)
 
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
@@ -181,6 +177,12 @@ class PitchDataDownloader
     raise "Baseball Savant returned HTML instead of CSV" if text.lstrip.downcase.start_with?("<!doctype html", "<html")
 
     text
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :baseball_savant).merge(
+      default_chunk_days: DiamondIqConfig.fetch(:operations, :pitch_data, :default_chunk_days)
+    )
   end
 
   def normalize_response_body(body)

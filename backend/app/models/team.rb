@@ -22,7 +22,7 @@ class Team < ApplicationRecord
     inverse_of: :opponent_team, dependent: :restrict_with_error
 
   def logo_url
-    "https://www.mlbstatic.com/team-logos/#{mlb_id}.svg"
+    "#{DiamondIqConfig.fetch(:external_services, :mlb_assets, :static_base_url)}/team-logos/#{mlb_id}.svg"
   end
 
   validates :mlb_id, presence: true, uniqueness: true

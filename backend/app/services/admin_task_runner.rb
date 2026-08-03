@@ -94,7 +94,7 @@ class AdminTaskRunner
   def mlb_player_profiles_sync
     MlbPlayerProfilesSync.call(
       only_missing: params.key?(:only_missing) ? params[:only_missing] : true,
-      batch_size: positive_integer(:batch_size, default: MlbPlayerProfilesSync::DEFAULT_BATCH_SIZE),
+      batch_size: positive_integer(:batch_size, default: DiamondIqConfig.fetch(:operations, :player_profiles, :batch_size).to_i),
       limit: optional_positive_integer(:limit),
       mlb_ids: params[:mlb_ids].presence
     )

@@ -1,6 +1,5 @@
 class MlbGameDetailsSyncJob < ApplicationJob
   queue_as :default
-  EXECUTION_HEARTBEAT_STALE_AFTER = 45.seconds
 
   def perform(task_run_id)
     claim_state = claim_execution(task_run_id)
@@ -55,7 +54,7 @@ class MlbGameDetailsSyncJob < ApplicationJob
 
       result_data = task_run.result_data.deep_dup
       existing_job_id = result_data["active_execution_job_id"]
-      recent_heartbeat = task_run.last_heartbeat_at.present? && task_run.last_heartbeat_at > EXECUTION_HEARTBEAT_STALE_AFTER.ago
+      recent_heartbeat = task_run.last_heartbeat_at.present? && task_run.last_heartbeat_at > execution_heartbeat_stale_seconds.seconds.ago
       duplicate_running = task_run.status == "running" && existing_job_id.present? && existing_job_id != job_id && recent_heartbeat
       return :duplicate if duplicate_running
 
@@ -78,6 +77,10 @@ class MlbGameDetailsSyncJob < ApplicationJob
     end
   rescue StandardError => error
     Rails.logger.warn("MlbGameDetailsSyncJob claim release skipped for task_run_id=#{task_run_id}: #{error.class}: #{error.message}")
+  end
+
+  def execution_heartbeat_stale_seconds
+    DiamondIqConfig.fetch(:operations, :game_details, :execution_heartbeat_stale_seconds).to_i
   end
 
   def analytics_refresh_interrupted?(task_run)

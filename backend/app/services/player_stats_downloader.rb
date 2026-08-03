@@ -3,26 +3,18 @@ require "json"
 require "net/http"
 
 class PlayerStatsDownloader
-  BASE_URL = "https://bdfed.stitch.mlbinfra.com/bdfed/stats/player"
-  BASEBALL_REFERENCE_WAR_URL = "https://www.baseball-reference.com/data/war_daily_pitch.txt"
-  LIMIT = 1_000
-  DEFAULT_TIMEOUT_SECONDS = 60
-  USER_AGENT = "Mozilla/5.0 (compatible; shopify-prep-project-mlb-season-stats/1.0)"
-
   CATEGORY_CONFIG = {
     "batting" => {
       group: "hitting",
       stat_type: "batter",
       sort_stat: "onBasePlusSlugging",
-      order: "desc",
-      referer: "https://www.mlb.com/stats/"
+      order: "desc"
     },
     "pitching" => {
       group: "pitching",
       stat_type: "pitcher",
       sort_stat: "earnedRunAverage",
-      order: "asc",
-      referer: "https://www.mlb.com/stats/pitching/"
+      order: "asc"
     }
   }.freeze
 
@@ -176,6 +168,23 @@ class PlayerStatsDownloader
     CATEGORY_CONFIG[category]
   end
 
+  def service_config
+    @service_config ||= {
+      base_url: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :base_url),
+      timeout_seconds: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :timeout_seconds),
+      user_agent: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :user_agent),
+      fangraphs_url: DiamondIqConfig.fetch(:external_services, :fangraphs, :leaders_url),
+      baseball_reference_url: DiamondIqConfig.fetch(:external_services, :baseball_reference, :war_url),
+      baseballsavant_leaderboard_url: DiamondIqConfig.fetch(:external_services, :baseball_savant, :leaderboard_url),
+      baseballsavant_user_agent: DiamondIqConfig.fetch(:external_services, :baseball_savant, :player_stats_user_agent),
+      referers: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :referers)
+    }
+  end
+
+  def page_size
+    DiamondIqConfig.fetch(:operations, :player_stats, :page_size).to_i
+  end
+
   def normalize_category(value)
     case value.to_s.strip.downcase
     when "batter", "batters", "hitting"
@@ -210,9 +219,9 @@ class PlayerStatsDownloader
       break if batch.empty?
 
       rows.concat(batch.map { |row| normalize_row(row, year, fetched_at_utc, url) })
-      break if batch.length < LIMIT
+      break if batch.length < page_size
 
-      offset += LIMIT
+      offset += page_size
       sleep(delay) if delay.positive?
     end
 
@@ -238,7 +247,7 @@ class PlayerStatsDownloader
   end
 
   def fetch_fangraphs_values(year)
-    uri = URI("https://www.fangraphs.com/api/leaders/major-league/data")
+    uri = URI(service_config.fetch(:fangraphs_url))
     query = {
       pos: "all",
       stats: category == "batting" ? "bat" : "pit",
@@ -255,10 +264,10 @@ class PlayerStatsDownloader
 
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agent)
     request["Accept"] = "application/json,text/plain,*/*"
 
     response = http.request(request)
@@ -332,7 +341,7 @@ class PlayerStatsDownloader
 
   def fetch_baseball_reference_values
     @fetch_baseball_reference_values ||= begin
-      uri = URI(BASEBALL_REFERENCE_WAR_URL)
+      uri = URI(service_config.fetch(:baseball_reference_url))
       response = request_csv(uri)
       csv_body = utf8_csv_body(response.body)
       values = Hash.new { |hash, year| hash[year] = {} }
@@ -349,7 +358,7 @@ class PlayerStatsDownloader
   end
 
   def fetch_statcast_values(year)
-    uri = URI("https://baseballsavant.mlb.com/leaderboard/custom")
+    uri = URI("#{service_config.fetch(:baseballsavant_leaderboard_url)}/custom")
     uri.query = {
       year: year,
       type: "pitcher",
@@ -372,7 +381,7 @@ class PlayerStatsDownloader
   end
 
   def fetch_statcast_run_values(year)
-    uri = URI("https://baseballsavant.mlb.com/leaderboard/swing-take")
+    uri = URI("#{service_config.fetch(:baseballsavant_leaderboard_url)}/swing-take")
     uri.query = {
       year: year,
       type: "All",
@@ -395,10 +404,10 @@ class PlayerStatsDownloader
   def request_csv(uri)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = true
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:baseballsavant_user_agent)
     request["Accept"] = "text/csv,*/*"
 
     response = http.request(request)
@@ -427,27 +436,27 @@ class PlayerStatsDownloader
       group: config.fetch(:group),
       playerPool: "ALL",
       gameType: "R",
-      limit: LIMIT.to_s,
+      limit: page_size.to_s,
       sortStat: config.fetch(:sort_stat),
       order: config.fetch(:order),
       season: year.to_s,
       offset: offset.to_s
     }.to_query
 
-    "#{BASE_URL}?#{query}"
+    "#{service_config.fetch(:base_url)}?#{query}"
   end
 
   def fetch_json(url)
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == "https"
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agent)
     request["Accept"] = "application/json,text/plain,*/*"
-    request["Referer"] = config.fetch(:referer)
+    request["Referer"] = service_config.fetch(:referers).fetch(category.to_sym)
 
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)

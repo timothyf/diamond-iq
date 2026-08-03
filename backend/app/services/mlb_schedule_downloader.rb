@@ -2,10 +2,7 @@ require "json"
 require "net/http"
 
 class MlbScheduleDownloader
-  BASE_URL = "https://statsapi.mlb.com/api/v1/schedule"
-  DEFAULT_TIMEOUT_SECONDS = 60
   DEFAULT_GAME_TYPES = "R"
-  USER_AGENT = "DiamondIQ/1.0 (MLB schedule synchronization)"
 
   attr_reader :start_date, :end_date, :game_types, :sport_id
 
@@ -73,24 +70,28 @@ class MlbScheduleDownloader
       hydrate: "team,probablePitcher,venue"
     }.to_query
 
-    "#{BASE_URL}?#{query}"
+    "#{service_config.fetch(:base_url)}/api/v1/schedule?#{query}"
   end
 
   def fetch_json(url)
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == "https"
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agents).fetch(:schedule)
     request["Accept"] = "application/json"
 
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
     JSON.parse(response.body)
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
   end
 
   def success(message, data = {})

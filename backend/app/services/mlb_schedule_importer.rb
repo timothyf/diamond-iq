@@ -218,7 +218,7 @@ class MlbScheduleImporter
     link = game_payload["link"].to_s
     return source_url if link.blank?
 
-    "https://statsapi.mlb.com#{link}"
+    "#{DiamondIqConfig.fetch(:external_services, :mlb_stats_api, :base_url)}#{link}"
   end
 
   def parse_date(value)

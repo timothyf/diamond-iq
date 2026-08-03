@@ -1,0 +1,62 @@
+default: &default
+  external_services:
+    mlb_stats_api:
+      base_url: <%= ENV.fetch("MLB_STATS_API_BASE_URL", "https://statsapi.mlb.com") %>
+      timeout_seconds: <%= ENV.fetch("MLB_STATS_API_TIMEOUT_SECONDS", 60) %>
+      user_agents:
+        schedule: <%= ENV.fetch("MLB_SCHEDULE_USER_AGENT", "DiamondIQ/1.0 (MLB schedule synchronization)") %>
+        roster: <%= ENV.fetch("MLB_ROSTER_USER_AGENT", "DiamondIQ/1.0 (MLB roster synchronization)") %>
+        player_profiles: <%= ENV.fetch("MLB_PLAYER_PROFILES_USER_AGENT", "DiamondIQ/1.0 (MLB player profile synchronization)") %>
+        transactions: <%= ENV.fetch("MLB_TRANSACTIONS_USER_AGENT", "DiamondIQ/1.0 (MLB player transaction synchronization)") %>
+        game_details: <%= ENV.fetch("MLB_GAME_DETAILS_USER_AGENT", "DiamondIQ/1.0 (MLB game detail synchronization)") %>
+    baseball_savant:
+      statcast_url: <%= ENV.fetch("BASEBALL_SAVANT_STATCAST_URL", "https://baseballsavant.mlb.com/statcast_search/csv") %>
+      statcast_referer: <%= ENV.fetch("BASEBALL_SAVANT_STATCAST_REFERER", "https://baseballsavant.mlb.com/statcast_search") %>
+      leaderboard_url: <%= ENV.fetch("BASEBALL_SAVANT_LEADERBOARD_URL", "https://baseballsavant.mlb.com/leaderboard") %>
+      timeout_seconds: <%= ENV.fetch("BASEBALL_SAVANT_TIMEOUT_SECONDS", 120) %>
+      statcast_user_agent: <%= ENV.fetch("BASEBALL_SAVANT_STATCAST_USER_AGENT", "Mozilla/5.0 (compatible; shopify-prep-project-mlb-pitch-data/1.0)") %>
+      player_stats_user_agent: <%= ENV.fetch("BASEBALL_SAVANT_PLAYER_STATS_USER_AGENT", "Mozilla/5.0 (compatible; shopify-prep-project-mlb-season-stats/1.0)") %>
+    mlb_player_stats:
+      base_url: <%= ENV.fetch("MLB_PLAYER_STATS_BASE_URL", "https://bdfed.stitch.mlbinfra.com/bdfed/stats/player") %>
+      timeout_seconds: <%= ENV.fetch("MLB_PLAYER_STATS_TIMEOUT_SECONDS", 60) %>
+      user_agent: <%= ENV.fetch("MLB_PLAYER_STATS_USER_AGENT", "Mozilla/5.0 (compatible; shopify-prep-project-mlb-season-stats/1.0)") %>
+      referers:
+        batting: <%= ENV.fetch("MLB_BATTING_STATS_REFERER", "https://www.mlb.com/stats/") %>
+        pitching: <%= ENV.fetch("MLB_PITCHING_STATS_REFERER", "https://www.mlb.com/stats/pitching/") %>
+    baseball_reference:
+      war_url: <%= ENV.fetch("BASEBALL_REFERENCE_WAR_URL", "https://www.baseball-reference.com/data/war_daily_pitch.txt") %>
+    fangraphs:
+      leaders_url: <%= ENV.fetch("FANGRAPHS_LEADERS_URL", "https://www.fangraphs.com/api/leaders/major-league/data") %>
+    mlb_assets:
+      static_base_url: <%= ENV.fetch("MLB_STATIC_BASE_URL", "https://www.mlbstatic.com") %>
+      headshot_base_url: <%= ENV.fetch("MLB_HEADSHOT_BASE_URL", "https://img.mlbstatic.com") %>
+  operations:
+    game_details:
+      default_worker_count: <%= ENV.fetch("GAME_DETAILS_SYNC_WORKERS", 3) %>
+      max_worker_count: <%= ENV.fetch("GAME_DETAILS_SYNC_MAX_WORKERS", 6) %>
+      per_game_timeout_seconds: <%= ENV.fetch("GAME_DETAILS_PER_GAME_TIMEOUT_SECONDS", 60) %>
+      execution_heartbeat_stale_seconds: <%= ENV.fetch("GAME_DETAILS_EXECUTION_HEARTBEAT_STALE_SECONDS", 45) %>
+      orphaned_task_heartbeat_seconds: <%= ENV.fetch("ADMIN_TASK_ORPHANED_HEARTBEAT_SECONDS", 90) %>
+    pitch_data:
+      default_chunk_days: <%= ENV.fetch("PITCH_DATA_DEFAULT_CHUNK_DAYS", 7) %>
+      retry_wait_seconds: <%= ENV.fetch("PITCH_DATA_RETRY_WAIT_SECONDS", 5) %>
+      retry_attempts: <%= ENV.fetch("PITCH_DATA_RETRY_ATTEMPTS", 3) %>
+    player_stats:
+      page_size: <%= ENV.fetch("PLAYER_STATS_PAGE_SIZE", 1000) %>
+    player_profiles:
+      max_people_per_request: <%= ENV.fetch("PLAYER_PROFILES_MAX_PEOPLE_PER_REQUEST", 100) %>
+      batch_size: <%= ENV.fetch("PLAYER_PROFILES_BATCH_SIZE", 50) %>
+    estimates:
+      game_details_seconds_per_game: <%= ENV.fetch("GAME_DETAILS_DEFAULT_SECONDS_PER_GAME", 50.0) %>
+      game_details_low_range_factor: <%= ENV.fetch("GAME_DETAILS_LOW_RANGE_FACTOR", 0.8) %>
+      game_details_high_range_factor: <%= ENV.fetch("GAME_DETAILS_HIGH_RANGE_FACTOR", 1.3) %>
+      pitch_data_seconds_per_game: <%= ENV.fetch("PITCH_DATA_DEFAULT_SECONDS_PER_GAME", 45.0) %>
+      pitch_data_low_range_factor: <%= ENV.fetch("PITCH_DATA_LOW_RANGE_FACTOR", 0.8) %>
+      pitch_data_high_range_factor: <%= ENV.fetch("PITCH_DATA_HIGH_RANGE_FACTOR", 1.35) %>
+      roster_seconds_per_team: <%= ENV.fetch("ROSTER_DEFAULT_SECONDS_PER_TEAM", 8.0) %>
+      roster_low_range_factor: <%= ENV.fetch("ROSTER_LOW_RANGE_FACTOR", 0.75) %>
+      roster_high_range_factor: <%= ENV.fetch("ROSTER_HIGH_RANGE_FACTOR", 1.5) %>
+
+development: *default
+test: *default
+production: *default

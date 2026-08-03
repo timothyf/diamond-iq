@@ -1,9 +1,5 @@
 class MlbRosterSyncTaskEstimate
   TASK_NAME = "mlb_roster_sync"
-  DEFAULT_SECONDS_PER_TEAM = 8.0
-  LOW_RANGE_FACTOR = 0.75
-  HIGH_RANGE_FACTOR = 1.5
-
   def self.call(team_scope:, team_mlb_id: nil, season: Date.current.year)
     new(team_scope:, team_mlb_id:, season:).call
   end
@@ -21,7 +17,7 @@ class MlbRosterSyncTaskEstimate
 
     team_count = target_team_ids.length
     timing = historical_timing
-    seconds_per_team = timing.fetch(:seconds_per_team, DEFAULT_SECONDS_PER_TEAM)
+    seconds_per_team = timing.fetch(:seconds_per_team, estimate_config.fetch(:roster_seconds_per_team).to_f)
     {
       task_parameters: {
         "team_scope" => team_scope,
@@ -30,8 +26,8 @@ class MlbRosterSyncTaskEstimate
       },
       team_count: team_count,
       estimated_seconds: (team_count * seconds_per_team).round,
-      low_estimated_seconds: (team_count * seconds_per_team * LOW_RANGE_FACTOR).ceil,
-      high_estimated_seconds: (team_count * seconds_per_team * HIGH_RANGE_FACTOR).ceil,
+      low_estimated_seconds: (team_count * seconds_per_team * estimate_config.fetch(:roster_low_range_factor)).ceil,
+      high_estimated_seconds: (team_count * seconds_per_team * estimate_config.fetch(:roster_high_range_factor)).ceil,
       seconds_per_team: seconds_per_team.round(1),
       timing_sample_team_count: timing.fetch(:team_count),
       timing_sample_run_count: timing.fetch(:run_count),
@@ -42,6 +38,10 @@ class MlbRosterSyncTaskEstimate
   private
 
   attr_reader :team_scope, :team_mlb_id, :season
+
+  def estimate_config
+    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates)
+  end
 
   def target_team_ids
     case team_scope

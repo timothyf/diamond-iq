@@ -1,9 +1,5 @@
 class MlbGameDetailsTaskEstimate
   TASK_NAME = "mlb_game_details_sync"
-  DEFAULT_SECONDS_PER_GAME = 50.0
-  LOW_RANGE_FACTOR = 0.8
-  HIGH_RANGE_FACTOR = 1.3
-
   def self.call(start_date: nil, end_date: nil, mlb_game_id: nil)
     new(start_date: start_date, end_date: end_date, mlb_game_id: mlb_game_id).call
   end
@@ -18,14 +14,14 @@ class MlbGameDetailsTaskEstimate
     attributes = normalized_attributes
     game_count = selected_games(attributes).count
     timing = historical_timing
-    seconds_per_game = timing.fetch(:seconds_per_game, DEFAULT_SECONDS_PER_GAME)
+    seconds_per_game = timing.fetch(:seconds_per_game, estimate_config.fetch(:game_details_seconds_per_game).to_f)
 
     {
       task_parameters: attributes,
       game_count: game_count,
       estimated_seconds: (game_count * seconds_per_game).round,
-      low_estimated_seconds: (game_count * seconds_per_game * LOW_RANGE_FACTOR).ceil,
-      high_estimated_seconds: (game_count * seconds_per_game * HIGH_RANGE_FACTOR).ceil,
+      low_estimated_seconds: (game_count * seconds_per_game * estimate_config.fetch(:game_details_low_range_factor)).ceil,
+      high_estimated_seconds: (game_count * seconds_per_game * estimate_config.fetch(:game_details_high_range_factor)).ceil,
       seconds_per_game: seconds_per_game.round(1),
       timing_sample_game_count: timing.fetch(:game_count),
       timing_sample_run_count: timing.fetch(:run_count),
@@ -36,6 +32,10 @@ class MlbGameDetailsTaskEstimate
   private
 
   attr_reader :start_date_input, :end_date_input, :mlb_game_id_input
+
+  def estimate_config
+    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates)
+  end
 
   def normalized_attributes
     if mlb_game_id_input.present?

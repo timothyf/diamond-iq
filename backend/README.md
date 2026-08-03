@@ -23,6 +23,15 @@ Things you may want to cover:
 
 * ...
 
+## Runtime configuration
+
+Operational defaults and external-service endpoints are defined in
+`config/diamond_iq.yml` and loaded through `Rails.application.config.x.diamond_iq`.
+Every value in that file has an environment-variable override, including API
+URLs, HTTP timeouts, game-detail worker limits, queue retry settings, and task
+estimate defaults. Secrets such as `ADMIN_API_TOKEN` and database credentials
+remain environment or Rails-credentials values.
+
 ## MLB roster synchronization
 
 After migrating the database, synchronize a team's dated 40-man roster with:

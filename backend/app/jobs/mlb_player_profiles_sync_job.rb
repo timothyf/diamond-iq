@@ -1,7 +1,7 @@
 class MlbPlayerProfilesSyncJob < ApplicationJob
   queue_as :default
 
-  def perform(only_missing: true, batch_size: MlbPlayerProfilesSync::DEFAULT_BATCH_SIZE, limit: nil, mlb_ids: nil)
+  def perform(only_missing: true, batch_size: nil, limit: nil, mlb_ids: nil)
     result = MlbPlayerProfilesSync.call(
       only_missing: only_missing,
       batch_size: batch_size,

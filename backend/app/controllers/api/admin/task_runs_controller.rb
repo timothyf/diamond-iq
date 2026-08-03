@@ -4,8 +4,6 @@ module Api
       before_action :require_authenticated_user
       before_action :require_admin_user
 
-      ORPHANED_HEARTBEAT_SECONDS = 90
-
       def index
         scope = AdminTaskRun.recent_first
         scope = scope.where(task_name: params[:task_name]) if params[:task_name].present?
@@ -103,7 +101,7 @@ module Api
         return task_run unless tracked_task_name?(task_run.task_name)
 
         execution_job_id = task_run.result_data.to_h["active_execution_job_id"]
-        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < ORPHANED_HEARTBEAT_SECONDS.seconds.ago
+        stale_heartbeat = task_run.last_heartbeat_at.blank? || task_run.last_heartbeat_at < orphaned_task_heartbeat_seconds.seconds.ago
         queue_job = execution_job_id.present? ? SolidQueue::Job.find_by(active_job_id: execution_job_id) : legacy_queue_job_for(task_run, stale_heartbeat: stale_heartbeat)
         return task_run unless queue_job
 
@@ -181,6 +179,10 @@ module Api
           :mlb_game_id,
           :calculation_version
         ).to_h
+      end
+
+      def orphaned_task_heartbeat_seconds
+        DiamondIqConfig.fetch(:operations, :game_details, :orphaned_task_heartbeat_seconds).to_i
       end
     end
   end

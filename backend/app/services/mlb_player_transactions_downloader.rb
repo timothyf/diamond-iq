@@ -2,10 +2,7 @@ require "json"
 require "net/http"
 
 class MlbPlayerTransactionsDownloader
-  BASE_URL = "https://statsapi.mlb.com/api/v1/transactions"
   DEFAULT_START_DATE = Date.new(1900, 1, 1)
-  DEFAULT_TIMEOUT_SECONDS = 60
-  USER_AGENT = "DiamondIQ/1.0 (MLB player transaction synchronization)"
 
   def self.call(player_mlb_id:, start_date: DEFAULT_START_DATE, end_date: Date.current)
     new(player_mlb_id: player_mlb_id, start_date: start_date, end_date: end_date).call
@@ -50,24 +47,28 @@ class MlbPlayerTransactionsDownloader
       startDate: start_date.strftime("%m/%d/%Y"),
       endDate: end_date.strftime("%m/%d/%Y")
     }.to_query
-    "#{BASE_URL}?#{query}"
+    "#{service_config.fetch(:base_url)}/api/v1/transactions?#{query}"
   end
 
   def fetch_json(url)
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == "https"
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agents).fetch(:transactions)
     request["Accept"] = "application/json"
 
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
     JSON.parse(response.body)
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
   end
 
   def parse_date(value)

@@ -1,10 +1,6 @@
 require "timeout"
 
 class MlbGameDetailsBatchSync
-  DEFAULT_WORKER_COUNT = 3
-  MAX_WORKER_COUNT = 6
-  PER_GAME_TIMEOUT_SECONDS = 60
-
   def self.call(start_date: nil, end_date: nil, mlb_game_id: nil, progress_tracker: nil, worker_count: nil)
     new(
       start_date: start_date,
@@ -93,8 +89,8 @@ class MlbGameDetailsBatchSync
     errors << "Start date is required" if start_date.nil?
     errors << "End date is required" if end_date.nil?
     errors << "End date must be on or after start date" if start_date && end_date && end_date < start_date
-    if worker_count.present? && (!worker_count.positive? || worker_count > MAX_WORKER_COUNT)
-      errors << "Worker count must be between 1 and #{MAX_WORKER_COUNT}"
+    if worker_count.present? && (!worker_count.positive? || worker_count > max_worker_count)
+      errors << "Worker count must be between 1 and #{max_worker_count}"
     end
     errors
   end
@@ -148,7 +144,7 @@ class MlbGameDetailsBatchSync
             finalized = false
             begin
               progress_tracker&.game_started!(game)
-              result = Timeout.timeout(PER_GAME_TIMEOUT_SECONDS) { MlbGameDetailsSync.call(game: game) }
+              result = Timeout.timeout(per_game_timeout_seconds) { MlbGameDetailsSync.call(game: game) }
               lock.synchronize do
                 if result[:success]
                   accumulate!(summary, result.fetch(:data))
@@ -161,7 +157,7 @@ class MlbGameDetailsBatchSync
               end
               progress_tracker&.game_finished!(game: game, success: result[:success], message: result[:message])
             rescue Timeout::Error
-              timeout_message = "Game details sync timed out after #{PER_GAME_TIMEOUT_SECONDS} seconds"
+              timeout_message = "Game details sync timed out after #{per_game_timeout_seconds} seconds"
               lock.synchronize do
                 summary[:failed_game_count] += 1
                 failures << { mlb_id: game.mlb_id, message: timeout_message, errors: [ "Timeout::Error" ] }
@@ -199,9 +195,25 @@ class MlbGameDetailsBatchSync
   def resolved_worker_count(game_count)
     return 1 if game_count <= 1
 
-    requested = worker_count || ENV.fetch("GAME_DETAILS_SYNC_WORKERS", DEFAULT_WORKER_COUNT)
-    count = Integer(requested, exception: false) || DEFAULT_WORKER_COUNT
-    [[count, 1].max, MAX_WORKER_COUNT].min
+    requested = worker_count || default_worker_count
+    count = Integer(requested, exception: false) || default_worker_count
+    [[count, 1].max, max_worker_count].min
+  end
+
+  def game_details_config
+    @game_details_config ||= DiamondIqConfig.fetch(:operations, :game_details)
+  end
+
+  def default_worker_count
+    game_details_config.fetch(:default_worker_count).to_i
+  end
+
+  def max_worker_count
+    game_details_config.fetch(:max_worker_count).to_i
+  end
+
+  def per_game_timeout_seconds
+    game_details_config.fetch(:per_game_timeout_seconds).to_i
   end
 
   def cancelled?(summary, lock)

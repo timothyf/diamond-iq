@@ -2,11 +2,6 @@ require "json"
 require "net/http"
 
 class MlbPlayerProfilesDownloader
-  BASE_URL = "https://statsapi.mlb.com/api/v1/people"
-  MAX_PEOPLE = 100
-  DEFAULT_TIMEOUT_SECONDS = 60
-  USER_AGENT = "DiamondIQ/1.0 (MLB player profile synchronization)"
-
   attr_reader :mlb_ids
 
   def self.call(mlb_ids:)
@@ -20,7 +15,7 @@ class MlbPlayerProfilesDownloader
   def call
     return failure("At least one player MLB id is required") if mlb_ids.empty?
     return failure("Player MLB ids must be positive integers") if mlb_ids.any? { |mlb_id| mlb_id < 1 }
-    return failure("A profile request cannot exceed #{MAX_PEOPLE} players") if mlb_ids.length > MAX_PEOPLE
+    return failure("A profile request cannot exceed #{max_people_per_request} players") if mlb_ids.length > max_people_per_request
 
     source_url = build_url
     payload = fetch_json(source_url)
@@ -48,24 +43,32 @@ class MlbPlayerProfilesDownloader
       personIds: mlb_ids.join(","),
       hydrate: "currentTeam"
     }.to_query
-    "#{BASE_URL}?#{query}"
+    "#{service_config.fetch(:base_url)}/api/v1/people?#{query}"
   end
 
   def fetch_json(url)
     uri = URI(url)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = uri.scheme == "https"
-    http.open_timeout = DEFAULT_TIMEOUT_SECONDS
-    http.read_timeout = DEFAULT_TIMEOUT_SECONDS
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
 
     request = Net::HTTP::Get.new(uri.request_uri)
-    request["User-Agent"] = USER_AGENT
+    request["User-Agent"] = service_config.fetch(:user_agents).fetch(:player_profiles)
     request["Accept"] = "application/json"
 
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
     JSON.parse(response.body)
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
+  end
+
+  def max_people_per_request
+    DiamondIqConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i
   end
 
   def success(message, data = {})

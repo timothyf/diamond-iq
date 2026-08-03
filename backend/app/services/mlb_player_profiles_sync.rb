@@ -1,11 +1,9 @@
 class MlbPlayerProfilesSync
-  DEFAULT_BATCH_SIZE = 50
-
-  def self.call(only_missing: true, batch_size: DEFAULT_BATCH_SIZE, limit: nil, mlb_ids: nil)
+  def self.call(only_missing: true, batch_size: nil, limit: nil, mlb_ids: nil)
     new(only_missing: only_missing, batch_size: batch_size, limit: limit, mlb_ids: mlb_ids).call
   end
 
-  def initialize(only_missing: true, batch_size: DEFAULT_BATCH_SIZE, limit: nil, mlb_ids: nil)
+  def initialize(only_missing: true, batch_size: nil, limit: nil, mlb_ids: nil)
     @only_missing = ActiveModel::Type::Boolean.new.cast(only_missing)
     @batch_size = normalized_batch_size(batch_size)
     @limit = positive_integer(limit)
@@ -85,8 +83,8 @@ class MlbPlayerProfilesSync
   end
 
   def normalized_batch_size(value)
-    parsed = positive_integer(value) || DEFAULT_BATCH_SIZE
-    [ parsed, MlbPlayerProfilesDownloader::MAX_PEOPLE ].min
+    parsed = positive_integer(value) || DiamondIqConfig.fetch(:operations, :player_profiles, :batch_size).to_i
+    [ parsed, DiamondIqConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i ].min
   end
 
   def positive_integer(value)
