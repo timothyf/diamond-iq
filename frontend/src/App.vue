@@ -56,8 +56,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
       <RouterLink to="/explore">Stat Explorer</RouterLink>
       <RouterLink to="/compare">Compare</RouterLink>
       <RouterLink to="/teams">Teams</RouterLink>
-      <RouterLink v-if="user" to="/watchlists">Watchlists</RouterLink>
-      <RouterLink v-if="isAdministrator" to="/admin">Admin</RouterLink>
     </nav>
     <div class="app-account">
       <RouterLink v-if="!user" :to="signInTarget">Sign in</RouterLink>
@@ -73,6 +71,8 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
         </button>
         <div v-if="accountMenuOpen" class="app-account__menu" role="menu">
           <span class="app-account__email">{{ user.email }}</span>
+          <RouterLink to="/watchlists" role="menuitem" @click="accountMenuOpen = false">Watchlists</RouterLink>
+          <RouterLink v-if="isAdministrator" to="/admin" role="menuitem" @click="accountMenuOpen = false">Admin</RouterLink>
           <button type="button" role="menuitem" @click="signOut">Sign out</button>
         </div>
       </template>

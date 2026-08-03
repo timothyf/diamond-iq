@@ -150,8 +150,24 @@
   text-align: left;
 }
 
+.app-account__menu a {
+  padding: 0.55rem;
+  border-radius: 8px;
+  color: #10263d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.app-account__menu a:hover,
+.app-account__menu a:focus-visible,
 .app-account__menu button:hover,
 .app-account__menu button:focus-visible { background: #f5e8cf; }
+
+.app-account__menu a.router-link-active {
+  color: #8f2d24;
+  background: #f5e8cf;
+}
 
 .app-bar nav a.router-link-active {
   color: #10263d;

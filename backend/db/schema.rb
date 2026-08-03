@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_02_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_03_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -200,9 +200,11 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_02_000000) do
     t.index ["away_probable_pitcher_id"], name: "index_games_on_away_probable_pitcher_id"
     t.index ["away_team_id", "official_date"], name: "index_games_on_away_team_id_and_official_date"
     t.index ["away_team_id"], name: "index_games_on_away_team_id"
+    t.index ["details_last_synced_at"], name: "idx_games_details_last_synced_at"
     t.index ["home_probable_pitcher_id"], name: "index_games_on_home_probable_pitcher_id"
     t.index ["home_team_id", "official_date"], name: "index_games_on_home_team_id_and_official_date"
     t.index ["home_team_id"], name: "index_games_on_home_team_id"
+    t.index ["last_synced_at"], name: "idx_games_last_synced_at"
     t.index ["mlb_id"], name: "index_games_on_mlb_id", unique: true
     t.index ["official_date", "status"], name: "index_games_on_official_date_and_status"
     t.index ["pitch_data_complete_at"], name: "index_games_on_pitch_data_complete_at"
@@ -745,10 +747,12 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_02_000000) do
     t.string "scope_key"
     t.index ["player_id", "stat_type_id", "season", "scope_type", "scope_key"], name: "idx_player_season_stats_unique_scope", unique: true
     t.index ["player_id"], name: "index_player_season_stats_on_player_id"
+    t.index ["season", "stat_type_id", "value"], name: "idx_player_season_stats_home_leaderboard", order: { value: :desc }, include: ["player_id", "team_id", "scope_type", "scope_key"]
     t.index ["season"], name: "index_player_season_stats_on_season"
     t.index ["stat_type_id", "value"], name: "idx_player_season_stats_leaderboard_lookup", order: { value: :desc }, include: ["player_id", "team_id", "season", "scope_type", "scope_key"]
     t.index ["stat_type_id"], name: "index_player_season_stats_on_stat_type_id"
     t.index ["team_id"], name: "index_player_season_stats_on_team_id"
+    t.index ["updated_at"], name: "idx_player_season_stats_updated_at"
     t.check_constraint "scope_type::text = ANY (ARRAY['team'::character varying, 'combined'::character varying, 'league'::character varying]::text[])", name: "player_season_stats_valid_scope_type"
   end
 
@@ -1074,6 +1078,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_02_000000) do
     t.jsonb "metrics", default: {}, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["calculated_at"], name: "idx_team_daily_metrics_calculated_at"
     t.index ["metric_date", "calculation_version"], name: "idx_on_metric_date_calculation_version_6b9dab98af"
     t.index ["team_id", "metric_date", "calculation_version"], name: "idx_team_daily_metrics_identity", unique: true
     t.index ["team_id"], name: "index_team_daily_metrics_on_team_id"

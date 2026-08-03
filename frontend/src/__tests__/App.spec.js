@@ -44,7 +44,7 @@ describe('App', () => {
     })
 
     await wrapper.get('.app-account__trigger').trigger('click')
-    await wrapper.get('[role="menuitem"]').trigger('click')
+    await wrapper.get('.app-account__menu button[role="menuitem"]').trigger('click')
     await flushPromises()
 
     expect(mocks.logout).toHaveBeenCalledOnce()
