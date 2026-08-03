@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 
 import { authRequestHeaders } from '../composables/apiAuth'
 import { useAuth } from '../composables/useAuth'
+import { API_BASE_URL } from '../config'
 
 const props = defineProps({
   playerId: {
@@ -15,7 +16,6 @@ const props = defineProps({
   },
 })
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const { user } = useAuth()
 const open = ref(false)
 const watchlists = ref([])

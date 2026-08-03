@@ -7,6 +7,7 @@ import { adminRequestHeaders } from '../composables/apiAuth'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import TeamLeadersCard from '../components/TeamLeadersCard.vue'
+import { teamLogoUrl } from '../config'
 
 const props = defineProps({
   teamId: { type: [String, Number], required: true },
@@ -526,7 +527,7 @@ async function saveLineupScenario() {
         <div v-if="nextOpponent" class="opponent-prep__overview">
           <div class="opponent-prep__identity">
             <span class="opponent-prep__logo">
-              <img :src="`https://www.mlbstatic.com/team-logos/${nextOpponent.mlb_id}.svg`" :alt="`${nextOpponent.name} logo`" />
+              <img :src="teamLogoUrl(nextOpponent.mlb_id)" :alt="`${nextOpponent.name} logo`" />
             </span>
             <div>
               <small>Next opponent</small>

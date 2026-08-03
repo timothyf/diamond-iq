@@ -1,10 +1,10 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { adminRequestHeaders } from './apiAuth'
+import { API_BASE_URL, frontendConfig } from '../config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const TASK_NAME = 'mlb_roster_sync'
 const ACTIVE_STATUSES = ['queued', 'running']
-const POLL_INTERVAL_MS = 1500
+const POLL_INTERVAL_MS = frontendConfig.pollingIntervalMs
 
 export function useRosterSync() {
   const task = ref(null)

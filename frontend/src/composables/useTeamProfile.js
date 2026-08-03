@@ -1,7 +1,6 @@
 import { computed, ref, watch } from 'vue'
 import { adminRequestHeaders } from './apiAuth'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config'
 
 function normalizeGame(game) {
   return {

@@ -1,4 +1,5 @@
-const ADMIN_API_TOKEN = import.meta.env.VITE_ADMIN_API_TOKEN || ''
+import { frontendConfig } from '../config'
+
 export const USER_TOKEN_STORAGE_KEY = 'diamondiq_user_token'
 
 export function adminRequestHeaders(headers = {}) {
@@ -11,11 +12,11 @@ export function adminRequestHeaders(headers = {}) {
     userToken = ''
   }
   if (userToken) return { ...headers, Authorization: `Bearer ${userToken}` }
-  if (!ADMIN_API_TOKEN) return headers
+  if (!frontendConfig.adminApiToken) return headers
 
   return {
     ...headers,
-    Authorization: `Bearer ${ADMIN_API_TOKEN}`,
+    Authorization: `Bearer ${frontendConfig.adminApiToken}`,
   }
 }
 

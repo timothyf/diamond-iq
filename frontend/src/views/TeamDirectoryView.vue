@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { API_BASE_URL } from '../config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const teams = ref([])
 const loading = ref(true)
 const error = ref('')

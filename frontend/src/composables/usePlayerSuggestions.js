@@ -1,12 +1,11 @@
 import { computed, ref, watch } from 'vue'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL, frontendConfig } from '../config'
 const MIN_QUERY_LENGTH = 2
-const DEBOUNCE_MS = 180
+const DEBOUNCE_MS = frontendConfig.playerSuggestionDebounceMs
 
 function buildSearchParams(query) {
   const searchParams = new URLSearchParams()
-  searchParams.set('per_page', String(query.perPage || 8))
+  searchParams.set('per_page', String(query.perPage || frontendConfig.playerSuggestionLimit))
   searchParams.set('sort', query.sort || 'last_name')
 
   if (query.name) {

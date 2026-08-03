@@ -1,7 +1,7 @@
 import { computed, ref, watch } from 'vue'
+import { API_BASE_URL, frontendConfig } from '../config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
-const DEFAULT_PER_PAGE = 20
+const DEFAULT_PER_PAGE = frontendConfig.defaultPitchDataPerPage
 
 function buildSearchParams(query) {
   const searchParams = new URLSearchParams()

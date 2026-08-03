@@ -8,6 +8,7 @@ import NotesPanel from '../components/NotesPanel.vue'
 import AddToWatchlistControl from '../components/AddToWatchlistControl.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
+import { frontendConfig } from '../config'
 
 const props = defineProps({
   playerId: {
@@ -158,25 +159,25 @@ const externalProfileLinks = computed(() => {
   const fangraphsId = player.value?.externalIds?.fangraphs
 
   return [
-    { key: 'mlb', label: 'MLB.com', href: `https://www.mlb.com/player/${slug}-${mlbId}` },
+    { key: 'mlb', label: 'MLB.com', href: `${frontendConfig.externalUrls.mlbPlayerBaseUrl}/${slug}-${mlbId}` },
     {
       key: 'fangraphs',
       label: 'FanGraphs',
       href: fangraphsId
-        ? `https://www.fangraphs.com/players/${slug}/${fangraphsId}/stats`
-        : `https://www.fangraphs.com/players.aspx?lastname=${encodedName}`,
+        ? `${frontendConfig.externalUrls.fangraphsBaseUrl}/${slug}/${fangraphsId}/stats`
+        : `${frontendConfig.externalUrls.fangraphsLegacyUrl}?lastname=${encodedName}`,
     },
     {
       key: 'baseball-reference',
       label: 'Baseball Reference',
       href: baseballReferenceId
-        ? `https://www.baseball-reference.com/players/${baseballReferenceId.charAt(0)}/${baseballReferenceId}.shtml`
-        : `https://www.baseball-reference.com/search/search.fcgi?search=${encodedName}`,
+        ? `${frontendConfig.externalUrls.baseballReferenceBaseUrl}/${baseballReferenceId.charAt(0)}/${baseballReferenceId}.shtml`
+        : `${frontendConfig.externalUrls.baseballReferenceSearchUrl}?search=${encodedName}`,
     },
     {
       key: 'baseball-savant',
       label: 'Baseball Savant',
-      href: `https://baseballsavant.mlb.com/savant-player/${slug}-${mlbId}?stats=${savantStatsMode.value}`,
+      href: `${frontendConfig.externalUrls.baseballSavantPlayerBaseUrl}/${slug}-${mlbId}?stats=${savantStatsMode.value}`,
     },
   ]
 })

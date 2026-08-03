@@ -22,6 +22,7 @@ import { usePlayerSeasonStatsDownload } from '../composables/usePlayerSeasonStat
 import { usePlayerSeasonStatsImport } from '../composables/usePlayerSeasonStatsImport'
 import { useRosterSnapshots } from '../composables/useRosterSnapshots'
 import { formatBytes, formatCount, formatDate, formatTimestamp, humanize } from '../utils/adminFormatting'
+import { frontendConfig } from '../config'
 
 const now = new Date()
 const today = [
@@ -69,7 +70,7 @@ const gameDetailsOptions = reactive({
 
 const profileOptions = reactive({
   onlyMissing: true,
-  batchSize: 50,
+  batchSize: frontendConfig.adminProfileBatchSize,
   limit: '',
   mlbIds: '',
 })

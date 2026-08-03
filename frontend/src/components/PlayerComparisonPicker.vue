@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
+import { frontendConfig } from '../config'
 
 const props = defineProps({
   label: { type: String, required: true },
@@ -11,7 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['select', 'clear'])
 
 const query = ref('')
-const searchQuery = computed(() => ({ name: query.value, perPage: 6 }))
+const searchQuery = computed(() => ({ name: query.value, perPage: frontendConfig.comparisonPlayerLimit }))
 const { suggestions, loading, error } = usePlayerSuggestions(searchQuery)
 const availableSuggestions = computed(() =>
   suggestions.value.filter((player) => String(player.id) !== String(props.excludedPlayerId)),

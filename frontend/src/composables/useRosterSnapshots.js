@@ -1,6 +1,5 @@
 import { computed, ref } from 'vue'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config'
 
 export function useRosterSnapshots() {
   const snapshots = ref([])

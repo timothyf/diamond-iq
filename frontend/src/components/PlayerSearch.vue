@@ -1,11 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { API_BASE_URL, frontendConfig } from '../config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const MIN_QUERY_LENGTH = 2
-const SEARCH_DELAY_MS = 250
-const RESULT_LIMIT = 8
+const SEARCH_DELAY_MS = frontendConfig.searchDebounceMs
+const RESULT_LIMIT = frontendConfig.playerSearchLimit
 
 const router = useRouter()
 const root = ref(null)

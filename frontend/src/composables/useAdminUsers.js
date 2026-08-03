@@ -1,8 +1,7 @@
 import { computed, ref } from 'vue'
 
 import { adminRequestHeaders } from './apiAuth'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config'
 
 async function request(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, options)

@@ -1,8 +1,7 @@
 import { computed, ref, toValue } from 'vue'
 
 import { authRequestHeaders } from './apiAuth'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config'
 
 function normalizeUser(user) {
   return user ? { id: user.id, name: user.name || '', role: user.role || '' } : null

@@ -19,6 +19,14 @@ This template should help get you started developing with Vue 3 in Vite.
 
 See [Vite Configuration Reference](https://vite.dev/config/).
 
+## Runtime configuration
+
+Frontend runtime defaults are centralized in `src/config.js`. Use Vite
+environment variables to override the API origin and admin API token, task polling interval,
+search debounce timings, pagination/search limits, admin batch size, and
+external MLB/FanGraphs/Baseball Reference URLs. The development API proxy can
+be redirected with `VITE_DEV_API_TARGET`.
+
 ## Project Setup
 
 ```sh

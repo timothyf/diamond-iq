@@ -2,8 +2,7 @@ import { computed, ref } from 'vue'
 
 import { adminRequestHeaders } from './apiAuth'
 import { useBackgroundTaskRun } from './useBackgroundTaskRun'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
+import { API_BASE_URL } from '../config'
 const GENERIC_ADMIN_TASKS = [
   'mlb_schedule_sync',
   'mlb_player_profiles_sync',

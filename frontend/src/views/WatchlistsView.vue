@@ -7,8 +7,8 @@ import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import NotesPanel from '../components/NotesPanel.vue'
 import { useAuth } from '../composables/useAuth'
+import { API_BASE_URL, frontendConfig } from '../config'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 const route = inject(routeLocationKey, { query: {}, fullPath: '/watchlists' })
 const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const watchlists = ref([])
@@ -67,7 +67,7 @@ const newNeed = ref({
   ageWeight: 15,
   performanceWeight: 40,
 })
-const searchQuery = computed(() => ({ name: playerQuery.value, perPage: 6 }))
+const searchQuery = computed(() => ({ name: playerQuery.value, perPage: frontendConfig.comparisonPlayerLimit }))
 const { suggestions, loading: searching } = usePlayerSuggestions(searchQuery)
 const { user: currentUser } = useAuth()
 const availableOwners = ref([])

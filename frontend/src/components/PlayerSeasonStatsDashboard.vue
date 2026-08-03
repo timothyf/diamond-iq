@@ -7,13 +7,14 @@ import SavedAnalysisControls from './SavedAnalysisControls.vue'
 import { usePlayerSuggestions } from '../composables/usePlayerSuggestions'
 import { usePitchData } from '../composables/usePitchData'
 import { usePlayerSeasonStats } from '../composables/usePlayerSeasonStats'
+import { frontendConfig } from '../config'
 
 const DEFAULT_SORT_BY_CATEGORY = {
   batting: '-homeRuns',
   pitching: '-strikeOuts',
   pitchStats: '-pitch_usage',
 }
-const DEFAULT_PITCH_DATA_PER_PAGE = 20
+const DEFAULT_PITCH_DATA_PER_PAGE = frontendConfig.defaultPitchDataPerPage
 const FILTER_URL_CATEGORIES = new Set(['batting', 'pitching', 'pitchData'])
 
 const filters = reactive({
@@ -26,7 +27,7 @@ const filters = reactive({
 
 const pagination = reactive({
   page: 1,
-  perPage: 15,
+  perPage: frontendConfig.defaultStatsPerPage,
 })
 
 const pitchDataOptions = reactive({
@@ -90,17 +91,17 @@ const query = computed(() => ({
 const playerSuggestionQuery = computed(() => ({
   name: filters.playerName,
   teamId: filters.teamId,
-  perPage: 8,
+  perPage: frontendConfig.playerSuggestionLimit,
 }))
 
 const pitcherSuggestionQuery = computed(() => ({
   name: pitcherNameInput.value,
-  perPage: 8,
+  perPage: frontendConfig.playerSuggestionLimit,
 }))
 
 const batterSuggestionQuery = computed(() => ({
   name: batterNameInput.value,
-  perPage: 8,
+  perPage: frontendConfig.playerSuggestionLimit,
 }))
 
 const pitchDataQuery = computed(() => ({
@@ -396,7 +397,7 @@ function syncUrlState() {
     setSearchParam(searchParams, 'season_start', filters.seasonStart)
     setSearchParam(searchParams, 'season_end', filters.seasonEnd)
     setSearchParam(searchParams, 'page', pagination.page === 1 ? '' : pagination.page)
-    setSearchParam(searchParams, 'per_page', pagination.perPage === 15 ? '' : pagination.perPage)
+    setSearchParam(searchParams, 'per_page', pagination.perPage === frontendConfig.defaultStatsPerPage ? '' : pagination.perPage)
     setSearchParam(searchParams, 'sort', sort.value === defaultSort ? '' : sort.value)
   }
 
