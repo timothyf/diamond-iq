@@ -91,6 +91,18 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile")).to be_nil
   end
 
+  it "returns only the core profile payload when deferred sections are not requested" do
+    get api_player_path(@miguel), params: { sections: "core" }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", "career_overview")).to be_present
+    expect(json_body.dig("data", "analysis", "range")).to be_present
+    expect(json_body.dig("data")).not_to have_key("similar_players")
+    expect(json_body.dig("data")).not_to have_key("advanced_stats")
+    expect(json_body.dig("data")).not_to have_key("batter_splits")
+    expect(json_body.dig("data")).not_to have_key("recent_pitch_indicators")
+  end
+
   it "supports custom profile analysis ranges and rolling windows" do
     PitchDatum.create!(
       game_pk: 900_100,

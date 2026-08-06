@@ -48,7 +48,7 @@ const savedAnalysisUrl = computed(() => {
   }
   return `/players/${encodeURIComponent(playerId.value)}${query.size ? `?${query}` : ''}`
 })
-const { player, loading, error, refresh } = usePlayerProfile(playerId, analysisOptions)
+const { player, loading, error, sectionLoading, loadSection, refresh } = usePlayerProfile(playerId, analysisOptions)
 const headshotFailed = ref(false)
 
 watch(
@@ -98,6 +98,15 @@ watch(
   () => {
     headshotFailed.value = false
   },
+)
+
+watch(
+  selectedProfileTab,
+  (tab) => {
+    if (tab === 'advanced-stats') void loadSection('advanced_stats')
+    if (tab === 'splits') void loadSection('splits')
+  },
+  { immediate: true },
 )
 
 const initials = computed(() =>
@@ -337,11 +346,40 @@ const batterSplitMetrics = [
   ['average_exit_velocity', 'Exit velo', 'mph'],
 ]
 
+const selectedPitcherSplit = ref('batter_hand')
+const pitcherSplitDimension = computed(() => {
+  const dimensions = player.value?.pitcherSplits?.dimensions || []
+  return dimensions.find((dimension) => dimension.key === selectedPitcherSplit.value) || dimensions[0] || null
+})
+
+const pitcherSplitMetrics = [
+  ['batters_faced', 'BF', 'count'],
+  ['pitch_count', 'Pitches', 'count'],
+  ['strikeouts', 'K', 'count'],
+  ['walks', 'BB', 'count'],
+  ['zone_percentage', 'Zone%', 'percent'],
+  ['whiff_percentage', 'Whiff%', 'percent'],
+  ['chase_percentage', 'Chase%', 'percent'],
+  ['average_velocity', 'Avg velo', 'mph'],
+  ['maximum_velocity', 'Max velo', 'mph'],
+  ['average_spin_rate', 'Avg spin', 'rpm'],
+  ['delta_run_expectancy_per_100', 'Run value/100', 'runs'],
+]
+
 function batterSplitValue(value, unit) {
   if (value === null || value === undefined || value === '') return '—'
   if (unit === 'percent') return `${Number(value).toFixed(1)}%`
   if (unit === 'rate') return Number(value).toFixed(3)
   if (unit === 'mph') return `${Number(value).toFixed(1)} mph`
+  return Number(value).toLocaleString()
+}
+
+function pitcherSplitValue(value, unit) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (unit === 'percent') return `${Number(value).toFixed(1)}%`
+  if (unit === 'mph') return `${Number(value).toFixed(1)} mph`
+  if (unit === 'rpm') return `${Math.round(Number(value)).toLocaleString()} rpm`
+  if (unit === 'runs') return Number(value).toFixed(1)
   return Number(value).toLocaleString()
 }
 
@@ -708,7 +746,7 @@ function formatTimestamp(value) {
       <div class="profile-stat-tabs">
 
       <section
-        v-show="selectedProfileTab === 'overview'"
+        v-if="selectedProfileTab === 'overview'"
         id="player-profile-panel-overview"
         class="profile-stat-table profile-career-table"
         role="tabpanel"
@@ -761,7 +799,7 @@ function formatTimestamp(value) {
       </section>
 
       <section
-        v-show="selectedProfileTab === 'advanced-stats'"
+        v-if="selectedProfileTab === 'advanced-stats'"
         id="player-profile-panel-advanced-stats"
         class="profile-stat-table advanced-stats-panel"
         role="tabpanel"
@@ -776,7 +814,8 @@ function formatTimestamp(value) {
           <span>{{ careerRangeLabel }}</span>
         </header>
 
-        <div v-if="player.advancedStats.seasons.length" class="advanced-stat-groups">
+        <p v-if="sectionLoading('advanced_stats').value" class="profile-empty">Loading advanced statistics…</p>
+        <div v-else-if="player.advancedStats.seasons.length" class="advanced-stat-groups">
           <article
             v-for="group in player.advancedStats.groups"
             :key="group.key"
@@ -830,7 +869,7 @@ function formatTimestamp(value) {
       </section>
 
       <section
-        v-show="selectedProfileTab === 'splits'"
+        v-if="selectedProfileTab === 'splits'"
         id="player-profile-panel-splits"
         class="profile-stat-table batter-splits-panel"
         role="tabpanel"
@@ -840,45 +879,89 @@ function formatTimestamp(value) {
         <header class="profile-section-heading">
           <div>
             <p class="eyebrow">Matchup context</p>
-            <h2>Batter splits</h2>
+            <h2>Splits</h2>
           </div>
           <span>Pitch-level sample · {{ formatDate(player.analysis?.range?.startDate) }} — {{ formatDate(player.analysis?.range?.endDate) }}</span>
         </header>
 
-        <div v-if="showBattingIndicators && player.batterSplits.available" class="split-tabs" role="tablist" aria-label="Batter split dimensions">
-          <button
-            v-for="dimension in player.batterSplits.dimensions"
-            :key="dimension.key"
-            type="button"
-            role="tab"
-            :aria-selected="batterSplitDimension?.key === dimension.key"
-            :class="{ 'is-active': batterSplitDimension?.key === dimension.key }"
-            :data-test="`batter-split-tab-${dimension.key}`"
-            @click="selectedBatterSplit = dimension.key"
-          >
-            {{ dimension.label }}
-          </button>
+        <p v-if="sectionLoading('splits').value" class="profile-empty">Loading split statistics…</p>
+        <div v-else-if="showBattingIndicators && player.batterSplits.available" class="split-role">
+          <h3>As batter</h3>
+          <div class="split-tabs" role="tablist" aria-label="Batter split dimensions">
+            <button
+              v-for="dimension in player.batterSplits.dimensions"
+              :key="dimension.key"
+              type="button"
+              role="tab"
+              :aria-selected="batterSplitDimension?.key === dimension.key"
+              :class="{ 'is-active': batterSplitDimension?.key === dimension.key }"
+              :data-test="`batter-split-tab-${dimension.key}`"
+              @click="selectedBatterSplit = dimension.key"
+            >
+              {{ dimension.label }}
+            </button>
+          </div>
+
+          <div v-if="batterSplitDimension?.options?.length" class="split-table-wrap">
+            <table class="split-table">
+              <thead>
+                <tr>
+                  <th>Split</th>
+                  <th v-for="metric in batterSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="option in batterSplitDimension.options" :key="option.value">
+                  <th>{{ option.label }}</th>
+                  <td v-for="metric in batterSplitMetrics" :key="metric[0]">
+                    {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <div v-if="showBattingIndicators && player.batterSplits.available && batterSplitDimension?.options?.length" class="split-table-wrap">
-          <table class="split-table">
-            <thead>
-              <tr>
-                <th>Split</th>
-                <th v-for="metric in batterSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="option in batterSplitDimension.options" :key="option.value">
-                <th>{{ option.label }}</th>
-                <td v-for="metric in batterSplitMetrics" :key="metric[0]">
-                  {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="!sectionLoading('splits').value && showPitchingIndicators && player.pitcherSplits.available" class="split-role">
+          <h3>As pitcher</h3>
+          <div class="split-tabs" role="tablist" aria-label="Pitcher split dimensions">
+            <button
+              v-for="dimension in player.pitcherSplits.dimensions"
+              :key="dimension.key"
+              type="button"
+              role="tab"
+              :aria-selected="pitcherSplitDimension?.key === dimension.key"
+              :class="{ 'is-active': pitcherSplitDimension?.key === dimension.key }"
+              :data-test="`pitcher-split-tab-${dimension.key}`"
+              @click="selectedPitcherSplit = dimension.key"
+            >
+              {{ dimension.label }}
+            </button>
+          </div>
+
+          <div v-if="pitcherSplitDimension?.options?.length" class="split-table-wrap">
+            <table class="split-table">
+              <thead>
+                <tr>
+                  <th>Split</th>
+                  <th v-for="metric in pitcherSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="option in pitcherSplitDimension.options" :key="option.value">
+                  <th>{{ option.label }}</th>
+                  <td v-for="metric in pitcherSplitMetrics" :key="metric[0]">
+                    {{ pitcherSplitValue(option.metrics[metric[0]], metric[2]) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-        <p v-else class="profile-empty">Split data is available for batters after pitch-level analytics have been calculated for this period.</p>
+
+        <p v-if="!sectionLoading('splits').value && !(showBattingIndicators && player.batterSplits.available) && !(showPitchingIndicators && player.pitcherSplits.available)" class="profile-empty">
+          Split data is available after pitch-level analytics have been calculated for this period.
+        </p>
       </section>
 
       </div>
@@ -2144,6 +2227,18 @@ function formatTimestamp(value) {
   gap: 0.55rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.split-role + .split-role {
+  margin-top: 1.5rem;
+}
+
+.split-role h3 {
+  margin: 0 0 0.75rem;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.35rem;
+  text-transform: uppercase;
 }
 
 .split-tabs button {

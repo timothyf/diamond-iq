@@ -86,7 +86,7 @@ describe('usePlayerProfile', () => {
     const { player, loading, error } = usePlayerProfile(computed(() => '42'))
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/players/42', {
+    expect(fetchMock).toHaveBeenCalledWith('/api/players/42?sections=core', {
       headers: { Accept: 'application/json' },
     })
     expect(player.value).toMatchObject({

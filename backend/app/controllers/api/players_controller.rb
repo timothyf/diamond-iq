@@ -12,7 +12,9 @@ module Api
     def show
       player = Player.includes(:profile, :team, player_positions: :position).find(params[:id])
       analysis_range = PlayerAnalysisRange.resolve(player: player, params: analysis_params)
-      snapshot = PlayerProfileSnapshotQuery.new(player: player, analysis_range: analysis_range).result
+      snapshot = PlayerProfileSnapshotQuery.new(player: player, analysis_range: analysis_range).result(
+        sections: profile_sections
+      )
 
       render json: {
         data: serialize_player(player, include_profile: true, include_positions: true).merge(snapshot)
@@ -29,6 +31,12 @@ module Api
 
     def analysis_params
       params.permit(:range, :start_date, :end_date, :pa_window, :pitch_window).to_h
+    end
+
+    def profile_sections
+      return nil unless params.key?(:sections)
+
+      params[:sections].to_s.split(",").map(&:strip).reject(&:blank?)
     end
 
     def serialize_player(player, include_profile: false, include_positions: false)

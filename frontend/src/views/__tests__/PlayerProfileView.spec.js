@@ -439,7 +439,7 @@ describe('PlayerProfileView', () => {
 
     await wrapper.get('.range-presets button:nth-child(2)').trigger('click')
     await flushPromises()
-    expect(fetch).toHaveBeenCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100', {
+    expect(fetch).toHaveBeenCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100&sections=core', {
       headers: { Accept: 'application/json' },
     })
   })
@@ -514,10 +514,11 @@ describe('PlayerProfileView', () => {
     const profileRequestCount = fetch.mock.calls.length
 
     await advancedTab.trigger('click')
+    await flushPromises()
 
     expect(advancedTab.attributes('aria-selected')).toBe('true')
-    expect(fetch).toHaveBeenCalledTimes(profileRequestCount)
-    expect(wrapper.get('#player-profile-panel-overview').isVisible()).toBe(false)
+    expect(fetch).toHaveBeenCalledTimes(profileRequestCount + 1)
+    expect(wrapper.find('#player-profile-panel-overview').exists()).toBe(false)
     const panel = wrapper.get('[data-test="advanced-stats-panel"]')
     expect(panel.isVisible()).toBe(true)
     expect(wrapper.get('[data-test="similar-players"]').isVisible()).toBe(true)
@@ -628,6 +629,7 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
     await wrapper.get('[data-test="player-profile-tab-advanced-stats"]').trigger('click')
+    await flushPromises()
 
     const table = wrapper.get('[data-test="advanced-stat-group-rate_and_outcome_statistics"]')
     expect(table.text()).toContain('K-BB%')

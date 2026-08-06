@@ -336,7 +336,8 @@ class DailyAnalyticsCalculator
     {
       "batter_hand" => ->(pitch) { pitch.stand.presence&.upcase },
       "pitch_type" => ->(pitch) { pitch.pitch_type.presence },
-      "home_away" => ->(pitch) { home_away(pitch, pitching: true) }
+      "home_away" => ->(pitch) { home_away(pitch, pitching: true) },
+      "day_night" => ->(pitch) { day_night(pitch) }
     }
   end
 

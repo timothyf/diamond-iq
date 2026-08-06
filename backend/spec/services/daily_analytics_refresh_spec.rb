@@ -84,7 +84,7 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       "player_pitching_daily" => 1,
       "pitcher_pitch_type_daily" => 2,
       "batter_split_summaries" => 5,
-      "pitcher_split_summaries" => 4,
+      "pitcher_split_summaries" => 5,
       "team_daily_metrics" => 2
     )
 
@@ -114,6 +114,8 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       .to include("pitches_seen" => 3, "plate_appearances" => 1)
     expect(BatterSplitSummary.find_by!(player: batter, split_type: "day_night", split_value: "night").metrics)
       .to include("pitches_seen" => 3)
+    expect(PitcherSplitSummary.find_by!(player: pitcher, split_type: "day_night", split_value: "night").metrics)
+      .to include("pitch_count" => 3)
     expect(TeamDailyMetric.find_by!(team: home_team).metrics).to include(
       "wins" => 1,
       "runs_scored" => 4,

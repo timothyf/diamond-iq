@@ -162,6 +162,18 @@ function normalizeProfile(data = {}) {
         })),
       })),
     },
+    pitcherSplits: {
+      available: data.pitcher_splits?.available === true,
+      dimensions: (data.pitcher_splits?.dimensions || []).map((dimension) => ({
+        key: dimension.key,
+        label: dimension.label,
+        options: (dimension.options || []).map((option) => ({
+          value: option.value,
+          label: option.label,
+          metrics: option.metrics || {},
+        })),
+      })),
+    },
     contextualBenchmarks: {
       available: benchmarks.available === true,
       sourceStartDate: benchmarks.source_start_date,
@@ -281,6 +293,9 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
   const player = ref(null)
   const loading = ref(false)
   const error = ref('')
+  const loadingSections = ref({})
+  const loadedSections = new Set()
+  const requestedSections = new Set()
   let requestCounter = 0
 
   async function load() {
@@ -296,9 +311,12 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
 
     loading.value = true
     error.value = ''
+    loadedSections.clear()
+    requestedSections.clear()
+    loadingSections.value = {}
 
     try {
-      const query = analysisQuery(analysisOptionsRef?.value)
+      const query = analysisQuery(analysisOptionsRef?.value, 'core')
       const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}${query}`, {
         headers: { Accept: 'application/json' },
       })
@@ -314,6 +332,12 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
       if (requestId !== requestCounter) return
 
       player.value = normalizeProfile(payload.data)
+      window.setTimeout(() => {
+        if (requestId !== requestCounter) return
+
+        void loadSection('similar_players', requestId)
+        void loadSection('analytics', requestId)
+      }, 0)
     } catch (fetchError) {
       if (requestId !== requestCounter) return
 
@@ -325,6 +349,35 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
     }
   }
 
+  async function loadSection(section, requestId = requestCounter) {
+    const playerId = playerIdRef.value
+    if (!playerId || requestId !== requestCounter || loadedSections.has(section) || requestedSections.has(section)) return
+
+    requestedSections.add(section)
+    loadingSections.value = { ...loadingSections.value, [section]: true }
+
+    try {
+      const query = analysisQuery(analysisOptionsRef?.value, section)
+      const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}${query}`, {
+        headers: { Accept: 'application/json' },
+      })
+      if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
+
+      const payload = await response.json()
+      if (requestId !== requestCounter || !player.value) return
+
+      player.value = { ...player.value, ...normalizedSection(payload.data, section) }
+      loadedSections.add(section)
+    } catch (fetchError) {
+      if (requestId === requestCounter) console.error(fetchError)
+    } finally {
+      requestedSections.delete(section)
+      if (requestId === requestCounter) {
+        loadingSections.value = { ...loadingSections.value, [section]: false }
+      }
+    }
+  }
+
   analysisOptionsRef
     ? watch([playerIdRef, analysisOptionsRef], load, { immediate: true, deep: true })
     : watch(playerIdRef, load, { immediate: true })
@@ -333,18 +386,37 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
     player: computed(() => player.value),
     loading: computed(() => loading.value),
     error: computed(() => error.value),
+    sectionLoading: (section) => computed(() => loadingSections.value[section] === true),
+    loadSection,
     refresh: load,
   }
 }
 
-function analysisQuery(options) {
-  if (!options) return ''
+function normalizedSection(data, section) {
+  const normalized = normalizeProfile(data)
+  if (section === 'advanced_stats') return { advancedStats: normalized.advancedStats }
+  if (section === 'splits') return { batterSplits: normalized.batterSplits, pitcherSplits: normalized.pitcherSplits }
+  if (section === 'similar_players') return { similarPlayers: normalized.similarPlayers }
+  if (section === 'analytics') {
+    return {
+      pitchIndicators: normalized.pitchIndicators,
+      contextualBenchmarks: normalized.contextualBenchmarks,
+      trendEvents: normalized.trendEvents,
+      analysis: normalized.analysis,
+    }
+  }
+
+  return {}
+}
+
+function analysisQuery(options, sections = null) {
   const params = new URLSearchParams()
-  if (options.range) params.set('range', options.range)
-  if (options.startDate) params.set('start_date', options.startDate)
-  if (options.endDate) params.set('end_date', options.endDate)
-  if (options.paWindow) params.set('pa_window', options.paWindow)
-  if (options.pitchWindow) params.set('pitch_window', options.pitchWindow)
+  if (options?.range) params.set('range', options.range)
+  if (options?.startDate) params.set('start_date', options.startDate)
+  if (options?.endDate) params.set('end_date', options.endDate)
+  if (options?.paWindow) params.set('pa_window', options.paWindow)
+  if (options?.pitchWindow) params.set('pitch_window', options.pitchWindow)
+  if (sections) params.set('sections', sections)
   const query = params.toString()
   return query ? `?${query}` : ''
 }
