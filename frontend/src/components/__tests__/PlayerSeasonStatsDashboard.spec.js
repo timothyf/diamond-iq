@@ -166,6 +166,7 @@ describe('PlayerSeasonStatsDashboard', () => {
 
     await wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]').setValue('Al Kaline')
     await wrapper.find('[data-test="team-filter"]').setValue('2')
+    await wrapper.find('[data-test="league-filter"]').setValue('national')
     await wrapper.find('[data-test="season-start-filter"]').setValue('2025')
     await wrapper.find('[data-test="season-end-filter"]').setValue('2026')
     await wrapper.findAll('select').find((select) => select.text().includes('100')).setValue('30')
@@ -173,6 +174,7 @@ describe('PlayerSeasonStatsDashboard', () => {
 
     const searchParams = new URLSearchParams(window.location.search)
     expect(searchParams.get('player')).toBe('Al Kaline')
+    expect(searchParams.get('league')).toBe('national')
     expect(searchParams.get('team')).toBe('2')
     expect(searchParams.get('season_start')).toBe('2025')
     expect(searchParams.get('season_end')).toBe('2026')

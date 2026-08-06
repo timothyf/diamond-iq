@@ -20,6 +20,7 @@ const FILTER_URL_CATEGORIES = new Set(['batting', 'pitching', 'pitchData'])
 const filters = reactive({
   playerName: '',
   teamId: '',
+  league: '',
   seasonStart: '',
   seasonEnd: '',
   category: 'batting',
@@ -82,6 +83,7 @@ const query = computed(() => ({
   filters: {
     player_name: filters.playerName,
     team_id: filters.teamId,
+    league: filters.league,
     season_start: filters.seasonStart,
     season_end: filters.seasonEnd,
     category: filters.category,
@@ -133,6 +135,7 @@ watch(
     filters.category,
     filters.playerName,
     filters.teamId,
+    filters.league,
     filters.seasonStart,
     filters.seasonEnd,
     pagination.page,
@@ -157,7 +160,7 @@ watch(
 )
 
 watch(
-  () => [filters.playerName, filters.teamId, filters.seasonStart, filters.seasonEnd, filters.category, pagination.perPage, sort.value],
+  () => [filters.playerName, filters.teamId, filters.league, filters.seasonStart, filters.seasonEnd, filters.category, pagination.perPage, sort.value],
   () => {
     pagination.page = 1
   },
@@ -330,6 +333,8 @@ const filterSummary = computed(() => {
     filters.playerName && `Player: ${filters.playerName}`,
     selectedTeam.value &&
       `Team: ${selectedTeam.value.abbreviation || selectedTeam.value.short_name || selectedTeam.value.team_name || selectedTeam.value.name}`,
+    filters.league === 'american' && 'League: American League',
+    filters.league === 'national' && 'League: National League',
     seasonRangeLabel,
     filters.category && `Category: ${filters.category}`,
   ].filter(Boolean)
@@ -357,6 +362,7 @@ function applyUrlState() {
 
   filters.playerName = searchParams.get('player') || filters.playerName
   filters.teamId = searchParams.get('team') || filters.teamId
+  filters.league = ['american', 'national'].includes(searchParams.get('league')) ? searchParams.get('league') : filters.league
   filters.seasonStart = searchParams.get('season_start') || filters.seasonStart
   filters.seasonEnd = searchParams.get('season_end') || filters.seasonEnd
 
@@ -394,6 +400,7 @@ function syncUrlState() {
   } else {
     setSearchParam(searchParams, 'player', filters.playerName)
     setSearchParam(searchParams, 'team', filters.teamId)
+    setSearchParam(searchParams, 'league', filters.league)
     setSearchParam(searchParams, 'season_start', filters.seasonStart)
     setSearchParam(searchParams, 'season_end', filters.seasonEnd)
     setSearchParam(searchParams, 'page', pagination.page === 1 ? '' : pagination.page)
@@ -548,6 +555,7 @@ function resetFilters() {
 
   filters.playerName = ''
   filters.teamId = ''
+  filters.league = ''
   filters.seasonStart = ''
   filters.seasonEnd = ''
   pagination.page = 1
@@ -646,6 +654,15 @@ function resetFilters() {
             <option v-for="teamOption in meta.availableTeams" :key="teamOption.id" :value="String(teamOption.id)">
               {{ teamOption.abbreviation }} · {{ teamOption.short_name || teamOption.team_name || teamOption.name }}
             </option>
+          </select>
+        </label>
+
+        <label v-if="filters.category !== 'pitchData'" class="field">
+          <span>League</span>
+          <select v-model="filters.league" data-test="league-filter">
+            <option value="">All MLB</option>
+            <option value="american">American League</option>
+            <option value="national">National League</option>
           </select>
         </label>
 

@@ -68,6 +68,10 @@ class PlayerSeasonStatsIndexQuery
         scope = scope.where(player_season_stats: { scope_type: "team", team_id: normalized_filters[:team_id] })
       end
 
+      if normalized_filters[:league].present?
+        scope = scope.where(teams: { mlb_id: league_team_mlb_ids })
+      end
+
       if normalized_filters[:scope_type].present?
         scope = scope.where(player_season_stats: { scope_type: normalized_filters[:scope_type] })
       end
@@ -122,6 +126,7 @@ class PlayerSeasonStatsIndexQuery
           "season_start",
           "season_end",
           "team_id",
+          "league",
           "scope_type",
           "scope_key",
           "player_id",
@@ -140,6 +145,7 @@ class PlayerSeasonStatsIndexQuery
       integer_filter!(filters, "season_end")
       integer_filter!(filters, "team_id")
       integer_filter!(filters, "player_id")
+      filters.delete("league") unless %w[american national].include?(filters["league"])
       decimal_filter!(filters, "min_value")
       decimal_filter!(filters, "max_value")
       normalize_scope_type!(filters)
@@ -153,6 +159,10 @@ class PlayerSeasonStatsIndexQuery
   def raw_filters
     filters = params.fetch("filter", params.fetch(:filter, {}))
     filters.respond_to?(:to_h) ? filters.to_h.deep_stringify_keys : {}
+  end
+
+  def league_team_mlb_ids
+    MlbRosterBatchSync::TEAM_IDS_BY_LEAGUE.fetch(normalized_filters[:league])
   end
 
   def page

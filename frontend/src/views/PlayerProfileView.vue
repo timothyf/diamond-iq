@@ -1007,6 +1007,17 @@ provide('player-profile-context', {
   align-items: end;
 }
 
+.performance-trends-page .analysis-controls {
+  margin-bottom: 0;
+  border-radius: 28px 28px 0 0;
+}
+
+.performance-trends-page .analysis-controls + .trend-panel {
+  margin-top: 0;
+  border-top: 0;
+  border-radius: 0 0 28px 28px;
+}
+
 .range-presets {
   display: flex;
   flex-wrap: wrap;
@@ -1202,9 +1213,8 @@ provide('player-profile-context', {
 .profile-identity h1 {
   color: #10263d;
   font-family: 'Avenir Next Condensed', 'DIN Condensed', sans-serif;
-  font-size: clamp(3.45rem, 5.05vw, 6rem);
+  font-size: 60px;
   line-height: .83;
-  letter-spacing: .08em;
   text-transform: uppercase;
 }
 
@@ -1223,7 +1233,7 @@ provide('player-profile-context', {
   align-items: baseline;
   margin: 0;
   color: #151515;
-  font-size: clamp(1.25rem, 1.62vw, 1.95rem);
+  font-size: 18px;
   line-height: 1.08;
 }
 

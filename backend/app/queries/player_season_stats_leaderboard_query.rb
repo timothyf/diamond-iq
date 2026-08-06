@@ -392,7 +392,7 @@ class PlayerSeasonStatsLeaderboardQuery
   def normalized_filters
     @normalized_filters ||= begin
       filters = raw_filters
-        .slice("season", "season_start", "season_end", "team_id", "scope_type", "scope_key", "player_id", "team_name", "player_name", "category")
+        .slice("season", "season_start", "season_end", "team_id", "league", "scope_type", "scope_key", "player_id", "team_name", "player_name", "category")
         .transform_values { |value| value.is_a?(String) ? value.strip : value }
         .compact_blank
 
@@ -401,6 +401,7 @@ class PlayerSeasonStatsLeaderboardQuery
       integer_filter!(filters, "season_end")
       integer_filter!(filters, "team_id")
       integer_filter!(filters, "player_id")
+      filters.delete("league") unless %w[american national].include?(filters["league"])
       normalize_scope_type!(filters)
       normalize_season_bounds!(filters)
       filters["category"] = normalize_category(filters["category"])
@@ -413,6 +414,10 @@ class PlayerSeasonStatsLeaderboardQuery
   def raw_filters
     filters = params.fetch("filter", params.fetch(:filter, {}))
     filters.respond_to?(:to_h) ? filters.to_h.deep_stringify_keys : {}
+  end
+
+  def league_team_mlb_ids
+    MlbRosterBatchSync::TEAM_IDS_BY_LEAGUE.fetch(normalized_filters[:league])
   end
 
   def category
@@ -464,6 +469,10 @@ class PlayerSeasonStatsLeaderboardQuery
 
     if include_team && normalized_filters[:team_id].present?
       filtered_scope = filtered_scope.where(player_season_stats: { scope_type: "team", team_id: normalized_filters[:team_id] })
+    end
+
+    if normalized_filters[:league].present?
+      filtered_scope = filtered_scope.where(teams: { mlb_id: league_team_mlb_ids })
     end
 
     if normalized_filters[:scope_type].present?

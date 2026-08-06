@@ -382,47 +382,6 @@ const {
         <section class="profile-panel">
           <header class="profile-section-heading">
             <div>
-              <p class="eyebrow">Statcast pulse</p>
-              <h2>Recent pitch indicators</h2>
-            </div>
-            <span>Latest {{ player.pitchIndicators.sampleSize }} per role</span>
-          </header>
-
-          <div class="indicator-groups">
-            <article
-              v-if="showBattingIndicators"
-              class="indicator-card"
-              data-test="indicator-card-batting"
-              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'batter' }"
-            >
-              <h3>As batter</h3>
-              <dl>
-                <div v-for="metric in battingMetrics" :key="metric[0]">
-                  <dt>{{ metric[0] }}</dt>
-                  <dd>{{ displayValue(metric[1]) }}</dd>
-                </div>
-              </dl>
-            </article>
-            <article
-              v-if="showPitchingIndicators"
-              class="indicator-card"
-              data-test="indicator-card-pitching"
-              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'pitcher' }"
-            >
-              <h3>As pitcher</h3>
-              <dl>
-                <div v-for="metric in pitchingMetrics" :key="metric[0]">
-                  <dt>{{ metric[0] }}</dt>
-                  <dd>{{ displayValue(metric[1]) }}</dd>
-                </div>
-              </dl>
-            </article>
-          </div>
-        </section>
-
-        <section class="profile-panel">
-          <header class="profile-section-heading">
-            <div>
               <p class="eyebrow">Organization trail</p>
               <h2>Team history</h2>
             </div>

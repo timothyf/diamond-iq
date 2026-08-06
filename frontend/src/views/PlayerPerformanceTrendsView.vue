@@ -8,7 +8,7 @@ const {
   batterSplitMetrics, batterSplitValue, selectedBatterSplit, showPitchingIndicators, pitcherSplitDimension,
   pitcherSplitMetrics, pitcherSplitValue, selectedPitcherSplit, formatDate, similarityValue,
   contextualMetricLabel, contextualValue, peerAverage, peerLabel, percentileStyle, signedContextualValue,
-  benchmarkPeriodLabel, battingMetrics, pitchingMetrics, teamHistoryLabel, SavedAnalysisControls,
+  benchmarkPeriodLabel, battingMetrics, pitchingMetrics, teamHistoryLabel, displayValue, SavedAnalysisControls,
   savedAnalysisState, savedAnalysisUrl, openSavedAnalysis, analysisOptions, rangePresets, selectPreset,
   customStartDate, customEndDate, applyCustomRange, updateWindow, trendEventTone, trendEventLabel,
   trendEventTitle, trendEventValue, comparisonMetrics, trendCharts, PlayerTrendChart,
@@ -16,7 +16,7 @@ const {
 </script>
 
 <template>
-  <div id="player-page-panel-performance-trends" class="profile-page-content" role="tabpanel" aria-labelledby="player-page-tab-performance-trends">        <SavedAnalysisControls
+  <div id="player-page-panel-performance-trends" class="profile-page-content performance-trends-page" role="tabpanel" aria-labelledby="player-page-tab-performance-trends">        <SavedAnalysisControls
           analysis-type="player_date_range"
           :state="savedAnalysisState"
           :reproducible-url="savedAnalysisUrl"
@@ -24,6 +24,47 @@ const {
           @apply="openSavedAnalysis"
         />
 
+        <section class="profile-panel" data-test="recent-pitch-indicators">
+          <header class="profile-section-heading">
+            <div>
+              <p class="eyebrow">Statcast pulse</p>
+              <h2>Recent pitch indicators</h2>
+            </div>
+            <span>Latest {{ player.pitchIndicators.sampleSize }} per role</span>
+          </header>
+
+          <div class="indicator-groups">
+            <article
+              v-if="showBattingIndicators"
+              class="indicator-card"
+              data-test="indicator-card-batting"
+              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'batter' }"
+            >
+              <h3>As batter</h3>
+              <dl>
+                <div v-for="metric in battingMetrics" :key="metric[0]">
+                  <dt>{{ metric[0] }}</dt>
+                  <dd>{{ displayValue(metric[1]) }}</dd>
+                </div>
+              </dl>
+            </article>
+            <article
+              v-if="showPitchingIndicators"
+              class="indicator-card"
+              data-test="indicator-card-pitching"
+              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'pitcher' }"
+            >
+              <h3>As pitcher</h3>
+              <dl>
+                <div v-for="metric in pitchingMetrics" :key="metric[0]">
+                  <dt>{{ metric[0] }}</dt>
+                  <dd>{{ displayValue(metric[1]) }}</dd>
+                </div>
+              </dl>
+            </article>
+          </div>
+        </section>
+        
         <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
           <div>
             <p class="eyebrow">Analysis period</p>
@@ -110,5 +151,6 @@ const {
           </div>
           <p v-else class="profile-empty">No pitch-level trend data is available for this period.</p>
         </section>
+
   </div>
 </template>
