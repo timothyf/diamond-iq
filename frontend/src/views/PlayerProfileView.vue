@@ -25,6 +25,12 @@ const profileTabs = [
   { id: 'advanced-stats', label: 'Advanced Stats' },
   { id: 'splits', label: 'Splits' },
 ]
+const pageTabs = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'performance-trends', label: 'Performance Trends' },
+  { id: 'batted-ball-profile', label: 'Batted Ball Profile' },
+]
+const selectedPageTab = ref(pageTabs.some((tab) => tab.id === route.query.view) ? route.query.view : 'overview')
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
 const analysisOptions = ref({
   range: ['season', '7', '14', '30', 'custom'].includes(route.query.range) ? route.query.range : 'season',
@@ -58,6 +64,7 @@ watch(
   analysisOptions,
   (options) => {
     const query = {}
+    if (selectedPageTab.value !== 'overview') query.view = selectedPageTab.value
     if (options.range !== 'season') query.range = options.range
     if (options.paWindow !== 50) query.pa_window = String(options.paWindow)
     if (options.pitchWindow !== 100) query.pitch_window = String(options.pitchWindow)
@@ -72,6 +79,7 @@ watch(
 
 watch(
   () => [
+    route.query.view,
     route.query.tab,
     route.query.range,
     route.query.pa_window,
@@ -79,7 +87,8 @@ watch(
     route.query.start_date,
     route.query.end_date,
   ],
-  ([tab, range, paWindow, pitchWindow, startDate, endDate]) => {
+  ([view, tab, range, paWindow, pitchWindow, startDate, endDate]) => {
+    selectedPageTab.value = pageTabs.some((entry) => entry.id === view) ? view : 'overview'
     selectedProfileTab.value = profileTabs.some((entry) => entry.id === tab) ? tab : 'overview'
     const nextRange = ['season', '7', '14', '30', 'custom'].includes(range) ? range : 'season'
     const nextPaWindow = [25, 50, 100].includes(Number(paWindow)) ? Number(paWindow) : 50
@@ -131,9 +140,13 @@ function teamHistoryLabel(membership) {
   return membership.sourceStatusDescription || titleize(membership.rosterStatus)
 }
 
-const positionLabel = computed(() => {
+const headerPositionLabel = computed(() => {
   const position = player.value?.positions?.primary
-  return position ? `${position.abbreviation} · ${position.name}` : 'Position unavailable'
+  const parts = []
+  if (position?.abbreviation) parts.push(position.abbreviation)
+  if (position?.name) parts.push(position.name)
+  if (player.value?.currentMembership?.jerseyNumber) parts.push(`#${player.value.currentMembership.jerseyNumber}`)
+  return parts.length ? parts.join(' - ') : 'Position unavailable'
 })
 
 const savantStatsMode = computed(() => {
@@ -219,14 +232,12 @@ const externalProfileLinks = computed(() => {
   const fangraphsId = player.value?.externalIds?.fangraphs
 
   return [
-    { key: 'mlb', label: 'MLB.com', href: `${frontendConfig.externalUrls.mlbPlayerBaseUrl}/${slug}-${mlbId}` },
     {
-      key: 'fangraphs',
-      label: 'FanGraphs',
-      href: fangraphsId
-        ? `${frontendConfig.externalUrls.fangraphsBaseUrl}/${slug}/${fangraphsId}/stats`
-        : `${frontendConfig.externalUrls.fangraphsLegacyUrl}?lastname=${encodedName}`,
+      key: 'baseball-savant',
+      label: 'Baseball Savant',
+      href: `${frontendConfig.externalUrls.baseballSavantPlayerBaseUrl}/${slug}-${mlbId}?stats=${savantStatsMode.value}`,
     },
+    { key: 'mlb', label: 'MLB.com', href: `${frontendConfig.externalUrls.mlbPlayerBaseUrl}/${slug}-${mlbId}` },
     {
       key: 'baseball-reference',
       label: 'Baseball Reference',
@@ -235,9 +246,11 @@ const externalProfileLinks = computed(() => {
         : `${frontendConfig.externalUrls.baseballReferenceSearchUrl}?search=${encodedName}`,
     },
     {
-      key: 'baseball-savant',
-      label: 'Baseball Savant',
-      href: `${frontendConfig.externalUrls.baseballSavantPlayerBaseUrl}/${slug}-${mlbId}?stats=${savantStatsMode.value}`,
+      key: 'fangraphs',
+      label: 'FanGraphs',
+      href: fangraphsId
+        ? `${frontendConfig.externalUrls.fangraphsBaseUrl}/${slug}/${fangraphsId}/stats`
+        : `${frontendConfig.externalUrls.fangraphsLegacyUrl}?lastname=${encodedName}`,
     },
   ]
 })
@@ -508,6 +521,19 @@ function selectAdjacentTab(event, index) {
   event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
 }
 
+function selectAdjacentPageTab(event, index) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  event.preventDefault()
+
+  let nextIndex = index
+  if (event.key === 'ArrowRight') nextIndex = (index + 1) % pageTabs.length
+  if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pageTabs.length) % pageTabs.length
+  if (event.key === 'Home') nextIndex = 0
+  if (event.key === 'End') nextIndex = pageTabs.length - 1
+  selectedPageTab.value = pageTabs[nextIndex].id
+  event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
+}
+
 function openSavedAnalysis(item) {
   const state = item.state || {}
   analysisOptions.value = {
@@ -659,15 +685,7 @@ async function closeSourceModal() {
       <RouterLink class="profile-back" :to="{ name: 'stat-explorer' }">← Back to Stat Explorer</RouterLink>
 
       <section class="profile-hero">
-        <button
-          ref="sourceModalTrigger"
-          type="button"
-          class="profile-provenance-link"
-          data-test="player-data-provenance-link"
-          @click="openSourceModal"
-        >
-          Data sources & freshness
-        </button>
+        <p class="profile-hero__title">Unified Player Profile - <span>MLB ID: {{ player.mlbId }}</span></p>
 
         <div
           class="profile-portrait"
@@ -683,26 +701,25 @@ async function closeSourceModal() {
         </div>
 
         <div class="profile-identity">
-          <p class="eyebrow">Unified player profile · MLB {{ player.mlbId }}</p>
           <h1>{{ player.fullName }}</h1>
-          <p class="profile-teamline">
-            <strong>
-              <RouterLink
-                v-if="player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id"
-                :to="{ name: 'team-profile', params: { id: player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id } }"
-              >
-                {{ player.displayTeam?.name || player.currentMembership?.team?.name || player.team?.name }}
-              </RouterLink>
-              <template v-else>Team unavailable</template>
-            </strong>
-            <span>{{ positionLabel }}</span>
-            <span v-if="player.currentMembership?.jerseyNumber">#{{ player.currentMembership.jerseyNumber }}</span>
-          </p>
-          <div class="profile-status" :class="{ 'profile-status--injured': player.currentMembership?.injured }">
-            <span class="profile-status__dot"></span>
-            {{ rosterLabel }}
+          <div class="profile-summary-line">
+            <p class="profile-teamline">
+              <strong>
+                <RouterLink
+                  v-if="player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id"
+                  :to="{ name: 'team-profile', params: { id: player.displayTeam?.id || player.currentMembership?.team?.id || player.team?.id } }"
+                >
+                  {{ player.displayTeam?.name || player.currentMembership?.team?.name || player.team?.name }}
+                </RouterLink>
+                <template v-else>Team unavailable</template>
+              </strong>
+              <span>{{ headerPositionLabel }}</span>
+            </p>
+            <div class="profile-status" :class="{ 'profile-status--injured': player.currentMembership?.injured }">
+              {{ rosterLabel }}
+            </div>
           </div>
-          <nav class="external-profile-links" aria-label="External player profiles">
+          <nav class="profile-primary-actions" aria-label="Player actions">
             <AddToWatchlistControl :player-id="player.id" :player-name="player.fullName" />
             <RouterLink
               class="compare-player-link"
@@ -712,6 +729,35 @@ async function closeSourceModal() {
               Compare player
               <span aria-hidden="true">⇄</span>
             </RouterLink>
+          </nav>
+        </div>
+
+        <dl class="profile-bio">
+          <div>
+            <dt>Bats/Throws</dt>
+            <dd>{{ displayValue(player.profile?.bats) }}/{{ displayValue(player.profile?.throws) }}</dd>
+          </div>
+          <div>
+            <dt>Born</dt>
+            <dd>{{ formatDate(player.profile?.birthDate) }}</dd>
+          </div>
+          <div>
+            <dt>Size</dt>
+            <dd>{{ displayValue(player.profile?.formattedHeight) }} - {{ displayValue(player.profile?.weightPounds) }} lb</dd>
+          </div>
+          <div>
+            <dt>Age</dt>
+            <dd>{{ displayValue(player.profile?.age) }}</dd>
+          </div>
+          <div>
+            <dt>MLB debut</dt>
+            <dd>{{ formatDate(player.profile?.mlbDebutDate) }}</dd>
+          </div>
+          <div class="profile-bio__empty" aria-hidden="true"></div>
+        </dl>
+
+        <div class="profile-hero__footer">
+          <nav class="external-profile-links" aria-label="External player profiles">
             <a
               v-for="link in externalProfileLinks"
               :key="link.key"
@@ -724,51 +770,70 @@ async function closeSourceModal() {
               <span aria-hidden="true">↗</span>
             </a>
           </nav>
-        </div>
 
-        <dl class="profile-bio">
-          <div>
-            <dt>Bats / Throws</dt>
-            <dd>{{ displayValue(player.profile?.bats) }} / {{ displayValue(player.profile?.throws) }}</dd>
-          </div>
-          <div>
-            <dt>Size</dt>
-            <dd>{{ displayValue(player.profile?.formattedHeight) }} · {{ displayValue(player.profile?.weightPounds) }} lb</dd>
-          </div>
-          <div>
-            <dt>Born</dt>
-            <dd>{{ formatDate(player.profile?.birthDate) }}<span v-if="player.profile?.age"> · Age {{ player.profile.age }}</span></dd>
-          </div>
-          <div>
-            <dt>MLB debut</dt>
-            <dd>{{ formatDate(player.profile?.mlbDebutDate) }}</dd>
-          </div>
-        </dl>
+          <button
+            ref="sourceModalTrigger"
+            type="button"
+            class="profile-provenance-link"
+            data-test="player-data-provenance-link"
+            @click="openSourceModal"
+          >
+            Data sources & freshness
+            <span aria-hidden="true">i</span>
+          </button>
+        </div>
       </section>
 
-      <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
-
-      <nav class="profile-tabs" aria-label="Player profile sections">
+      <nav class="profile-page-tabs" aria-label="Player profile pages">
         <div role="tablist">
           <button
-            v-for="(tab, index) in profileTabs"
-            :id="`player-profile-tab-${tab.id}`"
+            v-for="(tab, index) in pageTabs"
+            :id="`player-page-tab-${tab.id}`"
             :key="tab.id"
             type="button"
             role="tab"
-            :aria-controls="`player-profile-panel-${tab.id}`"
-            :aria-selected="selectedProfileTab === tab.id"
-            :tabindex="selectedProfileTab === tab.id ? 0 : -1"
-            :data-test="`player-profile-tab-${tab.id}`"
-            @click="selectedProfileTab = tab.id"
-            @keydown="selectAdjacentTab($event, index)"
+            :aria-controls="`player-page-panel-${tab.id}`"
+            :aria-selected="selectedPageTab === tab.id"
+            :tabindex="selectedPageTab === tab.id ? 0 : -1"
+            :data-test="`player-page-tab-${tab.id}`"
+            @click="selectedPageTab = tab.id"
+            @keydown="selectAdjacentPageTab($event, index)"
           >
             {{ tab.label }}
           </button>
         </div>
       </nav>
 
-      <div class="profile-stat-tabs">
+      <div
+        v-if="selectedPageTab === 'overview'"
+        id="player-page-panel-overview"
+        class="profile-page-content"
+        role="tabpanel"
+        aria-labelledby="player-page-tab-overview"
+      >
+        <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
+
+        <nav class="profile-tabs" aria-label="Player profile sections">
+          <div role="tablist">
+            <button
+              v-for="(tab, index) in profileTabs"
+              :id="`player-profile-tab-${tab.id}`"
+              :key="tab.id"
+              type="button"
+              role="tab"
+              :aria-controls="`player-profile-panel-${tab.id}`"
+              :aria-selected="selectedProfileTab === tab.id"
+              :tabindex="selectedProfileTab === tab.id ? 0 : -1"
+              :data-test="`player-profile-tab-${tab.id}`"
+              @click="selectedProfileTab = tab.id"
+              @keydown="selectAdjacentTab($event, index)"
+            >
+              {{ tab.label }}
+            </button>
+          </div>
+        </nav>
+
+        <div class="profile-stat-tabs">
 
       <section
         v-if="selectedProfileTab === 'overview'"
@@ -989,7 +1054,7 @@ async function closeSourceModal() {
         </p>
       </section>
 
-      </div>
+        </div>
 
       <section class="profile-panel similar-players-panel" data-test="similar-players">
         <header class="profile-section-heading">
@@ -1048,101 +1113,6 @@ async function closeSourceModal() {
         <small v-if="player.similarPlayers.methodology" class="similar-player-methodology">
           {{ player.similarPlayers.methodology }}
         </small>
-      </section>
-
-      <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
-        <div>
-          <p class="eyebrow">Analysis period</p>
-          <div class="range-presets" role="group" aria-label="Player analysis range">
-            <button v-for="preset in rangePresets" :key="preset.value" type="button"
-              :class="{ 'is-active': analysisOptions.range === preset.value }" @click="selectPreset(preset.value)">
-              {{ preset.label }}
-            </button>
-          </div>
-        </div>
-        <div class="custom-range">
-          <label>From <input v-model="customStartDate" type="date" /></label>
-          <label>Through <input v-model="customEndDate" type="date" /></label>
-          <button type="button" :disabled="!customStartDate || !customEndDate" @click="applyCustomRange">Apply custom</button>
-        </div>
-        <div class="rolling-window-controls">
-          <label>
-            Batting window
-            <select :value="analysisOptions.paWindow" @change="updateWindow('paWindow', $event.target.value)">
-              <option :value="25">25 PA</option>
-              <option :value="50">50 PA</option>
-              <option :value="100">100 PA</option>
-            </select>
-          </label>
-          <label>
-            Pitching window
-            <select :value="analysisOptions.pitchWindow" @change="updateWindow('pitchWindow', $event.target.value)">
-              <option :value="50">50 pitches</option>
-              <option :value="100">100 pitches</option>
-              <option :value="250">250 pitches</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
-      <SavedAnalysisControls
-        analysis-type="player_date_range"
-        :state="savedAnalysisState"
-        :reproducible-url="savedAnalysisUrl"
-        compact
-        @apply="openSavedAnalysis"
-      />
-
-      <section class="profile-panel trend-panel" data-test="player-trends">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Rolling intelligence</p>
-            <h2>Performance trends</h2>
-          </div>
-          <span v-if="player.analysis?.range?.startDate">
-            {{ formatDate(player.analysis.range.startDate) }} — {{ formatDate(player.analysis.range.endDate) }}
-          </span>
-        </header>
-
-        <div v-if="player.trendEvents?.events?.length" class="trend-events" data-test="trend-events">
-          <article v-for="event in player.trendEvents.events" :key="event.id"
-            :class="[
-              `trend-event--${trendEventTone(event)}`,
-              `trend-event--${event.severity}`,
-              { 'trend-event--resolved': event.status === 'resolved' },
-            ]">
-            <header>
-              <span>{{ trendEventLabel(event) }} · {{ event.status }}</span>
-              <time :datetime="event.onsetDate">Onset {{ formatDate(event.onsetDate) }}</time>
-            </header>
-            <strong>{{ trendEventTitle(event) }}</strong>
-            <p>
-              {{ trendEventValue(event, event.baselineValue) }} → {{ trendEventValue(event, event.currentValue) }}
-              ({{ signedContextualValue(event.changeValue, event.unit === 'mph' ? 'mph' : 'percent') }})
-            </p>
-            <small>
-              Sample {{ event.sampleSize }} vs {{ event.baselineSampleSize }} baseline ·
-              {{ event.supportingPitches.length }} supporting pitches
-            </small>
-          </article>
-        </div>
-
-        <div class="period-comparison">
-          <article v-for="metric in comparisonMetrics" :key="metric.key">
-            <span>{{ metric.label }}</span>
-            <strong>{{ contextualValue(metric.current, metric.unit) }}</strong>
-            <small>
-              Previous {{ contextualValue(metric.previous, metric.unit) }} ·
-              {{ signedContextualValue(metric.change, metric.unit) }}
-            </small>
-          </article>
-        </div>
-
-        <div v-if="trendCharts.length" class="trend-grid">
-          <PlayerTrendChart v-for="chart in trendCharts" :key="`${chart.group}-${chart.key}`"
-            :title="`${chart.group} · ${chart.title}`" :subtitle="chart.subtitle" :unit="chart.unit" :series="chart.series" />
-        </div>
-        <p v-else class="profile-empty">No pitch-level trend data is available for this period.</p>
       </section>
 
       <section class="profile-panel contextual-panel" data-test="contextual-benchmarks">
@@ -1271,6 +1241,120 @@ async function closeSourceModal() {
           <p v-else class="profile-empty">No dated team history has been synchronized.</p>
         </section>
       </div>
+      </div>
+
+      <div
+        v-if="selectedPageTab === 'performance-trends'"
+        id="player-page-panel-performance-trends"
+        class="profile-page-content"
+        role="tabpanel"
+        aria-labelledby="player-page-tab-performance-trends"
+      >
+        <SavedAnalysisControls
+          analysis-type="player_date_range"
+          :state="savedAnalysisState"
+          :reproducible-url="savedAnalysisUrl"
+          compact
+          @apply="openSavedAnalysis"
+        />
+
+        <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
+          <div>
+            <p class="eyebrow">Analysis period</p>
+            <div class="range-presets" role="group" aria-label="Player analysis range">
+              <button v-for="preset in rangePresets" :key="preset.value" type="button"
+                :class="{ 'is-active': analysisOptions.range === preset.value }" @click="selectPreset(preset.value)">
+                {{ preset.label }}
+              </button>
+            </div>
+          </div>
+          <div class="custom-range">
+            <label>From <input v-model="customStartDate" type="date" /></label>
+            <label>Through <input v-model="customEndDate" type="date" /></label>
+            <button type="button" :disabled="!customStartDate || !customEndDate" @click="applyCustomRange">Apply custom</button>
+          </div>
+          <div class="rolling-window-controls">
+            <label>
+              Batting window
+              <select :value="analysisOptions.paWindow" @change="updateWindow('paWindow', $event.target.value)">
+                <option :value="25">25 PA</option>
+                <option :value="50">50 PA</option>
+                <option :value="100">100 PA</option>
+              </select>
+            </label>
+            <label>
+              Pitching window
+              <select :value="analysisOptions.pitchWindow" @change="updateWindow('pitchWindow', $event.target.value)">
+                <option :value="50">50 pitches</option>
+                <option :value="100">100 pitches</option>
+                <option :value="250">250 pitches</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="profile-panel trend-panel" data-test="player-trends">
+          <header class="profile-section-heading">
+            <div>
+              <p class="eyebrow">Rolling intelligence</p>
+              <h2>Performance trends</h2>
+            </div>
+            <span v-if="player.analysis?.range?.startDate">
+              {{ formatDate(player.analysis.range.startDate) }} — {{ formatDate(player.analysis.range.endDate) }}
+            </span>
+          </header>
+
+          <div v-if="player.trendEvents?.events?.length" class="trend-events" data-test="trend-events">
+            <article v-for="event in player.trendEvents.events" :key="event.id"
+              :class="[
+                `trend-event--${trendEventTone(event)}`,
+                `trend-event--${event.severity}`,
+                { 'trend-event--resolved': event.status === 'resolved' },
+              ]">
+              <header>
+                <span>{{ trendEventLabel(event) }} · {{ event.status }}</span>
+                <time :datetime="event.onsetDate">Onset {{ formatDate(event.onsetDate) }}</time>
+              </header>
+              <strong>{{ trendEventTitle(event) }}</strong>
+              <p>
+                {{ trendEventValue(event, event.baselineValue) }} → {{ trendEventValue(event, event.currentValue) }}
+                ({{ signedContextualValue(event.changeValue, event.unit === 'mph' ? 'mph' : 'percent') }})
+              </p>
+              <small>
+                Sample {{ event.sampleSize }} vs {{ event.baselineSampleSize }} baseline ·
+                {{ event.supportingPitches.length }} supporting pitches
+              </small>
+            </article>
+          </div>
+
+          <div class="period-comparison">
+            <article v-for="metric in comparisonMetrics" :key="metric.key">
+              <span>{{ metric.label }}</span>
+              <strong>{{ contextualValue(metric.current, metric.unit) }}</strong>
+              <small>
+                Previous {{ contextualValue(metric.previous, metric.unit) }} ·
+                {{ signedContextualValue(metric.change, metric.unit) }}
+              </small>
+            </article>
+          </div>
+
+          <div v-if="trendCharts.length" class="trend-grid">
+            <PlayerTrendChart v-for="chart in trendCharts" :key="`${chart.group}-${chart.key}`"
+              :title="`${chart.group} · ${chart.title}`" :subtitle="chart.subtitle" :unit="chart.unit" :series="chart.series" />
+          </div>
+          <p v-else class="profile-empty">No pitch-level trend data is available for this period.</p>
+        </section>
+      </div>
+
+      <div
+        v-if="selectedPageTab === 'batted-ball-profile'"
+        id="player-page-panel-batted-ball-profile"
+        class="profile-page-content profile-page-content--empty"
+        role="tabpanel"
+        aria-labelledby="player-page-tab-batted-ball-profile"
+      >
+        <p class="profile-empty">Batted ball profile coming soon.</p>
+      </div>
 
       <div
         v-if="sourceModalOpen"
@@ -1333,14 +1417,73 @@ async function closeSourceModal() {
   text-decoration: none;
 }
 
+.profile-page-tabs {
+  margin-top: 1.25rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 20px;
+  background: rgba(247, 246, 241, 0.94);
+  box-shadow: 0 8px 24px rgba(16, 38, 61, 0.08);
+  backdrop-filter: blur(10px);
+}
+
+.profile-page-tabs [role='tablist'] {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.profile-page-tabs button {
+  min-height: 46px;
+  padding: 0.7rem 0.85rem;
+  border: 0;
+  border-radius: 14px;
+  color: #65747e;
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.profile-page-tabs button[aria-selected='true'] {
+  color: #fffaf0;
+  background: #173652;
+  box-shadow: 0 5px 14px rgba(16, 38, 61, 0.18);
+}
+
+.profile-page-tabs button:focus-visible {
+  outline: 3px solid rgba(169, 54, 39, 0.32);
+  outline-offset: 2px;
+}
+
+.profile-page-content {
+  margin-top: 1.25rem;
+}
+
+.profile-page-content > * {
+  width: 100%;
+}
+
+.profile-page-content--empty {
+  min-height: 220px;
+  padding: 3rem 1.5rem;
+  border: 1px solid rgba(16, 38, 61, 0.13);
+  border-radius: 20px;
+  background: rgba(255, 250, 240, 0.9);
+  text-align: center;
+}
+
 .profile-tabs {
   position: sticky;
   z-index: 8;
   top: 0.5rem;
   margin-top: 1.25rem;
+  margin-bottom: 0;
   padding: 0.35rem;
   border: 1px solid rgba(16, 38, 61, 0.1);
-  border-radius: 15px;
+  border-radius: 20px 20px 0 0;
   background: rgba(247, 246, 241, 0.94);
   box-shadow: 0 8px 24px rgba(16, 38, 61, 0.08);
   backdrop-filter: blur(10px);
@@ -1533,10 +1676,24 @@ async function closeSourceModal() {
 .profile-hero {
   position: relative;
   display: grid;
-  grid-template-columns: 170px minmax(0, 1.2fr) minmax(280px, 0.7fr);
-  gap: 2rem;
+  grid-template-columns: 250px minmax(0, 1fr) minmax(380px, 0.68fr);
+  gap: 1.45rem 1.85rem;
   align-items: center;
-  padding: 3.15rem 2rem 2rem;
+  padding: 1.15rem 1.75rem 1rem;
+}
+
+.profile-hero__title {
+  grid-column: 1 / -1;
+  margin: 0 0 .1rem 2.65rem;
+  color: #050607;
+  font-weight: 900;
+  line-height: 1;
+  font-size: 1.25rem;
+}
+
+.profile-hero__title span {
+  color: #414141;
+  font-size: .78em;
 }
 
 .profile-portrait {
@@ -1544,12 +1701,14 @@ async function closeSourceModal() {
   display: grid;
   place-items: center;
   overflow: hidden;
+  width: min(100%, 220px);
   aspect-ratio: 1;
-  border: 5px solid rgba(255, 255, 255, 0.85);
+  justify-self: center;
+  border: 7px solid rgba(255, 255, 255, 0.86);
   border-radius: 50%;
   color: #fff7e7;
   background: linear-gradient(145deg, #153a59, #8f2d24);
-  box-shadow: 0 12px 28px rgba(16, 38, 61, 0.2);
+  box-shadow: 0 0 0 1px rgba(16, 38, 61, .08), 0 14px 34px rgba(16, 38, 61, 0.12);
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 3rem;
   font-weight: 800;
@@ -1568,21 +1727,36 @@ async function closeSourceModal() {
   background: #c9c9c9;
 }
 
+.profile-identity {
+  align-self: center;
+}
+
 .profile-identity h1 {
   color: #10263d;
   font-family: 'Avenir Next Condensed', 'DIN Condensed', sans-serif;
-  font-size: clamp(2.8rem, 5vw, 5.8rem);
-  line-height: 0.9;
-  letter-spacing: -0.025em;
+  font-size: clamp(3.45rem, 5.05vw, 6rem);
+  line-height: .83;
+  letter-spacing: .08em;
   text-transform: uppercase;
+}
+
+.profile-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1.45rem;
 }
 
 .profile-teamline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem 0.8rem;
-  margin-top: 1rem;
-  color: #455563;
+  gap: .45rem;
+  align-items: baseline;
+  margin: 0;
+  color: #151515;
+  font-size: clamp(1.25rem, 1.62vw, 1.95rem);
+  line-height: 1.08;
 }
 
 .profile-teamline a,
@@ -1592,56 +1766,70 @@ async function closeSourceModal() {
   text-underline-offset: 0.18em;
 }
 
+.profile-teamline a {
+  text-decoration: none;
+}
+
 .profile-teamline a:hover,
 .team-timeline a:hover {
   color: #8f2d24;
 }
 
+.profile-teamline strong {
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .profile-teamline span::before {
-  margin-right: 0.8rem;
-  color: #b79569;
-  content: '•';
+  margin-inline: .2rem .45rem;
+  color: #151515;
+  content: '|';
 }
 
 .profile-status {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding: 0.4rem 0.8rem;
+  padding: 0.3rem .9rem;
   border-radius: 999px;
-  color: #20543c;
-  background: #e1f0e5;
-  font-size: 0.84rem;
-  font-weight: 800;
+  color: #fffdf7;
+  background: #4f865d;
+  font-size: clamp(.92rem, 1.15vw, 1.45rem);
+  font-weight: 500;
+  line-height: 1;
   text-transform: uppercase;
 }
 
 .profile-status--injured {
-  color: #7d291f;
-  background: #f5ddd5;
-}
-
-.profile-status__dot {
-  width: 0.55rem;
-  height: 0.55rem;
-  border-radius: 50%;
-  background: currentColor;
+  color: #fffdf7;
+  background: #9a3d30;
 }
 
 .profile-provenance-link {
-  position: absolute;
-  top: 1.05rem;
-  right: 1.35rem;
+  display: inline-flex;
+  gap: .45rem;
+  align-items: center;
+  justify-self: end;
   padding: 0;
   border: 0;
-  color: #486171;
+  color: #0d3e68;
   background: transparent;
-  font-size: .76rem;
-  font-weight: 800;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-size: clamp(.98rem, 1.35vw, 1.65rem);
+  font-weight: 500;
+  line-height: 1;
   cursor: pointer;
+}
+
+.profile-provenance-link span {
+  display: grid;
+  width: 1.35rem;
+  height: 1.35rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #fffdf7;
+  background: #0b6f9e;
+  font-size: .82rem;
+  font-weight: 900;
+  font-family: Georgia, serif;
 }
 
 .profile-provenance-link:hover { color: #8f2d24; }
@@ -1652,46 +1840,60 @@ async function closeSourceModal() {
   outline-offset: 3px;
 }
 
+.profile-primary-actions,
 .external-profile-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.75rem;
+  gap: .55rem .7rem;
+  align-items: center;
+}
+
+.profile-primary-actions {
+  margin-top: 1.75rem;
+}
+
+.profile-primary-actions :deep(.watchlist-control__trigger),
+.profile-primary-actions .compare-player-link {
+  padding: .4rem .85rem;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 999px;
+  color: #fffdf7;
+  background: #12395e;
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, .14), 0 2px 0 rgba(16, 38, 61, .75);
+  font-size: clamp(.9rem, 1.18vw, 1.45rem);
+  font-weight: 400;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.profile-primary-actions :deep(.watchlist-control__trigger:hover),
+.profile-primary-actions :deep(.watchlist-control__trigger:focus-visible),
+.profile-primary-actions .compare-player-link:hover,
+.profile-primary-actions .compare-player-link:focus-visible {
+  color: #fffdf7;
+  background: #1b4d79;
 }
 
 .external-profile-links a {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.34rem 0.58rem;
-  border: 1px solid rgba(23, 54, 82, 0.2);
+  padding: .28rem .62rem;
+  border: 1px solid rgba(83, 101, 117, .12);
   border-radius: 999px;
-  color: #173652;
-  background: rgba(255, 255, 255, 0.72);
-  font-size: 0.72rem;
-  font-weight: 800;
-  line-height: 1;
-  text-decoration: none;
-}
-
-.external-profile-links .compare-player-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  padding: 0.34rem 0.58rem;
-  border: 1px solid rgba(169, 54, 39, 0.35);
-  border-radius: 999px;
-  color: #8f2d24;
-  background: rgba(255, 250, 240, 0.9);
-  font-size: 0.72rem;
-  font-weight: 800;
+  color: #fffdf7;
+  background: #5b6d7e;
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .12);
+  font-size: clamp(.78rem, .95vw, 1.12rem);
+  font-weight: 400;
   line-height: 1;
   text-decoration: none;
 }
 
 .external-profile-links a:hover {
-  border-color: rgba(23, 54, 82, 0.5);
-  background: #fff;
+  border-color: rgba(91, 109, 126, .2);
+  color: #fffdf7;
+  background: #6a7c8d;
   transform: translateY(-1px);
 }
 
@@ -1703,24 +1905,57 @@ async function closeSourceModal() {
 .profile-bio {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  padding: 1.2rem;
-  border-radius: 20px;
-  background: rgba(16, 38, 61, 0.055);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid #d1c7b7;
+  border-radius: 18px;
+  background: rgba(255, 252, 244, .58);
+}
+
+.profile-bio div {
+  min-height: 74px;
+  padding: .82rem 1.05rem;
+  border-right: 1px solid #d1c7b7;
+  border-bottom: 1px solid #d1c7b7;
+}
+
+.profile-bio div:nth-child(2n) {
+  border-right: 0;
+}
+
+.profile-bio div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.profile-bio__empty {
+  background: linear-gradient(135deg, transparent 62%, rgba(16, 38, 61, .08));
 }
 
 .profile-bio dt,
 .indicator-card dt {
-  color: #71808c;
-  font-size: 0.72rem;
+  color: #292929;
+  font-size: clamp(.74rem, .88vw, 1.08rem);
   font-weight: 800;
-  letter-spacing: 0.08em;
+  line-height: 1;
+  letter-spacing: .06em;
   text-transform: uppercase;
 }
 
 .profile-bio dd {
-  color: #10263d;
-  font-weight: 700;
+  margin-top: .28rem;
+  color: #1f232b;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.08;
+}
+
+.profile-hero__footer {
+  display: grid;
+  grid-column: 2 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  margin-top: .85rem;
 }
 
 .profile-panel {
@@ -1729,13 +1964,14 @@ async function closeSourceModal() {
 }
 
 .profile-stat-tabs {
-  margin-top: 1.25rem;
+  margin-top: 0;
 }
 
 .profile-stat-table {
   padding: 1.5rem;
   border: 1px solid rgba(16, 38, 61, 0.13);
-  border-radius: 20px;
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
   background: rgba(255, 250, 240, 0.9);
 }
 
@@ -2461,10 +2697,14 @@ async function closeSourceModal() {
 
 @media (max-width: 980px) {
   .profile-hero {
-    grid-template-columns: 130px 1fr;
+    grid-template-columns: 145px 1fr;
   }
 
   .profile-bio {
+    grid-column: 1 / -1;
+  }
+
+  .profile-hero__footer {
     grid-column: 1 / -1;
   }
 
@@ -2507,8 +2747,23 @@ async function closeSourceModal() {
   }
 
   .profile-portrait {
-    width: 120px;
+    width: 135px;
     margin-inline: auto;
+  }
+
+  .profile-identity h1 {
+    font-size: clamp(2.75rem, 16vw, 4.1rem);
+  }
+
+  .profile-summary-line,
+  .profile-primary-actions,
+  .external-profile-links,
+  .profile-hero__footer {
+    justify-content: center;
+  }
+
+  .profile-hero__footer {
+    grid-template-columns: 1fr;
   }
 
   .profile-teamline,
@@ -2519,6 +2774,14 @@ async function closeSourceModal() {
   .indicator-groups,
   .profile-bio {
     grid-template-columns: 1fr;
+  }
+
+  .profile-bio div {
+    border-right: 0;
+  }
+
+  .profile-bio__empty {
+    display: none;
   }
 
   .profile-section-heading {

@@ -434,6 +434,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Recent pitch indicators')
     expect(wrapper.text()).toContain('91.2 mph')
     expect(wrapper.text()).toContain('Team history')
+    await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     expect(wrapper.get('[data-test="player-date-range-controls"]').text()).toContain('Full season')
     expect(wrapper.get('[data-test="player-date-range-controls"]').text()).toContain('Last 30 days')
     expect(wrapper.get('[data-test="player-trends"]').text()).toContain('Performance trends')
@@ -443,6 +444,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Sample 32 vs 30 baseline')
     expect(wrapper.get('[data-test="trend-events"]').text()).toContain('Onset Jul 1, 2026')
     expect(wrapper.get('[data-test="player-trends"] svg').attributes('aria-label')).toBe('Batting · Exit velocity rolling trend')
+    await wrapper.get('[data-test="player-page-tab-overview"]').trigger('click')
     const benchmarks = wrapper.get('[data-test="contextual-benchmarks"]')
     expect(benchmarks.text()).toContain('Benchmarks & percentiles')
     expect(benchmarks.text()).toContain('0.842')
@@ -458,6 +460,7 @@ describe('PlayerProfileView', () => {
     })
     expect(wrapper.get('.profile-portrait').classes()).toContain('profile-portrait--photo')
 
+    await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     await wrapper.get('.range-presets button:nth-child(2)').trigger('click')
     await flushPromises()
     expect(fetch).toHaveBeenCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100&sections=core', {
@@ -486,6 +489,7 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     const event = wrapper.get('[data-test="trend-events"] article')
     expect(event.classes()).toContain('trend-event--favorable')
     expect(event.text()).toContain('improvement · active')
@@ -543,7 +547,7 @@ describe('PlayerProfileView', () => {
     const panel = wrapper.get('[data-test="advanced-stats-panel"]')
     expect(panel.isVisible()).toBe(true)
     expect(wrapper.get('[data-test="similar-players"]').isVisible()).toBe(true)
-    expect(wrapper.get('[data-test="player-trends"]').isVisible()).toBe(true)
+    expect(wrapper.find('[data-test="player-trends"]').exists()).toBe(false)
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('BB%')
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('10.2%')
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('.331')
@@ -724,10 +728,12 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     const trends = wrapper.get('[data-test="player-trends"]')
     expect(trends.text()).toContain('Pitching · Velocity')
     expect(trends.text()).not.toContain('Batting · Exit velocity')
     expect(trends.find('svg').attributes('aria-label')).toBe('Pitching · Velocity rolling trend')
+    await wrapper.get('[data-test="player-page-tab-overview"]').trigger('click')
     expect(wrapper.find('[data-test="indicator-card-batting"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
     expect(wrapper.get('[data-test="external-profile-baseball-savant"]').attributes('href')).toBe(
@@ -776,9 +782,11 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     const trends = wrapper.get('[data-test="player-trends"]')
     expect(trends.text()).toContain('Batting · Exit velocity')
     expect(trends.text()).toContain('Pitching · Velocity')
+    await wrapper.get('[data-test="player-page-tab-overview"]').trigger('click')
     expect(wrapper.find('[data-test="indicator-card-batting"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="indicator-card-pitching"]').exists()).toBe(true)
   })
