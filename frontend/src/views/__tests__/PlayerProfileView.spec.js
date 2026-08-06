@@ -316,6 +316,27 @@ function apiPayloadWith(mutator) {
 }
 
 describe('PlayerProfileView', () => {
+  it('opens data provenance from the profile header in a modal', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => apiPayload() }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="player-data-provenance-modal"]').exists()).toBe(false)
+    await wrapper.get('[data-test="player-data-provenance-link"]').trigger('click')
+
+    const modal = wrapper.get('[data-test="player-data-provenance-modal"]')
+    expect(modal.get('[role="dialog"]').attributes('aria-modal')).toBe('true')
+    expect(modal.text()).toContain('Sources & freshness')
+    expect(modal.text()).toContain('MLB Stats API')
+
+    await modal.get('[aria-label="Close data provenance"]').trigger('click')
+    expect(wrapper.find('[data-test="player-data-provenance-modal"]').exists()).toBe(false)
+  })
+
   it('uses the longest-served team in a retired player header', async () => {
     const payload = apiPayloadWith((response) => {
       response.data.team = { id: 2, mlb_id: 146, name: 'Miami Marlins', abbreviation: 'MIA' }

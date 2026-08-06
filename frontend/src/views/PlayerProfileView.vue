@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, ref, watch } from 'vue'
+import { computed, inject, nextTick, ref, watch } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
 
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
@@ -50,6 +50,9 @@ const savedAnalysisUrl = computed(() => {
 })
 const { player, loading, error, sectionLoading, loadSection, refresh } = usePlayerProfile(playerId, analysisOptions)
 const headshotFailed = ref(false)
+const sourceModalOpen = ref(false)
+const sourceModalTrigger = ref(null)
+const sourceModal = ref(null)
 
 watch(
   analysisOptions,
@@ -626,6 +629,18 @@ function formatTimestamp(value) {
     minute: '2-digit',
   }).format(new Date(value))
 }
+
+async function openSourceModal() {
+  sourceModalOpen.value = true
+  await nextTick()
+  sourceModal.value?.focus()
+}
+
+async function closeSourceModal() {
+  sourceModalOpen.value = false
+  await nextTick()
+  sourceModalTrigger.value?.focus()
+}
 </script>
 
 <template>
@@ -644,6 +659,16 @@ function formatTimestamp(value) {
       <RouterLink class="profile-back" :to="{ name: 'stat-explorer' }">← Back to Stat Explorer</RouterLink>
 
       <section class="profile-hero">
+        <button
+          ref="sourceModalTrigger"
+          type="button"
+          class="profile-provenance-link"
+          data-test="player-data-provenance-link"
+          @click="openSourceModal"
+        >
+          Data sources & freshness
+        </button>
+
         <div
           class="profile-portrait"
           :class="{ 'profile-portrait--photo': player.profile?.headshotUrl && !headshotFailed }"
@@ -1247,22 +1272,39 @@ function formatTimestamp(value) {
         </section>
       </div>
 
-      <section class="profile-panel profile-sources">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Data provenance</p>
-            <h2>Sources & freshness</h2>
+      <div
+        v-if="sourceModalOpen"
+        class="profile-modal-backdrop"
+        data-test="player-data-provenance-modal"
+        @click.self="closeSourceModal"
+        @keydown.esc="closeSourceModal"
+      >
+        <section
+          ref="sourceModal"
+          class="profile-modal profile-sources-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="player-data-provenance-title"
+          tabindex="-1"
+        >
+          <header class="profile-section-heading">
+            <div>
+              <p class="eyebrow">Data provenance</p>
+              <h2 id="player-data-provenance-title">Sources & freshness</h2>
+            </div>
+            <button type="button" class="profile-modal__close" aria-label="Close data provenance" @click="closeSourceModal">×</button>
+          </header>
+          <p class="profile-modal__updated">Profile updated {{ formatTimestamp(player.sourceMetadata.lastUpdatedAt) }}</p>
+          <div v-if="player.sourceMetadata.datasets.length" class="source-grid">
+            <article v-for="dataset in player.sourceMetadata.datasets" :key="dataset.name">
+              <strong>{{ titleize(dataset.name) }}</strong>
+              <span>{{ dataset.sourceName || 'DiamondIQ' }}</span>
+              <small>{{ formatTimestamp(dataset.lastUpdatedAt) }}</small>
+            </article>
           </div>
-          <span>Profile updated {{ formatTimestamp(player.sourceMetadata.lastUpdatedAt) }}</span>
-        </header>
-        <div class="source-grid">
-          <article v-for="dataset in player.sourceMetadata.datasets" :key="dataset.name">
-            <strong>{{ titleize(dataset.name) }}</strong>
-            <span>{{ dataset.sourceName || 'DiamondIQ' }}</span>
-            <small>{{ formatTimestamp(dataset.lastUpdatedAt) }}</small>
-          </article>
-        </div>
-      </section>
+          <p v-else class="profile-empty">No source freshness details are available yet.</p>
+        </section>
+      </div>
     </template>
   </main>
 </template>
@@ -1489,11 +1531,12 @@ function formatTimestamp(value) {
 }
 
 .profile-hero {
+  position: relative;
   display: grid;
   grid-template-columns: 170px minmax(0, 1.2fr) minmax(280px, 0.7fr);
   gap: 2rem;
   align-items: center;
-  padding: 2rem;
+  padding: 3.15rem 2rem 2rem;
 }
 
 .profile-portrait {
@@ -1584,6 +1627,29 @@ function formatTimestamp(value) {
   height: 0.55rem;
   border-radius: 50%;
   background: currentColor;
+}
+
+.profile-provenance-link {
+  position: absolute;
+  top: 1.05rem;
+  right: 1.35rem;
+  padding: 0;
+  border: 0;
+  color: #486171;
+  background: transparent;
+  font-size: .76rem;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.profile-provenance-link:hover { color: #8f2d24; }
+
+.profile-provenance-link:focus-visible,
+.profile-modal__close:focus-visible {
+  outline: 3px solid rgba(31, 111, 235, .32);
+  outline-offset: 3px;
 }
 
 .external-profile-links {
@@ -2187,6 +2253,51 @@ function formatTimestamp(value) {
 .source-grid span,
 .source-grid small {
   color: #697784;
+}
+
+.profile-modal-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(8, 22, 35, .7);
+  backdrop-filter: blur(5px);
+}
+
+.profile-modal {
+  width: min(720px, calc(100vw - 2rem));
+  max-height: min(720px, calc(100vh - 2rem));
+  overflow: auto;
+  padding: clamp(1.35rem, 4vw, 2rem);
+  outline: none;
+  border: 1px solid rgba(143, 45, 36, .2);
+  border-radius: 24px;
+  background: #fffaf0;
+  box-shadow: 0 24px 70px rgba(8, 22, 35, .28);
+}
+
+.profile-modal .profile-section-heading { margin-bottom: .5rem; }
+
+.profile-modal__close {
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid rgba(16, 38, 61, .15);
+  border-radius: 50%;
+  color: #10263d;
+  background: #fffdf7;
+  font-size: 1.45rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.profile-modal__updated {
+  margin: 0 0 1.2rem;
+  color: #697784;
+  font-size: .85rem;
 }
 
 .profile-state {
