@@ -1,11 +1,13 @@
 <script setup>
-import { computed, inject, nextTick, ref, watch } from 'vue'
+import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
 
 import PlayerTrendChart from '../components/PlayerTrendChart.vue'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
-import NotesPanel from '../components/NotesPanel.vue'
 import AddToWatchlistControl from '../components/AddToWatchlistControl.vue'
+import PlayerOverviewView from './PlayerProfileOverviewView.vue'
+import PlayerPerformanceTrendsView from './PlayerPerformanceTrendsView.vue'
+import PlayerBattedBallProfileView from './PlayerBattedBallProfileView.vue'
 import { usePlayerProfile } from '../composables/usePlayerProfile'
 import { formatBaseballStatValue } from '../utils/baseballStatFormatting'
 import { frontendConfig } from '../config'
@@ -667,6 +669,18 @@ async function closeSourceModal() {
   await nextTick()
   sourceModalTrigger.value?.focus()
 }
+
+provide('player-profile-context', {
+  player, selectedProfileTab, profileTabs, sectionLoading, careerTableRows, titleize, careerRangeLabel,
+  formatBaseballStatValue, advancedTableRows, advancedStatValue, showBattingIndicators, batterSplitDimension,
+  batterSplitMetrics, batterSplitValue, selectedBatterSplit, showPitchingIndicators, pitcherSplitDimension,
+  pitcherSplitMetrics, pitcherSplitValue, selectedPitcherSplit, formatDate, similarityValue,
+  contextualMetricLabel, contextualValue, peerAverage, peerLabel, percentileStyle, signedContextualValue,
+  benchmarkPeriodLabel, battingMetrics, pitchingMetrics, teamHistoryLabel, displayValue, SavedAnalysisControls,
+  savedAnalysisState, savedAnalysisUrl, openSavedAnalysis, analysisOptions, rangePresets, selectPreset,
+  customStartDate, customEndDate, applyCustomRange, updateWindow, trendEventTone, trendEventLabel,
+  trendEventTitle, trendEventValue, comparisonMetrics, trendCharts, PlayerTrendChart, selectAdjacentTab,
+})
 </script>
 
 <template>
@@ -804,557 +818,11 @@ async function closeSourceModal() {
         </div>
       </nav>
 
-      <div
-        v-if="selectedPageTab === 'overview'"
-        id="player-page-panel-overview"
-        class="profile-page-content"
-        role="tabpanel"
-        aria-labelledby="player-page-tab-overview"
-      >
-        <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
+      <PlayerOverviewView v-if="selectedPageTab === 'overview'" />
 
-        <nav class="profile-tabs" aria-label="Player profile sections">
-          <div role="tablist">
-            <button
-              v-for="(tab, index) in profileTabs"
-              :id="`player-profile-tab-${tab.id}`"
-              :key="tab.id"
-              type="button"
-              role="tab"
-              :aria-controls="`player-profile-panel-${tab.id}`"
-              :aria-selected="selectedProfileTab === tab.id"
-              :tabindex="selectedProfileTab === tab.id ? 0 : -1"
-              :data-test="`player-profile-tab-${tab.id}`"
-              @click="selectedProfileTab = tab.id"
-              @keydown="selectAdjacentTab($event, index)"
-            >
-              {{ tab.label }}
-            </button>
-          </div>
-        </nav>
+      <PlayerPerformanceTrendsView v-if="selectedPageTab === 'performance-trends'" />
 
-        <div class="profile-stat-tabs">
-
-      <section
-        v-if="selectedProfileTab === 'overview'"
-        id="player-profile-panel-overview"
-        class="profile-stat-table profile-career-table"
-        role="tabpanel"
-        aria-labelledby="player-profile-tab-overview"
-      >
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Career ledger</p>
-            <h2>{{ titleize(player.careerOverview.category) }} by season</h2>
-          </div>
-          <span>{{ careerRangeLabel }}</span>
-        </header>
-
-        <div v-if="player.careerOverview.seasons.length" class="career-table-wrap" data-test="career-season-table">
-          <table class="career-table">
-            <thead>
-              <tr>
-                <th class="career-table__season">Season</th>
-                <th class="career-table__team">Team</th>
-                <th v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ column.label }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="seasonRow in careerTableRows"
-                :key="`${seasonRow.season}-${seasonRow.teamLabel}`"
-                :class="{ 'career-table__season-total': seasonRow.isSeasonTotal }"
-              >
-                <th class="career-table__season">{{ seasonRow.season }}</th>
-                <td class="career-table__team">{{ seasonRow.teamLabel }}</td>
-                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ formatBaseballStatValue(column.key, seasonRow.statValues[column.key]) }}
-                </td>
-              </tr>
-            </tbody>
-            <tfoot>
-              <tr>
-                <th class="career-table__season">Career</th>
-                <td class="career-table__team">Total</td>
-                <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
-                  {{ formatBaseballStatValue(column.key, player.careerOverview.statValues[column.key]) }}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-        <p v-else class="profile-empty">No season statistics have been imported for this player yet.</p>
-      </section>
-
-      <section
-        v-if="selectedProfileTab === 'advanced-stats'"
-        id="player-profile-panel-advanced-stats"
-        class="profile-stat-table advanced-stats-panel"
-        role="tabpanel"
-        aria-labelledby="player-profile-tab-advanced-stats"
-        data-test="advanced-stats-panel"
-      >
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Plate-discipline & production</p>
-            <h2>Advanced Stats</h2>
-          </div>
-          <span>{{ careerRangeLabel }}</span>
-        </header>
-
-        <p v-if="sectionLoading('advanced_stats').value" class="profile-empty">Loading advanced statistics…</p>
-        <div v-else-if="player.advancedStats.seasons.length" class="advanced-stat-groups">
-          <article
-            v-for="group in player.advancedStats.groups"
-            :key="group.key"
-            class="advanced-stat-group"
-            :data-test="`advanced-stat-group-${group.key}`"
-          >
-            <h3>{{ group.label }}</h3>
-            <p v-if="group.description" class="advanced-stat-group__description">{{ group.description }}</p>
-            <div class="advanced-table-wrap">
-              <table class="advanced-table">
-                <thead>
-                  <tr>
-                    <th>Season</th>
-                    <th>Team</th>
-                    <th
-                      v-for="column in group.columns"
-                      :key="column.key"
-                      class="advanced-table__metric-heading"
-                    >
-                      {{ column.label }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="seasonRow in advancedTableRows"
-                    :key="`${group.key}-${seasonRow.season}-${seasonRow.teamLabel}`"
-                    :class="{ 'advanced-table__season-total': seasonRow.isSeasonTotal }"
-                  >
-                    <th>{{ seasonRow.season }}</th>
-                    <td>{{ seasonRow.teamLabel }}</td>
-                    <td v-for="column in group.columns" :key="column.key">
-                      {{ advancedStatValue(column, seasonRow.values[column.key]) }}
-                    </td>
-                  </tr>
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <th>Career</th>
-                    <td>Total</td>
-                    <td v-for="column in group.columns" :key="column.key">
-                      {{ advancedStatValue(column, player.advancedStats.career.values[column.key]) }}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </article>
-        </div>
-        <p v-else class="profile-empty">No advanced statistics have been imported for this player yet.</p>
-      </section>
-
-      <section
-        v-if="selectedProfileTab === 'splits'"
-        id="player-profile-panel-splits"
-        class="profile-stat-table batter-splits-panel"
-        role="tabpanel"
-        aria-labelledby="player-profile-tab-splits"
-        data-test="batter-splits"
-      >
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Matchup context</p>
-            <h2>Splits</h2>
-          </div>
-          <span>Pitch-level sample · {{ formatDate(player.analysis?.range?.startDate) }} — {{ formatDate(player.analysis?.range?.endDate) }}</span>
-        </header>
-
-        <p v-if="sectionLoading('splits').value" class="profile-empty">Loading split statistics…</p>
-        <div v-else-if="showBattingIndicators && player.batterSplits.available" class="split-role">
-          <h3>As batter</h3>
-          <div class="split-tabs" role="tablist" aria-label="Batter split dimensions">
-            <button
-              v-for="dimension in player.batterSplits.dimensions"
-              :key="dimension.key"
-              type="button"
-              role="tab"
-              :aria-selected="batterSplitDimension?.key === dimension.key"
-              :class="{ 'is-active': batterSplitDimension?.key === dimension.key }"
-              :data-test="`batter-split-tab-${dimension.key}`"
-              @click="selectedBatterSplit = dimension.key"
-            >
-              {{ dimension.label }}
-            </button>
-          </div>
-
-          <div v-if="batterSplitDimension?.options?.length" class="split-table-wrap">
-            <table class="split-table">
-              <thead>
-                <tr>
-                  <th>Split</th>
-                  <th v-for="metric in batterSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="option in batterSplitDimension.options" :key="option.value">
-                  <th>{{ option.label }}</th>
-                  <td v-for="metric in batterSplitMetrics" :key="metric[0]">
-                    {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div v-if="!sectionLoading('splits').value && showPitchingIndicators && player.pitcherSplits.available" class="split-role">
-          <h3>As pitcher</h3>
-          <div class="split-tabs" role="tablist" aria-label="Pitcher split dimensions">
-            <button
-              v-for="dimension in player.pitcherSplits.dimensions"
-              :key="dimension.key"
-              type="button"
-              role="tab"
-              :aria-selected="pitcherSplitDimension?.key === dimension.key"
-              :class="{ 'is-active': pitcherSplitDimension?.key === dimension.key }"
-              :data-test="`pitcher-split-tab-${dimension.key}`"
-              @click="selectedPitcherSplit = dimension.key"
-            >
-              {{ dimension.label }}
-            </button>
-          </div>
-
-          <div v-if="pitcherSplitDimension?.options?.length" class="split-table-wrap">
-            <table class="split-table">
-              <thead>
-                <tr>
-                  <th>Split</th>
-                  <th v-for="metric in pitcherSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="option in pitcherSplitDimension.options" :key="option.value">
-                  <th>{{ option.label }}</th>
-                  <td v-for="metric in pitcherSplitMetrics" :key="metric[0]">
-                    {{ pitcherSplitValue(option.metrics[metric[0]], metric[2]) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <p v-if="!sectionLoading('splits').value && !(showBattingIndicators && player.batterSplits.available) && !(showPitchingIndicators && player.pitcherSplits.available)" class="profile-empty">
-          Split data is available after pitch-level analytics have been calculated for this period.
-        </p>
-      </section>
-
-        </div>
-
-      <section class="profile-panel similar-players-panel" data-test="similar-players">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">Statistical neighbors</p>
-            <h2>Similar players</h2>
-          </div>
-          <span v-if="player.similarPlayers.season">
-            {{ player.similarPlayers.season }} {{ titleize(player.similarPlayers.category) }}
-          </span>
-        </header>
-
-        <div v-if="player.similarPlayers.matches.length" class="similar-player-grid">
-          <article
-            v-for="match in player.similarPlayers.matches"
-            :key="match.player.id"
-            class="similar-player-card"
-            :data-test="`similar-player-${match.player.id}`"
-          >
-            <div class="similar-player-card__heading">
-              <img v-if="match.player.headshotUrl" :src="match.player.headshotUrl" :alt="`${match.player.fullName} headshot`" />
-              <div>
-                <RouterLink :to="{ name: 'player-profile', params: { id: match.player.id } }">
-                  {{ match.player.fullName }}
-                </RouterLink>
-                <span>
-                  {{ match.position?.abbreviation || '—' }}
-                  <template v-if="match.team?.abbreviation"> · {{ match.team.abbreviation }}</template>
-                </span>
-              </div>
-              <strong>{{ match.similarityScore }}%</strong>
-            </div>
-
-            <dl>
-              <div v-for="metric in match.closestMetrics" :key="metric.key">
-                <dt>{{ metric.label }}</dt>
-                <dd>
-                  {{ similarityValue(metric, metric.targetValue) }}
-                  <span aria-hidden="true">↔</span>
-                  {{ similarityValue(metric, metric.candidateValue) }}
-                </dd>
-              </div>
-            </dl>
-
-            <RouterLink
-              class="similar-player-card__compare"
-              :to="{ name: 'player-comparison', query: { left: player.id, right: match.player.id } }"
-            >
-              Compare side by side →
-            </RouterLink>
-          </article>
-        </div>
-        <p v-else class="profile-empty">
-          Similar players will appear when at least three comparable same-season metrics are available.
-        </p>
-        <small v-if="player.similarPlayers.methodology" class="similar-player-methodology">
-          {{ player.similarPlayers.methodology }}
-        </small>
-      </section>
-
-      <section class="profile-panel contextual-panel" data-test="contextual-benchmarks">
-        <header class="profile-section-heading">
-          <div>
-            <p class="eyebrow">P1.5 context</p>
-            <h2>Benchmarks & percentiles</h2>
-          </div>
-          <span>{{ benchmarkPeriodLabel }}</span>
-        </header>
-
-        <div v-if="player.contextualBenchmarks.metrics.length" class="context-table-wrap">
-          <table class="context-table">
-            <thead>
-              <tr>
-                <th>Metric</th>
-                <th>Player</th>
-                <th>MLB average</th>
-                <th>Position / role</th>
-                <th>Percentile</th>
-                <th>Previous-period change</th>
-                <th>Sample</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="metric in player.contextualBenchmarks.metrics" :key="`${metric.metricKey}-${metric.dimensionValue || 'all'}`">
-                <th>
-                  <strong>{{ contextualMetricLabel(metric) }}</strong>
-                  <small>{{ titleize(metric.metricGroup) }}</small>
-                </th>
-                <td><strong>{{ contextualValue(metric.rawValue, metric.unit) }}</strong></td>
-                <td>
-                  {{ contextualValue(metric.mlbAverage, metric.unit) }}
-                  <small>{{ metric.mlbPlayerCount }} players</small>
-                </td>
-                <td>
-                  {{ contextualValue(peerAverage(metric), metric.unit) }}
-                  <small>{{ peerLabel(metric) }}</small>
-                </td>
-                <td>
-                  <span class="percentile-pill" :style="percentileStyle(metric.percentile)">
-                    P{{ Math.round(metric.percentile) }}
-                  </span>
-                </td>
-                <td>
-                  {{ signedContextualValue(metric.changeValue, metric.unit) }}
-                  <small v-if="metric.previousValue !== null && metric.previousValue !== undefined">
-                    from {{ contextualValue(metric.previousValue, metric.unit) }}
-                  </small>
-                </td>
-                <td>{{ Number(metric.sampleSize || 0).toLocaleString() }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="profile-empty">
-          Benchmark context will appear after daily analytics have been calculated for multiple players.
-        </p>
-      </section>
-
-      <div class="profile-two-column">
-        <section class="profile-panel">
-          <header class="profile-section-heading">
-            <div>
-              <p class="eyebrow">Statcast pulse</p>
-              <h2>Recent pitch indicators</h2>
-            </div>
-            <span>Latest {{ player.pitchIndicators.sampleSize }} per role</span>
-          </header>
-
-          <div class="indicator-groups">
-            <article
-              v-if="showBattingIndicators"
-              class="indicator-card"
-              data-test="indicator-card-batting"
-              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'batter' }"
-            >
-              <h3>As batter</h3>
-              <dl>
-                <div v-for="metric in battingMetrics" :key="metric[0]">
-                  <dt>{{ metric[0] }}</dt>
-                  <dd>{{ displayValue(metric[1]) }}</dd>
-                </div>
-              </dl>
-            </article>
-            <article
-              v-if="showPitchingIndicators"
-              class="indicator-card"
-              data-test="indicator-card-pitching"
-              :class="{ 'indicator-card--primary': player.pitchIndicators.primaryRole === 'pitcher' }"
-            >
-              <h3>As pitcher</h3>
-              <dl>
-                <div v-for="metric in pitchingMetrics" :key="metric[0]">
-                  <dt>{{ metric[0] }}</dt>
-                  <dd>{{ displayValue(metric[1]) }}</dd>
-                </div>
-              </dl>
-            </article>
-          </div>
-        </section>
-
-        <section class="profile-panel">
-          <header class="profile-section-heading">
-            <div>
-              <p class="eyebrow">Organization trail</p>
-              <h2>Team history</h2>
-            </div>
-            <span>{{ player.teamHistory.length }} {{ player.teamHistory.length === 1 ? 'organization tenure' : 'organization tenures' }}</span>
-          </header>
-
-          <ol v-if="player.teamHistory.length" class="team-timeline">
-            <li v-for="membership in player.teamHistory" :key="membership.id">
-              <span class="team-timeline__mark"></span>
-              <div>
-                <strong>
-                  <RouterLink v-if="membership.team?.id" :to="{ name: 'team-profile', params: { id: membership.team.id } }">
-                    {{ membership.team.name }}
-                  </RouterLink>
-                </strong>
-                <span>{{ formatDate(membership.startsOn) }} — {{ membership.endsOn ? formatDate(membership.endsOn) : 'Present' }}</span>
-              </div>
-              <small>{{ teamHistoryLabel(membership) }}</small>
-            </li>
-          </ol>
-          <p v-else class="profile-empty">No dated team history has been synchronized.</p>
-        </section>
-      </div>
-      </div>
-
-      <div
-        v-if="selectedPageTab === 'performance-trends'"
-        id="player-page-panel-performance-trends"
-        class="profile-page-content"
-        role="tabpanel"
-        aria-labelledby="player-page-tab-performance-trends"
-      >
-        <SavedAnalysisControls
-          analysis-type="player_date_range"
-          :state="savedAnalysisState"
-          :reproducible-url="savedAnalysisUrl"
-          compact
-          @apply="openSavedAnalysis"
-        />
-
-        <section class="profile-panel analysis-controls" data-test="player-date-range-controls">
-          <div>
-            <p class="eyebrow">Analysis period</p>
-            <div class="range-presets" role="group" aria-label="Player analysis range">
-              <button v-for="preset in rangePresets" :key="preset.value" type="button"
-                :class="{ 'is-active': analysisOptions.range === preset.value }" @click="selectPreset(preset.value)">
-                {{ preset.label }}
-              </button>
-            </div>
-          </div>
-          <div class="custom-range">
-            <label>From <input v-model="customStartDate" type="date" /></label>
-            <label>Through <input v-model="customEndDate" type="date" /></label>
-            <button type="button" :disabled="!customStartDate || !customEndDate" @click="applyCustomRange">Apply custom</button>
-          </div>
-          <div class="rolling-window-controls">
-            <label>
-              Batting window
-              <select :value="analysisOptions.paWindow" @change="updateWindow('paWindow', $event.target.value)">
-                <option :value="25">25 PA</option>
-                <option :value="50">50 PA</option>
-                <option :value="100">100 PA</option>
-              </select>
-            </label>
-            <label>
-              Pitching window
-              <select :value="analysisOptions.pitchWindow" @change="updateWindow('pitchWindow', $event.target.value)">
-                <option :value="50">50 pitches</option>
-                <option :value="100">100 pitches</option>
-                <option :value="250">250 pitches</option>
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section class="profile-panel trend-panel" data-test="player-trends">
-          <header class="profile-section-heading">
-            <div>
-              <p class="eyebrow">Rolling intelligence</p>
-              <h2>Performance trends</h2>
-            </div>
-            <span v-if="player.analysis?.range?.startDate">
-              {{ formatDate(player.analysis.range.startDate) }} — {{ formatDate(player.analysis.range.endDate) }}
-            </span>
-          </header>
-
-          <div v-if="player.trendEvents?.events?.length" class="trend-events" data-test="trend-events">
-            <article v-for="event in player.trendEvents.events" :key="event.id"
-              :class="[
-                `trend-event--${trendEventTone(event)}`,
-                `trend-event--${event.severity}`,
-                { 'trend-event--resolved': event.status === 'resolved' },
-              ]">
-              <header>
-                <span>{{ trendEventLabel(event) }} · {{ event.status }}</span>
-                <time :datetime="event.onsetDate">Onset {{ formatDate(event.onsetDate) }}</time>
-              </header>
-              <strong>{{ trendEventTitle(event) }}</strong>
-              <p>
-                {{ trendEventValue(event, event.baselineValue) }} → {{ trendEventValue(event, event.currentValue) }}
-                ({{ signedContextualValue(event.changeValue, event.unit === 'mph' ? 'mph' : 'percent') }})
-              </p>
-              <small>
-                Sample {{ event.sampleSize }} vs {{ event.baselineSampleSize }} baseline ·
-                {{ event.supportingPitches.length }} supporting pitches
-              </small>
-            </article>
-          </div>
-
-          <div class="period-comparison">
-            <article v-for="metric in comparisonMetrics" :key="metric.key">
-              <span>{{ metric.label }}</span>
-              <strong>{{ contextualValue(metric.current, metric.unit) }}</strong>
-              <small>
-                Previous {{ contextualValue(metric.previous, metric.unit) }} ·
-                {{ signedContextualValue(metric.change, metric.unit) }}
-              </small>
-            </article>
-          </div>
-
-          <div v-if="trendCharts.length" class="trend-grid">
-            <PlayerTrendChart v-for="chart in trendCharts" :key="`${chart.group}-${chart.key}`"
-              :title="`${chart.group} · ${chart.title}`" :subtitle="chart.subtitle" :unit="chart.unit" :series="chart.series" />
-          </div>
-          <p v-else class="profile-empty">No pitch-level trend data is available for this period.</p>
-        </section>
-      </div>
-
-      <div
-        v-if="selectedPageTab === 'batted-ball-profile'"
-        id="player-page-panel-batted-ball-profile"
-        class="profile-page-content profile-page-content--empty"
-        role="tabpanel"
-        aria-labelledby="player-page-tab-batted-ball-profile"
-      >
-        <p class="profile-empty">Batted ball profile coming soon.</p>
-      </div>
+      <PlayerBattedBallProfileView v-if="selectedPageTab === 'batted-ball-profile'" />
 
       <div
         v-if="sourceModalOpen"
@@ -1393,7 +861,7 @@ async function closeSourceModal() {
   </main>
 </template>
 
-<style scoped>
+<style>
 .profile-shell {
   min-height: calc(100vh - 74px);
   padding: 2.5rem 1.25rem 5rem;
@@ -1852,7 +1320,7 @@ async function closeSourceModal() {
   margin-top: 1.75rem;
 }
 
-.profile-primary-actions :deep(.watchlist-control__trigger),
+.profile-primary-actions .watchlist-control__trigger,
 .profile-primary-actions .compare-player-link {
   padding: .4rem .85rem;
   border: 1px solid rgba(255, 255, 255, .2);
@@ -1866,8 +1334,8 @@ async function closeSourceModal() {
   text-decoration: none;
 }
 
-.profile-primary-actions :deep(.watchlist-control__trigger:hover),
-.profile-primary-actions :deep(.watchlist-control__trigger:focus-visible),
+.profile-primary-actions .watchlist-control__trigger:hover,
+.profile-primary-actions .watchlist-control__trigger:focus-visible,
 .profile-primary-actions .compare-player-link:hover,
 .profile-primary-actions .compare-player-link:focus-visible {
   color: #fffdf7;
