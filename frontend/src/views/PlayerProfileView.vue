@@ -143,6 +143,54 @@ const careerRangeLabel = computed(() => {
   return `${range} · ${career.seasonCount} ${seasonLabel}`
 })
 
+const careerTableRows = computed(() => player.value?.careerOverview?.seasons?.flatMap((seasonRow) => {
+  if (seasonRow.teamRows.length > 1) {
+    return [
+      ...seasonRow.teamRows.map((teamRow) => ({
+        season: seasonRow.season,
+        teamLabel: teamRow.team?.abbreviation || '—',
+        statValues: teamRow.statValues,
+      })),
+      {
+        season: seasonRow.season,
+        teamLabel: 'Total',
+        statValues: seasonRow.totalStatValues,
+        isSeasonTotal: true,
+      },
+    ]
+  }
+
+  return [{
+    season: seasonRow.season,
+    teamLabel: seasonTeamLabel(seasonRow),
+    statValues: seasonRow.statValues,
+  }]
+}) || [])
+
+const advancedTableRows = computed(() => player.value?.advancedStats?.seasons?.flatMap((seasonRow) => {
+  if (seasonRow.teamRows.length > 1) {
+    return [
+      ...seasonRow.teamRows.map((teamRow) => ({
+        season: seasonRow.season,
+        teamLabel: teamRow.team?.abbreviation || '—',
+        values: teamRow.values,
+      })),
+      {
+        season: seasonRow.season,
+        teamLabel: 'Total',
+        values: seasonRow.totalValues,
+        isSeasonTotal: true,
+      },
+    ]
+  }
+
+  return [{
+    season: seasonRow.season,
+    teamLabel: seasonTeamLabel(seasonRow),
+    values: seasonRow.values,
+  }]
+}) || [])
+
 const externalProfileLinks = computed(() => {
   const fullName = player.value?.fullName
   const mlbId = player.value?.mlbId
@@ -686,9 +734,13 @@ function formatTimestamp(value) {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="seasonRow in player.careerOverview.seasons" :key="seasonRow.season">
+              <tr
+                v-for="seasonRow in careerTableRows"
+                :key="`${seasonRow.season}-${seasonRow.teamLabel}`"
+                :class="{ 'career-table__season-total': seasonRow.isSeasonTotal }"
+              >
                 <th class="career-table__season">{{ seasonRow.season }}</th>
-                <td class="career-table__team">{{ seasonTeamLabel(seasonRow) }}</td>
+                <td class="career-table__team">{{ seasonRow.teamLabel }}</td>
                 <td v-for="column in player.careerOverview.columns" :key="column.key" class="career-table__stat">
                   {{ formatBaseballStatValue(column.key, seasonRow.statValues[column.key]) }}
                 </td>
@@ -749,9 +801,13 @@ function formatTimestamp(value) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="seasonRow in player.advancedStats.seasons" :key="seasonRow.season">
+                  <tr
+                    v-for="seasonRow in advancedTableRows"
+                    :key="`${group.key}-${seasonRow.season}-${seasonRow.teamLabel}`"
+                    :class="{ 'advanced-table__season-total': seasonRow.isSeasonTotal }"
+                  >
                     <th>{{ seasonRow.season }}</th>
-                    <td>{{ seasonTeamLabel(seasonRow) }}</td>
+                    <td>{{ seasonRow.teamLabel }}</td>
                     <td v-for="column in group.columns" :key="column.key">
                       {{ advancedStatValue(column, seasonRow.values[column.key]) }}
                     </td>
@@ -1725,6 +1781,15 @@ function formatTimestamp(value) {
 .career-table tbody tr:nth-child(even) td,
 .career-table tbody tr:nth-child(even) th {
   background: #faf5ea;
+}
+
+.career-table tbody tr.career-table__season-total td,
+.career-table tbody tr.career-table__season-total th,
+.advanced-table tbody tr.advanced-table__season-total td,
+.advanced-table tbody tr.advanced-table__season-total th {
+  color: #10263d;
+  background: #e7edf1;
+  font-weight: 900;
 }
 
 .career-table tbody th {
