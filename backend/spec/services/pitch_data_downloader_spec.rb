@@ -54,4 +54,20 @@ RSpec.describe PitchDataDownloader, type: :service do
     expect(rows.first["game_pk"]).to eq("777")
     expect(rows.first["source_start_date"]).to eq("2026-04-01")
   end
+
+  it "includes both boundary dates in the Baseball Savant query" do
+    downloader = described_class.new(
+      start_date: "2026-04-01",
+      end_date: "2026-04-01",
+      game_types: "R",
+      chunk_days: 1
+    )
+    allow(downloader).to receive(:fetch_csv) do |url|
+      query = URI.parse(url).query
+      expect(query).to include("game_date_gt=2026-03-31", "game_date_lt=2026-04-02")
+      "game_pk,at_bat_number,pitch_number\n777,1,1\n"
+    end
+
+    expect(downloader.call[:success]).to be(true)
+  end
 end

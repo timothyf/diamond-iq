@@ -12,6 +12,7 @@ export const frontendConfig = Object.freeze({
   searchDebounceMs: numberSetting('VITE_SEARCH_DEBOUNCE_MS', 250),
   playerSuggestionDebounceMs: numberSetting('VITE_PLAYER_SUGGESTION_DEBOUNCE_MS', 180),
   playerSearchLimit: numberSetting('VITE_PLAYER_SEARCH_LIMIT', 8),
+  teamSearchLimit: numberSetting('VITE_TEAM_SEARCH_LIMIT', 8),
   playerSuggestionLimit: numberSetting('VITE_PLAYER_SUGGESTION_LIMIT', 8),
   comparisonPlayerLimit: numberSetting('VITE_COMPARISON_PLAYER_LIMIT', 6),
   adminProfileBatchSize: numberSetting('VITE_ADMIN_PROFILE_BATCH_SIZE', 50),

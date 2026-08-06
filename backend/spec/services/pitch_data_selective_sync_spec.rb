@@ -40,4 +40,28 @@ RSpec.describe "selective Statcast pitch synchronization" do
     expect(game.reload.pitch_data_complete_at).to be_present
     expect(game.pitch_data_row_count).to eq(1)
   end
+
+  it "uses the live feed when a live game has no historical pitch rows" do
+    game = game_for(date: Date.new(2026, 7, 3), mlb_id: 700_003)
+    game.update!(status: "final")
+    allow(PitchDataDownloader).to receive(:call).and_return(success: false, message: "No pitch data rows returned from Baseball Savant", data: {})
+    allow(MlbLivePitchDataDownloader).to receive(:call).with(game: game).and_return(
+      success: true,
+      rows: [
+        {
+          "game_pk" => game.mlb_id.to_s,
+          "game_date" => game.official_date.iso8601,
+          "at_bat_number" => "1",
+          "pitch_number" => "1",
+          "pitch_type" => "FF"
+        }
+      ]
+    )
+
+    result = PitchDataBatchSync.call(start_date: "2026-07-03", end_date: "2026-07-03", game_types: "R", chunk_days: 1)
+
+    expect(result).to include(success: true)
+    expect(PitchDatum.where(game_id: game.id).pluck(:game_pk, :pitch_type)).to eq([[ game.mlb_id, "FF" ]])
+    expect(MlbLivePitchDataDownloader).to have_received(:call).with(game: game)
+  end
 end

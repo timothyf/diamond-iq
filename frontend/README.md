@@ -23,7 +23,7 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 
 Frontend runtime defaults are centralized in `src/config.js`. Use Vite
 environment variables to override the API origin and admin API token, task polling interval,
-search debounce timings, pagination/search limits, admin batch size, and
+search debounce timings, pagination/search limits (including the top-nav player/team search), admin batch size, and
 external MLB/FanGraphs/Baseball Reference URLs. The development API proxy can
 be redirected with `VITE_DEV_API_TARGET`.
 

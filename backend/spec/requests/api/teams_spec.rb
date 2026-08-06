@@ -30,6 +30,14 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", 1, "logo_url")).to eq("https://www.mlbstatic.com/team-logos/116.svg")
   end
 
+  it "filters teams for global search" do
+    get api_teams_path, params: { per_page: 8, filter: { name: "tigers" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("meta", "total_count")).to eq(1)
+    expect(json_body.dig("data", 0, "abbreviation")).to eq("DET")
+  end
+
   it "only embeds workflow summaries visible to the signed-in owner or an administrator" do
     owner = create_user(role: "coach")
     other_user = create_user(role: "scout")

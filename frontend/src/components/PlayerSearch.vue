@@ -5,7 +5,8 @@ import { API_BASE_URL, frontendConfig } from '../config'
 
 const MIN_QUERY_LENGTH = 2
 const SEARCH_DELAY_MS = frontendConfig.searchDebounceMs
-const RESULT_LIMIT = frontendConfig.playerSearchLimit
+const PLAYER_RESULT_LIMIT = frontendConfig.playerSearchLimit
+const TEAM_RESULT_LIMIT = frontendConfig.teamSearchLimit
 
 const router = useRouter()
 const root = ref(null)
@@ -22,7 +23,7 @@ let abortController
 const normalizedQuery = computed(() => normalizeQuery(query.value))
 const canSearch = computed(() => normalizedQuery.value.length >= MIN_QUERY_LENGTH)
 const activeDescendant = computed(() => (
-  activeIndex.value >= 0 ? `player-search-result-${results.value[activeIndex.value]?.id}` : undefined
+  activeIndex.value >= 0 ? `global-search-result-${results.value[activeIndex.value]?.key}` : undefined
 ))
 
 watch(normalizedQuery, (value) => {
@@ -66,29 +67,60 @@ async function search(value) {
   requestSequence = requestId
   abortController = new AbortController()
 
-  const params = new URLSearchParams({ per_page: String(RESULT_LIMIT), sort: 'last_name' })
-  params.set('filter[name]', value)
+  const playerParams = new URLSearchParams({ per_page: String(PLAYER_RESULT_LIMIT), sort: 'last_name' })
+  playerParams.set('filter[name]', value)
+  const teamParams = new URLSearchParams({ per_page: String(TEAM_RESULT_LIMIT) })
+  teamParams.set('filter[name]', value)
 
   try {
-    const response = await fetch(`${API_BASE_URL}/api/players?${params}`, {
-      headers: { Accept: 'application/json' },
-      signal: abortController.signal,
-    })
-    if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
+    const [playerResponse, teamResponse] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/players?${playerParams}`, {
+        headers: { Accept: 'application/json' },
+        signal: abortController.signal,
+      }),
+      fetch(`${API_BASE_URL}/api/teams?${teamParams}`, {
+        headers: { Accept: 'application/json' },
+        signal: abortController.signal,
+      }),
+    ])
+    if (!playerResponse.ok || !teamResponse.ok) throw new Error('Search request failed')
 
-    const payload = await response.json()
+    const [playerPayload, teamPayload] = await Promise.all([playerResponse.json(), teamResponse.json()])
     if (requestId !== requestSequence || value !== normalizedQuery.value) return
 
-    const seen = new Set()
-    results.value = (Array.isArray(payload?.data) ? payload.data : [])
-      .filter((player) => player?.id && player?.full_name && !seen.has(player.id) && seen.add(player.id))
-      .slice(0, RESULT_LIMIT)
+    const seenPlayers = new Set()
+    const players = (Array.isArray(playerPayload?.data) ? playerPayload.data : [])
+      .filter((player) => player?.id && player?.full_name && !seenPlayers.has(player.id) && seenPlayers.add(player.id))
+      .slice(0, PLAYER_RESULT_LIMIT)
+      .map((player) => ({
+        key: `player-${player.id}`,
+        type: 'player',
+        id: player.id,
+        name: player.full_name,
+        subtitle: `Player · MLB ${player.mlb_id}`,
+        meta: player.team?.abbreviation || '—',
+        metaLabel: player.team?.short_name || player.team?.team_name || player.team?.name || 'No current team',
+      }))
+    const seenTeams = new Set()
+    const teams = (Array.isArray(teamPayload?.data) ? teamPayload.data : [])
+      .filter((team) => team?.id && team?.name && !seenTeams.has(team.id) && seenTeams.add(team.id))
+      .slice(0, TEAM_RESULT_LIMIT)
+      .map((team) => ({
+        key: `team-${team.id}`,
+        type: 'team',
+        id: team.id,
+        name: team.name,
+        subtitle: `Team · MLB ${team.mlb_id}`,
+        meta: team.abbreviation || '—',
+        metaLabel: team.location_name || team.short_name || team.team_name || '',
+      }))
+    results.value = [...players, ...teams]
     activeIndex.value = results.value.length ? 0 : -1
   } catch (searchError) {
     if (searchError.name === 'AbortError' || requestId !== requestSequence) return
 
     results.value = []
-    error.value = 'Player search is temporarily unavailable.'
+    error.value = 'Search is temporarily unavailable.'
   } finally {
     if (requestId === requestSequence) loading.value = false
   }
@@ -116,15 +148,18 @@ function moveActive(direction) {
 }
 
 function selectActive() {
-  const player = results.value[activeIndex.value]
-  if (player) selectPlayer(player)
+  const result = results.value[activeIndex.value]
+  if (result) selectResult(result)
 }
 
-async function selectPlayer(player) {
+async function selectResult(result) {
   panelOpen.value = false
   query.value = ''
   results.value = []
-  await router.push({ name: 'player-profile', params: { id: String(player.id) } })
+  await router.push({
+    name: result.type === 'team' ? 'team-profile' : 'player-profile',
+    params: { id: String(result.id) },
+  })
 }
 
 function closePanel() {
@@ -135,7 +170,7 @@ function closePanel() {
 
 <template>
   <div ref="root" class="player-search">
-    <label class="visually-hidden" for="global-player-search">Find a player profile</label>
+    <label class="visually-hidden" for="global-player-search">Find a player or team</label>
     <div class="player-search__control">
       <span aria-hidden="true">⌕</span>
       <input
@@ -145,7 +180,7 @@ function closePanel() {
         inputmode="search"
         autocomplete="off"
         maxlength="100"
-        placeholder="Find a player…"
+        placeholder="Find a player or team…"
         role="combobox"
         aria-autocomplete="list"
         aria-controls="player-search-results"
@@ -162,15 +197,15 @@ function closePanel() {
 
     <div v-if="panelOpen" id="player-search-results" class="player-search__panel">
       <p v-if="error" class="player-search__message player-search__message--error">{{ error }}</p>
-      <p v-else-if="loading && !results.length" class="player-search__message">Searching players…</p>
+      <p v-else-if="loading && !results.length" class="player-search__message">Searching players and teams…</p>
       <p v-else-if="!results.length" class="player-search__message">
-        No players found for “{{ normalizedQuery }}”.
+        No players or teams found for “{{ normalizedQuery }}”.
       </p>
-      <ul v-else role="listbox" aria-label="Player search results">
+      <ul v-else role="listbox" aria-label="Player and team search results">
         <li
-          v-for="(player, index) in results"
-          :id="`player-search-result-${player.id}`"
-          :key="player.id"
+          v-for="(result, index) in results"
+          :id="`global-search-result-${result.key}`"
+          :key="result.key"
           role="option"
           :aria-selected="index === activeIndex"
         >
@@ -179,15 +214,15 @@ function closePanel() {
             :class="{ 'is-active': index === activeIndex }"
             @mouseenter="activeIndex = index"
             @mousedown.prevent
-            @click="selectPlayer(player)"
+            @click="selectResult(result)"
           >
             <span>
-              <strong>{{ player.full_name }}</strong>
-              <small>MLB {{ player.mlb_id }}</small>
+              <strong>{{ result.name }}</strong>
+              <small>{{ result.subtitle }}</small>
             </span>
             <span class="player-search__team">
-              {{ player.team?.abbreviation || '—' }}
-              <small>{{ player.team?.short_name || player.team?.team_name || player.team?.name || 'No current team' }}</small>
+              {{ result.meta }}
+              <small>{{ result.metaLabel }}</small>
             </span>
           </button>
         </li>

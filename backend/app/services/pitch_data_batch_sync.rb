@@ -96,20 +96,33 @@ class PitchDataBatchSync
   attr_reader :start_date, :end_date, :game_types, :chunk_days, :replace_existing, :progress_tracker
 
   def download_chunk(chunk_start:, chunk_end:)
-    PitchDataDownloader.call(
+    result = PitchDataDownloader.call(
       start_date: chunk_start,
       end_date: chunk_end,
       game_types: game_types,
       chunk_days: ((chunk_end - chunk_start).to_i + 1)
     )
+
+    return { success: true, data: { rows: [] } } if result[:message] == "No pitch data rows returned from Baseball Savant"
+
+    result
   end
 
   def sync_game_rows(game:, rows:, chunk_start:, chunk_end:)
+    source_name = "Baseball Savant pitch data #{chunk_start.iso8601}-#{chunk_end.iso8601}"
+    if rows.empty?
+      live_result = MlbLivePitchDataDownloader.call(game: game)
+      if live_result[:success] && live_result[:rows].present?
+        rows = live_result[:rows]
+        source_name = "MLB Stats API live pitch data #{game.mlb_id}"
+      end
+    end
+
     return failure("No pitch data rows were returned for stored game #{game.mlb_id}", [], { downloaded_count: 0, imported_count: 0, duplicate_count: 0, skipped_count: 0 }) if rows.empty?
 
     import_result = PitchDataImporter.import_raw_rows(
       rows: rows,
-      source_name: "Baseball Savant pitch data #{chunk_start.iso8601}-#{chunk_end.iso8601}",
+      source_name: source_name,
       replace_game_id: (game.id if replace_existing)
     )
     return import_result unless import_result[:success]

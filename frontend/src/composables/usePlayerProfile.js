@@ -138,6 +138,18 @@ function normalizeProfile(data = {}) {
       pitching: indicators.pitching || {},
       batting: indicators.batting || {},
     },
+    batterSplits: {
+      available: data.batter_splits?.available === true,
+      dimensions: (data.batter_splits?.dimensions || []).map((dimension) => ({
+        key: dimension.key,
+        label: dimension.label,
+        options: (dimension.options || []).map((option) => ({
+          value: option.value,
+          label: option.label,
+          metrics: option.metrics || {},
+        })),
+      })),
+    },
     contextualBenchmarks: {
       available: benchmarks.available === true,
       sourceStartDate: benchmarks.source_start_date,

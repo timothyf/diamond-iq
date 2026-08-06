@@ -166,6 +166,7 @@ class DailyAnalyticsCalculator
         chases: chases,
         chase_percentage: percent(chases, chase_opportunities),
         hits: terminal_event_count(grouped, HIT_EVENTS),
+        home_runs: terminal_event_count(grouped, [ "home_run" ]),
         walks: terminal_event_count(grouped, WALK_EVENTS),
         strikeouts: terminal_event_count(grouped, STRIKEOUT_EVENTS)
       }
@@ -296,7 +297,7 @@ class DailyAnalyticsCalculator
 
   def games
     @games ||= Game.where(official_date: metric_date, status: "final")
-      .select(:id, :mlb_id, :home_team_id, :away_team_id, :home_score, :away_score, :boxscore_raw_data).to_a
+      .select(:id, :mlb_id, :home_team_id, :away_team_id, :home_score, :away_score, :scheduled_at, :raw_data, :boxscore_raw_data).to_a
   end
 
   def pitches
@@ -326,7 +327,8 @@ class DailyAnalyticsCalculator
     {
       "pitcher_hand" => ->(pitch) { pitch.p_throws.presence&.upcase },
       "pitch_type" => ->(pitch) { pitch.pitch_type.presence },
-      "home_away" => ->(pitch) { home_away(pitch, pitching: false) }
+      "home_away" => ->(pitch) { home_away(pitch, pitching: false) },
+      "day_night" => ->(pitch) { day_night(pitch) }
     }
   end
 
@@ -344,6 +346,17 @@ class DailyAnalyticsCalculator
 
     top = value.start_with?("top")
     pitching ? (top ? "home" : "away") : (top ? "away" : "home")
+  end
+
+  def day_night(pitch)
+    game = games_by_mlb_id[pitch.game_pk]
+    return if game.nil?
+
+    value = game.raw_data.to_h["dayNight"] || game.raw_data.to_h.dig("gameData", "datetime", "dayNight")
+    return value.downcase if %w[day night].include?(value.to_s.downcase)
+    return if game.scheduled_at.nil?
+
+    game.scheduled_at.in_time_zone("America/New_York").hour < 17 ? "day" : "night"
   end
 
   def team_score(game, team_id)

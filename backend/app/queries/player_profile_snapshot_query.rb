@@ -139,6 +139,7 @@ class PlayerProfileSnapshotQuery
       current_membership: serialize_membership(current_membership),
       team_history: organization_tenures,
       recent_pitch_indicators: recent_pitch_indicators,
+      batter_splits: batter_splits_payload,
       contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(
         player: player,
         start_date: analysis_range.start_date,
@@ -1015,6 +1016,93 @@ class PlayerProfileSnapshotQuery
       average_launch_angle: average(launch_angles),
       hard_hit_percentage: percentage(exit_velocities.count { |value| value >= 95.0 }, exit_velocities.length)
     }
+  end
+
+  def batter_splits_payload
+    rows = BatterSplitSummary
+      .where(player: player, metric_date: analysis_range.start_date..analysis_range.end_date)
+      .where(calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
+      .to_a
+
+    dimensions = [
+      [ "pitcher_hand", "Vs. pitcher handedness", { "L" => "Left-handed", "R" => "Right-handed" } ],
+      [ "home_away", "Home / away", { "home" => "Home", "away" => "Away" } ],
+      [ "day_night", "Day / night", { "day" => "Day", "night" => "Night" } ]
+    ]
+
+    {
+      available: rows.any?,
+      dimensions: dimensions.map do |split_type, label, options|
+        grouped = rows.select { |row| row.split_type == split_type }.group_by(&:split_value)
+        {
+          key: split_type,
+          label: label,
+          options: options.filter_map do |value, option_label|
+            split_rows = grouped[value]
+            next if split_rows.blank?
+
+            { value: value, label: option_label, metrics: aggregate_batter_split_rows(split_rows) }
+          end
+        }
+      end
+    }
+  end
+
+  def aggregate_batter_split_rows(rows)
+    counts = %i[pitches_seen plate_appearances swings whiffs batted_balls hits home_runs walks strikeouts].to_h do |key|
+      [ key, rows.sum { |row| metric_number(row, key) } ]
+    end
+    swing_percentage = ratio_as_percentage(counts[:swings], counts[:pitches_seen])
+    whiff_percentage = ratio_as_percentage(counts[:whiffs], counts[:swings])
+    chase_opportunities = rows.sum { |row| metric_number(row, :chase_opportunities) }
+    chases = rows.sum { |row| metric_number(row, :chases) }
+    batted_balls = counts[:batted_balls]
+    hard_hit_balls = rows.sum do |row|
+      metric_number(row, :hard_hit_percentage) * batted_balls_for(row) / 100.0
+    end
+
+    counts.merge(
+      batting_average: ratio(counts[:hits], counts[:plate_appearances] - counts[:walks]),
+      swing_percentage: swing_percentage,
+      whiff_percentage: whiff_percentage,
+      chase_percentage: ratio_as_percentage(chases, chase_opportunities),
+      hard_hit_percentage: ratio_as_percentage(hard_hit_balls, batted_balls),
+      average_exit_velocity: weighted_average(rows, :average_exit_velocity, :exit_velocity_sample_size),
+      estimated_woba: weighted_average(rows, :estimated_woba, :sample_size)
+    )
+  end
+
+  def batted_balls_for(row)
+    metric_number(row, :batted_balls)
+  end
+
+  def ratio_as_percentage(numerator, denominator)
+    return nil if denominator.to_f.zero?
+
+    (numerator.to_f / denominator.to_f * 100).round(1)
+  end
+
+  def metric_number(row, key)
+    value = row.metrics.to_h[key.to_s] || row.metrics.to_h[key]
+    value.to_f
+  end
+
+  def ratio(numerator, denominator)
+    return nil if denominator.to_f <= 0
+
+    (numerator.to_f / denominator.to_f).round(3)
+  end
+
+  def weighted_average(rows, metric_key, weight_key)
+    weighted_total = rows.sum do |row|
+      metric = row.metrics.to_h[metric_key.to_s] || row.metrics.to_h[metric_key]
+      weight = metric_number(row, weight_key)
+      metric.present? ? metric.to_f * weight : 0
+    end
+    total_weight = rows.sum { |row| metric_number(row, weight_key) }
+    return nil if total_weight.zero?
+
+    (weighted_total / total_weight).round(1)
   end
 
   def recent_pitcher_rows

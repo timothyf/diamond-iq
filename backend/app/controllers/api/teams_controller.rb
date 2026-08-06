@@ -2,6 +2,17 @@ module Api
   class TeamsController < ApplicationController
     def index
       teams = Team.order(:name)
+      filter = params[:filter] || {}
+      name_filter = filter[:name] || filter["name"]
+      if name_filter.present?
+        query = ActiveRecord::Base.sanitize_sql_like(name_filter.to_s.strip)
+        pattern = "%#{query}%"
+        teams = teams.where(
+          "teams.name ILIKE :pattern OR teams.team_name ILIKE :pattern OR teams.location_name ILIKE :pattern OR teams.short_name ILIKE :pattern OR teams.abbreviation ILIKE :pattern",
+          pattern: pattern
+        )
+      end
+      teams = teams.limit([[params[:per_page].to_i, 1].max, 50].min) if params[:per_page].present?
 
       render json: {
         data: teams.map { |team| serialize_team(team) },

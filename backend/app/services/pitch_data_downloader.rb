@@ -150,8 +150,8 @@ class PitchDataDownloader
       all: "true",
       type: "details",
       player_type: "pitcher",
-      game_date_gt: chunk_start.iso8601,
-      game_date_lt: chunk_end.iso8601,
+      game_date_gt: (chunk_start - 1.day).iso8601,
+      game_date_lt: (chunk_end + 1.day).iso8601,
       hfGT: game_types.map { |game_type| "#{game_type}|" }.join
     }.to_query
 

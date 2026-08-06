@@ -1,0 +1,141 @@
+require "json"
+require "net/http"
+
+class MlbLivePitchDataDownloader
+  COMPLETED_STATUSES = %w[final complete].freeze
+
+  def self.call(game:)
+    new(game: game).call
+  end
+
+  def initialize(game:)
+    @game = game
+  end
+
+  def call
+    return failure("Game must be a persisted Game record") unless game.is_a?(Game) && game.mlb_id.present?
+    return success([], "Game is not complete") unless COMPLETED_STATUSES.include?(game.status.to_s.downcase)
+
+    live_feed = fetch_json(live_feed_url)
+    rows = build_rows(live_feed)
+    success(rows, "Downloaded #{rows.length} live Statcast pitch rows for #{game.mlb_id}")
+  rescue JSON::ParserError => e
+    failure("Failed to parse live MLB game #{game.mlb_id} pitch data: #{e.message}")
+  rescue StandardError => e
+    failure("Failed to download live MLB game #{game.mlb_id} pitch data: #{e.message}")
+  end
+
+  private
+
+  attr_reader :game
+
+  def live_feed_url
+    "#{service_config.fetch(:base_url)}/api/v1.1/game/#{game.mlb_id}/feed/live"
+  end
+
+  def fetch_json(url)
+    uri = URI(url)
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = uri.scheme == "https"
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
+
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request["User-Agent"] = service_config.fetch(:user_agents).fetch(:game_details)
+    request["Accept"] = "application/json"
+    response = http.request(request)
+    raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+    JSON.parse(response.body)
+  end
+
+  def build_rows(live_feed)
+    fetched_at = Time.current.utc.iso8601
+    Array(live_feed.dig("liveData", "plays", "allPlays")).flat_map do |play|
+      base = play_row(play, fetched_at)
+      next [] if base.nil?
+
+      Array(play["playEvents"]).filter_map.with_index do |event, index|
+        next unless event["isPitch"] == true || event["pitchNumber"].present? || event.dig("details", "type", "code").present?
+
+        base.merge(pitch_event_row(event, index))
+      end
+    end
+  end
+
+  def play_row(play, fetched_at)
+    at_bat_index = integer(play.dig("about", "atBatIndex"))
+    batter = integer(play.dig("matchup", "batter", "id"))
+    pitcher = integer(play.dig("matchup", "pitcher", "id"))
+    return if at_bat_index.nil? || batter.nil? || pitcher.nil?
+
+    {
+      "source_start_date" => game.official_date.iso8601,
+      "source_end_date" => game.official_date.iso8601,
+      "fetched_at_utc" => fetched_at,
+      "game_date" => game.official_date.iso8601,
+      "game_pk" => game.mlb_id.to_s,
+      "game_type" => game.game_type,
+      "home_team" => game.home_team&.abbreviation,
+      "away_team" => game.away_team&.abbreviation,
+      "inning" => play.dig("about", "inning"),
+      "inning_topbot" => play.dig("about", "halfInning"),
+      "at_bat_number" => at_bat_index + 1,
+      "pitcher" => pitcher,
+      "player_name" => play.dig("matchup", "pitcher", "fullName"),
+      "batter" => batter,
+      "stand" => play.dig("matchup", "batSide", "code"),
+      "p_throws" => play.dig("matchup", "pitchHand", "code")
+    }
+  end
+
+  def pitch_event_row(event, fallback_pitch_number)
+    details = event.fetch("details", {})
+    hit_data = event.fetch("hitData", {})
+    pitch_data = event.fetch("pitchData", {})
+    coordinates = pitch_data.fetch("coordinates", {})
+    breaks = pitch_data.fetch("breaks", {})
+    pitch_type = details.fetch("type", {})
+
+    {
+      "pitch_number" => event["pitchNumber"] || fallback_pitch_number + 1,
+      "pitch_type" => pitch_type["code"],
+      "pitch_name" => pitch_type["description"],
+      "description" => details["description"],
+      "events" => details["event"],
+      "zone" => pitch_data["zone"],
+      "release_speed" => pitch_data["startSpeed"],
+      "plate_x" => coordinates["pX"],
+      "plate_z" => coordinates["pZ"],
+      "pfx_x" => coordinates["pfxX"],
+      "pfx_z" => coordinates["pfxZ"],
+      "spin_axis" => breaks["spinAxis"],
+      "break_angle_deprecated" => breaks["breakAngle"],
+      "break_length_deprecated" => breaks["breakLength"],
+      "balls" => event.dig("count", "balls"),
+      "strikes" => event.dig("count", "strikes"),
+      "outs_when_up" => event.dig("count", "outs"),
+      "launch_speed" => hit_data["launchSpeed"],
+      "launch_angle" => hit_data["launchAngle"],
+      "hit_distance_sc" => hit_data["totalDistance"],
+      "bb_type" => hit_data["trajectory"],
+      "raw_live_feed_event" => event
+    }
+  end
+
+  def integer(value)
+    Integer(value, exception: false)
+  end
+
+  def service_config
+    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
+  end
+
+  def success(rows, message)
+    { success: true, message: message, rows: rows }
+  end
+
+  def failure(message)
+    { success: false, message: message, rows: [] }
+  end
+end

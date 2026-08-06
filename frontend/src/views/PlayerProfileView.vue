@@ -21,8 +21,9 @@ const route = inject(routeLocationKey, { query: {}, fullPath: `/players/${props.
 const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const playerId = computed(() => props.playerId)
 const profileTabs = [
-  { id: 'overview', label: 'Overview' },
+  { id: 'overview', label: 'Basic Stats' },
   { id: 'advanced-stats', label: 'Advanced Stats' },
+  { id: 'splits', label: 'Splits' },
 ]
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
 const analysisOptions = ref({
@@ -51,10 +52,9 @@ const { player, loading, error, refresh } = usePlayerProfile(playerId, analysisO
 const headshotFailed = ref(false)
 
 watch(
-  [analysisOptions, selectedProfileTab],
-  ([options, tab]) => {
+  analysisOptions,
+  (options) => {
     const query = {}
-    if (tab !== 'overview') query.tab = tab
     if (options.range !== 'season') query.range = options.range
     if (options.paWindow !== 50) query.pa_window = String(options.paWindow)
     if (options.pitchWindow !== 100) query.pitch_window = String(options.pitchWindow)
@@ -269,6 +269,33 @@ const visibleTrendGroups = computed(() => {
 
 const showBattingIndicators = computed(() => visibleTrendGroups.value.includes('batting'))
 const showPitchingIndicators = computed(() => visibleTrendGroups.value.includes('pitching'))
+const selectedBatterSplit = ref('pitcher_hand')
+const batterSplitDimension = computed(() => {
+  const dimensions = player.value?.batterSplits?.dimensions || []
+  return dimensions.find((dimension) => dimension.key === selectedBatterSplit.value) || dimensions[0] || null
+})
+
+const batterSplitMetrics = [
+  ['plate_appearances', 'PA', 'count'],
+  ['batting_average', 'AVG', 'rate'],
+  ['hits', 'H', 'count'],
+  ['home_runs', 'HR', 'count'],
+  ['walks', 'BB', 'count'],
+  ['strikeouts', 'K', 'count'],
+  ['swing_percentage', 'Swing%', 'percent'],
+  ['whiff_percentage', 'Whiff%', 'percent'],
+  ['chase_percentage', 'Chase%', 'percent'],
+  ['hard_hit_percentage', 'Hard-hit%', 'percent'],
+  ['average_exit_velocity', 'Exit velo', 'mph'],
+]
+
+function batterSplitValue(value, unit) {
+  if (value === null || value === undefined || value === '') return '—'
+  if (unit === 'percent') return `${Number(value).toFixed(1)}%`
+  if (unit === 'rate') return Number(value).toFixed(3)
+  if (unit === 'mph') return `${Number(value).toFixed(1)} mph`
+  return Number(value).toLocaleString()
+}
 
 const trendCharts = computed(() => {
   const analysis = player.value?.analysis
@@ -630,10 +657,12 @@ function formatTimestamp(value) {
         </div>
       </nav>
 
+      <div class="profile-stat-tabs">
+
       <section
         v-show="selectedProfileTab === 'overview'"
         id="player-profile-panel-overview"
-        class="profile-panel profile-career-table"
+        class="profile-stat-table profile-career-table"
         role="tabpanel"
         aria-labelledby="player-profile-tab-overview"
       >
@@ -682,7 +711,7 @@ function formatTimestamp(value) {
       <section
         v-show="selectedProfileTab === 'advanced-stats'"
         id="player-profile-panel-advanced-stats"
-        class="profile-panel advanced-stats-panel"
+        class="profile-stat-table advanced-stats-panel"
         role="tabpanel"
         aria-labelledby="player-profile-tab-advanced-stats"
         data-test="advanced-stats-panel"
@@ -743,6 +772,60 @@ function formatTimestamp(value) {
         </div>
         <p v-else class="profile-empty">No advanced statistics have been imported for this player yet.</p>
       </section>
+
+      <section
+        v-show="selectedProfileTab === 'splits'"
+        id="player-profile-panel-splits"
+        class="profile-stat-table batter-splits-panel"
+        role="tabpanel"
+        aria-labelledby="player-profile-tab-splits"
+        data-test="batter-splits"
+      >
+        <header class="profile-section-heading">
+          <div>
+            <p class="eyebrow">Matchup context</p>
+            <h2>Batter splits</h2>
+          </div>
+          <span>Pitch-level sample · {{ formatDate(player.analysis?.range?.startDate) }} — {{ formatDate(player.analysis?.range?.endDate) }}</span>
+        </header>
+
+        <div v-if="showBattingIndicators && player.batterSplits.available" class="split-tabs" role="tablist" aria-label="Batter split dimensions">
+          <button
+            v-for="dimension in player.batterSplits.dimensions"
+            :key="dimension.key"
+            type="button"
+            role="tab"
+            :aria-selected="batterSplitDimension?.key === dimension.key"
+            :class="{ 'is-active': batterSplitDimension?.key === dimension.key }"
+            :data-test="`batter-split-tab-${dimension.key}`"
+            @click="selectedBatterSplit = dimension.key"
+          >
+            {{ dimension.label }}
+          </button>
+        </div>
+
+        <div v-if="showBattingIndicators && player.batterSplits.available && batterSplitDimension?.options?.length" class="split-table-wrap">
+          <table class="split-table">
+            <thead>
+              <tr>
+                <th>Split</th>
+                <th v-for="metric in batterSplitMetrics" :key="metric[0]">{{ metric[1] }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="option in batterSplitDimension.options" :key="option.value">
+                <th>{{ option.label }}</th>
+                <td v-for="metric in batterSplitMetrics" :key="metric[0]">
+                  {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="profile-empty">Split data is available for batters after pitch-level analytics have been calculated for this period.</p>
+      </section>
+
+      </div>
 
       <section class="profile-panel similar-players-panel" data-test="similar-players">
         <header class="profile-section-heading">
@@ -1084,7 +1167,7 @@ function formatTimestamp(value) {
 
 .profile-tabs [role='tablist'] {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
@@ -1440,6 +1523,23 @@ function formatTimestamp(value) {
   padding: 1.5rem;
 }
 
+.profile-stat-tabs {
+  margin-top: 1.25rem;
+}
+
+.profile-stat-table {
+  padding: 1.5rem;
+  border: 1px solid rgba(16, 38, 61, 0.13);
+  border-radius: 20px;
+  background: rgba(255, 250, 240, 0.9);
+}
+
+.profile-stat-table + .profile-stat-table {
+  margin-top: 0;
+  border-top: 0;
+  border-radius: 0 0 20px 20px;
+}
+
 .profile-section-heading {
   display: flex;
   justify-content: space-between;
@@ -1720,6 +1820,20 @@ function formatTimestamp(value) {
   text-align: left;
 }
 
+.advanced-table th:first-child,
+.advanced-table td:first-child {
+  width: 76px;
+  min-width: 76px;
+  max-width: 76px;
+}
+
+.advanced-table th:nth-child(2),
+.advanced-table td:nth-child(2) {
+  width: 70px;
+  min-width: 70px;
+  max-width: 70px;
+}
+
 .advanced-table thead th {
   color: #697784;
   background: #e7edf1;
@@ -1960,6 +2074,116 @@ function formatTimestamp(value) {
   background: rgba(16, 38, 61, 0.04);
 }
 
+.split-tabs {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.split-tabs button {
+  border: 1px solid rgba(16, 38, 61, 0.16);
+  border-radius: 999px;
+  padding: 0.55rem 0.8rem;
+  color: #405568;
+  background: white;
+  cursor: pointer;
+}
+
+.split-tabs button.is-active {
+  border-color: #b0000a;
+  color: white;
+  background: #b0000a;
+}
+
+.split-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.split-card {
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+  background: rgba(16, 38, 61, 0.025);
+}
+
+.split-card h3 {
+  margin: 0 0 0.75rem;
+}
+
+.split-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+  margin: 0;
+}
+
+.split-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.split-card dt {
+  color: #697784;
+}
+
+.split-card dd {
+  margin: 0;
+  font-weight: 700;
+  color: #10263d;
+}
+
+.split-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 16px;
+  background: #fffdf7;
+}
+
+.split-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #243b50;
+  font-variant-numeric: tabular-nums;
+}
+
+.split-table th,
+.split-table td {
+  padding: 0.78rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.split-table thead th {
+  color: #697784;
+  background: #e7edf1;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.split-table tbody tr:nth-child(even) th,
+.split-table tbody tr:nth-child(even) td {
+  background: #faf5ea;
+}
+
+.split-table th:first-child,
+.split-table td:first-child {
+  text-align: left;
+}
+
+.split-table tbody th {
+  color: #10263d;
+  font-weight: 900;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -1983,6 +2207,10 @@ function formatTimestamp(value) {
   }
 
   .trend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .split-grid {
     grid-template-columns: 1fr;
   }
 }
