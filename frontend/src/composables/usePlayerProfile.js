@@ -289,7 +289,7 @@ function normalizeTrendGroup(group = {}) {
   }
 }
 
-export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
+export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { includeCoreSection = true } = {}) {
   const player = ref(null)
   const loading = ref(false)
   const error = ref('')
@@ -316,7 +316,7 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null) {
     loadingSections.value = {}
 
     try {
-      const query = analysisQuery(analysisOptionsRef?.value, 'core')
+      const query = analysisQuery(analysisOptionsRef?.value, includeCoreSection ? 'core' : null)
       const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}${query}`, {
         headers: { Accept: 'application/json' },
       })

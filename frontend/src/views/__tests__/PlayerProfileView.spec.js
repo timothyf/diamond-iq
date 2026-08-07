@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { vi } from 'vitest'
 
-import PlayerProfileView from '../PlayerProfileView.vue'
+import PlayerProfileView from '../PlayerProfile/PlayerProfileView.vue'
 import AddToWatchlistControl from '../../components/AddToWatchlistControl.vue'
 
 function apiPayload() {

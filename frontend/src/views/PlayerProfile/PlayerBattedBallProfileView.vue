@@ -8,3 +8,4 @@
     <p class="profile-empty">Batted ball profile coming soon.</p>
   </div>
 </template>
+

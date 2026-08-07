@@ -19,8 +19,8 @@ const savedAnalysisUrl = computed(() => {
   if (rightId.value) query.set('right', rightId.value)
   return `/compare${query.size ? `?${query}` : ''}`
 })
-const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId)
-const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId)
+const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId, null, { includeCoreSection: false })
+const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId, null, { includeCoreSection: false })
 
 const ready = computed(() => Boolean(
   leftPlayer.value &&

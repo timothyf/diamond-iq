@@ -1,0 +1,54 @@
+<script setup>
+import { inject } from 'vue'
+import NotesPanel from '../../components/NotesPanel.vue'
+import PlayerCareerStatsPanel from './PlayerCareerStatsPanel.vue'
+import PlayerAdvancedStatsPanel from './PlayerAdvancedStatsPanel.vue'
+import PlayerSplitsPanel from './PlayerSplitsPanel.vue'
+import SimilarPlayersPanel from './SimilarPlayersPanel.vue'
+import ContextualBenchmarksPanel from './ContextualBenchmarksPanel.vue'
+import RecentTeamHistoryCard from './RecentTeamHistoryCard.vue'
+
+const {
+  player, selectedProfileTab, profileTabs, selectAdjacentTab,
+} = inject('player-profile-context')
+</script>
+
+<template>
+  <div id="player-page-panel-overview" class="profile-page-content" role="tabpanel" aria-labelledby="player-page-tab-overview">
+    <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
+
+    <nav class="profile-tabs" aria-label="Player profile sections">
+      <div role="tablist">
+        <button
+          v-for="(tab, index) in profileTabs"
+          :id="`player-profile-tab-${tab.id}`"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-controls="`player-profile-panel-${tab.id}`"
+          :aria-selected="selectedProfileTab === tab.id"
+          :tabindex="selectedProfileTab === tab.id ? 0 : -1"
+          :data-test="`player-profile-tab-${tab.id}`"
+          @click="selectedProfileTab = tab.id"
+          @keydown="selectAdjacentTab($event, index)"
+        >
+          {{ tab.label }}
+        </button>
+      </div>
+    </nav>
+
+    <div class="profile-stat-tabs">
+      <PlayerCareerStatsPanel v-if="selectedProfileTab === 'overview'" />
+      <PlayerAdvancedStatsPanel v-if="selectedProfileTab === 'advanced-stats'" />
+      <PlayerSplitsPanel v-if="selectedProfileTab === 'splits'" />
+    </div>
+
+    <SimilarPlayersPanel />
+    <ContextualBenchmarksPanel />
+
+    <div class="profile-two-column">
+      <RecentTeamHistoryCard />
+    </div>
+  </div>
+</template>
+
