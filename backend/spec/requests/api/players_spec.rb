@@ -195,6 +195,7 @@ RSpec.describe "Api::Players", type: :request do
       events: "single",
       launch_speed: 101.4,
       launch_angle: 22.0,
+      hit_distance_sc: 287.0,
       hc_x: 118.0,
       hc_y: 142.0,
       fetched_at_utc: Time.current,
@@ -262,7 +263,7 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "batted_ball_profile")).to include(
       "available" => true,
       "contact_count" => 1,
-      "hit_points" => include(hash_including("event" => "single", "x" => 118.0, "y" => 142.0))
+      "hit_points" => include(hash_including("event" => "single", "x" => 118.0, "y" => 142.0, "hit_distance" => 287.0))
     )
     expect(json_body.dig("data", "recent_pitch_indicators", "pitching")).to include(
       "pitch_count" => 1,

@@ -913,7 +913,7 @@ class PlayerProfileSnapshotQuery
     points = PitchDatum
       .where(batter: player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
       .where.not(hc_x: nil, hc_y: nil)
-      .select(:id, :game_date, :hc_x, :hc_y, :events, :bb_type, :launch_speed, :launch_angle, :description)
+      .select(:id, :game_date, :hc_x, :hc_y, :events, :bb_type, :launch_speed, :launch_angle, :hit_distance_sc, :description)
       .order(:game_date, :id)
       .to_a
       .select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
@@ -935,6 +935,7 @@ class PlayerProfileSnapshotQuery
       batted_ball_type: row.bb_type,
       exit_velocity: rounded(row.launch_speed),
       launch_angle: rounded(row.launch_angle),
+      hit_distance: rounded(row.hit_distance_sc),
       game_date: row.game_date
     }
   end

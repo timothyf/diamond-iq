@@ -215,7 +215,7 @@ function apiPayload() {
         available: true,
         contact_count: 3,
         spray_points: [
-          { x: 95, y: 125, event: 'single', batted_ball_type: 'ground_ball', exit_velocity: 98.4, game_date: '2026-07-14' },
+          { x: 95, y: 125, event: 'single', batted_ball_type: 'ground_ball', exit_velocity: 98.4, hit_distance: 287, game_date: '2026-07-14' },
           { x: 145, y: 105, event: 'field_out', batted_ball_type: 'fly_ball', exit_velocity: 101.2, game_date: '2026-07-12' },
           { x: 175, y: 75, event: 'home_run', batted_ball_type: 'fly_ball', exit_velocity: 109.4, game_date: '2026-07-10' },
         ],
@@ -579,6 +579,15 @@ describe('PlayerProfileView', () => {
     expect(panel.get('[data-test="batted-ball-hit-location-chart"]').text()).toContain('Hit-location chart')
     expect(panel.text()).toContain('3 tracked contacts')
     expect(panel.text()).toContain('2 tracked hits')
+    expect(panel.findAll('.spray-point')).toHaveLength(3)
+    expect(panel.find('.spray-point--single').exists()).toBe(true)
+    expect(panel.find('.spray-point--home-run').exists()).toBe(true)
+    expect(panel.get('circle.spray-point--single title').text()).toContain('SINGLE')
+    expect(panel.get('circle.spray-point--single title').text()).toContain('287 ft')
+
+    await panel.get('[data-test="spray-chart-outs-toggle"]').setValue(false)
+
+    expect(panel.findAll('.spray-point')).toHaveLength(2)
   })
 
   it('uses Savant-inspired percentile markers with readable text contrast', async () => {

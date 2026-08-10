@@ -1,10 +1,13 @@
 <script setup>
-import { computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 
 const { player, formatDate } = inject('player-profile-context')
 
 const profile = computed(() => player.value?.battedBallProfile || { available: false, sprayPoints: [], hitPoints: [] })
-const sprayPoints = computed(() => profile.value.sprayPoints.map((point) => ({
+const showOuts = ref(true)
+const sprayPoints = computed(() => profile.value.sprayPoints
+  .filter((point) => showOuts.value || pointTone(point) !== 'out')
+  .map((point) => ({
   ...point,
   chartX: 170 + ((Number(point.x) - 125) * 1.12),
   chartY: 278 - ((199 - Number(point.y)) * 1.22),
@@ -23,15 +26,15 @@ const hitLocationBins = computed(() => {
 const maxHitBin = computed(() => Math.max(1, ...hitLocationBins.value.map((bin) => bin.count)))
 
 function pointTone(point) {
-  if (point.event === 'home_run') return 'home-run'
-  if (['single', 'double', 'triple'].includes(point.event)) return 'hit'
+  if (['single', 'double', 'triple', 'home_run'].includes(point.event)) return point.event.replaceAll('_', '-')
   return 'out'
 }
 
 function pointLabel(point) {
-  const outcome = point.event?.replaceAll('_', ' ') || point.battedBallType || 'Ball in play'
-  const velocity = point.exitVelocity ? ` · ${point.exitVelocity.toFixed(1)} mph` : ''
-  return `${outcome}${velocity}${point.gameDate ? ` · ${formatDate(point.gameDate)}` : ''}`
+  const outcome = (point.event?.replaceAll('_', ' ') || point.battedBallType || 'Ball in play').toUpperCase()
+  const date = point.gameDate ? ` · ${formatDate(point.gameDate)}` : ''
+  const distance = point.hitDistance ? ` · ${Math.round(point.hitDistance)} ft` : ''
+  return `${outcome}${date}${distance}`
 }
 </script>
 
@@ -52,10 +55,16 @@ function pointLabel(point) {
       </header>
 
       <div v-if="profile.available" class="batted-ball-profile__charts">
-        <article class="batted-ball-chart" data-test="batted-ball-spray-chart">
-          <header>
-            <h3>Spray chart</h3>
-            <p>All tracked balls in play</p>
+        <article class="batted-ball-chart batted-ball-chart--spray" data-test="batted-ball-spray-chart">
+          <header class="batted-ball-chart__header">
+            <div>
+              <h3>Spray chart</h3>
+              <p>Tracked balls in play</p>
+            </div>
+            <label class="spray-chart-toggle">
+              <input v-model="showOuts" type="checkbox" data-test="spray-chart-outs-toggle">
+              <span>Show outs</span>
+            </label>
           </header>
           <svg viewBox="0 0 340 300" role="img" aria-label="Batted ball spray chart">
             <path class="spray-field" d="M170 279 L43 152 M170 279 L297 152 M43 152 Q170 22 297 152 M78 186 Q170 95 262 186" />
@@ -75,7 +84,9 @@ function pointLabel(point) {
           </svg>
           <footer class="batted-ball-chart__legend">
             <span><i class="spray-point--out"></i>Out</span>
-            <span><i class="spray-point--hit"></i>Hit</span>
+            <span><i class="spray-point--single"></i>Single</span>
+            <span><i class="spray-point--double"></i>Double</span>
+            <span><i class="spray-point--triple"></i>Triple</span>
             <span><i class="spray-point--home-run"></i>Home run</span>
           </footer>
         </article>

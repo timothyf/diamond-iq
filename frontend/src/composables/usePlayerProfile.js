@@ -161,6 +161,7 @@ function normalizeProfile(data = {}) {
         battedBallType: point.batted_ball_type,
         exitVelocity: point.exit_velocity,
         launchAngle: point.launch_angle,
+        hitDistance: point.hit_distance,
         gameDate: point.game_date,
       })),
       hitPoints: (battedBallProfile.hit_points || []).map((point) => ({
@@ -170,6 +171,7 @@ function normalizeProfile(data = {}) {
         battedBallType: point.batted_ball_type,
         exitVelocity: point.exit_velocity,
         launchAngle: point.launch_angle,
+        hitDistance: point.hit_distance,
         gameDate: point.game_date,
       })),
     },
