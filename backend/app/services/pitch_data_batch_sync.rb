@@ -27,6 +27,7 @@ class PitchDataBatchSync
       progress_unit: "games",
       errors: []
     }
+    analytics_dates = []
     progress_tracker&.start!(total: summary[:game_count])
 
     chunks.each do |chunk_start, chunk_end|
@@ -38,7 +39,7 @@ class PitchDataBatchSync
       targeted_games = games_by_chunk.fetch([chunk_start, chunk_end], [])
       next if targeted_games.empty?
 
-      download_result = download_chunk(chunk_start:, chunk_end:)
+      download_result = download_chunk(chunk_start: chunk_start, chunk_end: chunk_end)
       unless download_result[:success]
         summary[:errors] << { chunk: "#{chunk_start.iso8601} — #{chunk_end.iso8601}", message: download_result[:message], errors: Array(download_result.dig(:data, :errors)) }
         progress_tracker&.chunk_finished!(
@@ -51,6 +52,7 @@ class PitchDataBatchSync
       end
 
       rows_by_game_pk = group_rows_by_game_pk(download_result.dig(:data, :rows) || [])
+      importable_games = []
 
       targeted_games.each do |game|
         if progress_tracker&.cancel_requested?
@@ -59,25 +61,49 @@ class PitchDataBatchSync
         end
 
         progress_tracker&.game_started!(game)
-        result = sync_game_rows(game: game, rows: rows_by_game_pk.fetch(game.mlb_id, []), chunk_start: chunk_start, chunk_end: chunk_end)
-        if result[:success]
-          summary[:downloaded_count] += result.dig(:data, :downloaded_count).to_i
-          summary[:imported_count] += result.dig(:data, :imported_count).to_i
-          summary[:duplicate_count] += result.dig(:data, :duplicate_count).to_i
-          summary[:skipped_count] += result.dig(:data, :skipped_count).to_i
+        rows, source_name = rows_for_game(game: game, rows: rows_by_game_pk.fetch(game.mlb_id, []), chunk_start: chunk_start, chunk_end: chunk_end)
+        if rows.empty?
+          result = failure("No pitch data rows were returned for stored game #{game.mlb_id}")
+          summary[:errors] << { game_pk: game.mlb_id, message: result[:message], errors: [] }
+          progress_tracker&.chunk_finished!(success: false, processed_game_count: 1, result_data: { progress_unit: "games" }, message: result[:message])
         else
-          summary[:errors] << { game_pk: game.mlb_id, message: result[:message], errors: Array(result.dig(:data, :errors)) }
+          importable_games << { game: game, rows: rows, source_name: source_name }
         end
+      end
 
-        progress_tracker&.chunk_finished!(
-          success: result[:success],
-          processed_game_count: 1,
-          result_data: (result[:data] || {}).merge(progress_unit: "games"),
-          message: result[:message]
-        )
+      import_result = import_chunk_rows(importable_games)
+      if import_result[:success]
+        result_data = import_result[:data] || {}
+        summary[:downloaded_count] += importable_games.sum { |entry| entry[:rows].length }
+        summary[:imported_count] += result_data[:imported_count].to_i
+        summary[:duplicate_count] += result_data[:duplicate_count].to_i
+        summary[:skipped_count] += result_data[:skipped_count].to_i
+        analytics_dates.concat(importable_games.flat_map { |entry| entry[:rows].filter_map { |row| row["game_date"] || row[:game_date] } })
+        mark_games_complete!(importable_games.map { |entry| entry[:game] })
+
+        importable_games.each do |entry|
+          progress_tracker&.chunk_finished!(
+            success: true,
+            processed_game_count: 1,
+            result_data: { downloaded_count: entry[:rows].length, imported_count: entry[:rows].length, progress_unit: "games" },
+            message: import_result[:message]
+          )
+        end
+      else
+        summary[:errors] << { chunk: "#{chunk_start.iso8601} — #{chunk_end.iso8601}", message: import_result[:message], errors: Array(import_result.dig(:data, :errors)) }
+        importable_games.each do |_entry|
+          progress_tracker&.chunk_finished!(success: false, processed_game_count: 1, result_data: { progress_unit: "games" }, message: import_result[:message])
+        end
       end
 
       break if summary[:cancelled]
+    end
+
+    progress_tracker&.analytics_started!
+    summary[:analytics_refresh] = refresh_daily_analytics(analytics_dates)
+    progress_tracker&.analytics_finished!(summary[:analytics_refresh])
+    if summary[:analytics_refresh].dig(:success) == false
+      summary[:errors] << { message: summary[:analytics_refresh][:message], errors: [] }
     end
 
     if summary[:cancelled]
@@ -108,7 +134,7 @@ class PitchDataBatchSync
     result
   end
 
-  def sync_game_rows(game:, rows:, chunk_start:, chunk_end:)
+  def rows_for_game(game:, rows:, chunk_start:, chunk_end:)
     source_name = "Baseball Savant pitch data #{chunk_start.iso8601}-#{chunk_end.iso8601}"
     if rows.empty?
       live_result = MlbLivePitchDataDownloader.call(game: game)
@@ -118,18 +144,38 @@ class PitchDataBatchSync
       end
     end
 
-    return failure("No pitch data rows were returned for stored game #{game.mlb_id}", [], { downloaded_count: 0, imported_count: 0, duplicate_count: 0, skipped_count: 0 }) if rows.empty?
+    [rows, source_name]
+  end
 
-    import_result = PitchDataImporter.import_raw_rows(
-      rows: rows,
-      source_name: source_name,
-      replace_game_id: (game.id if replace_existing)
+  def import_chunk_rows(importable_games)
+    return success("No pitch data rows to import", { imported_count: 0, duplicate_count: 0, skipped_count: 0 }) if importable_games.empty?
+
+    source_names = importable_games.map { |entry| entry[:source_name] }.uniq
+    PitchDataImporter.import_raw_rows(
+      rows: importable_games.flat_map { |entry| entry[:rows] },
+      source_name: source_names.one? ? source_names.first : source_names.join("; "),
+      replace_game_ids: (importable_games.map { |entry| entry[:game].id } if replace_existing),
+      refresh_analytics: false
     )
-    return import_result unless import_result[:success]
+  end
 
-    game.update!(pitch_data_complete_at: Time.current, pitch_data_row_count: PitchDatum.where(game_id: game.id).count)
+  def mark_games_complete!(games)
+    return if games.empty?
 
-    { success: true, message: import_result[:message], data: import_result[:data].merge(downloaded_count: rows.length) }
+    timestamp = Time.current
+    Game.where(id: games.map(&:id)).update_all(
+      pitch_data_complete_at: timestamp,
+      pitch_data_row_count: Arel.sql("(SELECT COUNT(*) FROM pitch_data WHERE pitch_data.game_id = games.id)")
+    )
+  end
+
+  def refresh_daily_analytics(dates)
+    unique_dates = dates.filter_map { |date| date.presence && Date.parse(date.to_s) }.uniq.sort
+    return { skipped: true, reason: "No imported pitch dates" } if unique_dates.empty?
+
+    DailyAnalyticsRefresh.call(dates: unique_dates)
+  rescue StandardError => error
+    { success: false, message: "Pitch data was imported, but daily analytics refresh failed: #{error.message}" }
   end
 
   def date_chunks

@@ -73,7 +73,7 @@ class GamePitchingAnalysis
   def pitch_usage(pitches)
     pitches.group_by { |pitch| pitch.pitch_type.presence || "UN" }.map do |pitch_type, rows|
       velocities = rows.filter_map { |pitch| pitch.release_speed&.to_f }
-      exit_velocities = rows.filter_map { |pitch| pitch.launch_speed&.to_f }
+      exit_velocities = rows.filter_map { |pitch| pitch.launch_speed&.to_f if DailyAnalyticsCalculator.batted_ball?(pitch) }
       swings = rows.count { |pitch| swing?(pitch) }
       whiffs = rows.count { |pitch| whiff?(pitch) }
       called_strikes = rows.count { |pitch| called_strike?(pitch) }
@@ -131,19 +131,19 @@ class GamePitchingAnalysis
   end
 
   def swing?(pitch)
-    SWING_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    DailyAnalyticsCalculator.swing?(pitch)
   end
 
   def whiff?(pitch)
-    WHIFF_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    DailyAnalyticsCalculator.whiff?(pitch)
   end
 
   def called_strike?(pitch)
-    CALLED_STRIKE_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    CALLED_STRIKE_DESCRIPTIONS.include?(DailyAnalyticsCalculator.description_key(pitch.description))
   end
 
   def strike?(pitch)
-    STRIKE_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    STRIKE_DESCRIPTIONS.include?(DailyAnalyticsCalculator.description_key(pitch.description))
   end
 
   def chase_opportunity?(pitch)

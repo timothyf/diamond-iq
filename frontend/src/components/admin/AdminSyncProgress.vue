@@ -1,8 +1,10 @@
 <script setup>
+import { computed } from 'vue'
+
 import { formatCount, formatElapsed } from '../../utils/adminFormatting'
 import { taskStatusLabel } from '../../utils/gameDetailsTaskPresentation'
 
-defineProps({
+const props = defineProps({
   task: { type: Object, required: true },
   active: { type: Boolean, default: false },
   testId: { type: String, required: true },
@@ -10,8 +12,24 @@ defineProps({
   itemNoun: { type: String, default: 'games' },
   currentItemLabel: { type: String, default: 'Current game' },
   cancelItemNoun: { type: String, default: 'game' },
+  progressMode: { type: String, default: 'standard' },
 })
 const emit = defineEmits(['cancel'])
+
+const pitchDataPhase = computed(() => props.task.resultData?.progress_phase || 'downloading')
+const progressLabel = computed(() => {
+  if (props.progressMode !== 'pitch-data') return taskStatusLabel(props.task.status)
+  if (pitchDataPhase.value === 'analytics') return 'Finalizing analytics'
+  if (pitchDataPhase.value === 'complete') return 'Synchronization complete'
+  return 'Downloading and importing'
+})
+const progressSummary = computed(() => {
+  if (props.progressMode === 'pitch-data' && pitchDataPhase.value === 'analytics') return 'Finalizing imported pitch data…'
+  return `${formatCount(props.task.processedItems)} of ${formatCount(props.task.totalItems)} ${props.itemNoun}`
+})
+const cancellationAvailable = computed(() => (
+  props.active && !(props.progressMode === 'pitch-data' && pitchDataPhase.value === 'analytics')
+))
 
 </script>
 
@@ -19,8 +37,8 @@ const emit = defineEmits(['cancel'])
   <section class="sync-progress" :data-test="testId" aria-live="polite">
     <header>
       <div>
-        <span>{{ taskStatusLabel(task.status) }}</span>
-        <strong>{{ formatCount(task.processedItems) }} of {{ formatCount(task.totalItems) }} {{ itemNoun }}</strong>
+        <span>{{ progressLabel }}</span>
+        <strong>{{ progressSummary }}</strong>
       </div>
       <b>{{ task.progressPercentage.toFixed(1) }}%</b>
     </header>
@@ -41,13 +59,20 @@ const emit = defineEmits(['cancel'])
       <div><dt>Remaining</dt><dd>{{ active ? formatElapsed(task.estimatedRemainingSeconds) : '—' }}</dd></div>
     </dl>
     <p v-if="task.currentItemLabel" class="sync-progress__current"><span>{{ currentItemLabel }}</span>{{ task.currentItemLabel }}</p>
+    <p
+      v-if="progressMode === 'pitch-data' && pitchDataPhase === 'analytics'"
+      class="sync-progress__notice"
+      data-test="pitch-data-analytics-refresh-processing"
+    >
+      Game downloads and imports are complete. Daily analytics are now being refreshed.
+    </p>
     <p v-if="task.cancelRequested && active" class="sync-progress__notice">Cancellation requested. The current {{ cancelItemNoun }} will finish safely before the task stops.</p>
     <p v-else-if="task.errorMessage" class="sync-progress__error">{{ task.errorMessage }}</p>
 
     <slot />
 
     <button
-      v-if="active"
+      v-if="cancellationAvailable"
       type="button"
       class="admin-button admin-button--danger"
       :data-test="`${testId.replace('-progress', '')}-cancel-active`"

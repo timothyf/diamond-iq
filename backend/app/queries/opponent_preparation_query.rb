@@ -133,7 +133,7 @@ class OpponentPreparationQuery
   def handedness_splits(pitches)
     %w[L R].map do |hand|
       rows = pitches.select { |pitch| pitch.stand == hand }
-      swings = rows.count { |pitch| SWING_DESCRIPTIONS.include?(pitch.description.to_s.downcase) }
+      swings = rows.count { |pitch| DailyAnalyticsCalculator.swing?(pitch) }
       appearances = rows.map { |pitch| [ pitch.game_pk, pitch.at_bat_number ] }.uniq.length
       strikeouts = rows.select { |pitch| DailyAnalyticsCalculator::STRIKEOUT_EVENTS.include?(pitch.events.to_s.downcase) }
         .map { |pitch| [ pitch.game_pk, pitch.at_bat_number ] }.uniq.length
@@ -142,7 +142,7 @@ class OpponentPreparationQuery
         pitches: rows.length,
         plate_appearances: appearances,
         strikeout_rate: percentage(strikeouts, appearances),
-        whiff_rate: percentage(rows.count { |pitch| WHIFF_DESCRIPTIONS.include?(pitch.description.to_s.downcase) }, swings),
+        whiff_rate: percentage(rows.count { |pitch| DailyAnalyticsCalculator.whiff?(pitch) }, swings),
         evidence: evidence(rows.first(2))
       }
     end

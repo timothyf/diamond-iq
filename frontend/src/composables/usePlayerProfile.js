@@ -178,8 +178,6 @@ function normalizeProfile(data = {}) {
       available: benchmarks.available === true,
       sourceStartDate: benchmarks.source_start_date,
       sourceEndDate: benchmarks.source_end_date,
-      previousStartDate: benchmarks.previous_start_date,
-      previousEndDate: benchmarks.previous_end_date,
       calculationVersion: benchmarks.calculation_version,
       calculatedAt: benchmarks.calculated_at,
       metrics: (benchmarks.metrics || []).map((metric) => ({
@@ -199,9 +197,6 @@ function normalizeProfile(data = {}) {
         percentile: metric.percentile,
         positionPercentile: metric.position_percentile,
         pitcherRolePercentile: metric.pitcher_role_percentile,
-        previousValue: metric.previous_value,
-        changeValue: metric.change_value,
-        changePercentage: metric.change_percentage,
         sampleSize: metric.sample_size,
         mlbSampleSize: metric.mlb_sample_size,
         mlbPlayerCount: metric.mlb_player_count,

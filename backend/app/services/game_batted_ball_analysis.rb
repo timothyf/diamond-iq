@@ -32,6 +32,7 @@ class GameBattedBallAnalysis
       .where.not(launch_speed: nil)
       .order(:at_bat_number, :pitch_number)
       .to_a
+      .select { |pitch| DailyAnalyticsCalculator.batted_ball?(pitch) }
   end
 
   def batting_team_id(pitch)

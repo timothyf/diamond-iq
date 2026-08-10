@@ -239,7 +239,7 @@ class PlayerTrendEventDetector
   end
 
   def swing?(pitch)
-    SWING_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    DailyAnalyticsCalculator.swing?(pitch)
   end
 
   def average(values)

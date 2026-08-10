@@ -24,7 +24,8 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       home: false, starter: true, plate_appearances: 4, at_bats: 3, runs: 1,
       hits: 2, doubles: 1, triples: 0, home_runs: 1, runs_batted_in: 2,
       walks: 1, strikeouts: 1, stolen_bases: 0, caught_stealing: 0,
-      source_name: "MLB Stats API", last_synced_at: Time.current
+      source_name: "MLB Stats API", last_synced_at: Time.current,
+      raw_data: { "stats" => { "batting" => { "hitByPitch" => 1, "sacFlies" => 1 } } }
     )
     GamePlayerPitchingLine.create!(
       game: game, player: pitcher, team: home_team, opponent_team: away_team,
@@ -99,6 +100,8 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     expect(batting.metrics).to include(
       "hits" => 2,
       "home_runs" => 1,
+      "hit_by_pitch" => 1,
+      "sacrifice_flies" => 1,
       "batting_average" => 0.6667,
       "slugging_percentage" => 2.0
     )
@@ -133,6 +136,47 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       "on_base_percentage_is_approximate" => false,
       "ops" => 2.6667
     )
+  end
+
+  it "excludes foul-ball contact from batted-ball metrics" do
+    create_pitch(
+      pitch_number: 4,
+      pitch_type: "FF",
+      description: "foul",
+      events: "field_out",
+      launch_speed: 45.0,
+      launch_angle: -30.0
+    )
+
+    described_class.call(start_date: date, end_date: date, refresh_contextual_benchmarks: false)
+
+    metrics = BatterSplitSummary.find_by!(player: batter, split_type: "home_away", split_value: "away").metrics
+    expect(metrics).to include(
+      "pitches_seen" => 4,
+      "batted_balls" => 1,
+      "exit_velocity_sample_size" => 1,
+      "average_exit_velocity" => 101.0,
+      "hard_hit_percentage" => 100.0
+    )
+  end
+
+  it "recognizes title-cased MLB live-feed swing descriptions" do
+    create_pitch(pitch_number: 4, pitch_type: "FF", description: "Swinging Strike", zone: 11)
+    create_pitch(pitch_number: 5, pitch_type: "FF", description: "In play, no out", zone: 12)
+
+    described_class.call(start_date: date, end_date: date, refresh_contextual_benchmarks: false)
+
+    metrics = BatterSplitSummary.find_by!(player: batter, split_type: "home_away", split_value: "away").metrics
+    expect(metrics).to include("chase_opportunities" => 2, "chases" => 2, "chase_percentage" => 100.0)
+  end
+
+  it "counts foul tips as whiffs" do
+    create_pitch(pitch_number: 4, pitch_type: "FF", description: "foul_tip", zone: 5)
+
+    described_class.call(start_date: date, end_date: date, refresh_contextual_benchmarks: false)
+
+    metrics = BatterSplitSummary.find_by!(player: batter, split_type: "home_away", split_value: "away").metrics
+    expect(metrics).to include("swings" => 3, "whiffs" => 2, "whiff_percentage" => 66.67)
   end
 
   it "replaces the same version idempotently while preserving other calculation versions" do

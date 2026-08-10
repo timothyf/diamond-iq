@@ -23,8 +23,6 @@ class PlayerBenchmarkSnapshotQuery
       cached: true,
       source_start_date: latest_rows.first.source_start_date,
       source_end_date: latest_rows.first.source_end_date,
-      previous_start_date: latest_rows.first.previous_start_date,
-      previous_end_date: latest_rows.first.previous_end_date,
       calculation_version: calculation_version,
       calculated_at: latest_rows.map(&:calculated_at).max,
       metrics: serialized_metrics
@@ -88,9 +86,6 @@ class PlayerBenchmarkSnapshotQuery
         percentile: number(league.percentile),
         position_percentile: number(position&.percentile),
         pitcher_role_percentile: number(role&.percentile),
-        previous_value: number(league.previous_value),
-        change_value: number(league.change_value),
-        change_percentage: number(league.change_percentage),
         sample_size: league.sample_size,
         mlb_sample_size: benchmark.sample_size,
         mlb_player_count: benchmark.player_count,
@@ -110,8 +105,6 @@ class PlayerBenchmarkSnapshotQuery
       cached: false,
       source_start_date: nil,
       source_end_date: nil,
-      previous_start_date: nil,
-      previous_end_date: nil,
       calculation_version: calculation_version,
       calculated_at: nil,
       metrics: []

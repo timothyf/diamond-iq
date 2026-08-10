@@ -12,6 +12,18 @@ class ContextualBenchmarkRefresh
     "pitcher_chase_percentage" => { group: "pitching", label: "Chase rate", direction: "higher_better", unit: "percent" },
     "pitch_usage_percentage" => { group: "pitch_type", label: "Pitch usage", direction: "neutral", unit: "percent" }
   }.freeze
+  BATTING_TOTAL_KEYS = %w[plate_appearances at_bats hits doubles triples home_runs walks hit_by_pitch sacrifice_flies].freeze
+  SEASON_STAT_NAMES = {
+    "plate_appearances" => "plateAppearances",
+    "at_bats" => "atBats",
+    "hits" => "hits",
+    "doubles" => "doubles",
+    "triples" => "triples",
+    "home_runs" => "homeRuns",
+    "walks" => "baseOnBalls",
+    "hit_by_pitch" => "hitByPitch",
+    "sacrifice_flies" => "sacFlies"
+  }.freeze
 
   def self.call(start_date:, end_date:, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
     new(start_date: start_date, end_date: end_date, calculation_version: calculation_version).call
@@ -33,7 +45,6 @@ class ContextualBenchmarkRefresh
     return failure("Calculation version is required") if calculation_version.blank?
 
     current = observations(start_date, end_date)
-    previous = observations(previous_start_date, previous_end_date).index_by { |row| observation_identity(row) }
     benchmark_count = 0
     percentile_count = 0
 
@@ -43,7 +54,7 @@ class ContextualBenchmarkRefresh
         peer_groups(metric_rows).each do |peer_group_type, peer_group_key, peers|
           benchmark = create_benchmark!(identity, peer_group_type, peer_group_key, peers)
           benchmark_count += 1
-          percentile_count += create_percentiles!(benchmark, peers, previous)
+          percentile_count += create_percentiles!(benchmark, peers)
         end
       end
     end
@@ -54,8 +65,6 @@ class ContextualBenchmarkRefresh
       data: {
         source_start_date: start_date.iso8601,
         source_end_date: end_date.iso8601,
-        previous_start_date: previous_start_date.iso8601,
-        previous_end_date: previous_end_date.iso8601,
         calculation_version: calculation_version,
         benchmark_count: benchmark_count,
         percentile_count: percentile_count,
@@ -72,7 +81,6 @@ class ContextualBenchmarkRefresh
     return preview_result([]) if end_date < start_date || calculation_version.blank?
 
     current = observations(start_date, end_date)
-    previous = observations(previous_start_date, previous_end_date).index_by { |row| observation_identity(row) }
     metrics = grouped_observations(current).filter_map do |_identity, metric_rows|
       player_row = metric_rows.find { |row| row[:player_id] == player_id }
       next if player_row.nil?
@@ -81,8 +89,7 @@ class ContextualBenchmarkRefresh
       league = groups.find { |type, _key, _peers| type == "mlb" }
       position = groups.find { |type, _key, peers| type == "position" && peers.include?(player_row) }
       role = groups.find { |type, _key, peers| type == "pitcher_role" && peers.include?(player_row) }
-      previous_row = previous[observation_identity(player_row)]
-      preview_metric(player_row, league, position, role, previous_row)
+      preview_metric(player_row, league, position, role)
     end
     preview_result(metrics.sort_by { |metric| [ metric[:metric_group], metric[:display_name], metric[:dimension_value].to_s ] })
   end
@@ -97,21 +104,17 @@ class ContextualBenchmarkRefresh
       cached: false,
       source_start_date: start_date,
       source_end_date: end_date,
-      previous_start_date: previous_start_date,
-      previous_end_date: previous_end_date,
       calculation_version: calculation_version,
       calculated_at: calculated_at,
       metrics: metrics
     }
   end
 
-  def preview_metric(player_row, league, position, role, previous_row)
+  def preview_metric(player_row, league, position, role)
     definition = METRICS.fetch(player_row[:metric_key])
     league_type, league_key, league_peers = league
     position_type, position_key, position_peers = position
     role_type, role_key, role_peers = role
-    change_value = previous_row ? round(player_row[:value] - previous_row[:value]) : nil
-    change_percentage = previous_row && !previous_row[:value].zero? ? round(change_value / previous_row[:value].abs * 100) : nil
     {
       metric_key: player_row[:metric_key],
       metric_group: player_row[:metric_group],
@@ -129,9 +132,6 @@ class ContextualBenchmarkRefresh
       percentile: percentile(player_row[:value], league_peers.map { |row| row[:value] }, player_row[:directionality]),
       position_percentile: position_type ? percentile(player_row[:value], position_peers.map { |row| row[:value] }, player_row[:directionality]) : nil,
       pitcher_role_percentile: role_type ? percentile(player_row[:value], role_peers.map { |row| row[:value] }, player_row[:directionality]) : nil,
-      previous_value: previous_row&.dig(:value),
-      change_value: change_value,
-      change_percentage: change_percentage,
       sample_size: player_row[:sample_size],
       mlb_sample_size: league_peers.sum { |row| row[:sample_size] },
       mlb_player_count: league_peers.length,
@@ -148,8 +148,9 @@ class ContextualBenchmarkRefresh
   end
 
   def batting_observations(range_start, range_end)
+    official_totals = full_season_range?(range_start, range_end) ? season_batting_totals(end_date.year) : {}
     daily_rows(PlayerBattingDaily, range_start, range_end).group_by(&:player_id).filter_map do |player_id, rows|
-      totals = sum_metrics(rows, %w[plate_appearances at_bats hits doubles triples home_runs walks])
+      totals = official_totals[player_id] || sum_metrics(rows, BATTING_TOTAL_KEYS)
       next if totals["plate_appearances"].zero? || totals["at_bats"].zero?
 
       value = ops(totals)
@@ -303,27 +304,18 @@ class ContextualBenchmarkRefresh
     )
   end
 
-  def create_percentiles!(benchmark, peers, previous)
+  def create_percentiles!(benchmark, peers)
     values = peers.map { |row| row[:value] }
     peers.each do |row|
-      previous_row = previous[observation_identity(row)]
-      change_value = previous_row ? round(row[:value] - previous_row[:value]) : nil
-      change_percentage = previous_row && !previous_row[:value].zero? ? round(change_value / previous_row[:value].abs * 100) : nil
-
       PlayerMetricPercentile.create!(
         player_id: row[:player_id],
         league_metric_benchmark: benchmark,
         raw_value: row[:value],
         percentile: percentile(row[:value], values, benchmark.directionality),
-        previous_value: previous_row&.dig(:value),
-        change_value: change_value,
-        change_percentage: change_percentage,
         sample_size: row[:sample_size],
         peer_player_count: peers.length,
         source_start_date: start_date,
         source_end_date: end_date,
-        previous_start_date: previous_start_date,
-        previous_end_date: previous_end_date,
         calculation_version: calculation_version,
         calculated_at: calculated_at,
         source_name: SOURCE_NAME,
@@ -353,12 +345,34 @@ class ContextualBenchmarkRefresh
     at_bats = totals.fetch("at_bats").to_f
     hits = totals.fetch("hits").to_f
     walks = totals.fetch("walks").to_f
+    hit_by_pitch = totals.fetch("hit_by_pitch", 0).to_f
+    sacrifice_flies = totals.fetch("sacrifice_flies", 0).to_f
     return 0 if at_bats.zero?
 
     total_bases = hits + totals.fetch("doubles").to_f + (2 * totals.fetch("triples").to_f) + (3 * totals.fetch("home_runs").to_f)
-    obp_denominator = at_bats + walks
-    obp = obp_denominator.zero? ? 0 : (hits + walks) / obp_denominator
+    obp_denominator = at_bats + walks + hit_by_pitch + sacrifice_flies
+    obp = obp_denominator.zero? ? 0 : (hits + walks + hit_by_pitch) / obp_denominator
     obp + (total_bases / at_bats)
+  end
+
+  def full_season_range?(range_start, range_end)
+    range_start == Date.new(range_end.year, 1, 1)
+  end
+
+  def season_batting_totals(season)
+    rows = PlayerSeasonStat.joins(:stat_type)
+      .where(season: season, stat_types: { category: "batting", name: SEASON_STAT_NAMES.values })
+      .includes(:stat_type)
+      .to_a
+
+    rows.group_by(&:player_id).to_h do |player_id, player_rows|
+      scoped_rows = player_rows.group_by { |row| [ row.scope_type, row.scope_key ] }
+      rows_for_totals = scoped_rows.find { |(scope_type, _scope_key), _rows| scope_type == "combined" }&.last ||
+        player_rows.select { |row| row.scope_type == "team" }
+      values = rows_for_totals.group_by { |row| row.stat_type.name }.transform_values { |stat_rows| stat_rows.sum(&:value) }
+      totals = SEASON_STAT_NAMES.to_h { |key, stat_name| [ key, values[stat_name].to_f ] }
+      [ player_id, totals.stringify_keys ]
+    end
   end
 
   def percentile(value, values, directionality)
@@ -417,30 +431,15 @@ class ContextualBenchmarkRefresh
     weighted_metric_sum(rows, metric_key, sample_key) / 100.0
   end
 
-  def observation_identity(row)
-    [ row[:player_id], row[:metric_key], row[:dimension_type], row[:dimension_value] ]
-  end
-
   def remove_existing!
     benchmarks = LeagueMetricBenchmark.where(
       source_start_date: start_date,
       source_end_date: end_date,
       calculation_version: calculation_version
     )
-    PlayerMetricPercentile.where(league_metric_benchmark_id: benchmarks.select(:id)).delete_all
-    benchmarks.delete_all
-  end
-
-  def period_length
-    (end_date - start_date).to_i + 1
-  end
-
-  def previous_start_date
-    start_date - period_length.days
-  end
-
-  def previous_end_date
-    start_date - 1.day
+    benchmark_ids = benchmarks.pluck(:id)
+    PlayerMetricPercentile.where(league_metric_benchmark_id: benchmark_ids).delete_all
+    LeagueMetricBenchmark.where(id: benchmark_ids).delete_all
   end
 
   def parse_date(value)

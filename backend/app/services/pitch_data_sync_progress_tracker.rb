@@ -5,7 +5,8 @@ class PitchDataSyncProgressTracker
 
   def start!(total:)
     execution_job_id = task_run.result_data.to_h["active_execution_job_id"]
-    result_data = execution_job_id.present? ? { "active_execution_job_id" => execution_job_id } : {}
+    result_data = { "progress_phase" => "downloading" }
+    result_data["active_execution_job_id"] = execution_job_id if execution_job_id.present?
     task_run.update!(
       status: "running",
       total_items: total,
@@ -64,6 +65,21 @@ class PitchDataSyncProgressTracker
 
   def cancel_requested?
     task_run.reload.cancel_requested?
+  end
+
+  def analytics_started!
+    task_run.update!(
+      current_item_mlb_id: nil,
+      current_item_label: "Refreshing daily analytics",
+      result_data: task_run.result_data.to_h.merge("progress_phase" => "analytics"),
+      last_heartbeat_at: Time.current
+    )
+  end
+
+  def analytics_finished!(result = nil)
+    result_data = task_run.result_data.to_h.merge("progress_phase" => "complete")
+    result_data["analytics_refresh"] = result.deep_stringify_keys if result
+    task_run.update!(result_data: result_data, last_heartbeat_at: Time.current)
   end
 
   def complete!(result)

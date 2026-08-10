@@ -2,7 +2,6 @@ require "rails_helper"
 
 RSpec.describe ContextualBenchmarkRefresh, type: :service do
   let(:date) { Date.new(2026, 7, 15) }
-  let(:previous_date) { date - 1.day }
   let(:team) { create_team }
   let(:batter_one) { create_player(team: team) }
   let(:batter_two) { create_player(team: team) }
@@ -14,7 +13,6 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     create_player_position(player: batter_one, position: third_base, attributes: { is_primary: true })
     create_player_position(player: batter_two, position: third_base, attributes: { is_primary: true })
 
-    create_batting_daily(batter_one, previous_date, plate_appearances: 4, at_bats: 4, hits: 1, doubles: 0, triples: 0, home_runs: 0, walks: 0)
     create_batting_daily(batter_one, date, plate_appearances: 5, at_bats: 4, hits: 2, doubles: 1, triples: 0, home_runs: 0, walks: 1)
     create_batting_daily(batter_two, date, plate_appearances: 4, at_bats: 4, hits: 1, doubles: 0, triples: 0, home_runs: 0, walks: 0)
 
@@ -31,7 +29,7 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     create_pitch_type(reliever, "SL", 50)
   end
 
-  it "builds weighted MLB, position, role, percentile, change, and sample context" do
+  it "builds weighted MLB, position, role, percentile, and sample context" do
     result = described_class.call(start_date: date, end_date: date)
 
     expect(result).to include(success: true)
@@ -47,8 +45,6 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     batter_percentile = PlayerMetricPercentile.find_by!(player: batter_one, league_metric_benchmark: mlb_ops)
     expect(batter_percentile.percentile.to_f).to eq(75.0)
     expect(batter_percentile.raw_value.to_f).to eq(1.35)
-    expect(batter_percentile.previous_value.to_f).to eq(0.5)
-    expect(batter_percentile.change_value.to_f).to eq(0.85)
     expect(batter_percentile.sample_size).to eq(5)
 
     exit_velocity = LeagueMetricBenchmark.find_by!(metric_key: "average_exit_velocity", peer_group_type: "mlb")
@@ -82,23 +78,45 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
       available: true,
       cached: false,
       source_start_date: date,
-      source_end_date: date,
-      previous_start_date: previous_date,
-      previous_end_date: previous_date
+      source_end_date: date
     )
     ops = result.fetch(:metrics).find { |metric| metric[:metric_key] == "ops" }
     expect(ops).to include(
       raw_value: 1.35,
       position_key: "3B",
       percentile: 75.0,
-      previous_value: 0.5,
-      change_value: 0.85,
       sample_size: 5,
       mlb_player_count: 2
     )
     expect(ops[:mlb_average]).to be_within(0.0001).of(0.9444)
     expect(ops[:position_average]).to be_within(0.0001).of(0.9444)
     expect([ LeagueMetricBenchmark.count, PlayerMetricPercentile.count ]).to eq(counts)
+  end
+
+  it "uses canonical season totals for full-season OPS" do
+    {
+      "plateAppearances" => 113,
+      "atBats" => 100,
+      "hits" => 30,
+      "doubles" => 10,
+      "triples" => 1,
+      "homeRuns" => 5,
+      "baseOnBalls" => 10,
+      "hitByPitch" => 2,
+      "sacFlies" => 1
+    }.each do |name, value|
+      stat_type = create_stat_type(attributes: { name: name, label: name })
+      create_player_season_stat(
+        player: batter_one,
+        stat_type: stat_type,
+        attributes: { season: date.year, value: value }
+      )
+    end
+
+    result = described_class.preview(player_id: batter_one.id, start_date: Date.new(date.year, 1, 1), end_date: date)
+    ops = result.fetch(:metrics).find { |metric| metric[:metric_key] == "ops" }
+
+    expect(ops).to include(raw_value: 0.941681, sample_size: 113)
   end
 
   def common_daily(player, metric_date)

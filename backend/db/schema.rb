@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_03_000000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_09_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -648,15 +648,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_03_000000) do
     t.bigint "league_metric_benchmark_id", null: false
     t.decimal "raw_value", precision: 14, scale: 6, null: false
     t.decimal "percentile", precision: 6, scale: 2, null: false
-    t.decimal "previous_value", precision: 14, scale: 6
-    t.decimal "change_value", precision: 14, scale: 6
-    t.decimal "change_percentage", precision: 12, scale: 4
     t.bigint "sample_size", default: 0, null: false
     t.integer "peer_player_count", default: 0, null: false
     t.date "source_start_date", null: false
     t.date "source_end_date", null: false
-    t.date "previous_start_date"
-    t.date "previous_end_date"
     t.string "calculation_version", null: false
     t.datetime "calculated_at", null: false
     t.string "source_name", null: false

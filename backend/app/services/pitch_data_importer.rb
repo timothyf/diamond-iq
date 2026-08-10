@@ -40,15 +40,22 @@ class PitchDataImporter
     new(source_name: source_name).import_rows(rows)
   end
 
-  def self.import_raw_rows(rows:, source_name: nil, replace_game_id: nil)
-    new(source_name: source_name, replace_game_id: replace_game_id).send(:import_raw_rows, rows)
+  def self.import_raw_rows(rows:, source_name: nil, replace_game_id: nil, replace_game_ids: nil, refresh_analytics: true)
+    new(
+      source_name: source_name,
+      replace_game_id: replace_game_id,
+      replace_game_ids: replace_game_ids,
+      refresh_analytics: refresh_analytics
+    ).send(:import_raw_rows, rows)
   end
 
-  def initialize(csv_data: nil, file_path: nil, source_name: nil, replace_game_id: nil)
+  def initialize(csv_data: nil, file_path: nil, source_name: nil, replace_game_id: nil, replace_game_ids: nil, refresh_analytics: true)
     @csv_data = csv_data
     @file_path = file_path
     @source_name = source_name
     @replace_game_id = replace_game_id
+    @replace_game_ids = replace_game_ids
+    @refresh_analytics = refresh_analytics
     @errors = []
   end
 
@@ -93,7 +100,7 @@ class PitchDataImporter
 
   private
 
-  attr_reader :csv_data, :file_path, :source_name, :replace_game_id, :errors
+  attr_reader :csv_data, :file_path, :source_name, :replace_game_id, :replace_game_ids, :refresh_analytics, :errors
 
   def import_rows(rows)
     return failure("No valid pitch data rows found in CSV") if rows.blank?
@@ -102,7 +109,7 @@ class PitchDataImporter
     persist_rows(rows)
 
     linked_count = rows.count { |row| row[:game_id].present? }
-    analytics_refresh = refresh_daily_analytics(rows)
+    analytics_refresh = refresh_analytics ? refresh_daily_analytics(rows) : deferred_analytics_refresh
 
     success(
       "Imported #{rows.length} pitch data rows",
@@ -146,9 +153,14 @@ class PitchDataImporter
     { success: false, message: "Pitch data was imported, but daily analytics refresh failed: #{error.message}" }
   end
 
+  def deferred_analytics_refresh
+    { skipped: true, reason: "Daily analytics refresh deferred to the batch sync" }
+  end
+
   def persist_rows(rows)
     PitchDatum.transaction do
-      PitchDatum.where(game_id: replace_game_id).delete_all if replace_game_id.present?
+      replacement_game_ids = Array(replace_game_ids.presence || replace_game_id).compact
+      PitchDatum.where(game_id: replacement_game_ids).delete_all if replacement_game_ids.any?
       PitchDatum.upsert_all(rows, unique_by: UPSERT_INDEX)
     end
   end

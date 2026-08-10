@@ -3,7 +3,13 @@ class DailyAnalyticsCalculator
     swinging_strike swinging_strike_blocked missed_bunt foul foul_bunt foul_tip
     hit_into_play hit_into_play_no_out hit_into_play_score
   ].freeze
-  WHIFF_DESCRIPTIONS = %w[swinging_strike swinging_strike_blocked missed_bunt].freeze
+  WHIFF_DESCRIPTIONS = %w[swinging_strike swinging_strike_blocked missed_bunt foul_tip].freeze
+  BATTED_BALL_DESCRIPTIONS = %w[
+    hit_into_play hit_into_play_no_out hit_into_play_score
+  ].freeze
+  LIVE_IN_PLAY_DESCRIPTIONS = %w[
+    in\ play,\ out(s) in\ play,\ no\ out in\ play,\ run(s)
+  ].freeze
   HIT_EVENTS = %w[single double triple home_run].freeze
   WALK_EVENTS = %w[walk intent_walk intentional_walk].freeze
   STRIKEOUT_EVENTS = %w[strikeout strikeout_double_play].freeze
@@ -14,7 +20,7 @@ class DailyAnalyticsCalculator
   ].freeze
   BATTING_LINE_COLUMNS = %i[
     game_id player_id team_id plate_appearances at_bats runs hits doubles triples home_runs
-    runs_batted_in walks strikeouts stolen_bases caught_stealing
+    runs_batted_in walks strikeouts stolen_bases caught_stealing raw_data
   ].freeze
   PITCHING_LINE_COLUMNS = %i[
     game_id player_id team_id starter outs_recorded batters_faced hits runs earned_runs
@@ -24,6 +30,29 @@ class DailyAnalyticsCalculator
 
   def self.call(metric_date:, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
     new(metric_date: metric_date, calculation_version: calculation_version).call
+  end
+
+  def self.batted_ball?(pitch)
+    return false if pitch.launch_speed.blank?
+
+    description = pitch.description.to_s.downcase
+    BATTED_BALL_DESCRIPTIONS.include?(description) ||
+      LIVE_IN_PLAY_DESCRIPTIONS.include?(description)
+  end
+
+  def self.description_key(description)
+    normalized = description.to_s.downcase.parameterize(separator: "_")
+    return "hit_into_play" if %w[in_play_out_s in_play_no_out in_play_run_s].include?(normalized)
+
+    normalized
+  end
+
+  def self.swing?(pitch)
+    SWING_DESCRIPTIONS.include?(description_key(pitch.description))
+  end
+
+  def self.whiff?(pitch)
+    WHIFF_DESCRIPTIONS.include?(description_key(pitch.description))
   end
 
   def initialize(metric_date:, calculation_version:)
@@ -57,9 +86,13 @@ class DailyAnalyticsCalculator
   def batting_rows
     batting_lines.group_by { |line| [ line.player_id, line.team_id ] }.map do |(player_id, team_id), lines|
       totals = sum_fields(lines, %i[plate_appearances at_bats runs hits doubles triples home_runs runs_batted_in walks strikeouts stolen_bases caught_stealing])
+        .merge(batting_line_official_totals(lines))
       total_bases = totals[:hits] + totals[:doubles] + (2 * totals[:triples]) + (3 * totals[:home_runs])
       average = ratio(totals[:hits], totals[:at_bats])
-      obp = ratio(totals[:hits] + totals[:walks], totals[:at_bats] + totals[:walks])
+      obp = ratio(
+        totals[:hits] + totals[:walks] + totals[:hit_by_pitch],
+        totals[:at_bats] + totals[:walks] + totals[:hit_by_pitch] + totals[:sacrifice_flies]
+      )
       slugging = ratio(total_bases, totals[:at_bats])
 
       common_row(sample_size: totals[:plate_appearances]).merge(
@@ -143,7 +176,7 @@ class DailyAnalyticsCalculator
   def batter_split_rows
     split_rows(:batter, batter_split_dimensions) do |grouped|
       swings = grouped.count { |pitch| swing?(pitch) }
-      batted_balls = grouped.select { |pitch| pitch.launch_speed.present? }
+      batted_balls = grouped.select { |pitch| self.class.batted_ball?(pitch) }
       hard_hit = batted_balls.count { |pitch| pitch.launch_speed >= 95 }
       chase_opportunities = grouped.count { |pitch| chase_opportunity?(pitch) }
       chases = grouped.count { |pitch| chase?(pitch) }
@@ -288,6 +321,13 @@ class DailyAnalyticsCalculator
   def batting_lines
     @batting_lines ||= GamePlayerBattingLine.joins(:game)
       .where(games: { official_date: metric_date, status: "final" }).select(*BATTING_LINE_COLUMNS).to_a
+  end
+
+  def batting_line_official_totals(lines)
+    {
+      hit_by_pitch: lines.sum { |line| line.raw_data.to_h.dig("stats", "batting", "hitByPitch").to_i },
+      sacrifice_flies: lines.sum { |line| line.raw_data.to_h.dig("stats", "batting", "sacFlies").to_i }
+    }
   end
 
   def pitching_lines
@@ -467,11 +507,11 @@ class DailyAnalyticsCalculator
   end
 
   def swing?(pitch)
-    SWING_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    self.class.swing?(pitch)
   end
 
   def whiff?(pitch)
-    WHIFF_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    self.class.whiff?(pitch)
   end
 
   def chase_opportunity?(pitch)

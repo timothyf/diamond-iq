@@ -1320,7 +1320,7 @@ class PlayerProfileSnapshotQuery
 
   def batting_indicators
     rows = recent_batter_rows
-    batted_balls = rows.select { |row| row.launch_speed.present? }
+    batted_balls = rows.select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
     exit_velocities = numeric_values(batted_balls, :launch_speed)
     launch_angles = numeric_values(batted_balls, :launch_angle)
 

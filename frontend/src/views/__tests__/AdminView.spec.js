@@ -765,7 +765,7 @@ describe('AdminView', () => {
       completedItems: 8,
       failedItems: 2,
       processedItems: 10,
-      progressPercentage: 50.0,
+      progressPercentage: 40.0,
       currentItemLabel: 'DET at CLE — July 10, 2026',
       cancelRequested: false,
       elapsedSeconds: 180,
@@ -781,10 +781,37 @@ describe('AdminView', () => {
     expect(progress.text()).toContain('DET at CLE — July 10, 2026')
     expect(progress.text()).toContain('Cancel after current game')
     expect(progress.text()).toContain('3m')
-    expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
+    expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('40')
 
     await wrapper.get('[data-test="pitch-data-cancel-active"]').trigger('click')
     expect(cancelPitchDataSync).toHaveBeenCalledOnce()
+  })
+
+  it('holds pitch synchronization progress at the analytics phase after all games finish', () => {
+    pitchDataTask.value = {
+      id: 14,
+      status: 'running',
+      totalItems: 18,
+      completedItems: 18,
+      failedItems: 0,
+      processedItems: 18,
+      progressPercentage: 80.0,
+      currentItemLabel: 'Refreshing daily analytics',
+      cancelRequested: false,
+      elapsedSeconds: 240,
+      estimatedRemainingSeconds: null,
+      errorMessage: null,
+      resultData: { progress_phase: 'analytics' },
+    }
+
+    const wrapper = mount(AdminView)
+    const progress = wrapper.get('[data-test="pitch-data-progress"]')
+
+    expect(progress.text()).toContain('Finalizing analytics')
+    expect(progress.text()).toContain('Finalizing imported pitch data')
+    expect(progress.get('[data-test="pitch-data-analytics-refresh-processing"]').text())
+      .toContain('Daily analytics are now being refreshed')
+    expect(progress.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('80')
   })
 
   it('shows a roster estimate and persisted team progress with safe cancellation', async () => {

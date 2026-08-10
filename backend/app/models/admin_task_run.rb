@@ -35,7 +35,17 @@ class AdminTaskRun < ApplicationRecord
     return 100.0 if status == "completed"
     return 0.0 if total_items.zero?
 
-    [ (processed_items.to_f / total_items * 100).round(1), 100.0 ].min
+    base_percentage = [ (processed_items.to_f / total_items * 100).round(1), 100.0 ].min
+    return base_percentage unless task_name == "pitch_data_sync"
+
+    case result_data.to_h["progress_phase"]
+    when "analytics"
+      80.0
+    when "complete"
+      100.0
+    else
+      (base_percentage * 0.8).round(1)
+    end
   end
 
   def elapsed_seconds

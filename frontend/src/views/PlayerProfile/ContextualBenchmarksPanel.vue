@@ -3,7 +3,7 @@ import { inject } from 'vue'
 
 const {
   player, titleize, contextualMetricLabel, contextualValue, peerAverage, peerLabel,
-  percentileStyle, signedContextualValue, benchmarkPeriodLabel,
+  percentileStyle, benchmarkPeriodLabel,
 } = inject('player-profile-context')
 </script>
 
@@ -26,7 +26,6 @@ const {
             <th>MLB average</th>
             <th>Position / role</th>
             <th>Percentile</th>
-            <th>Previous-period change</th>
             <th>Sample</th>
           </tr>
         </thead>
@@ -50,12 +49,6 @@ const {
                 P{{ Math.round(metric.percentile) }}
               </span>
             </td>
-            <td>
-              {{ signedContextualValue(metric.changeValue, metric.unit) }}
-              <small v-if="metric.previousValue !== null && metric.previousValue !== undefined">
-                from {{ contextualValue(metric.previousValue, metric.unit) }}
-              </small>
-            </td>
             <td>{{ Number(metric.sampleSize || 0).toLocaleString() }}</td>
           </tr>
         </tbody>
@@ -66,4 +59,3 @@ const {
     </p>
   </section>
 </template>
-

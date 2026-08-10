@@ -58,6 +58,7 @@ RSpec.describe GameBattedBallAnalysis do
       at_bat_number: number,
       pitch_number: 1,
       batter: player.mlb_id,
+      description: "hit_into_play",
       launch_speed: launch_speed,
       launch_angle: launch_angle,
       bb_type: bb_type,

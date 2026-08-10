@@ -215,8 +215,6 @@ function apiPayload() {
         available: true,
         source_start_date: '2026-03-26',
         source_end_date: '2026-07-14',
-        previous_start_date: '2025-12-05',
-        previous_end_date: '2026-03-25',
         calculation_version: '1.0.0',
         metrics: [
           {
@@ -229,8 +227,6 @@ function apiPayload() {
             position_average: 0.745,
             position_key: 'CF',
             percentile: 82.5,
-            previous_value: 0.79,
-            change_value: 0.052,
             sample_size: 480,
             mlb_player_count: 280,
           },
@@ -451,7 +447,6 @@ describe('PlayerProfileView', () => {
     expect(benchmarks.text()).toContain('0.720')
     expect(benchmarks.text()).toContain('CF')
     expect(benchmarks.text()).toContain('P83')
-    expect(benchmarks.text()).toContain('+0.052')
     expect(benchmarks.text()).toContain('480')
     expect(wrapper.text()).toContain('Baseball Savant')
     expect(wrapper.get('.profile-portrait img').attributes()).toMatchObject({

@@ -54,7 +54,7 @@ function signed(value) {
         <div class="home-hero__baseball" aria-hidden="true"><span>Baseball Intelligence</span></div>
       </div>
       <div class="home-hero__copy">
-        <h1>Baseball intelligence, ready for first pitch.</h1>
+        <h1>Baseball intelligence,<br/> ready for first pitch.</h1>
         <p>
           Track today’s slate, scan the league’s top performers, and move directly into the player and team analysis behind the numbers.
         </p>
@@ -177,7 +177,12 @@ function signed(value) {
 .home-hero__baseball::after { transform: scaleX(-1); }
 .home-hero__baseball span { font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(.78rem,1.15vw,1.05rem); font-weight: 900; letter-spacing: .55em; line-height: 1; text-transform: uppercase; }
 .home-eyebrow { margin: 0; color: #a93627; font-size: .71rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
-.home-hero h1 { max-width: 850px; margin: 0 0 1.1rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: clamp(3.2rem, 5.5vw, 6rem); line-height: .96; letter-spacing: -.025em; text-transform: uppercase; }
+.home-hero h1 {
+   max-width: 850px; margin: 0 0 1.1rem; 
+   font-family: 'Avenir Next Condensed', sans-serif; 
+   font-size: clamp(3.2rem, 5.5vw, 6rem); 
+   font-size: 60px;
+   line-height: .96; letter-spacing: -.025em; text-transform: uppercase; }
 .home-hero__copy > p { max-width: 820px; color: #f0f2f3; font-size: clamp(1rem, 1.5vw, 1.25rem); font-weight: 750; line-height: 1.55; }
 .home-hero__tools { display: grid; grid-template-columns: minmax(180px, .65fr) minmax(280px, 1fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: start; margin-top: 1.7rem; }
 .home-actions { display: flex; flex-direction: column; gap: .8rem; align-items: flex-start; margin-top: 10px;}

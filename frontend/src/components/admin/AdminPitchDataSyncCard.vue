@@ -29,7 +29,7 @@ defineExpose({
     source="Baseball Savant"
     title="Statcast pitch data"
     chip="Download + import"
-    description="Downloads pitch-by-pitch Statcast data only for games without a completed local Statcast import."
+    description="Downloads and bulk-imports pitch-by-pitch Statcast data, then refreshes daily analytics for the imported dates."
     data-test="pitch-download-form"
     @submit.prevent="emit('submit')"
   >
@@ -65,6 +65,7 @@ defineExpose({
       v-if="task"
       :task="task"
       :active="active"
+      progress-mode="pitch-data"
       test-id="pitch-data-progress"
       aria-label="Statcast pitch synchronization"
       @cancel="emit('cancel-active')"

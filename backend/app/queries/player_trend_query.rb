@@ -41,7 +41,7 @@ class PlayerTrendQuery
   def summary_for(start_date, end_date)
     batter_rows = pitch_rows(:batter, start_date, end_date)
     pitcher_rows = pitch_rows(:pitcher, start_date, end_date)
-    batted_balls = batter_rows.select { |pitch| pitch.launch_speed.present? }
+    batted_balls = batter_rows.select { |pitch| DailyAnalyticsCalculator.batted_ball?(pitch) }
     batter_swings = batter_rows.count { |pitch| swing?(pitch) }
     batter_chase_opportunities = batter_rows.count { |pitch| chase_opportunity?(pitch) }
     pitcher_swings = pitcher_rows.count { |pitch| swing?(pitch) }
@@ -73,7 +73,7 @@ class PlayerTrendQuery
       .sort_by { |group| pitch_order(group.first) }
     points = sampled_indices(appearances.length).map do |index|
       window = appearances[[ index - analysis_range.plate_appearance_window + 1, 0 ].max..index].flatten
-      batted_balls = window.select { |pitch| pitch.launch_speed.present? }
+      batted_balls = window.select { |pitch| DailyAnalyticsCalculator.batted_ball?(pitch) }
       swings = window.count { |pitch| swing?(pitch) }
       chase_opportunities = window.count { |pitch| chase_opportunity?(pitch) }
       {
@@ -205,11 +205,11 @@ class PlayerTrendQuery
   end
 
   def swing?(pitch)
-    SWING_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    DailyAnalyticsCalculator.swing?(pitch)
   end
 
   def whiff?(pitch)
-    WHIFF_DESCRIPTIONS.include?(pitch.description.to_s.downcase)
+    DailyAnalyticsCalculator.whiff?(pitch)
   end
 
   def chase_opportunity?(pitch)
