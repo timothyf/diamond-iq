@@ -3,7 +3,10 @@ class ContextualBenchmarkRefresh
   METRICS = {
     "ops" => { group: "batting", label: "OPS", direction: "higher_better", unit: "rate" },
     "average_exit_velocity" => { group: "batting", label: "Average exit velocity", direction: "higher_better", unit: "mph" },
+    "maximum_exit_velocity" => { group: "batting", label: "Max exit velocity", direction: "higher_better", unit: "mph" },
+    "barrel_percentage" => { group: "batting", label: "Barrel rate", direction: "higher_better", unit: "percent" },
     "hard_hit_percentage" => { group: "batting", label: "Hard-hit rate", direction: "higher_better", unit: "percent" },
+    "average_bat_speed" => { group: "batting", label: "Bat speed", direction: "higher_better", unit: "mph" },
     "batter_whiff_percentage" => { group: "batting", label: "Whiff rate", direction: "lower_better", unit: "percent" },
     "batter_chase_percentage" => { group: "batting", label: "Chase rate", direction: "lower_better", unit: "percent" },
     "pitcher_average_velocity" => { group: "pitching", label: "Average velocity", direction: "higher_better", unit: "mph" },
@@ -13,6 +16,8 @@ class ContextualBenchmarkRefresh
     "pitch_usage_percentage" => { group: "pitch_type", label: "Pitch usage", direction: "neutral", unit: "percent" }
   }.freeze
   BATTING_TOTAL_KEYS = %w[plate_appearances at_bats hits doubles triples home_runs walks hit_by_pitch sacrifice_flies].freeze
+  BATTER_QUALIFIER_PER_TEAM_GAME = 2.1
+  PITCHER_QUALIFIER_PER_TEAM_GAME = 1.25
   SEASON_STAT_NAMES = {
     "plate_appearances" => "plateAppearances",
     "at_bats" => "atBats",
@@ -44,7 +49,7 @@ class ContextualBenchmarkRefresh
     return failure("End date must be on or after start date") if end_date < start_date
     return failure("Calculation version is required") if calculation_version.blank?
 
-    current = observations(start_date, end_date)
+    current = qualified_observations
     benchmark_count = 0
     percentile_count = 0
 
@@ -80,7 +85,7 @@ class ContextualBenchmarkRefresh
   def preview_for(player_id)
     return preview_result([]) if end_date < start_date || calculation_version.blank?
 
-    current = observations(start_date, end_date)
+    current = qualified_observations
     metrics = grouped_observations(current).filter_map do |_identity, metric_rows|
       player_row = metric_rows.find { |row| row[:player_id] == player_id }
       next if player_row.nil?
@@ -147,6 +152,53 @@ class ContextualBenchmarkRefresh
       pitch_usage_observations(range_start, range_end)
   end
 
+  def qualified_observations
+    observations(start_date, end_date).select do |row|
+      eligible_player_ids_for(row[:metric_group]).include?(row[:player_id])
+    end
+  end
+
+  def eligible_player_ids_for(metric_group)
+    case metric_group
+    when "batting"
+      qualified_player_ids(PlayerBattingDaily, BATTER_QUALIFIER_PER_TEAM_GAME)
+    when "pitching", "pitch_type"
+      qualified_player_ids(PlayerPitchingDaily, PITCHER_QUALIFIER_PER_TEAM_GAME)
+    else
+      Set.new
+    end
+  end
+
+  def qualified_player_ids(model, qualifier_per_team_game)
+    @qualified_player_ids ||= {}
+    @qualified_player_ids[[ model.name, qualifier_per_team_game ]] ||= begin
+      rows = daily_rows(model, start_date, end_date)
+      team_game_counts = games_by_team(rows.map(&:team_id).uniq)
+
+      rows.group_by(&:player_id).each_with_object(Set.new) do |(player_id, player_rows), eligible_ids|
+        games = player_rows.map(&:team_id).uniq.map do |team_id|
+          team_game_counts.fetch(team_id) { player_rows.select { |row| row.team_id == team_id }.map(&:metric_date).uniq.length }
+        end.max.to_i
+        next if games.zero?
+
+        appearances = player_rows.sum(&:sample_size)
+        eligible_ids << player_id if appearances >= games * qualifier_per_team_game
+      end
+    end
+  end
+
+  def games_by_team(team_ids)
+    counts = Hash.new(0)
+    Game.where(official_date: start_date..end_date)
+      .where("home_team_id IN (:team_ids) OR away_team_id IN (:team_ids)", team_ids: team_ids)
+      .pluck(:home_team_id, :away_team_id)
+      .each do |home_team_id, away_team_id|
+        counts[home_team_id] += 1 if team_ids.include?(home_team_id)
+        counts[away_team_id] += 1 if team_ids.include?(away_team_id)
+      end
+    counts
+  end
+
   def batting_observations(range_start, range_end)
     official_totals = full_season_range?(range_start, range_end) ? season_batting_totals(end_date.year) : {}
     daily_rows(PlayerBattingDaily, range_start, range_end).group_by(&:player_id).filter_map do |player_id, rows|
@@ -173,13 +225,21 @@ class ContextualBenchmarkRefresh
       swings = sum_metric(player_rows, "swings")
       chase_opportunities = sum_metric(player_rows, "chase_opportunities")
       exit_velocity_sum = weighted_metric_sum(player_rows, "average_exit_velocity", "exit_velocity_sample_size", fallback: "batted_balls")
+      maximum_exit_velocity = maximum_metric(player_rows, "maximum_exit_velocity")
+      barrels = sum_metric(player_rows, "barrel_count")
+      barrel_samples = sum_metric(player_rows, "barrel_sample_size", fallback: "batted_balls")
       hard_hit_sum = weighted_percentage_sum(player_rows, "hard_hit_percentage", "batted_balls")
+      bat_speed_samples = sum_metric(player_rows, "bat_speed_sample_size")
+      bat_speed_sum = weighted_metric_sum(player_rows, "average_bat_speed", "bat_speed_sample_size")
       whiffs = sum_metric(player_rows, "whiffs")
       chases = sum_metric(player_rows, "chases")
 
       [
         rate_observation(player_id, "average_exit_velocity", exit_velocity_sum, batted_balls),
+        value_observation(player_id, "maximum_exit_velocity", maximum_exit_velocity, sample_size: batted_balls),
+        rate_observation(player_id, "barrel_percentage", barrels, barrel_samples, scale: 100),
         rate_observation(player_id, "hard_hit_percentage", hard_hit_sum, batted_balls, scale: 100),
+        rate_observation(player_id, "average_bat_speed", bat_speed_sum, bat_speed_samples),
         rate_observation(player_id, "batter_whiff_percentage", whiffs, swings, scale: 100),
         rate_observation(player_id, "batter_chase_percentage", chases, chase_opportunities, scale: 100)
       ].compact
@@ -257,6 +317,21 @@ class ContextualBenchmarkRefresh
       sample_size: denominator.to_i,
       numerator: numerator.to_f * scale,
       denominator: denominator,
+      dimension_type: dimension_type,
+      dimension_value: dimension_value
+    )
+  end
+
+  def value_observation(player_id, metric_key, value, sample_size:, dimension_type: "", dimension_value: "")
+    return if value.nil?
+
+    observation(
+      player_id: player_id,
+      metric_key: metric_key,
+      value: value,
+      sample_size: sample_size,
+      numerator: value,
+      denominator: 1,
       dimension_type: dimension_type,
       dimension_value: dimension_value
     )
@@ -429,6 +504,10 @@ class ContextualBenchmarkRefresh
 
   def weighted_percentage_sum(rows, metric_key, sample_key)
     weighted_metric_sum(rows, metric_key, sample_key) / 100.0
+  end
+
+  def maximum_metric(rows, key)
+    rows.filter_map { |row| row.metrics[key] }.map(&:to_f).max
   end
 
   def remove_existing!

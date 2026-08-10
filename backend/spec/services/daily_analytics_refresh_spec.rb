@@ -8,6 +8,7 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
     create_game(
       mlb_id: 823_443,
       official_date: date,
+      scheduled_at: Time.find_zone!("America/New_York").local(date.year, date.month, date.day, 19, 5),
       home_team: home_team,
       away_team: away_team,
       home_score: 4,
@@ -72,7 +73,7 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
 
     create_pitch(pitch_number: 1, pitch_type: "FF", description: "called_strike", release_speed: 96.0)
     create_pitch(pitch_number: 2, pitch_type: "FF", description: "swinging_strike", release_speed: 98.0)
-    create_pitch(pitch_number: 3, pitch_type: "SL", description: "hit_into_play", events: "home_run", release_speed: 86.0, launch_speed: 101.0)
+    create_pitch(pitch_number: 3, pitch_type: "SL", description: "hit_into_play", events: "home_run", release_speed: 86.0, launch_speed: 101.0, launch_speed_angle: 6, bat_speed: 75.6)
   end
 
   it "builds every summary family with calculation metadata" do
@@ -114,7 +115,13 @@ RSpec.describe DailyAnalyticsRefresh, type: :service do
       "whiffs" => 1
     )
     expect(BatterSplitSummary.find_by!(player: batter, split_type: "pitcher_hand", split_value: "R").metrics)
-      .to include("pitches_seen" => 3, "plate_appearances" => 1)
+      .to include(
+        "pitches_seen" => 3,
+        "plate_appearances" => 1,
+        "barrel_count" => 1,
+        "barrel_percentage" => 100.0,
+        "average_bat_speed" => 75.6
+      )
     expect(BatterSplitSummary.find_by!(player: batter, split_type: "day_night", split_value: "night").metrics)
       .to include("pitches_seen" => 3)
     expect(PitcherSplitSummary.find_by!(player: pitcher, split_type: "day_night", split_value: "night").metrics)

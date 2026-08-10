@@ -1,11 +1,114 @@
+<script setup>
+import { computed, inject } from 'vue'
+
+const { player, formatDate } = inject('player-profile-context')
+
+const profile = computed(() => player.value?.battedBallProfile || { available: false, sprayPoints: [], hitPoints: [] })
+const sprayPoints = computed(() => profile.value.sprayPoints.map((point) => ({
+  ...point,
+  chartX: 170 + ((Number(point.x) - 125) * 1.12),
+  chartY: 278 - ((199 - Number(point.y)) * 1.22),
+})))
+
+const hitLocationBins = computed(() => {
+  const bins = Array.from({ length: 9 }, (_, index) => ({ id: index, count: 0 }))
+  profile.value.hitPoints.forEach((point) => {
+    const column = Number(point.x) < 92 ? 0 : Number(point.x) > 158 ? 2 : 1
+    const row = Number(point.y) < 105 ? 0 : Number(point.y) < 164 ? 1 : 2
+    bins[(row * 3) + column].count += 1
+  })
+  return bins
+})
+
+const maxHitBin = computed(() => Math.max(1, ...hitLocationBins.value.map((bin) => bin.count)))
+
+function pointTone(point) {
+  if (point.event === 'home_run') return 'home-run'
+  if (['single', 'double', 'triple'].includes(point.event)) return 'hit'
+  return 'out'
+}
+
+function pointLabel(point) {
+  const outcome = point.event?.replaceAll('_', ' ') || point.battedBallType || 'Ball in play'
+  const velocity = point.exitVelocity ? ` · ${point.exitVelocity.toFixed(1)} mph` : ''
+  return `${outcome}${velocity}${point.gameDate ? ` · ${formatDate(point.gameDate)}` : ''}`
+}
+</script>
+
 <template>
   <div
     id="player-page-panel-batted-ball-profile"
-    class="profile-page-content profile-page-content--empty"
+    class="profile-page-content"
     role="tabpanel"
     aria-labelledby="player-page-tab-batted-ball-profile"
   >
-    <p class="profile-empty">Batted ball profile coming soon.</p>
+    <section class="profile-panel batted-ball-profile" data-test="batted-ball-profile">
+      <header class="profile-section-heading">
+        <div>
+          <p class="eyebrow">Statcast contact</p>
+          <h2>Batted ball profile</h2>
+        </div>
+        <span>{{ profile.contactCount }} tracked contacts</span>
+      </header>
+
+      <div v-if="profile.available" class="batted-ball-profile__charts">
+        <article class="batted-ball-chart" data-test="batted-ball-spray-chart">
+          <header>
+            <h3>Spray chart</h3>
+            <p>All tracked balls in play</p>
+          </header>
+          <svg viewBox="0 0 340 300" role="img" aria-label="Batted ball spray chart">
+            <path class="spray-field" d="M170 279 L43 152 M170 279 L297 152 M43 152 Q170 22 297 152 M78 186 Q170 95 262 186" />
+            <path class="spray-infield" d="M170 279 L119 228 L170 177 L221 228 Z" />
+            <circle class="spray-home" cx="170" cy="279" r="4" />
+            <circle
+              v-for="(point, index) in sprayPoints"
+              :key="`${point.gameDate}-${index}`"
+              class="spray-point"
+              :class="`spray-point--${pointTone(point)}`"
+              :cx="point.chartX"
+              :cy="point.chartY"
+              r="4"
+            >
+              <title>{{ pointLabel(point) }}</title>
+            </circle>
+          </svg>
+          <footer class="batted-ball-chart__legend">
+            <span><i class="spray-point--out"></i>Out</span>
+            <span><i class="spray-point--hit"></i>Hit</span>
+            <span><i class="spray-point--home-run"></i>Home run</span>
+          </footer>
+        </article>
+
+        <article class="batted-ball-chart" data-test="batted-ball-hit-location-chart">
+          <header>
+            <h3>Hit-location chart</h3>
+            <p>Hit distribution by field zone</p>
+          </header>
+          <div class="hit-location-chart" role="img" aria-label="Hit locations by field zone">
+            <div class="hit-location-chart__axis hit-location-chart__axis--top">
+              <span>Left field</span><span>Center field</span><span>Right field</span>
+            </div>
+            <div class="hit-location-chart__body">
+              <div class="hit-location-chart__axis hit-location-chart__axis--side">
+                <span>Deep</span><span>Shallow</span><span>Infield</span>
+              </div>
+              <div class="hit-location-chart__grid">
+                <div
+                  v-for="bin in hitLocationBins"
+                  :key="bin.id"
+                  class="hit-location-chart__cell"
+                  :style="{ '--hit-density': bin.count / maxHitBin }"
+                >
+                  <strong>{{ bin.count }}</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <footer><strong>{{ profile.hitPoints.length }}</strong> tracked hits</footer>
+        </article>
+      </div>
+      <p v-else class="profile-empty">No tracked batted-ball locations are available for this analysis period.</p>
+    </section>
   </div>
 </template>
-

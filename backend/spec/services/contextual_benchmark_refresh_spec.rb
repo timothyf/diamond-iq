@@ -16,8 +16,8 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     create_batting_daily(batter_one, date, plate_appearances: 5, at_bats: 4, hits: 2, doubles: 1, triples: 0, home_runs: 0, walks: 1)
     create_batting_daily(batter_two, date, plate_appearances: 4, at_bats: 4, hits: 1, doubles: 0, triples: 0, home_runs: 0, walks: 0)
 
-    create_batter_split(batter_one, date, average_exit_velocity: 100, batted_balls: 2, hard_hit_percentage: 100, swings: 4, whiffs: 1, chase_opportunities: 4, chases: 1)
-    create_batter_split(batter_two, date, average_exit_velocity: 90, batted_balls: 2, hard_hit_percentage: 0, swings: 4, whiffs: 2, chase_opportunities: 4, chases: 2)
+    create_batter_split(batter_one, date, average_exit_velocity: 100, maximum_exit_velocity: 110, barrel_count: 1, barrel_sample_size: 2, average_bat_speed: 76, bat_speed_sample_size: 4, batted_balls: 2, hard_hit_percentage: 100, swings: 4, whiffs: 1, chase_opportunities: 4, chases: 1)
+    create_batter_split(batter_two, date, average_exit_velocity: 90, maximum_exit_velocity: 105, barrel_count: 0, barrel_sample_size: 2, average_bat_speed: 72, bat_speed_sample_size: 4, batted_balls: 2, hard_hit_percentage: 0, swings: 4, whiffs: 2, chase_opportunities: 4, chases: 2)
 
     create_pitching_daily(starter, games: 1, games_started: 1)
     create_pitching_daily(reliever, games: 1, games_started: 0)
@@ -49,6 +49,12 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
 
     exit_velocity = LeagueMetricBenchmark.find_by!(metric_key: "average_exit_velocity", peer_group_type: "mlb")
     expect(exit_velocity.average_value.to_f).to eq(95.0)
+    maximum_exit_velocity = LeagueMetricBenchmark.find_by!(metric_key: "maximum_exit_velocity", peer_group_type: "mlb")
+    expect(maximum_exit_velocity.average_value.to_f).to eq(107.5)
+    barrel_rate = LeagueMetricBenchmark.find_by!(metric_key: "barrel_percentage", peer_group_type: "mlb")
+    expect(barrel_rate.average_value.to_f).to eq(25.0)
+    bat_speed = LeagueMetricBenchmark.find_by!(metric_key: "average_bat_speed", peer_group_type: "mlb")
+    expect(bat_speed.average_value.to_f).to eq(74.0)
     chase = LeagueMetricBenchmark.find_by!(metric_key: "batter_chase_percentage", peer_group_type: "mlb")
     expect(chase.average_value.to_f).to eq(37.5)
     expect(PlayerMetricPercentile.find_by!(player: batter_one, league_metric_benchmark: chase).percentile.to_f).to eq(75.0)
@@ -67,6 +73,20 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     described_class.call(start_date: date, end_date: date)
 
     expect([ LeagueMetricBenchmark.count, PlayerMetricPercentile.count ]).to eq(counts)
+  end
+
+  it "limits Statcast percentile pools to players meeting MLB's team-game qualifier" do
+    low_sample_batter = create_player(team: team)
+    create_batting_daily(low_sample_batter, date, plate_appearances: 4, at_bats: 4, hits: 4, doubles: 0, triples: 0, home_runs: 0, walks: 0)
+    create_game(home_team: team, away_team: create_team, official_date: date)
+    create_game(home_team: team, away_team: create_team, official_date: date)
+
+    described_class.call(start_date: date, end_date: date)
+
+    expect(PlayerMetricPercentile.joins(:league_metric_benchmark).where(
+      player: low_sample_batter,
+      league_metric_benchmarks: { metric_key: "ops" }
+    )).to be_empty
   end
 
   it "previews an uncached player range without writing benchmark records" do
@@ -144,7 +164,7 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
   end
 
   def create_pitching_daily(player, metrics)
-    PlayerPitchingDaily.create!(common_daily(player, date).merge(metrics: metrics.stringify_keys))
+    PlayerPitchingDaily.create!(common_daily(player, date).merge(sample_size: metrics.fetch(:batters_faced, 5), metrics: metrics.stringify_keys))
   end
 
   def create_pitcher_split(player, metrics)

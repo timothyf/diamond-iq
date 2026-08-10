@@ -16,7 +16,7 @@ class DailyAnalyticsCalculator
   PITCH_COLUMNS = %i[
     game_pk at_bat_number pitcher batter stand p_throws pitch_type pitch_name
     description events inning_topbot release_speed release_spin_rate release_extension
-    pfx_x pfx_z zone launch_speed launch_angle estimated_woba_using_speedangle delta_run_exp
+    pfx_x pfx_z zone launch_speed launch_angle launch_speed_angle bat_speed estimated_woba_using_speedangle delta_run_exp
   ].freeze
   BATTING_LINE_COLUMNS = %i[
     game_id player_id team_id plate_appearances at_bats runs hits doubles triples home_runs
@@ -178,6 +178,8 @@ class DailyAnalyticsCalculator
       swings = grouped.count { |pitch| swing?(pitch) }
       batted_balls = grouped.select { |pitch| self.class.batted_ball?(pitch) }
       hard_hit = batted_balls.count { |pitch| pitch.launch_speed >= 95 }
+      barrels = batted_balls.count { |pitch| pitch.launch_speed_angle == GameBattedBallAnalysis::BARREL_CLASSIFICATION }
+      bat_speeds = values(grouped, :bat_speed)
       chase_opportunities = grouped.count { |pitch| chase_opportunity?(pitch) }
       chases = grouped.count { |pitch| chase?(pitch) }
 
@@ -192,7 +194,12 @@ class DailyAnalyticsCalculator
         exit_velocity_sample_size: batted_balls.length,
         average_exit_velocity: average(values(batted_balls, :launch_speed)),
         maximum_exit_velocity: values(batted_balls, :launch_speed).max,
+        barrel_count: barrels,
+        barrel_percentage: percent(barrels, batted_balls.length),
+        barrel_sample_size: batted_balls.length,
         hard_hit_percentage: percent(hard_hit, batted_balls.length),
+        average_bat_speed: average(bat_speeds),
+        bat_speed_sample_size: bat_speeds.length,
         average_launch_angle: average(values(batted_balls, :launch_angle)),
         estimated_woba: average(values(grouped, :estimated_woba_using_speedangle)),
         chase_opportunities: chase_opportunities,

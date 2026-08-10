@@ -211,6 +211,19 @@ function apiPayload() {
         },
         pitching: { pitch_count: 0, game_count: 0 },
       },
+      batted_ball_profile: {
+        available: true,
+        contact_count: 3,
+        spray_points: [
+          { x: 95, y: 125, event: 'single', batted_ball_type: 'ground_ball', exit_velocity: 98.4, game_date: '2026-07-14' },
+          { x: 145, y: 105, event: 'field_out', batted_ball_type: 'fly_ball', exit_velocity: 101.2, game_date: '2026-07-12' },
+          { x: 175, y: 75, event: 'home_run', batted_ball_type: 'fly_ball', exit_velocity: 109.4, game_date: '2026-07-10' },
+        ],
+        hit_points: [
+          { x: 95, y: 125, event: 'single', batted_ball_type: 'ground_ball', exit_velocity: 98.4, game_date: '2026-07-14' },
+          { x: 175, y: 75, event: 'home_run', batted_ball_type: 'fly_ball', exit_velocity: 109.4, game_date: '2026-07-10' },
+        ],
+      },
       contextual_benchmarks: {
         available: true,
         source_start_date: '2026-03-26',
@@ -228,6 +241,58 @@ function apiPayload() {
             position_key: 'CF',
             percentile: 82.5,
             sample_size: 480,
+            mlb_player_count: 280,
+          },
+          {
+            metric_key: 'average_exit_velocity',
+            metric_group: 'batting',
+            display_name: 'Average exit velocity',
+            unit: 'mph',
+            raw_value: 91.2,
+            mlb_average: 88.4,
+            position_average: 89.1,
+            position_key: 'CF',
+            percentile: 74,
+            sample_size: 224,
+            mlb_player_count: 280,
+          },
+          {
+            metric_key: 'maximum_exit_velocity',
+            metric_group: 'batting',
+            display_name: 'Max exit velocity',
+            unit: 'mph',
+            raw_value: 111.2,
+            mlb_average: 109.3,
+            position_average: 109.6,
+            position_key: 'CF',
+            percentile: 77,
+            sample_size: 224,
+            mlb_player_count: 280,
+          },
+          {
+            metric_key: 'barrel_percentage',
+            metric_group: 'batting',
+            display_name: 'Barrel rate',
+            unit: 'percent',
+            raw_value: 14.7,
+            mlb_average: 7.8,
+            position_average: 8.2,
+            position_key: 'CF',
+            percentile: 92,
+            sample_size: 224,
+            mlb_player_count: 280,
+          },
+          {
+            metric_key: 'average_bat_speed',
+            metric_group: 'batting',
+            display_name: 'Bat speed',
+            unit: 'mph',
+            raw_value: 75.6,
+            mlb_average: 72.1,
+            position_average: 72.5,
+            position_key: 'CF',
+            percentile: 90,
+            sample_size: 421,
             mlb_player_count: 280,
           },
         ],
@@ -443,10 +508,13 @@ describe('PlayerProfileView', () => {
     await wrapper.get('[data-test="player-page-tab-overview"]').trigger('click')
     const benchmarks = wrapper.get('[data-test="contextual-benchmarks"]')
     expect(benchmarks.text()).toContain('Benchmarks & percentiles')
+    expect(benchmarks.text()).toContain('Max exit velocity')
+    expect(benchmarks.text()).toContain('Barrel rate')
+    expect(benchmarks.text()).toContain('Bat speed')
     expect(benchmarks.text()).toContain('0.842')
     expect(benchmarks.text()).toContain('0.720')
     expect(benchmarks.text()).toContain('CF')
-    expect(benchmarks.text()).toContain('P83')
+    expect(benchmarks.text()).toContain('83')
     expect(benchmarks.text()).toContain('480')
     expect(wrapper.text()).toContain('Baseball Savant')
     expect(wrapper.get('.profile-portrait img').attributes()).toMatchObject({
@@ -492,7 +560,28 @@ describe('PlayerProfileView', () => {
     expect(event.text()).toContain('38.9 pts → 51.8 pts')
   })
 
-  it('uses adaptive red-to-green percentile colors with readable text contrast', async () => {
+  it('renders batter spray and hit-location charts on the Batted Ball Profile tab', async () => {
+    const corePayload = apiPayload()
+    delete corePayload.data.batted_ball_profile
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => corePayload })
+      .mockResolvedValue({ ok: true, json: async () => apiPayload() }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="player-page-tab-batted-ball-profile"]').trigger('click')
+    const panel = wrapper.get('[data-test="batted-ball-profile"]')
+    expect(panel.get('[data-test="batted-ball-spray-chart"]').text()).toContain('Spray chart')
+    expect(panel.get('[data-test="batted-ball-hit-location-chart"]').text()).toContain('Hit-location chart')
+    expect(panel.text()).toContain('3 tracked contacts')
+    expect(panel.text()).toContain('2 tracked hits')
+  })
+
+  it('uses Savant-inspired percentile markers with readable text contrast', async () => {
     const payload = apiPayloadWith((response) => {
       const benchmark = response.data.contextual_benchmarks.metrics[0]
       response.data.contextual_benchmarks.metrics = [
@@ -509,14 +598,16 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    const rows = wrapper.findAll('.context-percentile-row')
     const pills = wrapper.findAll('.percentile-pill')
-    expect(pills.map((pill) => pill.text())).toEqual(['P10', 'P50', 'P90'])
-    expect(pills[0].attributes('style')).toContain('--percentile-background: #f25549')
-    expect(pills[0].attributes('style')).toContain('--percentile-foreground: #f9fafb')
-    expect(pills[1].attributes('style')).toContain('--percentile-background: #f9fafb')
-    expect(pills[1].attributes('style')).toContain('--percentile-foreground: #1f2937')
-    expect(pills[2].attributes('style')).toContain('--percentile-background: #4eaa3f')
-    expect(pills[2].attributes('style')).toContain('--percentile-foreground: #f9fafb')
+    expect(pills.map((pill) => pill.text())).toEqual(['10', '50', '90'])
+    expect(rows[0].attributes('style')).toContain('--percentile-background: #5076b4')
+    expect(rows[0].attributes('style')).toContain('--percentile-foreground: #f9fafb')
+    expect(rows[0].attributes('style')).toContain('--percentile-position: 10%')
+    expect(rows[1].attributes('style')).toContain('--percentile-background: #c2bfbc')
+    expect(rows[1].attributes('style')).toContain('--percentile-foreground: #1f2937')
+    expect(rows[2].attributes('style')).toContain('--percentile-background: #df594c')
+    expect(rows[2].attributes('style')).toContain('--percentile-foreground: #f9fafb')
   })
 
   it('shows grouped rate and run-creation tables on the Advanced Stats tab', async () => {

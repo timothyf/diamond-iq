@@ -55,10 +55,12 @@ class MlbLivePitchDataDownloader
       base = play_row(play, fetched_at)
       next [] if base.nil?
 
-      Array(play["playEvents"]).filter_map.with_index do |event, index|
-        next unless event["isPitch"] == true || event["pitchNumber"].present? || event.dig("details", "type", "code").present?
-
-        base.merge(pitch_event_row(event, index))
+      pitch_events = Array(play["playEvents"]).select do |event|
+        event["isPitch"] == true || event["pitchNumber"].present? || event.dig("details", "type", "code").present?
+      end
+      pitch_events.map.with_index do |event, index|
+        result_event = index == pitch_events.length - 1 ? play.dig("result", "event") : nil
+        base.merge(pitch_event_row(event, index, result_event: result_event))
       end
     end
   end
@@ -89,9 +91,10 @@ class MlbLivePitchDataDownloader
     }
   end
 
-  def pitch_event_row(event, fallback_pitch_number)
+  def pitch_event_row(event, fallback_pitch_number, result_event: nil)
     details = event.fetch("details", {})
     hit_data = event.fetch("hitData", {})
+    hit_coordinates = hit_data.fetch("coordinates", {})
     pitch_data = event.fetch("pitchData", {})
     coordinates = pitch_data.fetch("coordinates", {})
     breaks = pitch_data.fetch("breaks", {})
@@ -102,7 +105,7 @@ class MlbLivePitchDataDownloader
       "pitch_type" => pitch_type["code"],
       "pitch_name" => pitch_type["description"],
       "description" => details["description"],
-      "events" => details["event"],
+      "events" => normalized_event(details["event"].presence || result_event),
       "zone" => pitch_data["zone"],
       "release_speed" => pitch_data["startSpeed"],
       "plate_x" => coordinates["pX"],
@@ -117,10 +120,18 @@ class MlbLivePitchDataDownloader
       "outs_when_up" => event.dig("count", "outs"),
       "launch_speed" => hit_data["launchSpeed"],
       "launch_angle" => hit_data["launchAngle"],
+      "launch_speed_angle" => hit_data["launchSpeedAngle"],
       "hit_distance_sc" => hit_data["totalDistance"],
       "bb_type" => hit_data["trajectory"],
+      "hc_x" => hit_coordinates["coordX"],
+      "hc_y" => hit_coordinates["coordY"],
+      "bat_speed" => hit_data["batSpeed"],
       "raw_live_feed_event" => event
     }
+  end
+
+  def normalized_event(event)
+    event.to_s.parameterize(separator: "_").presence
   end
 
   def integer(value)

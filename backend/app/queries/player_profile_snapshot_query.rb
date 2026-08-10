@@ -1,5 +1,6 @@
 class PlayerProfileSnapshotQuery
   PITCH_SAMPLE_SIZE = 100
+  HIT_EVENTS = %w[single double triple home_run].freeze
   SEASON_CATEGORIES = %w[batting pitching].freeze
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
@@ -893,6 +894,7 @@ class PlayerProfileSnapshotQuery
   def analytics_payload
     {
       recent_pitch_indicators: recent_pitch_indicators,
+      batted_ball_profile: batted_ball_profile,
       contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(
         player: player,
         start_date: analysis_range.start_date,
@@ -904,6 +906,36 @@ class PlayerProfileSnapshotQuery
         end_date: analysis_range.end_date
       ).result,
       analysis: PlayerTrendQuery.new(player: player, analysis_range: analysis_range).result
+    }
+  end
+
+  def batted_ball_profile
+    points = PitchDatum
+      .where(batter: player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
+      .where.not(hc_x: nil, hc_y: nil)
+      .select(:id, :game_date, :hc_x, :hc_y, :events, :bb_type, :launch_speed, :launch_angle, :description)
+      .order(:game_date, :id)
+      .to_a
+      .select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
+      .map { |row| serialize_batted_ball_point(row) }
+
+    {
+      available: points.any?,
+      contact_count: points.length,
+      spray_points: points,
+      hit_points: points.select { |point| HIT_EVENTS.include?(point[:event]) }
+    }
+  end
+
+  def serialize_batted_ball_point(row)
+    {
+      x: rounded(row.hc_x),
+      y: rounded(row.hc_y),
+      event: row.events,
+      batted_ball_type: row.bb_type,
+      exit_velocity: rounded(row.launch_speed),
+      launch_angle: rounded(row.launch_angle),
+      game_date: row.game_date
     }
   end
 

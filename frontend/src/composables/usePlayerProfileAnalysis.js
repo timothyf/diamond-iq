@@ -36,17 +36,12 @@ const trendEventLabels = {
 }
 
 const percentileColorStops = [
-  [0, '#b0000a'],
-  [10, '#f25549'],
-  [20, '#ff9a86'],
-  [30, '#ffd0b3'],
-  [40, '#fff0d6'],
-  [50, '#f9fafb'],
-  [60, '#f5f3b5'],
-  [70, '#dce994'],
-  [80, '#a8d66d'],
-  [90, '#4eaa3f'],
-  [100, '#006429'],
+  [0, '#315da8'],
+  [20, '#6f8ec0'],
+  [40, '#aec7cf'],
+  [60, '#d5b6a9'],
+  [80, '#de7261'],
+  [100, '#df4037'],
 ]
 
 export function usePlayerProfileAnalysis(player, formatDate) {
@@ -246,7 +241,8 @@ export function usePlayerProfileAnalysis(player, formatDate) {
 
     return {
       '--percentile-background': interpolateHexColor(lower[1], upper[1], progress),
-      '--percentile-foreground': percentile <= 31 || percentile >= 81 ? '#f9fafb' : '#1f2937',
+      '--percentile-foreground': percentile <= 35 || percentile >= 65 ? '#f9fafb' : '#1f2937',
+      '--percentile-position': `${percentile}%`,
     }
   }
 

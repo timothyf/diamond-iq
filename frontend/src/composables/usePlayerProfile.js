@@ -54,6 +54,7 @@ function normalizeProfile(data = {}) {
   const advancedStats = data.advanced_stats || {}
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
+  const battedBallProfile = data.batted_ball_profile || {}
   const analysis = data.analysis || {}
   const trendEvents = data.trend_events || {}
   const similarPlayers = data.similar_players || {}
@@ -149,6 +150,28 @@ function normalizeProfile(data = {}) {
       primaryRole: indicators.primary_role || 'batter',
       pitching: indicators.pitching || {},
       batting: indicators.batting || {},
+    },
+    battedBallProfile: {
+      available: battedBallProfile.available === true,
+      contactCount: battedBallProfile.contact_count || 0,
+      sprayPoints: (battedBallProfile.spray_points || []).map((point) => ({
+        x: point.x,
+        y: point.y,
+        event: point.event,
+        battedBallType: point.batted_ball_type,
+        exitVelocity: point.exit_velocity,
+        launchAngle: point.launch_angle,
+        gameDate: point.game_date,
+      })),
+      hitPoints: (battedBallProfile.hit_points || []).map((point) => ({
+        x: point.x,
+        y: point.y,
+        event: point.event,
+        battedBallType: point.batted_ball_type,
+        exitVelocity: point.exit_velocity,
+        launchAngle: point.launch_angle,
+        gameDate: point.game_date,
+      })),
     },
     batterSplits: {
       available: data.batter_splits?.available === true,
@@ -395,6 +418,7 @@ function normalizedSection(data, section) {
   if (section === 'analytics') {
     return {
       pitchIndicators: normalized.pitchIndicators,
+      battedBallProfile: normalized.battedBallProfile,
       contextualBenchmarks: normalized.contextualBenchmarks,
       trendEvents: normalized.trendEvents,
       analysis: normalized.analysis,

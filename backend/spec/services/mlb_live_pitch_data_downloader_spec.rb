@@ -11,6 +11,7 @@ RSpec.describe MlbLivePitchDataDownloader do
             "allPlays" => [
               {
                 "about" => { "atBatIndex" => 4, "inning" => 2, "halfInning" => "top" },
+                "result" => { "event" => "Single" },
                 "matchup" => {
                   "batter" => { "id" => 8001 },
                   "pitcher" => { "id" => 9001, "fullName" => "Pitcher One" },
@@ -33,8 +34,11 @@ RSpec.describe MlbLivePitchDataDownloader do
                     "hitData" => {
                       "launchSpeed" => 101.4,
                       "launchAngle" => 9.0,
+                      "launchSpeedAngle" => 6,
                       "totalDistance" => 200.0,
-                      "trajectory" => "line_drive"
+                      "trajectory" => "line_drive",
+                      "batSpeed" => 74.2,
+                      "coordinates" => { "coordX" => 140.5, "coordY" => 92.4 }
                     },
                     "count" => { "balls" => 0, "strikes" => 1, "outs" => 1 }
                   }
@@ -60,8 +64,13 @@ RSpec.describe MlbLivePitchDataDownloader do
       "release_speed" => 95.2,
       "launch_speed" => 101.4,
       "launch_angle" => 9.0,
+      "launch_speed_angle" => 6,
       "hit_distance_sc" => 200.0,
-      "bb_type" => "line_drive"
+      "bb_type" => "line_drive",
+      "events" => "single",
+      "hc_x" => 140.5,
+      "hc_y" => 92.4,
+      "bat_speed" => 74.2
     )
     expect(downloader).to have_received(:fetch_json).with(end_with("/api/v1.1/game/823443/feed/live"))
   end
