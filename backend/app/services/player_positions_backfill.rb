@@ -50,7 +50,7 @@ class PlayerPositionsBackfill
 
   def sync_membership(membership, summary)
     primary_code = normalize_code(membership.primary_position)
-    requested_codes = [primary_code, *Array(membership.secondary_positions).map { |code| normalize_code(code) }]
+    requested_codes = [ primary_code, *Array(membership.secondary_positions).map { |code| normalize_code(code) } ]
       .compact
       .uniq
 

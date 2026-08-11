@@ -80,9 +80,9 @@ class PlayerStatsCsvLocator
     return [] if paths.blank?
 
     present_file = paths.find { |path| path.basename.to_s.downcase.include?("present") }
-    return [present_file] if present_file
+    return [ present_file ] if present_file
 
-    [paths.max_by { |path| File.mtime(path) }]
+    [ paths.max_by { |path| File.mtime(path) } ]
   end
 
   def csv_family(path)

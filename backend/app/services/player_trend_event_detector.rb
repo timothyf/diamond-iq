@@ -213,6 +213,7 @@ class PlayerTrendEventDetector
     thresholds = THRESHOLDS.fetch(type)
     return "critical" if magnitude >= thresholds.fetch(:critical)
     return "warning" if magnitude >= thresholds.fetch(:warning)
+    nil
   end
 
   def serialize_pitch(pitch)

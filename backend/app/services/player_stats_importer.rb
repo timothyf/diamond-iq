@@ -157,7 +157,7 @@ class PlayerStatsImporter
       import_row = build_import_row(row, source_row_number)
       next if import_row.nil?
 
-      row_key = [import_row[:player_mlb_id], import_row[:season], import_row[:category], import_row[:scope_type], import_row[:scope_key]]
+      row_key = [ import_row[:player_mlb_id], import_row[:season], import_row[:category], import_row[:scope_type], import_row[:scope_key] ]
       @duplicate_count += 1 if rows_by_identity.key?(row_key)
       rows_by_identity[row_key] = import_row
     end
@@ -276,9 +276,9 @@ class PlayerStatsImporter
 
   def stat_lookup_names(stat_type, category)
     category_aliases = STAT_IMPORT_ALIASES.fetch(category, {})
-    aliases = category_aliases.fetch(stat_type.name, [stat_type.name])
+    aliases = category_aliases.fetch(stat_type.name, [ stat_type.name ])
 
-    ([stat_type.name, stat_type.label] + aliases).compact.uniq
+    ([ stat_type.name, stat_type.label ] + aliases).compact.uniq
   end
 
   def stat_types_for_category(category)
@@ -338,7 +338,7 @@ class PlayerStatsImporter
   end
 
   def replace_existing_season_rows(import_rows)
-    scopes = import_rows.map { |row| [row[:season], row[:category]] }.uniq
+    scopes = import_rows.map { |row| [  row[:season], row[:category]  ] }.uniq
 
     scopes.sum do |season, category|
       stat_type_ids = stat_types_for_category(category).map(&:id)
@@ -369,12 +369,12 @@ class PlayerStatsImporter
   end
 
   def split_name(full_name)
-    return [nil, nil] if full_name.blank?
+    return [ nil, nil ] if full_name.blank?
 
     parts = full_name.to_s.split
-    return [parts.first, nil] if parts.one?
+    return [ parts.first, nil ] if parts.one?
 
-    [parts[0..-2].join(" "), parts.last]
+    [ parts[0..-2].join(" "), parts.last ]
   end
 
   def normalize_category(raw_category)

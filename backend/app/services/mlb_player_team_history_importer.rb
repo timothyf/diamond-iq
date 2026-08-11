@@ -61,7 +61,7 @@ class MlbPlayerTeamHistoryImporter
       to_team = local_team(transaction["toTeam"])
 
       if leaving_organization?(transaction)
-        if current && [from_team&.id, to_team&.id].compact.include?(current[:team].id)
+        if current && [ from_team&.id, to_team&.id ].compact.include?(current[:team].id)
           current[:ends_on] = date - 1.day
           current[:end_transaction] = transaction
           current = nil
@@ -91,7 +91,7 @@ class MlbPlayerTeamHistoryImporter
 
   def sorted_transactions
     transactions.sort_by do |transaction|
-      [transaction_date(transaction) || Date.new(9999, 12, 31), transaction.fetch("id", 0).to_i]
+      [ transaction_date(transaction) || Date.new(9999, 12, 31), transaction.fetch("id", 0).to_i  ]
     end
   end
 
@@ -128,7 +128,7 @@ class MlbPlayerTeamHistoryImporter
 
   def transaction_team_ids
     transactions.flat_map do |transaction|
-      [transaction.dig("fromTeam", "id"), transaction.dig("toTeam", "id")]
+      [ transaction.dig("fromTeam", "id"), transaction.dig("toTeam", "id") ]
     end.filter_map { |value| Integer(value, exception: false) }.uniq
   end
 

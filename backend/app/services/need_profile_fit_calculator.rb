@@ -123,11 +123,13 @@ class NeedProfileFitCalculator
   end
 
   def latest_season
-    @latest_season ||= @provided_latest_season || if player.player_season_stats.loaded?
-      player.player_season_stats.map(&:season).compact.max
-    else
-      PlayerSeasonStat.where(player: player).maximum(:season)
-    end
+    @latest_season ||= @provided_latest_season || (
+      if player.player_season_stats.loaded?
+        player.player_season_stats.map(&:season).compact.max
+      else
+        PlayerSeasonStat.where(player: player).maximum(:season)
+      end
+    )
   end
 
   def season_stats

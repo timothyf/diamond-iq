@@ -113,7 +113,7 @@ class PitchDataSyncProgressTracker
   end
 
   def game_label(game)
-    matchup = [game.away_team&.abbreviation, game.home_team&.abbreviation].compact.join(" at ")
-    [matchup.presence || "MLB game #{game.mlb_id}", game.official_date&.to_fs(:long)].compact.join(" — ")
+    matchup = [ game.away_team&.abbreviation, game.home_team&.abbreviation ].compact.join(" at ")
+    [ matchup.presence || "MLB game #{game.mlb_id}", game.official_date&.to_fs(:long) ].compact.join(" — ")
   end
 end

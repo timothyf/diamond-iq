@@ -7,7 +7,7 @@ class MlbGameDetailsProgressTracker
     run = current_task_run
     if run.status == "running" && run.started_at.present? && run.processed_items.positive?
       run.update!(
-        total_items: [run.total_items, total].max,
+        total_items: [ run.total_items, total ].max,
         last_heartbeat_at: Time.current
       )
       return

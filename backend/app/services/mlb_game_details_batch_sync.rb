@@ -197,7 +197,7 @@ class MlbGameDetailsBatchSync
 
     requested = worker_count || default_worker_count
     count = Integer(requested, exception: false) || default_worker_count
-    [[count, 1].max, max_worker_count].min
+    [ [ count, 1 ].max, max_worker_count ].min
   end
 
   def game_details_config

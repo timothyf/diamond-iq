@@ -74,8 +74,8 @@ class PitchDataSyncTaskEstimate
     chunk_start = start_date
 
     while chunk_start <= end_date
-      chunk_end = [chunk_start + chunk_days.days - 1.day, end_date].min
-      chunks << [chunk_start, chunk_end]
+      chunk_end = [ chunk_start + chunk_days.days - 1.day, end_date ].min
+      chunks << [ chunk_start, chunk_end ]
       chunk_start = chunk_end + 1.day
     end
 
@@ -109,7 +109,7 @@ class PitchDataSyncTaskEstimate
     completed_runs = rows.filter_map do |completed_items, failed_items, started_at, finished_at|
       processed_items = completed_items + failed_items
       elapsed_seconds = finished_at - started_at
-      [processed_items, elapsed_seconds] if processed_items.positive? && elapsed_seconds.positive?
+      [ processed_items, elapsed_seconds ] if processed_items.positive? && elapsed_seconds.positive?
     end
 
     total_games = completed_runs.sum(&:first)

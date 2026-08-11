@@ -13,7 +13,7 @@ class LineupDecisionSupport
     @on = on
     @constraints = constraints.to_h.stringify_keys
     @weights = normalize_weights(weights)
-    @alternative_count = [[ alternatives.to_i, 0 ].max, 5].min
+    @alternative_count = [ [ alternatives.to_i, 0 ].max, 5 ].min
   end
 
   def call

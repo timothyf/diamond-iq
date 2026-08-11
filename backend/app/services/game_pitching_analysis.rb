@@ -3,7 +3,7 @@ class GamePitchingAnalysis
     swinging_strike swinging_strike_blocked missed_bunt foul foul_bunt foul_tip
     hit_into_play hit_into_play_no_out hit_into_play_score
   ].freeze
-  WHIFF_DESCRIPTIONS = %w[swinging_strike swinging_strike_blocked missed_bunt].freeze
+  WHIFF_DESCRIPTIONS = %w[ swinging_strike swinging_strike_blocked missed_bunt ].freeze
   CALLED_STRIKE_DESCRIPTIONS = %w[called_strike].freeze
   STRIKE_DESCRIPTIONS = (SWING_DESCRIPTIONS + CALLED_STRIKE_DESCRIPTIONS).freeze
 
@@ -93,7 +93,7 @@ class GamePitchingAnalysis
         batted_balls: exit_velocities.length,
         average_exit_velocity: average(exit_velocities)
       }
-    end.sort_by { |usage| [-usage.fetch(:count), usage.fetch(:pitch_type)] }
+    end.sort_by { |usage| [ -usage.fetch(:count), usage.fetch(:pitch_type) ] }
   end
 
   def times_through_order(pitches, appearances)
@@ -108,7 +108,7 @@ class GamePitchingAnalysis
     counts = if explicit_turns.any?
       explicit_turns.tally
     else
-      appearances.each_slice(9).map.with_index(1).to_h { |rows, turn| [turn, rows.length] }
+      appearances.each_slice(9).map.with_index(1).to_h { |rows, turn| [ turn, rows.length ] }
     end
 
     {

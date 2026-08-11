@@ -36,7 +36,7 @@ class PitchDataBatchSync
         break
       end
 
-      targeted_games = games_by_chunk.fetch([chunk_start, chunk_end], [])
+      targeted_games = games_by_chunk.fetch([ chunk_start, chunk_end ], [])
       next if targeted_games.empty?
 
       download_result = download_chunk(chunk_start: chunk_start, chunk_end: chunk_end)
@@ -114,7 +114,7 @@ class PitchDataBatchSync
       success("Synchronized #{summary[:imported_count]} pitch data rows across #{chunks.length} chunk#{'s' unless chunks.length == 1}", summary)
     end
   rescue Date::Error
-    failure("Pitch data sync received invalid dates", ["Invalid dates"], {})
+    failure("Pitch data sync received invalid dates", [ "Invalid dates" ], {})
   end
 
   private
@@ -144,7 +144,7 @@ class PitchDataBatchSync
       end
     end
 
-    [rows, source_name]
+    [ rows, source_name ]
   end
 
   def import_chunk_rows(importable_games)
@@ -183,8 +183,8 @@ class PitchDataBatchSync
     chunk_start = start_date
 
     while chunk_start <= end_date
-      chunk_end = [chunk_start + chunk_days.days - 1.day, end_date].min
-      chunks << [chunk_start, chunk_end]
+      chunk_end = [ chunk_start + chunk_days.days - 1.day, end_date ].min
+      chunks << [ chunk_start, chunk_end ]
       chunk_start = chunk_end + 1.day
     end
 
@@ -197,8 +197,8 @@ class PitchDataBatchSync
       days_from_start = (chunk_start - start_date).to_i
       offset = days_from_start % chunk_days
       actual_start = chunk_start - offset.days
-      actual_end = [actual_start + chunk_days.days - 1.day, end_date].min
-      [actual_start, actual_end]
+      actual_end = [ actual_start + chunk_days.days - 1.day, end_date ].min
+      [ actual_start, actual_end ]
     end
   end
 

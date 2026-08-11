@@ -137,8 +137,8 @@ class PitchDataDownloader
     chunk_start = start_date
 
     while chunk_start <= end_date
-      chunk_end = [chunk_start + chunk_days.days - 1.day, end_date].min
-      chunks << [chunk_start, chunk_end]
+      chunk_end = [ chunk_start + chunk_days.days - 1.day, end_date ].min
+      chunks << [ chunk_start, chunk_end ]
       chunk_start = chunk_end + 1.day
     end
 

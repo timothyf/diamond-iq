@@ -61,7 +61,7 @@ class PlayoffOddsProjection
       away_id = game.away_team_id
       next unless records.key?(home_id) && records.key?(away_id)
 
-      home_probability = [[0.5 + strength(home_id) - strength(away_id) + HOME_FIELD_ADVANTAGE, 0.1].max, 0.9].min
+      home_probability = [ [ 0.5 + strength(home_id) - strength(away_id) + HOME_FIELD_ADVANTAGE, 0.1 ].max, 0.9 ] .min
       winner_id, loser_id = random.rand < home_probability ? [ home_id, away_id ] : [ away_id, home_id ]
       records[winner_id][0] += 1
       records[loser_id][1] += 1

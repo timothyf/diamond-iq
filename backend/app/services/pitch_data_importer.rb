@@ -136,7 +136,7 @@ class PitchDataImporter
       attrs = build_row(row, source_row_number)
       next if attrs.nil?
 
-      row_key = [attrs[:game_pk], attrs[:at_bat_number], attrs[:pitch_number]]
+      row_key = [ attrs[:game_pk], attrs[:at_bat_number], attrs[:pitch_number] ]
       @duplicate_count += 1 if rows_by_identity.key?(row_key)
       rows_by_identity[row_key] = attrs.merge(created_at: timestamp, updated_at: timestamp)
     end
