@@ -9,6 +9,16 @@ URLs, HTTP timeouts, game-detail worker limits, queue retry settings, and task
 estimate defaults. Secrets such as `ADMIN_API_TOKEN` and database credentials
 remain environment or Rails-credentials values.
 
+## Sample-data bootstrap
+
+For a local installation with real MLB data spanning April-May 2025 and April-May 2026, run:
+
+```sh
+bin/rails sample_data:bootstrap
+```
+
+See [docs/sample_data.md](docs/sample_data.md) for the preview command, expected scope, and optional controls.
+
 ## MLB roster synchronization
 
 After migrating the database, synchronize a team's dated 40-man roster with:

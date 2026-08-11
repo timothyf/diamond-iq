@@ -1,0 +1,8 @@
+periods:
+  - start_date: "2025-04-01"
+    end_date: "2025-05-31"
+  - start_date: "2026-04-01"
+    end_date: "2026-05-31"
+
+game_types: "R"
+pitch_chunk_days: 7
