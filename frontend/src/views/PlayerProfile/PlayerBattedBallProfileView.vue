@@ -4,6 +4,7 @@ import { computed, inject, ref } from 'vue'
 const { player, formatDate } = inject('player-profile-context')
 
 const profile = computed(() => player.value?.battedBallProfile || { available: false, sprayPoints: [], hitPoints: [] })
+const isPitcher = computed(() => player.value?.pitchIndicators?.primaryRole === 'pitcher')
 const showOuts = ref(true)
 const sprayPoints = computed(() => profile.value.sprayPoints
   .filter((point) => showOuts.value || pointTone(point) !== 'out')
@@ -24,6 +25,20 @@ const hitLocationBins = computed(() => {
 })
 
 const maxHitBin = computed(() => Math.max(1, ...hitLocationBins.value.map((bin) => bin.count)))
+const pitcherMetricRows = computed(() => {
+  const metrics = profile.value.pitcherMetrics || {}
+  return [
+    ['GB%', metrics.groundBallPercentage, 'percent'],
+    ['FB%', metrics.flyBallPercentage, 'percent'],
+    ['LD%', metrics.lineDrivePercentage, 'percent'],
+    ['IFFB%', metrics.infieldFlyPercentage, 'percent'],
+    ['Pull%', metrics.pullPercentage, 'percent'],
+    ['Hard-hit%', metrics.hardHitPercentage, 'percent'],
+    ['Barrel%', metrics.barrelPercentage, 'percent'],
+    ['HR/FB', metrics.homeRunPerFlyBall, 'percent'],
+    ['Average launch angle', metrics.averageLaunchAngle, 'angle'],
+  ]
+})
 
 function pointTone(point) {
   if (['single', 'double', 'triple', 'home_run'].includes(point.event)) return point.event.replaceAll('_', '-')
@@ -35,6 +50,11 @@ function pointLabel(point) {
   const date = point.gameDate ? ` · ${formatDate(point.gameDate)}` : ''
   const distance = point.hitDistance ? ` · ${Math.round(point.hitDistance)} ft` : ''
   return `${outcome}${date}${distance}`
+}
+
+function pitcherMetricValue(value, unit) {
+  if (value === null || value === undefined) return '—'
+  return unit === 'angle' ? `${Number(value).toFixed(1)}°` : `${Number(value).toFixed(1)}%`
 }
 </script>
 
@@ -51,11 +71,25 @@ function pointLabel(point) {
           <p class="eyebrow">Statcast contact</p>
           <h2>Batted ball profile</h2>
         </div>
-        <span>{{ profile.contactCount }} tracked contacts</span>
+        <span>{{ isPitcher ? `${profile.pitcherMetrics?.battedBallCount || 0} batted balls against` : `${profile.contactCount} tracked contacts` }}</span>
       </header>
 
-      <div v-if="profile.available" class="batted-ball-profile__charts">
-        <article class="batted-ball-chart batted-ball-chart--spray" data-test="batted-ball-spray-chart">
+      <div v-if="isPitcher ? profile.pitcherMetrics?.available : profile.available" class="batted-ball-profile__charts">
+        <article v-if="isPitcher" class="batted-ball-chart pitcher-batted-ball-table" data-test="pitcher-batted-ball-table">
+          <header>
+            <h3>Batted balls allowed</h3>
+            <p>Statcast contact quality for the selected analysis period</p>
+          </header>
+          <dl>
+            <div v-for="([label, value, unit]) in pitcherMetricRows" :key="label">
+              <dt>{{ label }}</dt>
+              <dd>{{ pitcherMetricValue(value, unit) }}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <template v-else>
+          <article class="batted-ball-chart batted-ball-chart--spray" data-test="batted-ball-spray-chart">
           <header class="batted-ball-chart__header">
             <div>
               <h3>Spray chart</h3>
@@ -89,9 +123,9 @@ function pointLabel(point) {
             <span><i class="spray-point--triple"></i>Triple</span>
             <span><i class="spray-point--home-run"></i>Home run</span>
           </footer>
-        </article>
+          </article>
 
-        <article class="batted-ball-chart" data-test="batted-ball-hit-location-chart">
+          <article class="batted-ball-chart" data-test="batted-ball-hit-location-chart">
           <header>
             <h3>Hit-location chart</h3>
             <p>Hit distribution by field zone</p>
@@ -117,7 +151,8 @@ function pointLabel(point) {
             </div>
           </div>
           <footer><strong>{{ profile.hitPoints.length }}</strong> tracked hits</footer>
-        </article>
+          </article>
+        </template>
       </div>
       <p v-else class="profile-empty">No tracked batted-ball locations are available for this analysis period.</p>
     </section>

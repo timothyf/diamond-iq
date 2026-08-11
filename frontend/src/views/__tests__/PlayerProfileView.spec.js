@@ -590,6 +590,40 @@ describe('PlayerProfileView', () => {
     expect(panel.findAll('.spray-point')).toHaveLength(2)
   })
 
+  it('renders pitcher batted-ball metrics on the Batted Ball Profile tab', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.recent_pitch_indicators.primary_role = 'pitcher'
+      response.data.batted_ball_profile.pitcher_metrics = {
+        available: true,
+        batted_ball_count: 118,
+        ground_ball_percentage: 44.1,
+        fly_ball_percentage: 31.4,
+        line_drive_percentage: 24.5,
+        infield_fly_percentage: 12.2,
+        pull_percentage: 37.6,
+        hard_hit_percentage: 34.8,
+        barrel_percentage: 7.6,
+        home_run_per_fly_ball: 13.5,
+        average_launch_angle: 11.8,
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="player-page-tab-batted-ball-profile"]').trigger('click')
+    const table = wrapper.get('[data-test="pitcher-batted-ball-table"]')
+    expect(table.text()).toContain('GB%')
+    expect(table.text()).toContain('IFFB%')
+    expect(table.text()).toContain('HR/FB')
+    expect(table.text()).toContain('44.1%')
+    expect(table.text()).toContain('11.8°')
+  })
+
   it('uses Savant-inspired percentile markers with readable text contrast', async () => {
     const payload = apiPayloadWith((response) => {
       const benchmark = response.data.contextual_benchmarks.metrics[0]

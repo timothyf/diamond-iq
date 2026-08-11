@@ -154,6 +154,19 @@ function normalizeProfile(data = {}) {
     battedBallProfile: {
       available: battedBallProfile.available === true,
       contactCount: battedBallProfile.contact_count || 0,
+      pitcherMetrics: {
+        available: battedBallProfile.pitcher_metrics?.available === true,
+        battedBallCount: battedBallProfile.pitcher_metrics?.batted_ball_count || 0,
+        groundBallPercentage: battedBallProfile.pitcher_metrics?.ground_ball_percentage,
+        flyBallPercentage: battedBallProfile.pitcher_metrics?.fly_ball_percentage,
+        lineDrivePercentage: battedBallProfile.pitcher_metrics?.line_drive_percentage,
+        infieldFlyPercentage: battedBallProfile.pitcher_metrics?.infield_fly_percentage,
+        pullPercentage: battedBallProfile.pitcher_metrics?.pull_percentage,
+        hardHitPercentage: battedBallProfile.pitcher_metrics?.hard_hit_percentage,
+        barrelPercentage: battedBallProfile.pitcher_metrics?.barrel_percentage,
+        homeRunPerFlyBall: battedBallProfile.pitcher_metrics?.home_run_per_fly_ball,
+        averageLaunchAngle: battedBallProfile.pitcher_metrics?.average_launch_angle,
+      },
       sprayPoints: (battedBallProfile.spray_points || []).map((point) => ({
         x: point.x,
         y: point.y,

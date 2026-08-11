@@ -923,8 +923,53 @@ class PlayerProfileSnapshotQuery
       available: points.any?,
       contact_count: points.length,
       spray_points: points,
-      hit_points: points.select { |point| HIT_EVENTS.include?(point[:event]) }
+      hit_points: points.select { |point| HIT_EVENTS.include?(point[:event]) },
+      pitcher_metrics: pitcher_batted_ball_metrics
     }
+  end
+
+  def pitcher_batted_ball_metrics
+    rows = PitchDatum
+      .where(pitcher: player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
+      .select(:bb_type, :events, :launch_speed, :launch_angle, :launch_speed_angle, :hc_x, :stand, :description)
+      .to_a
+      .select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
+    types = rows.group_by { |row| pitcher_batted_ball_type(row) }
+    fly_balls = Array(types[:fly_ball]) + Array(types[:infield_fly])
+    directional_rows = rows.select { |row| row.hc_x.present? && %w[L R].include?(row.stand) }
+    pulled_balls = directional_rows.count { |row| pulled_batted_ball?(row) }
+
+    {
+      available: rows.any?,
+      batted_ball_count: rows.length,
+      ground_ball_percentage: percentage(Array(types[:ground_ball]).length, rows.length),
+      fly_ball_percentage: percentage(fly_balls.length, rows.length),
+      line_drive_percentage: percentage(Array(types[:line_drive]).length, rows.length),
+      infield_fly_percentage: percentage(Array(types[:infield_fly]).length, fly_balls.length),
+      pull_percentage: percentage(pulled_balls, directional_rows.length),
+      hard_hit_percentage: percentage(rows.count { |row| row.launch_speed.to_f >= 95.0 }, rows.length),
+      barrel_percentage: percentage(rows.count { |row| row.launch_speed_angle.to_i == GameBattedBallAnalysis::BARREL_CLASSIFICATION }, rows.length),
+      home_run_per_fly_ball: percentage(rows.count { |row| row.events.to_s.downcase == "home_run" }, fly_balls.length),
+      average_launch_angle: average(rows.filter_map { |row| row.launch_angle&.to_f })
+    }
+  end
+
+  def pitcher_batted_ball_type(row)
+    normalized = row.bb_type.to_s.downcase.tr(" -", "_")
+    return :ground_ball if %w[ground_ball groundball ground].include?(normalized)
+    return :line_drive if %w[line_drive linedrive line].include?(normalized)
+    return :infield_fly if %w[popup pop_up infield_fly].include?(normalized)
+    return :fly_ball if %w[fly_ball flyball fly].include?(normalized)
+
+    return :unknown if row.launch_angle.blank?
+    return :ground_ball if row.launch_angle < 10
+    return :line_drive if row.launch_angle < 25
+
+    :fly_ball
+  end
+
+  def pulled_batted_ball?(row)
+    (row.stand == "R" && row.hc_x < 92) || (row.stand == "L" && row.hc_x > 158)
   end
 
   def serialize_batted_ball_point(row)

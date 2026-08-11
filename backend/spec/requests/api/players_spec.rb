@@ -210,6 +210,14 @@ RSpec.describe "Api::Players", type: :request do
       type: "S",
       release_speed: 94.6,
       release_spin_rate: 2_350,
+      stand: "R",
+      description: "hit_into_play",
+      events: "single",
+      launch_speed: 96.0,
+      launch_angle: 6.0,
+      launch_speed_angle: 6,
+      bb_type: "ground_ball",
+      hc_x: 80.0,
       fetched_at_utc: Time.current,
       raw_data: { "game_pk" => "800002", "at_bat_number" => "1", "pitch_number" => "1" }
     )
@@ -264,6 +272,15 @@ RSpec.describe "Api::Players", type: :request do
       "available" => true,
       "contact_count" => 1,
       "hit_points" => include(hash_including("event" => "single", "x" => 118.0, "y" => 142.0, "hit_distance" => 287.0))
+    )
+    expect(json_body.dig("data", "batted_ball_profile", "pitcher_metrics")).to include(
+      "available" => true,
+      "batted_ball_count" => 1,
+      "ground_ball_percentage" => 100.0,
+      "pull_percentage" => 100.0,
+      "hard_hit_percentage" => 100.0,
+      "barrel_percentage" => 100.0,
+      "average_launch_angle" => 6.0
     )
     expect(json_body.dig("data", "recent_pitch_indicators", "pitching")).to include(
       "pitch_count" => 1,

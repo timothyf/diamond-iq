@@ -1148,8 +1148,42 @@
 .hit-location-chart__cell { display: grid; place-items: center; border: 1px solid rgba(56, 123, 127, 0.18); background: color-mix(in srgb, #d95943 calc(var(--hit-density) * 88%), #edf4f2); }
 .hit-location-chart__cell strong { color: #17364a; font-size: 1rem; }
 
+.pitcher-batted-ball-table { max-width: 46rem; }
+
+.pitcher-batted-ball-table dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 1rem 0 0;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.pitcher-batted-ball-table dl > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-height: 4.75rem;
+  padding: 0.75rem;
+  border-right: 1px solid rgba(16, 38, 61, 0.1);
+  border-bottom: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.pitcher-batted-ball-table dl > div:nth-child(3n) { border-right: 0; }
+.pitcher-batted-ball-table dl > div:nth-last-child(-n + 3) { border-bottom: 0; }
+.pitcher-batted-ball-table dt { color: #71808c; font-size: 0.72rem; font-weight: 700; }
+.pitcher-batted-ball-table dd { margin: 0; color: #17364a; font-size: 1.15rem; font-weight: 800; }
+
 @media (max-width: 980px) {
   .batted-ball-profile__charts { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .pitcher-batted-ball-table dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pitcher-batted-ball-table dl > div:nth-child(3n) { border-right: 1px solid rgba(16, 38, 61, 0.1); }
+  .pitcher-batted-ball-table dl > div:nth-child(2n) { border-right: 0; }
+  .pitcher-batted-ball-table dl > div:nth-last-child(-n + 3) { border-bottom: 1px solid rgba(16, 38, 61, 0.1); }
+  .pitcher-batted-ball-table dl > div:nth-last-child(-n + 1) { border-bottom: 0; }
 }
 
 .profile-two-column {
