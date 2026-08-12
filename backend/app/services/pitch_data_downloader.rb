@@ -180,8 +180,8 @@ class PitchDataDownloader
   end
 
   def service_config
-    @service_config ||= DiamondIqConfig.fetch(:external_services, :baseball_savant).merge(
-      default_chunk_days: DiamondIqConfig.fetch(:operations, :pitch_data, :default_chunk_days)
+    @service_config ||= NineLensConfig.fetch(:external_services, :baseball_savant).merge(
+      default_chunk_days: NineLensConfig.fetch(:operations, :pitch_data, :default_chunk_days)
     )
   end
 

@@ -57,7 +57,7 @@ function formatOdds(value) {
 <template>
   <main class="standings-shell">
     <section class="standings-hero">
-      <div><p>League table</p><h1>MLB standings</h1><span>Division races calculated from DiamondIQ’s stored final regular-season games.</span></div>
+      <div><p>League table</p><h1>MLB standings</h1><span>Division races calculated from NineLens's stored final regular-season games.</span></div>
       <label>
         <span>Season</span>
         <select :value="selectedSeason" data-test="standings-season" :disabled="loading" @change="selectSeason($event.target.value)">
@@ -86,7 +86,7 @@ function formatOdds(value) {
     <template v-else>
       <header class="standings-heading"><div><p>{{ currentLeague.name }}</p><h2>{{ selectedSeason }} standings</h2></div><span>{{ formatDate(standings.as_of) }}</span></header>
       <aside v-if="standings.playoff_odds" class="projection-note" data-test="playoff-odds-note">
-        <strong>Diamond IQ playoff projections</strong>
+        <strong>NineLens playoff projections</strong>
         <span>{{ standings.playoff_odds.simulations.toLocaleString() }} simulations · {{ standings.playoff_odds.remaining_games }} scheduled games remaining</span>
       </aside>
       <div class="standings-divisions" data-test="standings-divisions">

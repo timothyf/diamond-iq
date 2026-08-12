@@ -1,9 +1,9 @@
-# DiamondIQ Backend README
+# NineLens Backend README
 
 ## Runtime configuration
 
 Operational defaults and external-service endpoints are defined in
-`config/ninelens.yml` and loaded through `Rails.application.config.x.diamond_iq`.
+`config/ninelens.yml` and loaded through `Rails.application.config.x.netlens`.
 Every value in that file has an environment-variable override, including API
 URLs, HTTP timeouts, game-detail worker limits, queue retry settings, and task
 estimate defaults. Secrets such as `ADMIN_API_TOKEN` and database credentials

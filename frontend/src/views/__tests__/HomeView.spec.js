@@ -95,6 +95,6 @@ describe('HomeView', () => {
     const wrapper = mount(HomeView, { global: { components: { RouterLink } } })
     await flushPromises()
 
-    expect(wrapper.get('[data-test="home-error"]').text()).toContain('Unable to load today’s DiamondIQ briefing')
+    expect(wrapper.get('[data-test="home-error"]').text()).toContain('Unable to load today’s NineLens briefing')
   })
 })

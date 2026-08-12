@@ -40,7 +40,7 @@ class MlbRosterSyncTaskEstimate
   attr_reader :team_scope, :team_mlb_id, :season
 
   def estimate_config
-    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates)
+    @estimate_config ||= NineLensConfig.fetch(:operations, :estimates)
   end
 
   def target_team_ids

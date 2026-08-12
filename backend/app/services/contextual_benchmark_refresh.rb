@@ -1,5 +1,5 @@
 class ContextualBenchmarkRefresh
-  SOURCE_NAME = "DiamondIQ contextual benchmarks"
+  SOURCE_NAME = "NineLens contextual benchmarks"
   METRICS = {
     "ops" => { group: "batting", label: "OPS", direction: "higher_better", unit: "rate" },
     "average_exit_velocity" => { group: "batting", label: "Average exit velocity", direction: "higher_better", unit: "mph" },

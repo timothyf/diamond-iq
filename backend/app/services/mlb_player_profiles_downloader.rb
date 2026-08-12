@@ -82,11 +82,11 @@ class MlbPlayerProfilesDownloader
   end
 
   def service_config
-    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
+    @service_config ||= NineLensConfig.fetch(:external_services, :mlb_stats_api)
   end
 
   def max_people_per_request
-    DiamondIqConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i
+    NineLensConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i
   end
 
   def success(message, data = {})

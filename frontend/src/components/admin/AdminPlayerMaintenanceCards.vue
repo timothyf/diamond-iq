@@ -20,7 +20,7 @@ const emit = defineEmits(['sync-profiles', 'sync-team-histories', 'cancel-team-h
     source="Player identity"
     title="MLB profile synchronization"
     command="mlb_player_profiles:sync"
-    description="Downloads MLB biographical, handedness, position, and headshot information for players already stored in DiamondIQ."
+    description="Downloads MLB biographical, handedness, position, and headshot information for players already stored in NineLens."
     @submit.prevent="emit('sync-profiles')"
   >
     <div class="admin-fields admin-fields--four">

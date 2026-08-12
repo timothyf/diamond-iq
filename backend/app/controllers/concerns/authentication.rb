@@ -50,8 +50,8 @@ module Authentication
 
   def system_account_user
     User.active.find_by(system_account: true) || User.create!(
-      email: "system@diamondiq.local",
-      name: "DiamondIQ System",
+      email: "system@ninelens.local",
+      name: "NineLens System",
       role: "admin",
       password: SecureRandom.urlsafe_base64(24),
       system_account: true

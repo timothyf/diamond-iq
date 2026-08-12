@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import PlayerSearch from './components/PlayerSearch.vue'
-import diamondIqLogo from './assets/diamondiq_logo.png'
+import nineLensLogo from './assets/ninelens_logo.png'
 import { useAuth } from './composables/useAuth'
 
 const { user, loadCurrentUser, logout } = useAuth()
@@ -41,10 +41,10 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
   <header class="app-bar">
     <RouterLink class="app-brand" to="/">
       <span class="app-brand__mark" aria-hidden="true">
-        <img :src="diamondIqLogo" alt="" />
+        <img :src="nineLensLogo" alt="" />
       </span>
       <span>
-        <strong>DiamondIQ</strong>
+        <strong>NineLens</strong>
         <small>Baseball intelligence</small>
       </span>
     </RouterLink>

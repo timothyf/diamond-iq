@@ -65,7 +65,7 @@ describe('PlayerSearch', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    const requestUrl = new URL(fetchMock.mock.calls[0][0], 'http://diamondiq.test')
+    const requestUrl = new URL(fetchMock.mock.calls[0][0], 'http://ninelens.test')
     expect(requestUrl.searchParams.get('filter[name]')).toBe('Judge Aaron')
     expect(requestUrl.searchParams.get('per_page')).toBe('8')
     expect(wrapper.text()).toContain('Aaron Judge')

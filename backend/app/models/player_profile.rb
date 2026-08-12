@@ -31,6 +31,6 @@ class PlayerProfile < ApplicationRecord
     return headshot_url_override if headshot_url_override.present?
     return unless headshot_id.to_s.match?(/\A\d+\z/)
 
-    "#{DiamondIqConfig.fetch(:external_services, :mlb_assets, :headshot_base_url)}/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/#{headshot_id}/headshot/67/current"
+    "#{NineLensConfig.fetch(:external_services, :mlb_assets, :headshot_base_url)}/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/#{headshot_id}/headshot/67/current"
   end
 end

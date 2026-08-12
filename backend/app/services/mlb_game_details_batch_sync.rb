@@ -201,7 +201,7 @@ class MlbGameDetailsBatchSync
   end
 
   def game_details_config
-    @game_details_config ||= DiamondIqConfig.fetch(:operations, :game_details)
+    @game_details_config ||= NineLensConfig.fetch(:operations, :game_details)
   end
 
   def default_worker_count

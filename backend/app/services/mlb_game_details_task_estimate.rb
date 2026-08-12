@@ -34,7 +34,7 @@ class MlbGameDetailsTaskEstimate
   attr_reader :start_date_input, :end_date_input, :mlb_game_id_input
 
   def estimate_config
-    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates)
+    @estimate_config ||= NineLensConfig.fetch(:operations, :estimates)
   end
 
   def normalized_attributes

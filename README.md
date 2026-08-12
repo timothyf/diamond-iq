@@ -478,7 +478,7 @@ cd frontend
 npm run build
 ```
 
-The request, service, query, model, composable, component, and view suites cover both normal workflows and important incomplete-data/error states. A printable repository and coverage snapshot is available at `output/pdf/diamondiq-codebase-overview.pdf`.
+The request, service, query, model, composable, component, and view suites cover both normal workflows and important incomplete-data/error states. A printable repository and coverage snapshot is available at `output/pdf/ninelens-codebase-overview.pdf`.
 
 ## Data Model Notes
 

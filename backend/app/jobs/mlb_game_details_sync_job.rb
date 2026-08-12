@@ -80,7 +80,7 @@ class MlbGameDetailsSyncJob < ApplicationJob
   end
 
   def execution_heartbeat_stale_seconds
-    DiamondIqConfig.fetch(:operations, :game_details, :execution_heartbeat_stale_seconds).to_i
+    NineLensConfig.fetch(:operations, :game_details, :execution_heartbeat_stale_seconds).to_i
   end
 
   def analytics_refresh_interrupted?(task_run)

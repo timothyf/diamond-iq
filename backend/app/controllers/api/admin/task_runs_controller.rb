@@ -182,7 +182,7 @@ module Api
       end
 
       def orphaned_task_heartbeat_seconds
-        DiamondIqConfig.fetch(:operations, :game_details, :orphaned_task_heartbeat_seconds).to_i
+        NineLensConfig.fetch(:operations, :game_details, :orphaned_task_heartbeat_seconds).to_i
       end
     end
   end

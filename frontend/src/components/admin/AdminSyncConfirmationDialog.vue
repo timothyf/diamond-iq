@@ -47,7 +47,7 @@ watch(
       <p class="eyebrow">Before you continue</p>
       <h2 :id="`${testPrefix}-confirmation-title`">{{ title }}</h2>
       <p :id="`${testPrefix}-confirmation-description`">
-        DiamondIQ found
+        NineLens found
         <strong>{{ formatCount(estimate.estimatedGames) }} {{ estimate.estimatedGames === 1 ? workloadSingular : workloadPlural }}</strong>
         in <strong>{{ estimate.scope }}</strong>. Based on this selection, the operation should take
         <strong>{{ estimate.duration }}</strong> (typically {{ estimate.range }}).

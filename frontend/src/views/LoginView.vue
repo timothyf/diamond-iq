@@ -39,7 +39,7 @@ function returnDestination() {
   <main class="login-shell">
     <section class="login-card">
       <p class="eyebrow">Private front-office workspace</p>
-      <h1>{{ mode === 'login' ? 'Sign in to DiamondIQ' : 'Create your account' }}</h1>
+      <h1>{{ mode === 'login' ? 'Sign in to NineLens' : 'Create your account' }}</h1>
       <p>Watchlists, notes, and acquisition evaluations are private to your account.</p>
       <form @submit.prevent="submit">
         <label v-if="mode === 'register'">Name<input v-model="name" required autocomplete="name" /></label>

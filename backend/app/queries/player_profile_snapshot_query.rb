@@ -1771,8 +1771,8 @@ class PlayerProfileSnapshotQuery
 
   def source_datasets
     [
-      dataset("player", "DiamondIQ", player.updated_at),
-      dataset("profile", player.profile&.source_name, player.profile&.last_synced_at),
+      dataset("player", "NineLens", player.updated_at),
+      dataset("profile", "NineLens", player.profile&.last_synced_at),
       dataset_for_records("positions", player.player_positions.to_a, :source_name, :last_synced_at),
       dataset_for_records("memberships", memberships, :source_name, :last_synced_at),
       dataset_for_records("season_stats", all_season_rows, nil, :updated_at, source_name: "Imported season stats"),
