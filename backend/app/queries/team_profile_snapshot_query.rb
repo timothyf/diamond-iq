@@ -402,7 +402,7 @@ class TeamProfileSnapshotQuery
       analytics_last_calculated_at: analytics_sync,
       sources: [
         ("MLB Stats API" if game_sync.present? || roster_sync.present?),
-        ("DiamondIQ daily analytics" if analytics_sync.present?)
+        ("NineLens daily analytics" if analytics_sync.present?)
       ].compact
     }
   end

@@ -69,7 +69,7 @@ function handleViewKeydown(event, currentIndex) {
       <div class="database-summary-grid">
         <article><span>Total database</span><strong>{{ loading ? 'Measuring…' : formatBytes(metrics.sizeBytes) }}</strong><small>Entire PostgreSQL database</small></article>
         <article><span>Application tables</span><strong>{{ formatBytes(metrics.userTableSizeBytes) }}</strong><small>Table data, TOAST, and indexes</small></article>
-        <article><span>Tables</span><strong>{{ formatCount(metrics.tableCount) }}</strong><small>DiamondIQ application tables</small></article>
+        <article><span>Tables</span><strong>{{ formatCount(metrics.tableCount) }}</strong><small>NineLens application tables</small></article>
         <article><span>Estimated rows</span><strong>{{ formatCount(metrics.estimatedRowCount) }}</strong><small>{{ formatCount(metrics.estimatedDeadRowCount) }} dead rows awaiting cleanup</small></article>
       </div>
 
@@ -106,7 +106,7 @@ function handleViewKeydown(event, currentIndex) {
             </tbody>
           </table>
         </div>
-        <p v-else class="database-insights__empty">Per-table storage metrics are available when DiamondIQ uses PostgreSQL.</p>
+        <p v-else class="database-insights__empty">Per-table storage metrics are available when NineLens uses PostgreSQL.</p>
       </div>
 
       <div v-show="activeView === 'usage'" id="database-view-usage" role="tabpanel" aria-labelledby="database-view-usage-tab" data-test="database-view-usage">
@@ -124,7 +124,7 @@ function handleViewKeydown(event, currentIndex) {
             </tbody>
           </table>
         </div>
-        <p v-else class="database-insights__empty">Per-table usage metrics are available when DiamondIQ uses PostgreSQL.</p>
+        <p v-else class="database-insights__empty">Per-table usage metrics are available when NineLens uses PostgreSQL.</p>
       </div>
       <footer v-if="activeView === 'storage'">Row counts come from PostgreSQL statistics and are approximate. Run <code>ANALYZE</code> to refresh estimates after a large import.</footer>
       <footer v-else>These cumulative counters include cached reads and reset when PostgreSQL statistics are reset. A sequential scan is not necessarily inefficient for a small table.</footer>

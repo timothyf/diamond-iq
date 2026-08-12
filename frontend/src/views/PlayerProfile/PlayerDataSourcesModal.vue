@@ -73,7 +73,7 @@ watch(
       <div v-if="player.sourceMetadata.datasets.length" class="source-grid">
         <article v-for="dataset in player.sourceMetadata.datasets" :key="dataset.name">
           <strong>{{ titleize(dataset.name) }}</strong>
-          <span>{{ dataset.sourceName || 'DiamondIQ' }}</span>
+          <span>{{ dataset.sourceName || 'NineLens' }}</span>
           <small>{{ formatTimestamp(dataset.lastUpdatedAt) }}</small>
         </article>
       </div>

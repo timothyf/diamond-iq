@@ -2,8 +2,8 @@ class PitchDataSyncJob < ApplicationJob
   queue_as :default
 
   retry_on StandardError,
-    wait: DiamondIqConfig.fetch(:operations, :pitch_data, :retry_wait_seconds).to_i.seconds,
-    attempts: DiamondIqConfig.fetch(:operations, :pitch_data, :retry_attempts).to_i do |job, error|
+    wait: NineLensConfig.fetch(:operations, :pitch_data, :retry_wait_seconds).to_i.seconds,
+    attempts: NineLensConfig.fetch(:operations, :pitch_data, :retry_attempts).to_i do |job, error|
     task_run = AdminTaskRun.find_by(id: job.arguments.first)
     PitchDataSyncProgressTracker.new(task_run).fail!(error.message) if task_run
   end

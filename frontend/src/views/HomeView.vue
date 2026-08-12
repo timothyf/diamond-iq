@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import GameScheduleCard from '../components/GameScheduleCard.vue'
 import { useHomeDashboard } from '../composables/useHomeDashboard'
-import diamondIqLogo from '../assets/diamondiq_logo_hero.png'
+import nineLensLogo from '../assets/ninelens_logo_hero.png'
 
 const { dashboard, loading, error, refresh } = useHomeDashboard()
 
@@ -54,7 +54,7 @@ function signed(value) {
   <main class="home-shell">
     <section class="home-hero">
       <div class="home-hero__brand">
-        <img :src="diamondIqLogo" alt="DiamondIQ Baseball" />
+        <img :src="nineLensLogo" alt="NineLens Baseball" />
         <div class="home-hero__baseball" aria-hidden="true"><span>Baseball Intelligence</span></div>
       </div>
       <div class="home-hero__copy">
@@ -67,7 +67,7 @@ function signed(value) {
             <RouterLink class="home-button" :to="{ name: 'stat-explorer' }">Explore league stats</RouterLink>
             <RouterLink class="home-button home-button--secondary" :to="{ name: 'teams' }">Browse all teams</RouterLink>
           </div>
-          <aside class="home-hero__signal" aria-label="DiamondIQ quick start">
+          <aside class="home-hero__signal" aria-label="NineLens quick start">
             <span>Start with a name</span>
             <strong>Find any player from the search bar above.</strong>
             <small>Jump from season totals into career history, rolling trends, pitch-level analysis, and contextual benchmarks.</small>
@@ -165,14 +165,14 @@ function signed(value) {
         </div>
       </section>
 
-      <section class="quick-grid" aria-label="Explore DiamondIQ">
+      <section class="quick-grid" aria-label="Explore NineLens">
         <RouterLink :to="{ name: 'stat-explorer' }"><span>01</span><strong>Stat Explorer</strong><small>Filter and compare batting, pitching, and Statcast data.</small></RouterLink>
         <RouterLink :to="{ name: 'teams' }"><span>02</span><strong>Team Profiles</strong><small>Review records, rankings, recent form, schedules, and rosters.</small></RouterLink>
         <div><span>03</span><strong>Player Profiles</strong><small>Use player search to open career rates, trends, and benchmarks.</small></div>
       </section>
 
       <footer class="home-freshness">
-        <span>DiamondIQ data briefing</span>
+        <span>NineLens data briefing</span>
         <small>Latest stored update {{ formatTimestamp(lastUpdatedAt) }}</small>
       </footer>
     </template>

@@ -1,6 +1,6 @@
 class DailyAnalyticsRefresh
   CALCULATION_VERSION = "1.0.0"
-  SOURCE_NAME = "DiamondIQ daily analytics"
+  SOURCE_NAME = "NineLens daily analytics"
   SUMMARY_MODELS = [
     PlayerBattingDaily,
     PlayerPitchingDaily,

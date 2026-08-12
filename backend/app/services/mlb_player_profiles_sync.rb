@@ -83,8 +83,8 @@ class MlbPlayerProfilesSync
   end
 
   def normalized_batch_size(value)
-    parsed = positive_integer(value) || DiamondIqConfig.fetch(:operations, :player_profiles, :batch_size).to_i
-    [ parsed, DiamondIqConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i ].min
+    parsed = positive_integer(value) || NineLensConfig.fetch(:operations, :player_profiles, :batch_size).to_i
+    [ parsed, NineLensConfig.fetch(:operations, :player_profiles, :max_people_per_request).to_i ].min
   end
 
   def positive_integer(value)

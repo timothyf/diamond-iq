@@ -37,7 +37,7 @@ export function useHomeDashboard() {
       }
     } catch (fetchError) {
       dashboard.value = emptyDashboard()
-      error.value = 'Unable to load today’s DiamondIQ briefing. Confirm the Rails API is running and reachable.'
+      error.value = 'Unable to load today’s NineLens briefing. Confirm the Rails API is running and reachable.'
       console.error(fetchError)
     } finally {
       loading.value = false

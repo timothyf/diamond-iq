@@ -158,7 +158,7 @@ RSpec.describe "Api::Admin::Tasks", type: :request do
         "start_date" => "2026-07-15",
         "end_date" => "2026-07-17"
       ),
-      "initiated_by" => include("email" => "system@diamondiq.local")
+      "initiated_by" => include("email" => "system@ninelens.local")
     )
   end
 

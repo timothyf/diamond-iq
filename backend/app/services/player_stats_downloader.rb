@@ -170,19 +170,19 @@ class PlayerStatsDownloader
 
   def service_config
     @service_config ||= {
-      base_url: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :base_url),
-      timeout_seconds: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :timeout_seconds),
-      user_agent: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :user_agent),
-      fangraphs_url: DiamondIqConfig.fetch(:external_services, :fangraphs, :leaders_url),
-      baseball_reference_url: DiamondIqConfig.fetch(:external_services, :baseball_reference, :war_url),
-      baseballsavant_leaderboard_url: DiamondIqConfig.fetch(:external_services, :baseball_savant, :leaderboard_url),
-      baseballsavant_user_agent: DiamondIqConfig.fetch(:external_services, :baseball_savant, :player_stats_user_agent),
-      referers: DiamondIqConfig.fetch(:external_services, :mlb_player_stats, :referers)
+      base_url: NineLensConfig.fetch(:external_services, :mlb_player_stats, :base_url),
+      timeout_seconds: NineLensConfig.fetch(:external_services, :mlb_player_stats, :timeout_seconds),
+      user_agent: NineLensConfig.fetch(:external_services, :mlb_player_stats, :user_agent),
+      fangraphs_url: NineLensConfig.fetch(:external_services, :fangraphs, :leaders_url),
+      baseball_reference_url: NineLensConfig.fetch(:external_services, :baseball_reference, :war_url),
+      baseballsavant_leaderboard_url: NineLensConfig.fetch(:external_services, :baseball_savant, :leaderboard_url),
+      baseballsavant_user_agent: NineLensConfig.fetch(:external_services, :baseball_savant, :player_stats_user_agent),
+      referers: NineLensConfig.fetch(:external_services, :mlb_player_stats, :referers)
     }
   end
 
   def page_size
-    DiamondIqConfig.fetch(:operations, :player_stats, :page_size).to_i
+    NineLensConfig.fetch(:operations, :player_stats, :page_size).to_i
   end
 
   def normalize_category(value)

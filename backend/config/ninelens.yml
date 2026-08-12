@@ -4,11 +4,11 @@ default: &default
       base_url: <%= ENV.fetch("MLB_STATS_API_BASE_URL", "https://statsapi.mlb.com") %>
       timeout_seconds: <%= ENV.fetch("MLB_STATS_API_TIMEOUT_SECONDS", 60) %>
       user_agents:
-        schedule: <%= ENV.fetch("MLB_SCHEDULE_USER_AGENT", "DiamondIQ/1.0 (MLB schedule synchronization)") %>
-        roster: <%= ENV.fetch("MLB_ROSTER_USER_AGENT", "DiamondIQ/1.0 (MLB roster synchronization)") %>
-        player_profiles: <%= ENV.fetch("MLB_PLAYER_PROFILES_USER_AGENT", "DiamondIQ/1.0 (MLB player profile synchronization)") %>
-        transactions: <%= ENV.fetch("MLB_TRANSACTIONS_USER_AGENT", "DiamondIQ/1.0 (MLB player transaction synchronization)") %>
-        game_details: <%= ENV.fetch("MLB_GAME_DETAILS_USER_AGENT", "DiamondIQ/1.0 (MLB game detail synchronization)") %>
+        schedule: <%= ENV.fetch("MLB_SCHEDULE_USER_AGENT", "NineLens/1.0 (MLB schedule synchronization)") %>
+        roster: <%= ENV.fetch("MLB_ROSTER_USER_AGENT", "NineLens/1.0 (MLB roster synchronization)") %>
+        player_profiles: <%= ENV.fetch("MLB_PLAYER_PROFILES_USER_AGENT", "NineLens/1.0 (MLB player profile synchronization)") %>
+        transactions: <%= ENV.fetch("MLB_TRANSACTIONS_USER_AGENT", "NineLens/1.0 (MLB player transaction synchronization)") %>
+        game_details: <%= ENV.fetch("MLB_GAME_DETAILS_USER_AGENT", "NineLens/1.0 (MLB game detail synchronization)") %>
     baseball_savant:
       statcast_url: <%= ENV.fetch("BASEBALL_SAVANT_STATCAST_URL", "https://baseballsavant.mlb.com/statcast_search/csv") %>
       statcast_referer: <%= ENV.fetch("BASEBALL_SAVANT_STATCAST_REFERER", "https://baseballsavant.mlb.com/statcast_search") %>

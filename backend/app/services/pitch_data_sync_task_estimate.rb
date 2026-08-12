@@ -37,8 +37,8 @@ class PitchDataSyncTaskEstimate
   attr_reader :start_date_input, :end_date_input, :game_types_input, :chunk_days_input, :replace_existing_input
 
   def estimate_config
-    @estimate_config ||= DiamondIqConfig.fetch(:operations, :estimates).merge(
-      default_chunk_days: DiamondIqConfig.fetch(:operations, :pitch_data, :default_chunk_days)
+    @estimate_config ||= NineLensConfig.fetch(:operations, :estimates).merge(
+      default_chunk_days: NineLensConfig.fetch(:operations, :pitch_data, :default_chunk_days)
     )
   end
 

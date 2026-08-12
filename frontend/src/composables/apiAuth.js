@@ -1,6 +1,6 @@
 import { frontendConfig } from '../config'
 
-export const USER_TOKEN_STORAGE_KEY = 'diamondiq_user_token'
+export const USER_TOKEN_STORAGE_KEY = 'ninelens_user_token'
 
 export function adminRequestHeaders(headers = {}) {
   let userToken = ''

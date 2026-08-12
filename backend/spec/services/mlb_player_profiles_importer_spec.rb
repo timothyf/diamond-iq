@@ -70,7 +70,7 @@ RSpec.describe MlbPlayerProfilesImporter do
     expect(result.dig(:data, :missing_mlb_ids)).to eq([ 999_999 ])
   end
 
-  it "skips returned people that do not exist in DiamondIQ" do
+  it "skips returned people that do not exist in NineLens" do
     result = import(payload: { "people" => [ person ] })
 
     expect(result[:success]).to be(true)

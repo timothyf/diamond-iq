@@ -85,7 +85,7 @@ class SampleDataBootstrap
 
       imported = PlayerStatsImporter.call(
         csv_data: result.dig(:data, :csv_data),
-        source_name: "DiamondIQ sample #{category} season stats (2025-2026)",
+        source_name: "NineLens sample #{category} season stats (2025-2026)",
         replace_season: replace_existing
       )
       raise imported[:message] unless imported[:success]

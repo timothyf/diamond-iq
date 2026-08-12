@@ -76,7 +76,7 @@ class MlbRosterDownloader
   end
 
   def service_config
-    @service_config ||= DiamondIqConfig.fetch(:external_services, :mlb_stats_api)
+    @service_config ||= NineLensConfig.fetch(:external_services, :mlb_stats_api)
   end
 
   def parse_date(value)

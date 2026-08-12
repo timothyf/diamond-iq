@@ -35,7 +35,7 @@ class CreateUsersAndAuditHistory < ActiveRecord::Migration[7.1]
       direction.up do
         execute <<~SQL.squish
           INSERT INTO users (email, name, role, system_account, created_at, updated_at)
-          VALUES ('system@diamondiq.local', 'DiamondIQ System', 'admin', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          VALUES ('system@ninelens.local', 'NineLens System', 'admin', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         SQL
         execute <<~SQL.squish
           UPDATE watchlists

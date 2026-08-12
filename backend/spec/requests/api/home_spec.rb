@@ -106,7 +106,7 @@ RSpec.describe "Api::Home", type: :request do
       sample_size: 1,
       calculation_version: "v1",
       calculated_at: calculated_at,
-      source_name: "DiamondIQ daily analytics",
+      source_name: "NineLens daily analytics",
       metrics: { games: 1, wins: 1, losses: 0, runs_scored: 5, runs_allowed: 3 }
     )
     TeamDailyMetric.create!(
@@ -117,7 +117,7 @@ RSpec.describe "Api::Home", type: :request do
       sample_size: 1,
       calculation_version: "v1",
       calculated_at: calculated_at,
-      source_name: "DiamondIQ daily analytics",
+      source_name: "NineLens daily analytics",
       metrics: { games: 1, wins: 0, losses: 1, runs_scored: 3, runs_allowed: 5 }
     )
 
@@ -166,7 +166,7 @@ RSpec.describe "Api::Home", type: :request do
         sample_size: 1,
         calculation_version: "v1",
         calculated_at: calculated_at,
-        source_name: "DiamondIQ daily analytics",
+        source_name: "NineLens daily analytics",
         metrics: { games: 1, wins: win ? 1 : 0, losses: win ? 0 : 1, runs_scored: win ? 5 : 2, runs_allowed: win ? 2 : 5 }
       )
     end
@@ -190,7 +190,7 @@ RSpec.describe "Api::Home", type: :request do
       sample_size: 1,
       calculation_version: "v1",
       calculated_at: calculated_at,
-      source_name: "DiamondIQ daily analytics",
+      source_name: "NineLens daily analytics",
       metrics: { games: 1, wins: 0, losses: 0, ties: 1, runs_scored: 0, runs_allowed: 0 }
     )
 

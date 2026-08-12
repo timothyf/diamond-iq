@@ -467,7 +467,7 @@ async function saveLineupScenario() {
         <article><span>{{ team.season }} record</span><strong>{{ recordLabel }}</strong><small>{{ team.record.games_played || 0 }} games</small></article>
         <article><span>Run differential</span><strong>{{ (team.record.runs_scored || 0) - (team.record.runs_allowed || 0) }}</strong><small>{{ team.record.runs_scored || 0 }} RS · {{ team.record.runs_allowed || 0 }} RA</small></article>
         <article><span>{{ team.season }} roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
-        <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'DiamondIQ' }}</small></article>
+        <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'NineLens' }}</small></article>
       </section>
 
       <nav class="team-profile-tabs" role="tablist" aria-label="Team profile sections">

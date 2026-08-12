@@ -73,7 +73,7 @@ RSpec.describe PlayerBenchmarkSnapshotQuery do
         source_end_date: end_date,
         calculation_version: "1.0.0",
         calculated_at: Time.current,
-        source_name: "DiamondIQ contextual benchmarks",
+        source_name: "NineLens contextual benchmarks",
         metadata: { "unit" => "rate" }
       }.merge(attributes)
     )
@@ -92,7 +92,7 @@ RSpec.describe PlayerBenchmarkSnapshotQuery do
         source_end_date: end_date,
         calculation_version: "1.0.0",
         calculated_at: Time.current,
-        source_name: "DiamondIQ contextual benchmarks"
+        source_name: "NineLens contextual benchmarks"
       }.merge(attributes)
     )
   end

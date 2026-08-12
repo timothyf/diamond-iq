@@ -332,7 +332,7 @@ async function closeDatabaseDetails() {
   <main class="admin-shell">
     <section class="admin-hero">
       <div>
-        <p class="eyebrow">DiamondIQ operations</p>
+        <p class="eyebrow">NineLens operations</p>
         <h1>Data administration</h1>
         <p>
           Import local datasets, retrieve source data, and run MLB synchronization tasks from one operational workspace.
