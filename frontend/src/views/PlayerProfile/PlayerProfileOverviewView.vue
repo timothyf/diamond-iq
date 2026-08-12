@@ -1,6 +1,5 @@
 <script setup>
 import { inject } from 'vue'
-import NotesPanel from '../../components/NotesPanel.vue'
 import PlayerCareerStatsPanel from './PlayerCareerStatsPanel.vue'
 import PlayerAdvancedStatsPanel from './PlayerAdvancedStatsPanel.vue'
 import PlayerDefensiveStatsPanel from './PlayerDefensiveStatsPanel.vue'
@@ -15,8 +14,6 @@ const {
 
 <template>
   <div id="player-page-panel-overview" class="profile-page-content" role="tabpanel" aria-labelledby="player-page-tab-overview">
-    <NotesPanel target-type="player" :target-id="player.id" title="Player notes" />
-
     <nav class="profile-tabs" aria-label="Player profile sections">
       <div role="tablist">
         <button
@@ -46,7 +43,7 @@ const {
 
     <ContextualBenchmarksPanel />
 
-    <div class="profile-two-column">
+    <div class="">
       <RecentTeamHistoryCard />
     </div>
   </div>

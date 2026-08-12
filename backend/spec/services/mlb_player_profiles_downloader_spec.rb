@@ -10,7 +10,7 @@ RSpec.describe MlbPlayerProfilesDownloader do
       expect(URI(url).path).to eq("/api/v1/people")
       expect(query).to include(
         "personIds" => "700270,669360",
-        "hydrate" => "currentTeam"
+        "hydrate" => "currentTeam,awards"
       )
       payload
     end

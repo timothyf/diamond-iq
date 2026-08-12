@@ -12,7 +12,11 @@ module Api
     def show
       player = Player.includes(:profile, :team, player_positions: :position).find(params[:id])
       analysis_range = PlayerAnalysisRange.resolve(player: player, params: analysis_params)
-      snapshot = PlayerProfileSnapshotQuery.new(player: player, analysis_range: analysis_range).result(
+      snapshot = PlayerProfileSnapshotQuery.new(
+        player: player,
+        analysis_range: analysis_range,
+        similarity_options: similarity_params
+      ).result(
         sections: profile_sections
       )
 
@@ -31,6 +35,10 @@ module Api
 
     def analysis_params
       params.permit(:range, :start_date, :end_date, :pa_window, :pitch_window).to_h
+    end
+
+    def similarity_params
+      params.permit(:similar_mode, :similar_season, :similar_min_age, :similar_max_age, :similar_position).to_h
     end
 
     def profile_sections
@@ -68,6 +76,9 @@ module Api
         weight_pounds: profile.weight_pounds,
         bats: profile.bats,
         throws: profile.throws,
+        draft_year: Integer(profile.raw_data.to_h["draftYear"], exception: false),
+        awards: serialized_awards(profile),
+        all_star_selections: serialized_all_star_selections(profile),
         mlb_debut_date: profile.mlb_debut_date,
         headshot_id: profile.headshot_id,
         headshot_url: profile.headshot_url,
@@ -75,6 +86,31 @@ module Api
         source_updated_at: profile.source_updated_at,
         last_synced_at: profile.last_synced_at
       }
+    end
+
+    def serialized_awards(profile)
+      profile_awards(profile).reject { |award| mlb_all_star_award?(award) }.map do |award|
+        {
+          id: award["id"],
+          name: award["name"],
+          season: Integer(award["season"], exception: false),
+          date: award["date"]
+        }
+      end
+    end
+
+    def serialized_all_star_selections(profile)
+      profile_awards(profile).select { |award| mlb_all_star_award?(award) }.filter_map do |award|
+        Integer(award["season"], exception: false)
+      end.uniq.sort.reverse
+    end
+
+    def profile_awards(profile)
+      Array(profile.raw_data.to_h["awards"]).select { |award| award.is_a?(Hash) && award["name"].present? }
+    end
+
+    def mlb_all_star_award?(award)
+      %w[ALAS NLAS].include?(award["id"].to_s.upcase)
     end
 
     def serialize_player_positions(assignments)

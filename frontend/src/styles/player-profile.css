@@ -7,6 +7,51 @@
     linear-gradient(180deg, #f7f1e3, #ead8b6);
 }
 
+.pitch-arsenal-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(16, 38, 61, .1);
+  border-radius: 14px;
+  background: rgba(255, 253, 247, .72);
+}
+
+.pitch-arsenal-table {
+  width: 100%;
+  min-width: 1120px;
+  border-collapse: collapse;
+  font-size: .78rem;
+}
+
+.pitch-arsenal-table th,
+.pitch-arsenal-table td {
+  padding: .75rem .65rem;
+  border-bottom: 1px solid rgba(16, 38, 61, .08);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pitch-arsenal-table thead th {
+  color: #65747e;
+  background: #e8eef2;
+  font-size: .68rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.pitch-arsenal-table th:first-child,
+.pitch-arsenal-table td:first-child {
+  text-align: left;
+}
+
+.pitch-arsenal-table tbody th {
+  color: #173652;
+}
+
+.pitch-arsenal-table tbody th small {
+  margin-left: .35rem;
+  color: #65747e;
+  font-weight: 700;
+}
+
 .profile-shell > * {
   width: min(1420px, calc(100vw - 2.5rem));
   margin-inline: auto;
@@ -33,7 +78,7 @@
 
 .profile-page-tabs [role='tablist'] {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
@@ -95,7 +140,7 @@
 
 .profile-tabs [role='tablist'] {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.35rem;
 }
 
@@ -427,7 +472,7 @@
   border: 0;
   color: #0d3e68;
   background: transparent;
-  font-size: clamp(.98rem, 1.35vw, 1.65rem);
+  font-size: 16px;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
@@ -742,6 +787,234 @@
   display: block;
   margin-top: 0.85rem;
   color: #71808c;
+}
+
+.similar-model-explainer {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr);
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 14px;
+  background: rgba(231, 238, 243, 0.48);
+}
+
+.similar-player-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(180px, 0.65fr) auto;
+  align-items: end;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 14px;
+  background: #fffdf7;
+}
+
+.similar-player-controls fieldset {
+  display: flex;
+  align-items: end;
+  gap: 0.65rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.similar-player-controls .similar-player-controls__mode {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.similar-player-controls__mode label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border: 1px solid rgba(16, 38, 61, 0.14);
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.similar-player-controls__mode label.is-selected {
+  border-color: #20543c;
+  background: rgba(32, 84, 60, 0.08);
+  box-shadow: inset 0 0 0 1px #20543c;
+}
+
+.similar-player-controls__mode input {
+  width: auto;
+  min-height: 0;
+  margin-top: 0.15rem;
+  accent-color: #20543c;
+}
+
+.similar-player-controls__mode span {
+  display: grid;
+  gap: 0.15rem;
+  color: #607184;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.similar-player-controls__mode strong {
+  color: #243b50;
+  font-size: 0.8rem;
+}
+
+.similar-player-controls legend {
+  width: 100%;
+  margin-bottom: 0.45rem;
+  color: #243b50;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.similar-player-controls label {
+  display: grid;
+  flex: 1;
+  gap: 0.3rem;
+  min-width: 90px;
+  color: #607184;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.similar-player-controls select,
+.similar-player-controls input {
+  width: 100%;
+  min-height: 2.35rem;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid rgba(16, 38, 61, 0.18);
+  border-radius: 8px;
+  background: #fff;
+  color: #243b50;
+  font: inherit;
+}
+
+.similar-player-controls__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.similar-player-controls__actions button {
+  min-height: 2.35rem;
+  padding: 0.45rem 0.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: #10263d;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.similar-player-controls__actions .profile-button--quiet {
+  border: 1px solid rgba(16, 38, 61, 0.15);
+  background: transparent;
+  color: #526477;
+}
+
+.similar-player-loading {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(183, 149, 105, 0.13);
+  color: #526477;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.similar-model-explainer h3,
+.similar-player-card__why h3 {
+  margin: 0;
+  color: #243b50;
+  font-size: 0.82rem;
+}
+
+.similar-model-explainer p {
+  margin: 0.3rem 0 0;
+  color: #71808c;
+  font-size: 0.75rem;
+}
+
+.similar-model-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.45rem;
+}
+
+.similar-model-metrics div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: #fffdf7;
+  color: #607184;
+  font-size: 0.72rem;
+}
+
+.similar-player-card__why {
+  margin-top: 0.85rem;
+  padding: 0.7rem;
+  border-radius: 10px;
+  background: rgba(32, 84, 60, 0.07);
+}
+
+.similar-player-card__why ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+  color: #526477;
+  font-size: 0.74rem;
+}
+
+.similar-player-card__metrics {
+  margin-top: 0.8rem;
+  color: #526477;
+  font-size: 0.74rem;
+}
+
+.similar-player-card__metrics summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.similar-player-card__metrics table {
+  width: 100%;
+  margin-top: 0.5rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.similar-player-card__metrics th,
+.similar-player-card__metrics td {
+  padding: 0.35rem 0.25rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.07);
+  text-align: right;
+}
+
+.similar-player-card__metrics th:first-child {
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  .similar-player-controls,
+  .similar-model-explainer {
+    grid-template-columns: 1fr;
+  }
+
+  .similar-player-controls fieldset {
+    flex-wrap: wrap;
+  }
+
+  .similar-player-controls .similar-player-controls__mode {
+    grid-template-columns: 1fr;
+  }
 }
 
 .career-table-wrap {
@@ -1080,6 +1353,10 @@
   gap: 1rem;
 }
 
+.batted-ball-profile__charts--pitcher {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .batted-ball-chart {
   padding: 1rem;
   border: 1px solid rgba(16, 38, 61, 0.1);
@@ -1171,7 +1448,61 @@
 .hit-location-chart__cell { display: grid; place-items: center; border: 1px solid rgba(56, 123, 127, 0.18); background: color-mix(in srgb, #d95943 calc(var(--hit-density) * 88%), #edf4f2); }
 .hit-location-chart__cell strong { color: #17364a; font-size: 1rem; }
 
-.pitcher-batted-ball-table { max-width: 46rem; }
+.pitcher-batted-ball-table { width: 100%; max-width: none; }
+
+.pitcher-batted-ball-table-wrap {
+  overflow: hidden;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 12px;
+}
+
+.pitcher-batted-ball-season-table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+  border-collapse: collapse;
+  color: #243b50;
+  font-variant-numeric: tabular-nums;
+}
+
+.pitcher-batted-ball-season-table th,
+.pitcher-batted-ball-season-table td {
+  padding: 0.55rem 0.35rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.08);
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.72rem;
+}
+
+.pitcher-batted-ball-season-table thead th {
+  background: #e7edf1;
+  color: #607184;
+  font-size: 0.61rem;
+  line-height: 1.15;
+  font-weight: 900;
+  text-transform: uppercase;
+  white-space: normal;
+}
+
+.pitcher-batted-ball-season-table th:first-child,
+.pitcher-batted-ball-season-table td:first-child { width: 8%; }
+.pitcher-batted-ball-season-table th:nth-child(2),
+.pitcher-batted-ball-season-table td:nth-child(2) { width: 10%; }
+
+.pitcher-batted-ball-season-table th:first-child,
+.pitcher-batted-ball-season-table td:first-child {
+  text-align: left;
+}
+
+.pitcher-batted-ball-season-table tbody th {
+  color: #243b50;
+  font-weight: 900;
+}
+
+.pitcher-batted-ball-season-table tbody tr:last-child th,
+.pitcher-batted-ball-season-table tbody tr:last-child td {
+  border-bottom: 0;
+}
 
 .pitcher-batted-ball-table dl {
   display: grid;
@@ -1259,6 +1590,56 @@
   list-style: none;
 }
 
+.organization-milestones {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1.15rem;
+  padding-bottom: 1.15rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.organization-milestones div {
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: rgba(16, 38, 61, 0.045);
+}
+
+.organization-milestones .organization-milestones__wide {
+  grid-column: 1 / -1;
+}
+
+.organization-milestones dt {
+  margin-bottom: 0.25rem;
+  color: #71808c;
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.organization-milestones dd {
+  margin: 0;
+  color: #10263d;
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.organization-award-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.organization-award-list span {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 999px;
+  background: #fffdf7;
+  color: #526477;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
 .team-timeline li {
   position: relative;
   display: grid;
@@ -1298,6 +1679,12 @@
 .team-timeline small {
   color: #697784;
   font-size: 0.8rem;
+}
+
+@media (max-width: 560px) {
+  .organization-milestones {
+    grid-template-columns: 1fr;
+  }
 }
 
 .source-grid {

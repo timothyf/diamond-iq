@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, ref } from 'vue'
 
-const { player, formatDate } = inject('player-profile-context')
+const { player, formatDate, rangePresets, tabAnalysisOptions, updateTabAnalysisPeriod, PlayerAnalysisPeriodControls } = inject('player-profile-context')
 
 const profile = computed(() => player.value?.battedBallProfile || { available: false, sprayPoints: [], hitPoints: [] })
 const isPitcher = computed(() => player.value?.pitchIndicators?.primaryRole === 'pitcher')
@@ -25,20 +25,18 @@ const hitLocationBins = computed(() => {
 })
 
 const maxHitBin = computed(() => Math.max(1, ...hitLocationBins.value.map((bin) => bin.count)))
-const pitcherMetricRows = computed(() => {
-  const metrics = profile.value.pitcherMetrics || {}
-  return [
-    ['GB%', metrics.groundBallPercentage, 'percent'],
-    ['FB%', metrics.flyBallPercentage, 'percent'],
-    ['LD%', metrics.lineDrivePercentage, 'percent'],
-    ['IFFB%', metrics.infieldFlyPercentage, 'percent'],
-    ['Pull%', metrics.pullPercentage, 'percent'],
-    ['Hard-hit%', metrics.hardHitPercentage, 'percent'],
-    ['Barrel%', metrics.barrelPercentage, 'percent'],
-    ['HR/FB', metrics.homeRunPerFlyBall, 'percent'],
-    ['Average launch angle', metrics.averageLaunchAngle, 'angle'],
-  ]
-})
+const pitcherMetricColumns = [
+  ['groundBallPercentage', 'GB%', 'percent'],
+  ['flyBallPercentage', 'FB%', 'percent'],
+  ['groundBallToFlyBallRatio', 'GB/FB', 'ratio'],
+  ['lineDrivePercentage', 'LD%', 'percent'],
+  ['infieldFlyPercentage', 'IFFB%', 'percent'],
+  ['pullPercentage', 'Pull%', 'percent'],
+  ['hardHitPercentage', 'Hard-hit%', 'percent'],
+  ['barrelPercentage', 'Barrel%', 'percent'],
+  ['homeRunPerFlyBall', 'HR/FB', 'percent'],
+  ['averageLaunchAngle', 'Average launch angle', 'angle'],
+]
 
 function pointTone(point) {
   if (['single', 'double', 'triple', 'home_run'].includes(point.event)) return point.event.replaceAll('_', '-')
@@ -54,7 +52,9 @@ function pointLabel(point) {
 
 function pitcherMetricValue(value, unit) {
   if (value === null || value === undefined) return '—'
-  return unit === 'angle' ? `${Number(value).toFixed(1)}°` : `${Number(value).toFixed(1)}%`
+  if (unit === 'angle') return `${Number(value).toFixed(1)}°`
+  if (unit === 'ratio') return Number(value).toFixed(2)
+  return `${Number(value).toFixed(1)}%`
 }
 </script>
 
@@ -65,6 +65,14 @@ function pitcherMetricValue(value, unit) {
     role="tabpanel"
     aria-labelledby="player-page-tab-batted-ball-profile"
   >
+    <component
+      v-if="!isPitcher"
+      :is="PlayerAnalysisPeriodControls"
+      :options="tabAnalysisOptions['batted-ball-profile']"
+      :range-presets="rangePresets"
+      label="Batted ball analysis period"
+      @change="updateTabAnalysisPeriod('batted-ball-profile', $event)"
+    />
     <section class="profile-panel batted-ball-profile" data-test="batted-ball-profile">
       <header class="profile-section-heading">
         <div>
@@ -74,18 +82,36 @@ function pitcherMetricValue(value, unit) {
         <span>{{ isPitcher ? `${profile.pitcherMetrics?.battedBallCount || 0} batted balls against` : `${profile.contactCount} tracked contacts` }}</span>
       </header>
 
-      <div v-if="isPitcher ? profile.pitcherMetrics?.available : profile.available" class="batted-ball-profile__charts">
+      <div
+        v-if="isPitcher ? profile.pitcherMetrics?.available : profile.available"
+        class="batted-ball-profile__charts"
+        :class="{ 'batted-ball-profile__charts--pitcher': isPitcher }"
+      >
         <article v-if="isPitcher" class="batted-ball-chart pitcher-batted-ball-table" data-test="pitcher-batted-ball-table">
           <header>
             <h3>Batted balls allowed</h3>
-            <p>Statcast contact quality for the selected analysis period</p>
+            <p>Statcast contact quality by season</p>
           </header>
-          <dl>
-            <div v-for="([label, value, unit]) in pitcherMetricRows" :key="label">
-              <dt>{{ label }}</dt>
-              <dd>{{ pitcherMetricValue(value, unit) }}</dd>
-            </div>
-          </dl>
+          <div class="pitcher-batted-ball-table-wrap">
+            <table class="pitcher-batted-ball-season-table">
+              <thead>
+                <tr>
+                  <th>Season</th>
+                  <th>Batted balls</th>
+                  <th v-for="([, label]) in pitcherMetricColumns" :key="label">{{ label }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="season in profile.pitcherMetrics.seasons" :key="season.season">
+                  <th>{{ season.season }}</th>
+                  <td>{{ season.battedBallCount }}</td>
+                  <td v-for="([key, , unit]) in pitcherMetricColumns" :key="key">
+                    {{ pitcherMetricValue(season[key], unit) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <template v-else>

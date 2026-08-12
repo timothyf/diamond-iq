@@ -43,6 +43,14 @@ function normalizeProfile(data = {}) {
         birthDate: data.profile.birth_date,
         formattedHeight: data.profile.formatted_height,
         weightPounds: data.profile.weight_pounds,
+        draftYear: data.profile.draft_year,
+        awards: (data.profile.awards || []).map((award) => ({
+          id: award.id,
+          name: award.name,
+          season: award.season,
+          date: award.date,
+        })),
+        allStarSelections: data.profile.all_star_selections || [],
         mlbDebutDate: data.profile.mlb_debut_date,
         headshotUrl: data.profile.headshot_url,
         sourceName: data.profile.source_name,
@@ -56,6 +64,7 @@ function normalizeProfile(data = {}) {
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
   const battedBallProfile = data.batted_ball_profile || {}
+  const pitchArsenal = data.pitch_arsenal || {}
   const analysis = data.analysis || {}
   const trendEvents = data.trend_events || {}
   const similarPlayers = data.similar_players || {}
@@ -138,7 +147,27 @@ function normalizeProfile(data = {}) {
     similarPlayers: {
       season: similarPlayers.season,
       category: similarPlayers.category,
+      mode: similarPlayers.mode || similarPlayers.controls?.mode || 'season',
       methodology: similarPlayers.methodology,
+      positionMismatchPenalty: similarPlayers.position_mismatch_penalty,
+      controls: {
+        availableSeasons: similarPlayers.controls?.available_seasons || [],
+        mode: similarPlayers.controls?.mode || 'season',
+        selectedSeason: similarPlayers.controls?.selected_season,
+        minAge: similarPlayers.controls?.min_age,
+        maxAge: similarPlayers.controls?.max_age,
+        targetAge: similarPlayers.controls?.target_age,
+        positionMatch: similarPlayers.controls?.position_match || 'any',
+        positionOptions: (similarPlayers.controls?.position_options || []).map((option) => ({
+          value: option.value,
+          label: option.label,
+        })),
+      },
+      modelMetrics: (similarPlayers.model_metrics || []).map((metric) => ({
+        key: metric.key,
+        label: metric.label,
+        weight: metric.weight,
+      })),
       matches: (similarPlayers.matches || []).map((match) => ({
         player: {
           id: match.player?.id,
@@ -149,13 +178,27 @@ function normalizeProfile(data = {}) {
         team: normalizeTeam(match.team),
         position: match.position,
         similarityScore: match.similarity_score,
+        age: match.age,
         sharedMetricCount: match.shared_metric_count,
         samePositionType: match.same_position_type,
+        whySimilar: match.why_similar || [],
+        metricsUsed: (match.metrics_used || []).map((metric) => ({
+          key: metric.key,
+          label: metric.label,
+          targetValue: metric.target_value,
+          candidateValue: metric.candidate_value,
+          weight: metric.weight,
+          normalizedWeight: metric.normalized_weight,
+          standardizedDifference: metric.standardized_difference,
+        })),
         closestMetrics: (match.closest_metrics || []).map((metric) => ({
           key: metric.key,
           label: metric.label,
           targetValue: metric.target_value,
           candidateValue: metric.candidate_value,
+          weight: metric.weight,
+          normalizedWeight: metric.normalized_weight,
+          standardizedDifference: metric.standardized_difference,
         })),
       })),
     },
@@ -175,6 +218,7 @@ function normalizeProfile(data = {}) {
         battedBallCount: battedBallProfile.pitcher_metrics?.batted_ball_count || 0,
         groundBallPercentage: battedBallProfile.pitcher_metrics?.ground_ball_percentage,
         flyBallPercentage: battedBallProfile.pitcher_metrics?.fly_ball_percentage,
+        groundBallToFlyBallRatio: battedBallProfile.pitcher_metrics?.ground_ball_to_fly_ball_ratio,
         lineDrivePercentage: battedBallProfile.pitcher_metrics?.line_drive_percentage,
         infieldFlyPercentage: battedBallProfile.pitcher_metrics?.infield_fly_percentage,
         pullPercentage: battedBallProfile.pitcher_metrics?.pull_percentage,
@@ -182,6 +226,20 @@ function normalizeProfile(data = {}) {
         barrelPercentage: battedBallProfile.pitcher_metrics?.barrel_percentage,
         homeRunPerFlyBall: battedBallProfile.pitcher_metrics?.home_run_per_fly_ball,
         averageLaunchAngle: battedBallProfile.pitcher_metrics?.average_launch_angle,
+        seasons: (battedBallProfile.pitcher_metrics?.seasons || []).map((season) => ({
+          season: season.season,
+          battedBallCount: season.batted_ball_count,
+          groundBallPercentage: season.ground_ball_percentage,
+          flyBallPercentage: season.fly_ball_percentage,
+          groundBallToFlyBallRatio: season.ground_ball_to_fly_ball_ratio,
+          lineDrivePercentage: season.line_drive_percentage,
+          infieldFlyPercentage: season.infield_fly_percentage,
+          pullPercentage: season.pull_percentage,
+          hardHitPercentage: season.hard_hit_percentage,
+          barrelPercentage: season.barrel_percentage,
+          homeRunPerFlyBall: season.home_run_per_fly_ball,
+          averageLaunchAngle: season.average_launch_angle,
+        })),
       },
       sprayPoints: (battedBallProfile.spray_points || []).map((point) => ({
         x: point.x,
@@ -202,6 +260,26 @@ function normalizeProfile(data = {}) {
         launchAngle: point.launch_angle,
         hitDistance: point.hit_distance,
         gameDate: point.game_date,
+      })),
+    },
+    pitchArsenal: {
+      available: pitchArsenal.available === true,
+      pitches: (pitchArsenal.pitches || []).map((pitch) => ({
+        pitchType: pitch.pitch_type,
+        pitchName: pitch.pitch_name,
+        usagePercentage: pitch.usage_percentage,
+        pitchCount: pitch.pitch_count,
+        averageVelocity: pitch.average_velocity,
+        maximumVelocity: pitch.maximum_velocity,
+        spinRate: pitch.spin_rate,
+        activeSpin: pitch.active_spin,
+        verticalMovement: pitch.vertical_movement,
+        horizontalMovement: pitch.horizontal_movement,
+        zonePercentage: pitch.zone_percentage,
+        chasePercentage: pitch.chase_percentage,
+        whiffPercentage: pitch.whiff_percentage,
+        hardHitPercentage: pitch.hard_hit_percentage,
+        runValue: pitch.run_value,
       })),
     },
     batterSplits: {
@@ -397,7 +475,7 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
     }
   }
 
-  async function loadSection(section, requestId = requestCounter) {
+  async function loadSection(section, requestId = requestCounter, sectionOptions = {}) {
     const playerId = playerIdRef.value
     if (!playerId || requestId !== requestCounter || loadedSections.has(section) || requestedSections.has(section)) return
 
@@ -405,7 +483,12 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
     loadingSections.value = { ...loadingSections.value, [section]: true }
 
     try {
-      const query = analysisQuery(analysisOptionsRef?.value, section)
+      const hasSectionAnalysisRange = sectionOptions?.range !== undefined
+      const query = analysisQuery(
+        hasSectionAnalysisRange ? sectionOptions : analysisOptionsRef?.value,
+        section,
+        hasSectionAnalysisRange ? {} : sectionOptions,
+      )
       const response = await fetch(`${API_BASE_URL}/api/players/${encodeURIComponent(playerId)}${query}`, {
         headers: { Accept: 'application/json' },
       })
@@ -426,6 +509,12 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
     }
   }
 
+  async function reloadSection(section, sectionOptions = {}) {
+    loadedSections.delete(section)
+    requestedSections.delete(section)
+    return loadSection(section, requestCounter, sectionOptions)
+  }
+
   analysisOptionsRef
     ? watch([playerIdRef, analysisOptionsRef], load, { immediate: true, deep: true })
     : watch(playerIdRef, load, { immediate: true })
@@ -436,6 +525,7 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
     error: computed(() => error.value),
     sectionLoading: (section) => computed(() => loadingSections.value[section] === true),
     loadSection,
+    reloadSection,
     refresh: load,
   }
 }
@@ -450,6 +540,7 @@ function normalizedSection(data, section) {
     return {
       pitchIndicators: normalized.pitchIndicators,
       battedBallProfile: normalized.battedBallProfile,
+      pitchArsenal: normalized.pitchArsenal,
       contextualBenchmarks: normalized.contextualBenchmarks,
       trendEvents: normalized.trendEvents,
       analysis: normalized.analysis,
@@ -459,7 +550,7 @@ function normalizedSection(data, section) {
   return {}
 }
 
-function analysisQuery(options, sections = null) {
+function analysisQuery(options, sections = null, extraParams = {}) {
   const params = new URLSearchParams()
   if (options?.range) params.set('range', options.range)
   if (options?.startDate) params.set('start_date', options.startDate)
@@ -467,6 +558,9 @@ function analysisQuery(options, sections = null) {
   if (options?.paWindow) params.set('pa_window', options.paWindow)
   if (options?.pitchWindow) params.set('pitch_window', options.pitchWindow)
   if (sections) params.set('sections', sections)
+  Object.entries(extraParams).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== '') params.set(key, value)
+  })
   const query = params.toString()
   return query ? `?${query}` : ''
 }

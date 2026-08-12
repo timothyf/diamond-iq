@@ -120,10 +120,11 @@ class PlayerProfileSnapshotQuery
   TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
   DEFERRED_SECTIONS = %w[advanced_stats defensive_stats splits similar_players analytics].freeze
 
-  def initialize(player:, on: Date.current, analysis_range: nil)
+  def initialize(player:, on: Date.current, analysis_range: nil, similarity_options: {})
     @player = player
     @on = on
     @analysis_range = analysis_range || PlayerAnalysisRange.resolve(player: player)
+    @similarity_options = similarity_options.to_h.symbolize_keys
   end
 
   def result(sections: nil)
@@ -148,8 +149,12 @@ class PlayerProfileSnapshotQuery
     if selected_sections.include?("similar_players")
       payload[:similar_players] = SimilarPlayersQuery.new(
         player: player,
-        season: latest_season,
-        category: preferred_category
+        season: similarity_options[:similar_season].presence || latest_season,
+        category: preferred_category,
+        mode: similarity_options[:similar_mode],
+        min_age: similarity_options[:similar_min_age],
+        max_age: similarity_options[:similar_max_age],
+        position_match: similarity_options[:similar_position]
       ).result
     end
     payload.merge!(analytics_payload) if selected_sections.include?("analytics")
@@ -159,7 +164,7 @@ class PlayerProfileSnapshotQuery
 
   private
 
-  attr_reader :player, :on, :analysis_range
+  attr_reader :player, :on, :analysis_range, :similarity_options
 
   def display_team
     return current_membership&.team || player.team unless retired_player?
@@ -974,7 +979,8 @@ class PlayerProfileSnapshotQuery
     @all_season_rows ||= begin
       stored_rows = player.player_season_stats.includes(:stat_type, :team).to_a
       normalized_rows = normalize_mislabeled_team_totals(stored_rows)
-      normalized_rows + derived_game_stat_rows(normalized_rows)
+      corrected_rows = correct_mismatched_team_rows(normalized_rows)
+      corrected_rows + derived_game_stat_rows(corrected_rows)
     end
   end
 
@@ -982,6 +988,7 @@ class PlayerProfileSnapshotQuery
     {
       recent_pitch_indicators: recent_pitch_indicators,
       batted_ball_profile: batted_ball_profile,
+      pitch_arsenal: pitch_arsenal,
       contextual_benchmarks: PlayerBenchmarkSnapshotQuery.new(
         player: player,
         start_date: analysis_range.start_date,
@@ -1017,10 +1024,62 @@ class PlayerProfileSnapshotQuery
 
   def pitcher_batted_ball_metrics
     rows = PitchDatum
-      .where(pitcher: player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
-      .select(:bb_type, :events, :launch_speed, :launch_angle, :launch_speed_angle, :hc_x, :stand, :description)
+      .where(pitcher: player.mlb_id)
+      .where.not(game_date: nil)
+      .select(:game_date, :bb_type, :events, :launch_speed, :launch_angle, :launch_speed_angle, :hc_x, :stand, :description)
       .to_a
       .select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
+
+    summary = pitcher_batted_ball_metric_summary(rows)
+    summary[:seasons] = rows.group_by { |row| row.game_date.year }
+      .sort_by { |season, _| -season }
+      .map { |season, season_rows| pitcher_batted_ball_metric_summary(season_rows).merge(season: season) }
+    summary
+  end
+
+  def pitch_arsenal
+    rows = PitchDatum
+      .where(pitcher: player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
+      .where.not(pitch_type: [ nil, "" ])
+      .to_a
+    total = rows.length
+
+    {
+      available: rows.any?,
+      pitches: rows.group_by(&:pitch_type).map do |pitch_type, grouped|
+        batted_balls = grouped.select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
+        swings = grouped.count { |row| DailyAnalyticsCalculator.swing?(row) }
+        chase_opportunities = grouped.count { |row| row.zone.present? && !row.zone.to_i.between?(1, 9) }
+        chases = grouped.count { |row| chase_opportunities.positive? && DailyAnalyticsCalculator.swing?(row) && row.zone.present? && !row.zone.to_i.between?(1, 9) }
+        spin_efficiencies = grouped.filter_map { |row| raw_pitch_value(row, "active_spin", "spin_efficiency") }
+        run_values = grouped.filter_map { |row| row.delta_run_exp&.to_f }
+
+        {
+          pitch_type: pitch_type,
+          pitch_name: grouped.filter_map(&:pitch_name).first || pitch_type,
+          usage_percentage: percentage(grouped.length, total),
+          pitch_count: grouped.length,
+          average_velocity: average(grouped.filter_map { |row| row.release_speed&.to_f }),
+          maximum_velocity: grouped.filter_map { |row| row.release_speed&.to_f }.max&.round(1),
+          spin_rate: average(grouped.filter_map { |row| row.release_spin_rate&.to_f }),
+          active_spin: average(spin_efficiencies),
+          vertical_movement: average(grouped.filter_map { |row| row.pfx_z&.to_f * 12 }),
+          horizontal_movement: average(grouped.filter_map { |row| row.pfx_x&.to_f * 12 }),
+          zone_percentage: percentage(grouped.count { |row| row.zone.to_i.between?(1, 9) }, grouped.length),
+          chase_percentage: percentage(chases, chase_opportunities),
+          whiff_percentage: percentage(grouped.count { |row| DailyAnalyticsCalculator.whiff?(row) }, swings),
+          hard_hit_percentage: percentage(batted_balls.count { |row| row.launch_speed.to_f >= 95.0 }, batted_balls.length),
+          run_value: run_values.any? ? run_values.sum.round(2) : nil
+        }
+      end.sort_by { |pitch| -pitch[:pitch_count] }
+    }
+  end
+
+  def raw_pitch_value(row, *keys)
+    keys.filter_map { |key| row.raw_data.to_h[key] || row.raw_data.to_h[key.to_sym] }.first&.to_f
+  end
+
+  def pitcher_batted_ball_metric_summary(rows)
     types = rows.group_by { |row| pitcher_batted_ball_type(row) }
     fly_balls = Array(types[:fly_ball]) + Array(types[:infield_fly])
     directional_rows = rows.select { |row| row.hc_x.present? && %w[L R].include?(row.stand) }
@@ -1031,6 +1090,7 @@ class PlayerProfileSnapshotQuery
       batted_ball_count: rows.length,
       ground_ball_percentage: percentage(Array(types[:ground_ball]).length, rows.length),
       fly_ball_percentage: percentage(fly_balls.length, rows.length),
+      ground_ball_to_fly_ball_ratio: ratio(Array(types[:ground_ball]).length, fly_balls.length),
       line_drive_percentage: percentage(Array(types[:line_drive]).length, rows.length),
       infield_fly_percentage: percentage(Array(types[:infield_fly]).length, fly_balls.length),
       pull_percentage: percentage(pulled_balls, directional_rows.length),
@@ -1091,7 +1151,7 @@ class PlayerProfileSnapshotQuery
           .length
         source_game_count = source_game_count(category, rows)
 
-        [ category, season, team_id ] if season_game_count > team_game_count && source_game_count == season_game_count
+        [ category, season, team_id ] if team_game_count.zero? && season_game_count > team_game_count && source_game_count == season_game_count
       end
     end
 
@@ -1132,11 +1192,42 @@ class PlayerProfileSnapshotQuery
     derived_rows
   end
 
+  def correct_mismatched_team_rows(stored_rows)
+    replacements = %w[batting pitching].flat_map do |category|
+      game_line_groups(category, stored_rows).filter_map do |(season, team), lines|
+        rows = stored_rows.select do |row|
+          row.stat_type.category == category && row.season == season && row.scope_type == "team" && row.team_id == team.id
+        end
+        next if rows.empty?
+
+        imported_game_count = source_game_count(category, rows)
+        actual_game_count = lines.map(&:game_id).uniq.length
+        next if imported_game_count.blank? || actual_game_count.zero? || imported_game_count == actual_game_count
+
+        [ [ category, season, team.id ], build_derived_stat_rows(
+          category,
+          season,
+          team,
+          category == "batting" ? batting_values_from_game_lines(lines) : pitching_values_from_game_lines(lines)
+        ) ]
+      end
+    end.to_h
+
+    replacements_by_key = replacements
+    stored_rows.reject do |row|
+      replacements_by_key.key?([ row.stat_type.category, row.season, row.team_id ])
+    end + replacements_by_key.values.flatten
+  end
+
   def game_line_groups(category, stored_rows)
     @game_line_groups ||= {}
     return @game_line_groups[category] if @game_line_groups.key?(category)
 
-    seasons = fallback_seasons(category, stored_rows)
+    seasons = stored_rows
+      .select { |row| row.stat_type.category == category }
+      .map(&:season)
+      .compact
+      .uniq
     return @game_line_groups[category] = {} if seasons.empty?
 
     relation = category == "batting" ? GamePlayerBattingLine : GamePlayerPitchingLine

@@ -22,6 +22,12 @@ function apiPayload() {
         weight_pounds: 200,
         bats: 'L',
         throws: 'L',
+        draft_year: 2019,
+        awards: [
+          { id: 'ALSS', name: 'AL Silver Slugger', season: 2025, date: '2025-11-07' },
+          { id: 'ALPOW', name: 'AL Player of the Week', season: 2025, date: '2025-05-04' },
+        ],
+        all_star_selections: [2026, 2025, 2024],
         mlb_debut_date: '2022-06-18',
         headshot_url:
           'https://img.mlbstatic.com/mlb-photos/image/upload/ar_20:23,c_fill,g_north,w_260/c_pad,b_auto:border,w_300,h_300,q_auto:best/v1/people/680776/headshot/67/current',
@@ -34,6 +40,7 @@ function apiPayload() {
       season_overview: {
         season: 2026,
         category: 'batting',
+        mode: 'season',
         preferred_category: 'batting',
         stats: [
           { key: 'homeRuns', label: 'HR', value: '18.0', scope_key: 'DET' },
@@ -54,6 +61,20 @@ function apiPayload() {
           { key: 'WAR', label: 'WAR' },
         ],
         seasons: [
+          {
+            season: 2025,
+            batted_ball_count: 100,
+            ground_ball_percentage: 46.2,
+            fly_ball_percentage: 29.1,
+            ground_ball_to_fly_ball_ratio: 1.59,
+            line_drive_percentage: 24.7,
+            infield_fly_percentage: 10.1,
+            pull_percentage: 35.4,
+            hard_hit_percentage: 36.2,
+            barrel_percentage: 8.1,
+            home_run_per_fly_ball: 12.8,
+            average_launch_angle: 10.6,
+          },
           {
             season: 2022,
             teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
@@ -159,6 +180,26 @@ function apiPayload() {
         season: 2026,
         category: 'batting',
         methodology: 'Standardized same-season statistical distance with a position-role adjustment.',
+        position_mismatch_penalty: 0.35,
+        controls: {
+          available_seasons: [2026, 2025, 2024],
+          mode: 'season',
+          selected_season: 2026,
+          min_age: null,
+          max_age: null,
+          target_age: 25,
+          position_match: 'any',
+          position_options: [
+            { value: 'any', label: 'Any position' },
+            { value: 'same_type', label: 'Same position group' },
+            { value: 'same_position', label: 'Same primary position' },
+          ],
+        },
+        model_metrics: [
+          { key: 'avg', label: 'AVG', weight: 0.1 },
+          { key: 'ops', label: 'OPS', weight: 0.2 },
+          { key: 'hr_rate', label: 'HR / PA', weight: 0.15 },
+        ],
         matches: [
           {
             player: {
@@ -172,6 +213,15 @@ function apiPayload() {
             similarity_score: 91.4,
             shared_metric_count: 8,
             same_position_type: true,
+            why_similar: [
+              'Closest statistical alignment: AVG, HR / PA, and OPS.',
+              'Same position group: Outfielder.',
+            ],
+            metrics_used: [
+              { key: 'ops', label: 'OPS', target_value: 0.842, candidate_value: 0.835, weight: 0.2, normalized_weight: 0.4444, standardized_difference: 0.1 },
+              { key: 'hr_rate', label: 'HR / PA', target_value: 4.1, candidate_value: 4.0, weight: 0.15, normalized_weight: 0.3333, standardized_difference: 0.2 },
+              { key: 'avg', label: 'AVG', target_value: 0.281, candidate_value: 0.278, weight: 0.1, normalized_weight: 0.2222, standardized_difference: 0.15 },
+            ],
             closest_metrics: [
               { key: 'avg', label: 'AVG', target_value: 0.281, candidate_value: 0.278 },
               { key: 'hr_rate', label: 'HR / PA', target_value: 4.1, candidate_value: 4.0 },
@@ -492,7 +542,16 @@ describe('PlayerProfileView', () => {
     expect(careerTable.text()).toContain('Career')
     expect(careerTable.text()).toContain('0.821')
     expect(wrapper.text()).not.toContain('Season snapshot')
-    expect(wrapper.text()).toContain('Team history')
+    expect(wrapper.text()).toContain('Player history')
+    const organizationMilestones = wrapper.get('[data-test="organization-milestones"]')
+    expect(organizationMilestones.text()).toContain('Draft information')
+    expect(organizationMilestones.text()).toContain('2019 MLB Draft')
+    expect(organizationMilestones.text()).toContain('MLB debut')
+    expect(organizationMilestones.text()).toContain('Jun 18, 2022')
+    expect(organizationMilestones.text()).toContain('Awards')
+    expect(organizationMilestones.text()).toContain('AL Silver Slugger (2025)')
+    expect(organizationMilestones.text()).toContain('All-Star selections')
+    expect(organizationMilestones.text()).toContain('2026, 2025, 2024 · 3× MLB All-Star')
     await wrapper.get('[data-test="player-page-tab-performance-trends"]').trigger('click')
     expect(wrapper.get('[data-test="recent-pitch-indicators"]').text()).toContain('Recent pitch indicators')
     expect(wrapper.get('[data-test="recent-pitch-indicators"]').text()).toContain('91.2 mph')
@@ -593,6 +652,26 @@ describe('PlayerProfileView', () => {
   it('renders pitcher batted-ball metrics on the Batted Ball Profile tab', async () => {
     const payload = apiPayloadWith((response) => {
       response.data.recent_pitch_indicators.primary_role = 'pitcher'
+      response.data.pitch_arsenal = {
+        available: true,
+        pitches: [{
+          pitch_type: 'FF',
+          pitch_name: '4-Seam Fastball',
+          usage_percentage: 54.2,
+          pitch_count: 64,
+          average_velocity: 96.4,
+          maximum_velocity: 98.1,
+          spin_rate: 2380,
+          active_spin: 91.2,
+          vertical_movement: 16.4,
+          horizontal_movement: -7.1,
+          zone_percentage: 49.5,
+          chase_percentage: 31.2,
+          whiff_percentage: 27.8,
+          hard_hit_percentage: 28.4,
+          run_value: -1.24,
+        }],
+      }
       response.data.batted_ball_profile.pitcher_metrics = {
         available: true,
         batted_ball_count: 118,
@@ -605,6 +684,36 @@ describe('PlayerProfileView', () => {
         barrel_percentage: 7.6,
         home_run_per_fly_ball: 13.5,
         average_launch_angle: 11.8,
+        seasons: [
+          {
+            season: 2025,
+            batted_ball_count: 100,
+            ground_ball_percentage: 46.2,
+            fly_ball_percentage: 29.1,
+            ground_ball_to_fly_ball_ratio: 1.59,
+            line_drive_percentage: 24.7,
+            infield_fly_percentage: 10.1,
+            pull_percentage: 35.4,
+            hard_hit_percentage: 36.2,
+            barrel_percentage: 8.1,
+            home_run_per_fly_ball: 12.8,
+            average_launch_angle: 10.6,
+          },
+          {
+            season: 2026,
+            batted_ball_count: 118,
+            ground_ball_percentage: 44.1,
+            fly_ball_percentage: 31.4,
+            ground_ball_to_fly_ball_ratio: 1.40,
+            line_drive_percentage: 24.5,
+            infield_fly_percentage: 12.2,
+            pull_percentage: 37.6,
+            hard_hit_percentage: 34.8,
+            barrel_percentage: 7.6,
+            home_run_per_fly_ball: 13.5,
+            average_launch_angle: 11.8,
+          },
+        ],
       }
     })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
@@ -620,8 +729,27 @@ describe('PlayerProfileView', () => {
     expect(table.text()).toContain('GB%')
     expect(table.text()).toContain('IFFB%')
     expect(table.text()).toContain('HR/FB')
+    expect(table.text()).toContain('GB/FB')
     expect(table.text()).toContain('44.1%')
     expect(table.text()).toContain('11.8°')
+    expect(table.text()).toContain('1.40')
+    expect(table.get('thead').text()).toContain('Season')
+    expect(table.get('tbody').text()).toContain('2026')
+    expect(table.get('tbody').text()).toContain('2025')
+
+    await wrapper.get('[data-test="player-page-tab-pitch-arsenal"]').trigger('click')
+    const arsenal = wrapper.get('[data-test="player-page-panel-pitch-arsenal"]')
+    expect(arsenal.text()).toContain('Pitch arsenal and effectiveness')
+    expect(arsenal.text()).toContain('4-Seam Fastball')
+    expect(arsenal.text()).toContain('Usage%')
+    expect(arsenal.text()).toContain('Active spin')
+    expect(arsenal.text()).toContain('54.2%')
+    expect(arsenal.text()).toContain('-1.24')
+
+    await arsenal.get('[data-test="tab-analysis-period-controls"] button').trigger('click')
+    await flushPromises()
+    expect(fetch.mock.calls.at(-1)[0]).toContain('sections=analytics')
+    expect(fetch.mock.calls.at(-1)[0]).toContain('range=season')
   })
 
   it('uses Savant-inspired percentile markers with readable text contrast', async () => {
@@ -993,7 +1121,33 @@ describe('PlayerProfileView', () => {
     expect(panel.text()).toContain('91.4%')
     expect(panel.text()).toContain('AVG')
     expect(panel.text()).toContain('HR / PA')
+    expect(panel.text()).toContain('Metrics used in the model')
+    expect(panel.text()).toContain('Age and season controls')
+    expect(panel.text()).toContain('Position controls')
+    expect(panel.text()).toContain('Current season')
+    expect(panel.text()).toContain('Career')
+    expect(panel.text()).toContain('Why this player is similar')
+    expect(panel.text()).toContain('Same position group: Outfielder.')
+    expect(panel.text()).toContain('All 3 metrics used')
+    expect(panel.text()).toContain('20%')
     expect(panel.text()).toContain('Compare side by side')
+
+    await panel.get('[data-test="similar-season-control"]').setValue('2025')
+    await panel.get('[data-test="similar-min-age-control"]').setValue('23')
+    await panel.get('[data-test="similar-max-age-control"]').setValue('29')
+    await panel.get('[data-test="similar-position-control"]').setValue('same_type')
+    await panel.get('[data-test="similar-player-controls"]').trigger('submit')
+    await flushPromises()
+
+    const requestUrl = fetch.mock.calls.at(-1)[0]
+    expect(requestUrl).toContain('similar_season=2025')
+    expect(requestUrl).toContain('similar_min_age=23')
+    expect(requestUrl).toContain('similar_max_age=29')
+    expect(requestUrl).toContain('similar_position=same_type')
+
+    await panel.get('[data-test="similar-mode-career"]').setValue(true)
+    await flushPromises()
+    expect(fetch.mock.calls.at(-1)[0]).toContain('similar_mode=career')
   })
 
   it('renders a retry state when loading fails', async () => {

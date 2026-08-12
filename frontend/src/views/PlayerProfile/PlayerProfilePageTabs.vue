@@ -1,16 +1,22 @@
 <script setup>
+import { computed, inject } from 'vue'
+
 defineProps({
   activeTab: { type: String, required: true },
 })
 
 const emit = defineEmits(['tab-change'])
+const context = inject('player-profile-context')
+const player = context?.player
 
-const pageTabs = [
+const pageTabs = computed(() => [
   { id: 'overview', label: 'Overview' },
   { id: 'performance-trends', label: 'Performance Trends' },
   { id: 'batted-ball-profile', label: 'Batted Ball Profile' },
   { id: 'similar-players', label: 'Similar Players' },
-]
+  ...(context?.canAccessNotes?.value ? [{ id: 'notes', label: 'Player Notes' }] : []),
+  ...(player?.value?.pitchIndicators?.primaryRole === 'pitcher' ? [{ id: 'pitch-arsenal', label: 'Pitch Arsenal' }] : []),
+])
 
 function selectTab(tabId) {
   emit('tab-change', tabId)
@@ -21,11 +27,11 @@ function selectAdjacentTab(event, index) {
   event.preventDefault()
 
   let nextIndex = index
-  if (event.key === 'ArrowRight') nextIndex = (index + 1) % pageTabs.length
-  if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pageTabs.length) % pageTabs.length
+  if (event.key === 'ArrowRight') nextIndex = (index + 1) % pageTabs.value.length
+  if (event.key === 'ArrowLeft') nextIndex = (index - 1 + pageTabs.value.length) % pageTabs.value.length
   if (event.key === 'Home') nextIndex = 0
-  if (event.key === 'End') nextIndex = pageTabs.length - 1
-  selectTab(pageTabs[nextIndex].id)
+  if (event.key === 'End') nextIndex = pageTabs.value.length - 1
+  selectTab(pageTabs.value[nextIndex].id)
   event.currentTarget.closest('[role="tablist"]')?.querySelectorAll('[role="tab"]')?.[nextIndex]?.focus()
 }
 </script>

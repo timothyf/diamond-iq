@@ -66,7 +66,14 @@ RSpec.describe "Api::Players", type: :request do
         throws: "R",
         mlb_debut_date: Date.new(2003, 6, 20),
         headshot_id: "408234",
-        headshot_url_override: "https://example.test/miguel-cabrera.png"
+        headshot_url_override: "https://example.test/miguel-cabrera.png",
+        raw_data: {
+          "draftYear" => 1999,
+          "awards" => [
+            { "id" => "ALMVP", "name" => "AL Most Valuable Player", "season" => "2012", "date" => "2012-11-15" },
+            { "id" => "ALAS", "name" => "AL All-Star", "season" => "2012", "date" => "2012-07-10" }
+          ]
+        }
       }
     )
 
@@ -81,6 +88,11 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile", "bats")).to eq("R")
     expect(json_body.dig("data", "profile", "throws")).to eq("R")
     expect(json_body.dig("data", "profile", "mlb_debut_date")).to eq("2003-06-20")
+    expect(json_body.dig("data", "profile", "draft_year")).to eq(1999)
+    expect(json_body.dig("data", "profile", "awards")).to contain_exactly(
+      include("id" => "ALMVP", "name" => "AL Most Valuable Player", "season" => 2012)
+    )
+    expect(json_body.dig("data", "profile", "all_star_selections")).to eq([ 2012 ])
     expect(json_body.dig("data", "profile", "headshot_url")).to eq("https://example.test/miguel-cabrera.png")
   end
 

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, inject, provide, ref, watch } from 'vue'
+import { computed, inject, provide, reactive, ref, watch } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
 
 import PlayerTrendChart from '../../components/PlayerTrendChart.vue'
@@ -7,6 +7,9 @@ import SavedAnalysisControls from '../../components/SavedAnalysisControls.vue'
 import PlayerOverviewView from './PlayerProfileOverviewView.vue'
 import PlayerPerformanceTrendsView from './PlayerPerformanceTrendsView.vue'
 import PlayerBattedBallProfileView from './PlayerBattedBallProfileView.vue'
+import PlayerPitchArsenalView from './PlayerPitchArsenalView.vue'
+import PlayerAnalysisPeriodControls from './PlayerAnalysisPeriodControls.vue'
+import PlayerNotesView from './PlayerNotesView.vue'
 import SimilarPlayersPanel from './SimilarPlayersPanel.vue'
 import PlayerProfileHeader from './PlayerProfileHeader.vue'
 import PlayerProfilePageTabs from './PlayerProfilePageTabs.vue'
@@ -16,6 +19,7 @@ import { usePlayerProfileAnalysis } from '../../composables/usePlayerProfileAnal
 import { usePlayerAnalysisFilters } from '../../composables/usePlayerAnalysisFilters'
 import { formatBaseballStatValue } from '../../utils/baseballStatFormatting'
 import { frontendConfig } from '../../config'
+import { useAuth } from '../../composables/useAuth'
 
 const props = defineProps({
   playerId: {
@@ -27,20 +31,27 @@ const props = defineProps({
 const route = inject(routeLocationKey, { query: {}, fullPath: `/players/${props.playerId}` })
 const router = inject(routerKey, { replace: () => {}, push: () => {} })
 const playerId = computed(() => props.playerId)
+const { user } = useAuth()
+const canAccessNotes = computed(() => Boolean(user.value))
 const profileTabs = [
   { id: 'overview', label: 'Basic Stats' },
   { id: 'advanced-stats', label: 'Advanced Stats' },
   { id: 'defensive-stats', label: 'Defensive Stats' },
   { id: 'splits', label: 'Splits' },
 ]
-const pageTabIds = ['overview', 'performance-trends', 'batted-ball-profile', 'similar-players']
-const selectedPageTab = ref(pageTabIds.includes(route.query.view) ? route.query.view : 'overview')
+const basePageTabIds = ['overview', 'performance-trends', 'batted-ball-profile', 'similar-players', 'pitch-arsenal']
+const pageTabIds = computed(() => canAccessNotes.value ? [...basePageTabIds, 'notes'] : basePageTabIds)
+const selectedPageTab = ref(pageTabIds.value.includes(route.query.view) ? route.query.view : 'overview')
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
 const {
   analysisOptions, customStartDate, customEndDate, rangePresets, savedAnalysisState,
   savedAnalysisUrl, selectPreset, applyCustomRange, updateWindow, openSavedAnalysis,
 } = usePlayerAnalysisFilters({ playerId, route, router, selectedPageTab })
-const { player, loading, error, sectionLoading, loadSection, refresh } = usePlayerProfile(playerId, analysisOptions)
+const tabAnalysisOptions = reactive({
+  'batted-ball-profile': { range: 'season', paWindow: 50, pitchWindow: 100, startDate: null, endDate: null },
+  'pitch-arsenal': { range: 'season', paWindow: 50, pitchWindow: 100, startDate: null, endDate: null },
+})
+const { player, loading, error, sectionLoading, loadSection, reloadSection, refresh } = usePlayerProfile(playerId, analysisOptions)
 const {
   careerTableRows, advancedTableRows, trendCharts, comparisonMetrics, selectedBatterSplit,
   batterSplitDimension, batterSplitMetrics, selectedPitcherSplit, pitcherSplitDimension,
@@ -59,10 +70,15 @@ watch(
     route.query.tab,
   ],
   ([view, tab]) => {
-    selectedPageTab.value = pageTabIds.includes(view) ? view : 'overview'
+    selectedPageTab.value = pageTabIds.value.includes(view) ? view : 'overview'
     selectedProfileTab.value = profileTabs.some((entry) => entry.id === tab) ? tab : 'overview'
   },
 )
+
+watch(canAccessNotes, (hasAccess) => {
+  if (hasAccess && route.query.view === 'notes') selectedPageTab.value = 'notes'
+  if (!hasAccess && selectedPageTab.value === 'notes') selectedPageTab.value = 'overview'
+})
 
 watch(
   () => player.value?.profile?.headshotUrl,
@@ -85,9 +101,17 @@ watch(
   selectedPageTab,
   (tab) => {
     if (tab === 'similar-players') void loadSection('similar_players')
+    if (tab === 'batted-ball-profile' || tab === 'pitch-arsenal') {
+      void reloadSection('analytics', tabAnalysisOptions[tab])
+    }
   },
   { immediate: true },
 )
+
+function updateTabAnalysisPeriod(tab, options) {
+  tabAnalysisOptions[tab] = options
+  if (selectedPageTab.value === tab) void reloadSection('analytics', options)
+}
 
 const initials = computed(() =>
   [player.value?.firstName, player.value?.lastName]
@@ -249,7 +273,8 @@ function closeSourceModal() {
 }
 
 provide('player-profile-context', {
-  player, selectedProfileTab, profileTabs, sectionLoading,
+  player, selectedProfileTab, profileTabs, sectionLoading, reloadSection,
+  canAccessNotes,
   defensiveStats: computed(() => player.value?.defensiveStats || { season: null, seasons: [], positions: [], fieldingPercentage: null, defensiveRunsSaved: null, outsAboveAverage: null }),
   careerTableRows, titleize, careerRangeLabel,
   formatBaseballStatValue, advancedTableRows, advancedStatValue, showBattingIndicators, batterSplitDimension,
@@ -257,6 +282,7 @@ provide('player-profile-context', {
   pitcherSplitMetrics, pitcherSplitValue, selectedPitcherSplit, formatDate, similarityValue,
   contextualMetricLabel, contextualValue, peerAverage, peerLabel, percentileStyle, signedContextualValue,
   benchmarkPeriodLabel, battingMetrics, pitchingMetrics, teamHistoryLabel, displayValue, SavedAnalysisControls,
+  PlayerAnalysisPeriodControls, tabAnalysisOptions, updateTabAnalysisPeriod,
   savedAnalysisState, savedAnalysisUrl, openSavedAnalysis, analysisOptions, rangePresets, selectPreset,
   customStartDate, customEndDate, applyCustomRange, updateWindow, trendEventTone, trendEventLabel,
   trendEventTitle, trendEventValue, comparisonMetrics, trendCharts, PlayerTrendChart, selectAdjacentTab,
@@ -276,8 +302,6 @@ provide('player-profile-context', {
     </div>
 
     <template v-else-if="player">
-      <RouterLink class="profile-back" :to="{ name: 'stat-explorer' }">← Back to Stat Explorer</RouterLink>
-
       <PlayerProfileHeader
         :player="player"
         :initials="initials"
@@ -301,6 +325,10 @@ provide('player-profile-context', {
       <PlayerPerformanceTrendsView v-if="selectedPageTab === 'performance-trends'" />
 
       <PlayerBattedBallProfileView v-if="selectedPageTab === 'batted-ball-profile'" />
+
+      <PlayerPitchArsenalView v-if="selectedPageTab === 'pitch-arsenal' && player?.pitchIndicators?.primaryRole === 'pitcher'" />
+
+      <PlayerNotesView v-if="selectedPageTab === 'notes' && canAccessNotes" />
 
       <section
         v-if="selectedPageTab === 'similar-players'"

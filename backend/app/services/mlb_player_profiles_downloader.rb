@@ -41,7 +41,7 @@ class MlbPlayerProfilesDownloader
   def build_url
     query = {
       personIds: mlb_ids.join(","),
-      hydrate: "currentTeam"
+      hydrate: "currentTeam,awards"
     }.to_query
     "#{service_config.fetch(:base_url)}/api/v1/people?#{query}"
   end
