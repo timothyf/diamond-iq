@@ -82,6 +82,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
     <RouterView />
   </div>
   <footer class="app-footer">
-    <a href="https://github.com/timothyf/diamond-iq" target="_blank" rel="noopener noreferrer">DiamondIQ on GitHub</a>
+    <a href="https://github.com/timothyf/ninelens" target="_blank" rel="noopener noreferrer">NineLens on GitHub</a>
   </footer>
 </template>

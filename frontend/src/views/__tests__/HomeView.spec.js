@@ -85,7 +85,7 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('4.2')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('60-36')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
-    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('Top teams in last 30 games')
+    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('Last 30 games')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('19-11')
     expect(wrapper.text()).toContain('Stat Explorer')
   })

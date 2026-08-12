@@ -38,7 +38,7 @@ describe('App', () => {
       global: { stubs: { RouterLink: true, RouterView: true } },
     })
 
-    expect(wrapper.get('.app-footer a').attributes('href')).toBe('https://github.com/timothyf/diamond-iq')
+    expect(wrapper.get('.app-footer a').attributes('href')).toBe('https://github.com/timothyf/ninelens')
   })
 
   it('leaves a protected route immediately when the user signs out', async () => {
