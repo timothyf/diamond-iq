@@ -131,6 +131,11 @@ RSpec.describe "Api::Home", type: :request do
     expect(json_body.dig("data", "leaders", 3, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
     expect(json_body.dig("data", "team_pulse", "best_records", 0, "team", "abbreviation")).to eq("DET")
     expect(json_body.dig("data", "team_pulse", "run_differential", 0, "run_differential")).to eq(2)
+    expect(json_body.dig("data", "team_pulse", "last_30_form", 0)).to include(
+      "recent_30_games" => 1,
+      "recent_30_wins" => 1,
+      "recent_30_losses" => 0
+    )
     expect(json_body.dig("data", "freshness", "analytics")).to eq("2026-07-16T20:32:00.000Z")
   end
 

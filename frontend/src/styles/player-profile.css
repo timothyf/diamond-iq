@@ -871,6 +871,29 @@
   font-variant-numeric: tabular-nums;
 }
 
+.defensive-stats-panel .advanced-table {
+  table-layout: fixed;
+  width: 100%;
+  min-width: 0;
+}
+
+.defensive-stats-panel .advanced-table th,
+.defensive-stats-panel .advanced-table td {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.defensive-stats-panel .advanced-table th:nth-child(1),
+.defensive-stats-panel .advanced-table td:nth-child(1) { width: 12%; }
+.defensive-stats-panel .advanced-table th:nth-child(2),
+.defensive-stats-panel .advanced-table td:nth-child(2) { width: 12%; }
+.defensive-stats-panel .advanced-table th:nth-child(3),
+.defensive-stats-panel .advanced-table td:nth-child(3) { width: 22%; }
+.defensive-stats-panel .advanced-table th:nth-child(4),
+.defensive-stats-panel .advanced-table td:nth-child(4) { width: 27%; }
+.defensive-stats-panel .advanced-table th:nth-child(5),
+.defensive-stats-panel .advanced-table td:nth-child(5) { width: 27%; }
+
 .advanced-table th,
 .advanced-table td {
   padding: 0.78rem;

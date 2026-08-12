@@ -7,6 +7,7 @@ import SavedAnalysisControls from '../../components/SavedAnalysisControls.vue'
 import PlayerOverviewView from './PlayerProfileOverviewView.vue'
 import PlayerPerformanceTrendsView from './PlayerPerformanceTrendsView.vue'
 import PlayerBattedBallProfileView from './PlayerBattedBallProfileView.vue'
+import SimilarPlayersPanel from './SimilarPlayersPanel.vue'
 import PlayerProfileHeader from './PlayerProfileHeader.vue'
 import PlayerProfilePageTabs from './PlayerProfilePageTabs.vue'
 import PlayerDataSourcesModal from './PlayerDataSourcesModal.vue'
@@ -29,9 +30,10 @@ const playerId = computed(() => props.playerId)
 const profileTabs = [
   { id: 'overview', label: 'Basic Stats' },
   { id: 'advanced-stats', label: 'Advanced Stats' },
+  { id: 'defensive-stats', label: 'Defensive Stats' },
   { id: 'splits', label: 'Splits' },
 ]
-const pageTabIds = ['overview', 'performance-trends', 'batted-ball-profile']
+const pageTabIds = ['overview', 'performance-trends', 'batted-ball-profile', 'similar-players']
 const selectedPageTab = ref(pageTabIds.includes(route.query.view) ? route.query.view : 'overview')
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
 const {
@@ -73,7 +75,16 @@ watch(
   selectedProfileTab,
   (tab) => {
     if (tab === 'advanced-stats') void loadSection('advanced_stats')
+    if (tab === 'defensive-stats') void loadSection('defensive_stats')
     if (tab === 'splits') void loadSection('splits')
+  },
+  { immediate: true },
+)
+
+watch(
+  selectedPageTab,
+  (tab) => {
+    if (tab === 'similar-players') void loadSection('similar_players')
   },
   { immediate: true },
 )
@@ -238,7 +249,9 @@ function closeSourceModal() {
 }
 
 provide('player-profile-context', {
-  player, selectedProfileTab, profileTabs, sectionLoading, careerTableRows, titleize, careerRangeLabel,
+  player, selectedProfileTab, profileTabs, sectionLoading,
+  defensiveStats: computed(() => player.value?.defensiveStats || { season: null, seasons: [], positions: [], fieldingPercentage: null, defensiveRunsSaved: null, outsAboveAverage: null }),
+  careerTableRows, titleize, careerRangeLabel,
   formatBaseballStatValue, advancedTableRows, advancedStatValue, showBattingIndicators, batterSplitDimension,
   batterSplitMetrics, batterSplitValue, selectedBatterSplit, showPitchingIndicators, pitcherSplitDimension,
   pitcherSplitMetrics, pitcherSplitValue, selectedPitcherSplit, formatDate, similarityValue,
@@ -288,6 +301,16 @@ provide('player-profile-context', {
       <PlayerPerformanceTrendsView v-if="selectedPageTab === 'performance-trends'" />
 
       <PlayerBattedBallProfileView v-if="selectedPageTab === 'batted-ball-profile'" />
+
+      <section
+        v-if="selectedPageTab === 'similar-players'"
+        id="player-page-panel-similar-players"
+        class="profile-page-content"
+        role="tabpanel"
+        aria-labelledby="player-page-tab-similar-players"
+      >
+        <SimilarPlayersPanel />
+      </section>
 
       <PlayerDataSourcesModal
         :open="sourceModalOpen"

@@ -160,6 +160,42 @@ RSpec.describe PlayerStatsDownloader, type: :service do
     )
   end
 
+  it "parses Baseball Savant OAA values using the yearly fielder leaderboard" do
+    downloader = described_class.new(category: "batting", start_year: 2025, end_year: 2025)
+    csv_body = <<~CSV
+      player_name,playerId,outs_above_average
+      Riley Greene,682985,3
+      Jacob Misiorowski,669373,-1.5
+    CSV
+    response = instance_double(Net::HTTPSuccess, body: csv_body)
+    allow(downloader).to receive(:request_csv) do |uri|
+      expect(uri.query).to include("startYear=2025", "endYear=2025", "range=year", "csv=true")
+      response
+    end
+
+    expect(downloader.send(:fetch_statcast_fielding_values, 2025)).to eq(
+      682985 => { "OAA" => 3.0 },
+      669373 => { "OAA" => -1.5 }
+    )
+  end
+
+  it "calculates fielding percentage from MLB fielding chances and errors" do
+    downloader = described_class.new(category: "batting", start_year: 2025, end_year: 2025)
+    allow(downloader).to receive(:fetch_json).and_return(
+      {
+        "stats" => [
+          { "playerId" => 682985, "chances" => 120, "errors" => 2 },
+          { "playerId" => 682985, "chances" => 10, "errors" => 0 }
+        ]
+      },
+      { "stats" => [] }
+    )
+
+    expect(downloader.send(:fetch_mlb_fielding_values, 2025)).to eq(
+      682985 => { "fieldingPercentage" => (128.0 / 130) }
+    )
+  end
+
   it "normalizes pitcher aliases and validates the year range" do
     bad_range = described_class.call(category: "pitching", start_year: 2026, end_year: 2025)
 

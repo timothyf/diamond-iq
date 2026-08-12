@@ -49,6 +49,7 @@ const dashboardPayload = {
       best_records: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, wins: 60, losses: 36 }],
       run_differential: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, run_differential: 105 }],
       recent_form: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, recent_games: 10, recent_wins: 8, recent_losses: 2 }],
+      last_30_form: [{ team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' }, recent_30_games: 30, recent_30_wins: 19, recent_30_losses: 11 }],
     },
     freshness: { analytics: '2026-07-16T20:32:00Z' },
   },
@@ -84,6 +85,8 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('4.2')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('60-36')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
+    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('Top teams in last 30 games')
+    expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('19-11')
     expect(wrapper.text()).toContain('Stat Explorer')
   })
 

@@ -1,6 +1,7 @@
 class HomeSnapshotQuery
   LEADER_LIMIT = 3
   RECENT_TEAM_GAME_LIMIT = 10
+  RECENT_TEAM_30_GAME_LIMIT = 30
   LEADER_DEFINITIONS = [
     { key: "ops", label: "OPS", category: "batting", aliases: %w[ops OPS], descending: true, qualifier: :at_bats },
     { key: "WAR", label: "WAR", category: "batting", aliases: %w[WAR war], descending: true },
@@ -212,6 +213,10 @@ class HomeSnapshotQuery
       recent_form: summaries
         .select { |entry| entry[:recent_games].positive? }
         .sort_by { |entry| [-entry[:recent_winning_percentage], -entry[:recent_run_differential], entry.dig(:team, :name)] }
+        .first(5),
+      last_30_form: summaries
+        .select { |entry| entry[:recent_30_games].positive? }
+        .sort_by { |entry| [-entry[:recent_30_winning_percentage], -entry[:recent_30_run_differential], entry.dig(:team, :name)] }
         .first(5)
     }
   end
@@ -222,6 +227,7 @@ class HomeSnapshotQuery
       next if totals[:games].zero?
 
       recent = recent_game_summary(team)
+      recent_30 = recent_game_summary(team, RECENT_TEAM_30_GAME_LIMIT)
       {
         team: serialize_team(team),
         games: totals[:games],
@@ -235,7 +241,13 @@ class HomeSnapshotQuery
         recent_losses: recent[:losses],
         recent_ties: recent[:ties],
         recent_winning_percentage: ratio(recent[:wins], recent[:wins] + recent[:losses]),
-        recent_run_differential: recent[:runs_scored] - recent[:runs_allowed]
+        recent_run_differential: recent[:runs_scored] - recent[:runs_allowed],
+        recent_30_games: recent_30[:games],
+        recent_30_wins: recent_30[:wins],
+        recent_30_losses: recent_30[:losses],
+        recent_30_ties: recent_30[:ties],
+        recent_30_winning_percentage: ratio(recent_30[:wins], recent_30[:wins] + recent_30[:losses]),
+        recent_30_run_differential: recent_30[:runs_scored] - recent_30[:runs_allowed]
       }
     end
   end
@@ -260,8 +272,8 @@ class HomeSnapshotQuery
     end
   end
 
-  def recent_game_summary(team)
-    games = completed_games_by_team.fetch(team.id, []).last(RECENT_TEAM_GAME_LIMIT)
+  def recent_game_summary(team, limit = RECENT_TEAM_GAME_LIMIT)
+    games = completed_games_by_team.fetch(team.id, []).last(limit)
     games.each_with_object({ games: games.length, wins: 0, losses: 0, ties: 0, runs_scored: 0, runs_allowed: 0 }) do |game, totals|
       scored, allowed = game.home_team_id == team.id ? [ game.home_score, game.away_score ] : [ game.away_score, game.home_score ]
       totals[:runs_scored] += scored

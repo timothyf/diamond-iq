@@ -9,6 +9,7 @@ const pageTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'performance-trends', label: 'Performance Trends' },
   { id: 'batted-ball-profile', label: 'Batted Ball Profile' },
+  { id: 'similar-players', label: 'Similar Players' },
 ]
 
 function selectTab(tabId) {
@@ -50,4 +51,3 @@ function selectAdjacentTab(event, index) {
     </div>
   </nav>
 </template>
-

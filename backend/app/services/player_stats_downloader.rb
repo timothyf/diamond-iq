@@ -226,6 +226,8 @@ class PlayerStatsDownloader
     end
 
     merge_fangraphs_values(rows, year)
+    merge_mlb_fielding_values(rows, year) if category == "batting"
+    merge_statcast_fielding_values(rows, year) if category == "batting"
     if category == "pitching"
       merge_baseball_reference_values(rows, year)
       merge_statcast_values(rows, year)
@@ -324,6 +326,117 @@ class PlayerStatsDownloader
   rescue StandardError => e
     Rails.logger.warn("Unable to download Statcast values for pitching #{year}: #{e.class}: #{e.message}")
     rows
+  end
+
+  def merge_statcast_fielding_values(rows, year)
+    fielding_values = fetch_statcast_fielding_values(year)
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless fielding_values.key?(player_id)
+
+      row.merge!(fielding_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download Statcast fielding values for #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def merge_mlb_fielding_values(rows, year)
+    fielding_values = fetch_mlb_fielding_values(year)
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless fielding_values.key?(player_id)
+
+      row.merge!(fielding_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download MLB fielding values for #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def fetch_mlb_fielding_values(year)
+    offset = 0
+    totals_by_player = Hash.new { |hash, player_id| hash[player_id] = { chances: 0, errors: 0 } }
+
+    loop do
+      query = {
+        stitch_env: "prod",
+        sportId: "1",
+        stats: "season",
+        group: "fielding",
+        playerPool: "ALL",
+        gameType: "R",
+        limit: page_size.to_s,
+        sortStat: "fieldingPercentage",
+        order: "desc",
+        season: year.to_s,
+        offset: offset.to_s
+      }.to_query
+      batch = extract_rows(fetch_json("#{service_config.fetch(:base_url)}?#{query}"))
+      break if batch.empty?
+
+      batch.each do |row|
+        player_id = Integer(row["playerId"], exception: false)
+        chances = Integer(row["chances"], exception: false)
+        errors = Integer(row["errors"], exception: false)
+        next unless player_id && chances
+
+        totals_by_player[player_id][:chances] += chances
+        totals_by_player[player_id][:errors] += errors || 0
+      end
+      break if batch.length < page_size
+
+      offset += page_size
+    end
+
+    totals_by_player.each_with_object({}) do |(player_id, totals), values|
+      next unless totals[:chances].positive?
+
+      values[player_id] = {
+        "fieldingPercentage" => (totals[:chances] - totals[:errors]).to_f / totals[:chances]
+      }
+    end
+  end
+
+  def fetch_statcast_fielding_values(year)
+    return {} if year < 2016
+
+    uri = URI("#{service_config.fetch(:baseballsavant_leaderboard_url)}/outs_above_average")
+    uri.query = {
+      type: "Fielder",
+      startYear: year,
+      endYear: year,
+      split: "no",
+      team: "",
+      range: "year",
+      min: 0,
+      pos: "",
+      roles: "",
+      viz: "hide",
+      csv: "true"
+    }.to_query
+
+    response = request_csv(uri)
+    CSV.parse(utf8_csv_body(response.body), headers: true).each_with_object({}) do |row, values|
+      headers = row.headers.compact
+      normalized_headers = headers.to_h do |header|
+        [header, header.to_s.downcase.gsub(/[^a-z0-9]/, "")]
+      end
+      player_header = headers.find do |header|
+        normalized = normalized_headers.fetch(header)
+        normalized.include?("playerid") || %w[mlbamid mlbamplayerid].include?(normalized)
+      end
+      player_header ||= headers.find { |header| normalized_headers.fetch(header) == "id" }
+      oaa_header = headers.find do |header|
+        normalized = normalized_headers.fetch(header)
+        normalized == "oaa" || normalized.include?("outsaboveaverage")
+      end
+      player_id = Integer(row[player_header], exception: false) if player_header
+      oaa = Float(row[oaa_header], exception: false) if oaa_header
+      next unless player_id && oaa
+
+      values[player_id] = { "OAA" => oaa }
+    end
   end
 
   def merge_baseball_reference_values(rows, year)

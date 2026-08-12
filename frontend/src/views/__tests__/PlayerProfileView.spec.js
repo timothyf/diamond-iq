@@ -675,7 +675,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.find('#player-profile-panel-overview').exists()).toBe(false)
     const panel = wrapper.get('[data-test="advanced-stats-panel"]')
     expect(panel.isVisible()).toBe(true)
-    expect(wrapper.get('[data-test="similar-players"]').isVisible()).toBe(true)
+    expect(wrapper.find('[data-test="similar-players"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="player-trends"]').exists()).toBe(false)
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('BB%')
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('10.2%')
@@ -981,6 +981,13 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    const similarPlayersTab = wrapper.get('[data-test="player-page-tab-similar-players"]')
+    expect(similarPlayersTab.attributes('aria-selected')).toBe('false')
+
+    await similarPlayersTab.trigger('click')
+    await flushPromises()
+
+    expect(similarPlayersTab.attributes('aria-selected')).toBe('true')
     const panel = wrapper.get('[data-test="similar-players"]')
     expect(panel.text()).toContain('Julio Rodríguez')
     expect(panel.text()).toContain('91.4%')

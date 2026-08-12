@@ -118,7 +118,7 @@ class PlayerProfileSnapshotQuery
     }
   ].freeze
   TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
-  DEFERRED_SECTIONS = %w[advanced_stats splits similar_players analytics].freeze
+  DEFERRED_SECTIONS = %w[advanced_stats defensive_stats splits similar_players analytics].freeze
 
   def initialize(player:, on: Date.current, analysis_range: nil)
     @player = player
@@ -140,6 +140,7 @@ class PlayerProfileSnapshotQuery
     }
 
     payload[:advanced_stats] = advanced_stats if selected_sections.include?("advanced_stats")
+    payload[:defensive_stats] = defensive_stats if selected_sections.include?("defensive_stats")
     if selected_sections.include?("splits")
       payload[:batter_splits] = batter_splits_payload
       payload[:pitcher_splits] = pitcher_splits_payload
@@ -270,6 +271,92 @@ class PlayerProfileSnapshotQuery
 
   def empty_advanced_stats
     { category: preferred_category, groups: advanced_groups(preferred_category), seasons: [], career: { values: {} } }
+  end
+
+  def defensive_stats
+    seasons = all_season_rows.map(&:season).compact.uniq.sort
+    rows = seasons.map { |season| defensive_season_stats(season) }
+    { season: latest_season, seasons: rows }
+  end
+
+  def defensive_season_stats(season)
+    stat_rows = all_season_rows.select { |row| row.season == season }
+    games = advanced_count(stat_rows, %w[gamesPlayed G games], career: false)
+    game_fielding = game_fielding_summary(season)
+    assignments = player.player_positions.to_a
+      .select { |assignment| assignment.season.nil? || assignment.season == season }
+      .sort_by { |assignment| [assignment.is_primary? ? 0 : 1, assignment.position.sort_order] }
+      .uniq { |assignment| assignment.position_id }
+
+    stored_fielding_percentage = advanced_rate(
+      stat_rows,
+      %w[fieldingPercentage fieldingPct fielding_percentage fldgPct FPCT FldgPct],
+      %w[gamesPlayed G games],
+      career: false
+    )
+    fielding_percentage = stored_fielding_percentage.to_f.positive? ? stored_fielding_percentage : game_fielding[:fielding_percentage]
+
+    {
+      season: season,
+      games: games || game_fielding[:positions].sum { |entry| entry[:games].to_i },
+      positions: (game_fielding[:positions].presence || assignments.map.with_index do |assignment, index|
+        { position: assignment.position.abbreviation || assignment.position.name, games: index.zero? ? games : nil, innings: nil }
+      end),
+      fielding_percentage: numeric_advanced_value(fielding_percentage),
+      defensive_runs_saved: numeric_advanced_value(
+        advanced_count(stat_rows, %w[defensiveRunsSaved DRS drs], career: false) || advanced_count(stat_rows, %w[Defense], career: false) || game_fielding[:defensive_runs_saved]
+      ),
+      outs_above_average: numeric_advanced_value(
+        advanced_count(stat_rows, %w[outsAboveAverage OAA oaa outs_above_average], career: false) || game_fielding[:outs_above_average]
+      )
+    }
+  end
+
+  def game_fielding_summary(season)
+    lines = player.game_player_batting_lines
+      .joins(:game)
+      .where(games: { status: "final" })
+      .where(games: { official_date: Date.new(season, 1, 1)..Date.new(season, 12, 31) })
+      .to_a
+    grouped = lines.group_by { |line| line.position.presence || "—" }
+    position_rows = grouped.map do |position, position_lines|
+      fielding = position_lines.filter_map { |line| line.raw_data.to_h.dig("stats", "fielding") }
+      innings = fielding.sum { |stats| Float(stats["innings"], exception: false) || 0.0 }
+      {
+        position: position,
+        games: position_lines.map(&:game_id).uniq.length,
+        innings: innings.positive? ? innings : nil
+      }
+    end
+    fielding_stats = lines.filter_map { |line| fielding_stats_for_line(line) }
+    chances = fielding_stats.sum { |stats| fielding_number(stats, "chances") }
+    errors = fielding_stats.sum { |stats| fielding_number(stats, "errors") }
+    direct_fielding_percentage = fielding_stats.filter_map do |stats|
+      Float(stats["fielding"] || stats["fieldingPercentage"] || stats["fieldingPct"] || stats["fldgPct"], exception: false)
+    end.first
+    defensive_runs_saved = fielding_stats.filter_map { |stats| fielding_value(stats, %w[defensiveRunsSaved DRS drs]) }.sum
+    outs_above_average = fielding_stats.filter_map { |stats| fielding_value(stats, %w[outsAboveAverage OAA oaa]) }.sum
+
+    {
+      positions: position_rows,
+      fielding_percentage: direct_fielding_percentage || (chances.positive? ? (chances - errors).to_f / chances : nil),
+      defensive_runs_saved: defensive_runs_saved.zero? ? nil : defensive_runs_saved,
+      outs_above_average: outs_above_average.zero? ? nil : outs_above_average
+    }
+  rescue ActiveRecord::StatementInvalid
+    { positions: [], fielding_percentage: nil }
+  end
+
+  def fielding_stats_for_line(line)
+    line.raw_data.to_h.dig("stats", "fielding")
+  end
+
+  def fielding_number(stats, key)
+    Integer(stats[key], exception: false) || 0
+  end
+
+  def fielding_value(stats, keys)
+    keys.filter_map { |key| Float(stats[key], exception: false) }.first
   end
 
   def advanced_groups(category)

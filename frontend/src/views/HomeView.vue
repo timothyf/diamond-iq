@@ -40,6 +40,10 @@ function record(entry, recent = false) {
   return [wins, losses, ...(Number(ties || 0) > 0 ? [ties] : [])].join('-')
 }
 
+function recordLast30(entry) {
+  return [entry.recent_30_wins, entry.recent_30_losses, ...(Number(entry.recent_30_ties || 0) > 0 ? [entry.recent_30_ties] : [])].join('-')
+}
+
 function signed(value) {
   const number = Number(value || 0)
   return `${number > 0 ? '+' : ''}${number}`
@@ -147,6 +151,16 @@ function signed(value) {
                 <strong>{{ record(entry, true) }}</strong>
               </li>
             </ol>
+          </article>
+          <article>
+            <h3>Last 30 games</h3>
+            <ol>
+              <li v-for="entry in dashboard.team_pulse.last_30_form" :key="entry.team.id">
+                <RouterLink :to="{ name: 'team-profile', params: { id: entry.team.id } }"><span>{{ entry.team.abbreviation }}</span>{{ entry.team.name }}</RouterLink>
+                <strong>{{ recordLast30(entry) }}</strong>
+              </li>
+            </ol>
+            <p v-if="!dashboard.team_pulse.last_30_form?.length" class="home-empty">No recent team results available.</p>
           </article>
         </div>
       </section>

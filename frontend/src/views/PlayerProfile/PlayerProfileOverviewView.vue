@@ -3,8 +3,8 @@ import { inject } from 'vue'
 import NotesPanel from '../../components/NotesPanel.vue'
 import PlayerCareerStatsPanel from './PlayerCareerStatsPanel.vue'
 import PlayerAdvancedStatsPanel from './PlayerAdvancedStatsPanel.vue'
+import PlayerDefensiveStatsPanel from './PlayerDefensiveStatsPanel.vue'
 import PlayerSplitsPanel from './PlayerSplitsPanel.vue'
-import SimilarPlayersPanel from './SimilarPlayersPanel.vue'
 import ContextualBenchmarksPanel from './ContextualBenchmarksPanel.vue'
 import RecentTeamHistoryCard from './RecentTeamHistoryCard.vue'
 
@@ -40,10 +40,10 @@ const {
     <div class="profile-stat-tabs">
       <PlayerCareerStatsPanel v-if="selectedProfileTab === 'overview'" />
       <PlayerAdvancedStatsPanel v-if="selectedProfileTab === 'advanced-stats'" />
+      <PlayerDefensiveStatsPanel v-if="selectedProfileTab === 'defensive-stats'" />
       <PlayerSplitsPanel v-if="selectedProfileTab === 'splits'" />
     </div>
 
-    <SimilarPlayersPanel />
     <ContextualBenchmarksPanel />
 
     <div class="profile-two-column">
@@ -51,4 +51,3 @@ const {
     </div>
   </div>
 </template>
-

@@ -52,6 +52,7 @@ function normalizeProfile(data = {}) {
   const season = data.season_overview || {}
   const career = data.career_overview || {}
   const advancedStats = data.advanced_stats || {}
+  const defensiveStats = data.defensive_stats || {}
   const indicators = data.recent_pitch_indicators || {}
   const benchmarks = data.contextual_benchmarks || {}
   const battedBallProfile = data.batted_ball_profile || {}
@@ -118,6 +119,21 @@ function normalizeProfile(data = {}) {
         totalValues: seasonRow.total_values || seasonRow.values || {},
       })),
       career: advancedStats.career || { values: {} },
+    },
+    defensiveStats: {
+      season: defensiveStats.season,
+      seasons: (defensiveStats.seasons || []).map((seasonRow) => ({
+        season: seasonRow.season,
+        games: seasonRow.games,
+        positions: seasonRow.positions || [],
+        fieldingPercentage: seasonRow.fielding_percentage,
+        defensiveRunsSaved: seasonRow.defensive_runs_saved,
+        outsAboveAverage: seasonRow.outs_above_average,
+      })),
+      positions: defensiveStats.positions || [],
+      fieldingPercentage: defensiveStats.fielding_percentage,
+      defensiveRunsSaved: defensiveStats.defensive_runs_saved,
+      outsAboveAverage: defensiveStats.outs_above_average,
     },
     similarPlayers: {
       season: similarPlayers.season,
@@ -368,7 +384,6 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
       window.setTimeout(() => {
         if (requestId !== requestCounter) return
 
-        void loadSection('similar_players', requestId)
         void loadSection('analytics', requestId)
       }, 0)
     } catch (fetchError) {
@@ -428,6 +443,7 @@ export function usePlayerProfile(playerIdRef, analysisOptionsRef = null, { inclu
 function normalizedSection(data, section) {
   const normalized = normalizeProfile(data)
   if (section === 'advanced_stats') return { advancedStats: normalized.advancedStats }
+  if (section === 'defensive_stats') return { defensiveStats: normalized.defensiveStats }
   if (section === 'splits') return { batterSplits: normalized.batterSplits, pitcherSplits: normalized.pitcherSplits }
   if (section === 'similar_players') return { similarPlayers: normalized.similarPlayers }
   if (section === 'analytics') {

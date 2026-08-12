@@ -10,6 +10,7 @@ const emptyDashboard = () => ({
     best_records: [],
     run_differential: [],
     recent_form: [],
+    last_30_form: [],
   },
   freshness: {},
 })
@@ -28,7 +29,12 @@ export function useHomeDashboard() {
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
 
       const payload = await response.json()
-      dashboard.value = { ...emptyDashboard(), ...(payload.data || {}) }
+      const data = payload.data || {}
+      dashboard.value = {
+        ...emptyDashboard(),
+        ...data,
+        team_pulse: { ...emptyDashboard().team_pulse, ...(data.team_pulse || {}) },
+      }
     } catch (fetchError) {
       dashboard.value = emptyDashboard()
       error.value = 'Unable to load today’s DiamondIQ briefing. Confirm the Rails API is running and reachable.'
