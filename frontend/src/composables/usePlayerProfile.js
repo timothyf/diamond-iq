@@ -44,6 +44,7 @@ function normalizeProfile(data = {}) {
         formattedHeight: data.profile.formatted_height,
         weightPounds: data.profile.weight_pounds,
         draftYear: data.profile.draft_year,
+        draftTeam: data.profile.draft_team,
         awards: (data.profile.awards || []).map((award) => ({
           id: award.id,
           name: award.name,

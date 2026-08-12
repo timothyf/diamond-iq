@@ -3,8 +3,8 @@ require "set"
 class MlbPlayerTeamHistoryImporter
   SOURCE_NAME = "MLB Stats API transactions"
   ROSTER_STATUS = "organization"
-  JOIN_TYPE_CODES = %w[CL PUR SE SFA TR].freeze
-  JOIN_DESCRIPTIONS = /claimed|purchased|selected|signed as free agent|trade/i
+  JOIN_TYPE_CODES = %w[ASG CL PUR SE SFA SGN TR].freeze
+  JOIN_DESCRIPTIONS = /assigned|claimed|purchased|selected|signed|trade/i
   LEAVE_DESCRIPTIONS = /declared free agency|elected free agency|released|retired/i
 
   def self.call(player:, payload:, source_url: nil, fetched_at: Time.current)

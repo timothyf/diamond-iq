@@ -78,5 +78,10 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
       </template>
     </div>
   </header>
-  <RouterView />
+  <div class="app-content">
+    <RouterView />
+  </div>
+  <footer class="app-footer">
+    <a href="https://github.com/timothyf/diamond-iq" target="_blank" rel="noopener noreferrer">DiamondIQ on GitHub</a>
+  </footer>
 </template>

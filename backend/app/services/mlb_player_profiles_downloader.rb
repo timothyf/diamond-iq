@@ -22,6 +22,19 @@ class MlbPlayerProfilesDownloader
     return failure("MLB people response must be a JSON object") unless payload.is_a?(Hash)
     return failure("MLB people response must include a people array") unless payload["people"].is_a?(Array)
 
+    payload["people"].each do |person|
+      next unless person.is_a?(Hash) && person["id"].present?
+      next if person["awards"].is_a?(Array) && person["drafts"].is_a?(Array)
+
+      detail = fetch_json(build_person_url(person["id"]))
+      detailed_person = detail.is_a?(Hash) ? Array(detail["people"]).first || detail : nil
+      next unless detailed_person.is_a?(Hash)
+
+      %w[awards drafts].each do |key|
+        person[key] = detailed_person[key] if detailed_person[key].is_a?(Array)
+      end
+    end
+
     success(
       "Downloaded #{payload['people'].length} MLB player profiles",
       payload: payload,
@@ -41,9 +54,14 @@ class MlbPlayerProfilesDownloader
   def build_url
     query = {
       personIds: mlb_ids.join(","),
-      hydrate: "currentTeam,awards"
+      hydrate: "currentTeam,awards,draft"
     }.to_query
     "#{service_config.fetch(:base_url)}/api/v1/people?#{query}"
+  end
+
+  def build_person_url(mlb_id)
+    query = { hydrate: "awards,draft" }.to_query
+    "#{service_config.fetch(:base_url)}/api/v1/people/#{mlb_id}?#{query}"
   end
 
   def fetch_json(url)

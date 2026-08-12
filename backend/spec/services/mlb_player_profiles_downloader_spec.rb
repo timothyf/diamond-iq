@@ -7,12 +7,15 @@ RSpec.describe MlbPlayerProfilesDownloader do
 
     allow(downloader).to receive(:fetch_json) do |url|
       query = Rack::Utils.parse_nested_query(URI(url).query)
-      expect(URI(url).path).to eq("/api/v1/people")
-      expect(query).to include(
-        "personIds" => "700270,669360",
-        "hydrate" => "currentTeam,awards"
-      )
-      payload
+      if URI(url).path == "/api/v1/people"
+        expect(query).to include(
+          "personIds" => "700270,669360",
+          "hydrate" => "currentTeam,awards,draft"
+        )
+        payload
+      else
+        { "people" => [ { "id" => URI(url).path.split("/").last } ] }
+      end
     end
 
     result = downloader.call

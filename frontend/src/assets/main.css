@@ -2,7 +2,29 @@
 
 #app {
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
+
+.app-content { flex: 1 0 auto; }
+
+.app-footer {
+  flex: 0 0 auto;
+  padding: 1rem max(1.25rem, calc((100vw - 1680px) / 2));
+  border-top: 1px solid rgba(16, 38, 61, 0.12);
+  color: #667685;
+  background: #fffdf7;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.app-footer a {
+  color: #173652;
+  font-weight: 700;
+}
+
+.app-footer a:hover,
+.app-footer a:focus-visible { color: #8f2d24; }
 
 .app-bar {
   position: sticky;

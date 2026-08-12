@@ -19,7 +19,10 @@ const {
     <dl class="organization-milestones" data-test="organization-milestones">
       <div>
         <dt>Draft information</dt>
-        <dd>{{ player.profile?.draftYear ? `${player.profile.draftYear} MLB Draft` : 'Not available' }}</dd>
+        <dd v-if="player.profile?.draftYear">
+          {{ player.profile.draftYear }} MLB Draft<template v-if="player.profile.draftTeam?.name"> · {{ player.profile.draftTeam.name }}</template>
+        </dd>
+        <dd v-else>Not available</dd>
       </div>
       <div>
         <dt>MLB debut</dt>

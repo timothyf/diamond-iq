@@ -32,7 +32,7 @@ RSpec.describe MlbPlayerTeamHistoryImporter do
     expect(result.dig(:data, :tenure_count)).to eq(5)
     expect(transaction_memberships(player).map { |membership| [ membership.team.mlb_id, membership.starts_on, membership.ends_on ] }).to eq(
       [
-        [ 138, Date.new(2017, 9, 1), Date.new(2023, 7, 31) ],
+        [ 138, Date.new(2017, 2, 16), Date.new(2023, 7, 31) ],
         [ 110, Date.new(2023, 8, 1), Date.new(2023, 11, 1) ],
         [ 116, Date.new(2023, 12, 20), Date.new(2024, 7, 29) ],
         [ 119, Date.new(2024, 7, 30), Date.new(2024, 10, 30) ],
@@ -48,9 +48,35 @@ RSpec.describe MlbPlayerTeamHistoryImporter do
         [ 119, Date.new(2024, 7, 30), Date.new(2024, 10, 30) ],
         [ 116, Date.new(2023, 12, 20), Date.new(2024, 7, 29) ],
         [ 110, Date.new(2023, 8, 1), Date.new(2023, 11, 1) ],
-        [ 138, Date.new(2017, 9, 1), Date.new(2023, 7, 31) ]
+        [ 138, Date.new(2017, 2, 16), Date.new(2023, 7, 31) ]
       ]
     )
+  end
+
+  it "includes an assigned transaction when it is the first organization event" do
+    team = create_team(mlb_id: 138, name: "St. Louis Cardinals", abbreviation: "STL")
+    player = create_player(team: team)
+
+    result = described_class.call(
+      player: player,
+      payload: { "transactions" => [ transaction(1, "2021-07-18", "ASG", "Assigned", to: team) ] }
+    )
+
+    expect(result[:success]).to be(true)
+    expect(transaction_memberships(player).pluck(:starts_on)).to eq([ Date.new(2021, 7, 18) ])
+  end
+
+  it "includes a signed transaction when it is the first organization event" do
+    team = create_team(mlb_id: 135, name: "San Diego Padres", abbreviation: "SD")
+    player = create_player(team: team)
+
+    result = described_class.call(
+      player: player,
+      payload: { "transactions" => [ transaction(1, "2021-07-28", "SGN", "Signed", to: team) ] }
+    )
+
+    expect(result[:success]).to be(true)
+    expect(transaction_memberships(player).pluck(:starts_on)).to eq([ Date.new(2021, 7, 28) ])
   end
 
   it "replaces only transaction-derived memberships when rerun" do

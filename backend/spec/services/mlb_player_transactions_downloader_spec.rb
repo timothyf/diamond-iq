@@ -11,13 +11,16 @@ RSpec.describe MlbPlayerTransactionsDownloader do
 
     allow(downloader).to receive(:fetch_json) do |url|
       query = Rack::Utils.parse_nested_query(URI(url).query)
-      expect(URI(url).path).to eq("/api/v1/transactions")
-      expect(query).to include(
-        "playerId" => "656427",
-        "startDate" => "01/01/2017",
-        "endDate" => "07/17/2026"
-      )
-      payload
+      if URI(url).path == "/api/v1/transactions"
+        expect(query).to include(
+          "playerId" => "656427",
+          "startDate" => "01/01/2017",
+          "endDate" => "07/17/2026"
+        )
+        payload
+      else
+        payload
+      end
     end
 
     result = downloader.call

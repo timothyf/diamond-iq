@@ -77,6 +77,7 @@ module Api
         bats: profile.bats,
         throws: profile.throws,
         draft_year: Integer(profile.raw_data.to_h["draftYear"], exception: false),
+        draft_team: serialized_draft_team(profile),
         awards: serialized_awards(profile),
         all_star_selections: serialized_all_star_selections(profile),
         mlb_debut_date: profile.mlb_debut_date,
@@ -97,6 +98,14 @@ module Api
           date: award["date"]
         }
       end
+    end
+
+    def serialized_draft_team(profile)
+      draft = Array(profile.raw_data.to_h["drafts"]).find { |entry| entry.is_a?(Hash) && entry.dig("team", "id").present? }
+      team = draft&.fetch("team")
+      return if team.blank?
+
+      { id: Integer(team["id"], exception: false), name: team["name"] }
     end
 
     def serialized_all_star_selections(profile)

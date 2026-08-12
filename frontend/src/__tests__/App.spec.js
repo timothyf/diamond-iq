@@ -33,6 +33,14 @@ vi.mock('vue-router', () => ({
 }))
 
 describe('App', () => {
+  it('renders a site-wide link to the project repository', () => {
+    const wrapper = shallowMount(App, {
+      global: { stubs: { RouterLink: true, RouterView: true } },
+    })
+
+    expect(wrapper.get('.app-footer a').attributes('href')).toBe('https://github.com/timothyf/diamond-iq')
+  })
+
   it('leaves a protected route immediately when the user signs out', async () => {
     const wrapper = shallowMount(App, {
       global: {

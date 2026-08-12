@@ -24,6 +24,10 @@ class MlbPlayerTransactionsDownloader
     return failure("MLB transactions response must be a JSON object") unless payload.is_a?(Hash)
     return failure("MLB transactions response must include a transactions array") unless payload["transactions"].is_a?(Array)
 
+    hydrated_payload = fetch_json(build_person_url)
+    hydrated_transactions = extract_transactions(hydrated_payload)
+    payload["transactions"] = merge_transactions(payload["transactions"], hydrated_transactions)
+
     success(
       "Downloaded #{payload['transactions'].length} MLB player transactions",
       payload: payload,
@@ -48,6 +52,24 @@ class MlbPlayerTransactionsDownloader
       endDate: end_date.strftime("%m/%d/%Y")
     }.to_query
     "#{service_config.fetch(:base_url)}/api/v1/transactions?#{query}"
+  end
+
+  def build_person_url
+    "#{service_config.fetch(:base_url)}/api/v1/people/#{player_mlb_id}?hydrate=transactions"
+  end
+
+  def extract_transactions(payload)
+    return [] unless payload.is_a?(Hash)
+
+    direct = payload["transactions"]
+    return direct if direct.is_a?(Array)
+
+    person = Array(payload["people"]).first
+    person.is_a?(Hash) && person["transactions"].is_a?(Array) ? person["transactions"] : []
+  end
+
+  def merge_transactions(primary, hydrated)
+    (primary + hydrated).uniq { |transaction| transaction["id"] || transaction }
   end
 
   def fetch_json(url)
