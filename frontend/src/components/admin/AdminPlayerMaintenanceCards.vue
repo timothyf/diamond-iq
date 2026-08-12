@@ -1,13 +1,17 @@
 <script setup>
 import AdminTaskCard from './AdminTaskCard.vue'
+import AdminSyncProgress from './AdminSyncProgress.vue'
 
 defineProps({
   profileOptions: { type: Object, required: true },
   teamHistoryOptions: { type: Object, required: true },
   anyActionRunning: { type: Boolean, default: false },
   runningTask: { type: String, default: '' },
+  teamHistoryTask: { type: Object, default: null },
+  teamHistoryActive: { type: Boolean, default: false },
+  teamHistoryError: { type: String, default: '' },
 })
-const emit = defineEmits(['sync-profiles', 'sync-team-histories'])
+const emit = defineEmits(['sync-profiles', 'sync-team-histories', 'cancel-team-histories'])
 </script>
 
 <template>
@@ -45,5 +49,17 @@ const emit = defineEmits(['sync-profiles', 'sync-team-histories'])
     <button class="admin-button" type="submit" :disabled="anyActionRunning">
       {{ runningTask === 'mlb_player_team_histories_sync' ? 'Synchronizing team histories…' : 'Synchronize team histories' }}
     </button>
+    <AdminSyncProgress
+      v-if="teamHistoryTask"
+      :task="teamHistoryTask"
+      :active="teamHistoryActive"
+      test-id="team-history-sync-progress"
+      aria-label="MLB transaction history synchronization"
+      item-noun="players"
+      current-item-label="Current player"
+      cancel-item-noun="player"
+      @cancel="emit('cancel-team-histories')"
+    />
+    <p v-if="teamHistoryError" class="admin-message admin-message--error" role="alert">{{ teamHistoryError }}</p>
   </AdminTaskCard>
 </template>

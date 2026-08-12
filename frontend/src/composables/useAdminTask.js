@@ -265,6 +265,7 @@ export function useAdminTask() {
     contextualBenchmarkMetrics: computed(() => contextualBenchmarkMetrics.value),
     loadOverview,
     loadLatestTask: backgroundTask.loadLatest,
+    cancelCurrentTask: backgroundTask.cancel,
     loadDataHealth,
     runTask,
   }

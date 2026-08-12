@@ -100,6 +100,7 @@ const {
   runningTask,
   error: taskError,
   currentTask,
+  cancelCurrentTask,
   lastResult,
   overviewLoading,
   overviewError,
@@ -596,8 +597,12 @@ async function closeDatabaseDetails() {
           :team-history-options="teamHistoryOptions"
           :any-action-running="anyActionRunning"
           :running-task="runningTask"
+          :team-history-task="currentTask?.taskName === 'mlb_player_team_histories_sync' ? currentTask : null"
+          :team-history-active="currentTask?.taskName === 'mlb_player_team_histories_sync' && ['queued', 'running'].includes(currentTask?.status)"
+          :team-history-error="currentTask?.taskName === 'mlb_player_team_histories_sync' ? taskError : ''"
           @sync-profiles="handleProfileSync"
           @sync-team-histories="handleTeamHistorySync"
+          @cancel-team-histories="cancelCurrentTask"
         />
 
         <AdminTaskCard

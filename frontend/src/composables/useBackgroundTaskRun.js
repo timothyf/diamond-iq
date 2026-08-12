@@ -112,6 +112,19 @@ export function useBackgroundTaskRun(taskName) {
     }
   }
 
+  async function cancel() {
+    if (!task.value?.id || !active.value) return null
+    try {
+      return await request(`/api/admin/task_runs/${task.value.id}/cancel`, {
+        method: 'POST',
+        headers: adminRequestHeaders({ Accept: 'application/json' }),
+      })
+    } catch (cancelError) {
+      requestError.value = cancelError.message || 'Unable to cancel the background task.'
+      return null
+    }
+  }
+
   async function loadLatest() {
     requestError.value = ''
     try {
@@ -144,6 +157,7 @@ export function useBackgroundTaskRun(taskName) {
     summary,
     start,
     refresh,
+    cancel,
     loadLatest,
     stopPolling,
   }
