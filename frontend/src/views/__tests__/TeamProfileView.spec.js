@@ -21,7 +21,14 @@ const payload = {
     logo_url: 'https://www.mlbstatic.com/team-logos/116.svg',
     season: 2026,
     available_seasons: [2025, 2026],
-    record: { wins: 52, losses: 43, ties: 0, games_played: 95, runs_scored: 430, runs_allowed: 401 },
+    record: {
+      wins: 52, losses: 43, ties: 0, games_played: 95, runs_scored: 430, runs_allowed: 401,
+      recent: {
+        10: { wins: 7, losses: 3, ties: 0, games_played: 10 },
+        30: { wins: 18, losses: 12, ties: 0, games_played: 30 },
+        50: { wins: 29, losses: 21, ties: 0, games_played: 50 },
+      },
+    },
     roster_summary: { total: 40, active: 26, injured: 6, other: 8 },
     roster_as_of: '2026-07-15',
     roster: [
@@ -300,6 +307,10 @@ describe('TeamProfileView', () => {
 
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('52–43')
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('Last 10')
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('7–3')
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('18–12')
+    expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('29–21')
     expect(wrapper.get('[data-test="upcoming-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="recent-games"]').text()).toContain('5–2')
     expect(wrapper.get('[data-test="recent-games"] .game-result-link').exists()).toBe(true)

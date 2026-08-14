@@ -138,10 +138,20 @@ const rosterViewLabel = computed(() => ({
 })[selectedRosterView.value])
 
 const recordLabel = computed(() => {
-  const record = team.value?.record
+  return formatRecord(team.value?.record)
+})
+
+function formatRecord(record) {
   if (!record?.games_played) return 'No completed games'
   return [record.wins, record.losses, ...(record.ties ? [record.ties] : [])].join('–')
-})
+}
+
+const recentRecordEntries = computed(() => (
+  [10, 30, 50].map((window) => {
+    const record = team.value?.record?.recent?.[window]
+    return record?.games_played ? { window, label: formatRecord(record) } : null
+  }).filter(Boolean)
+))
 
 const dashboard = computed(() => team.value?.performanceDashboard || {})
 const nextSeriesGames = computed(() => {
@@ -464,7 +474,17 @@ async function saveLineupScenario() {
       </section>
 
       <section class="team-summary" aria-label="Season summary">
-        <article><span>{{ team.season }} record</span><strong>{{ recordLabel }}</strong><small>{{ team.record.games_played || 0 }} games</small></article>
+        <article class="team-summary__record">
+          <div>
+            <span>{{ team.season }} record</span><strong>{{ recordLabel }}</strong><small>{{ team.record.games_played || 0 }} games</small>
+          </div>
+          <dl v-if="recentRecordEntries.length" class="team-summary__recent-records">
+            <div v-for="entry in recentRecordEntries" :key="entry.window">
+              <dt>Last {{ entry.window }}</dt>
+              <dd>{{ entry.label }}</dd>
+            </div>
+          </dl>
+        </article>
         <article><span>Run differential</span><strong>{{ (team.record.runs_scored || 0) - (team.record.runs_allowed || 0) }}</strong><small>{{ team.record.runs_scored || 0 }} RS · {{ team.record.runs_allowed || 0 }} RA</small></article>
         <article><span>{{ team.season }} roster</span><strong>{{ team.rosterSummary.total || 0 }}</strong><small>{{ team.rosterSummary.active || 0 }} active · {{ team.rosterSummary.injured || 0 }} injured</small></article>
         <article><span>Last updated</span><strong class="summary-date">{{ formatTimestamp(team.sourceMetadata.lastUpdatedAt) }}</strong><small>{{ team.sourceMetadata.sources.join(', ') || 'NineLens' }}</small></article>
@@ -1102,6 +1122,10 @@ async function saveLineupScenario() {
 .team-summary strong { margin: .25rem 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: 2.3rem; }
 .team-summary .summary-date { font-family: inherit; font-size: .92rem; line-height: 2.6rem; }
 .team-summary small { color: #788188; }
+.team-summary__record { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.team-summary__recent-records { display: grid; grid-template-columns: repeat(3, auto); gap: .7rem; margin: 0; text-align: right; }
+.team-summary__recent-records dt { color: #69747c; font-size: .58rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.team-summary__recent-records dd { margin: .2rem 0 0; font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.05rem; font-weight: 900; white-space: nowrap; }
 .team-profile-tabs { display: flex; gap: .45rem; margin: 0 0 1rem; padding: .3rem; border: 1px solid #d9d7ce; border-radius: 16px; background: rgba(255,250,240,.72); }
 .team-profile-tabs button { display: inline-flex; gap: .45rem; align-items: center; justify-content: center; min-width: 130px; padding: .72rem 1rem; border: 0; border-radius: 12px; color: #5b6871; background: transparent; font: inherit; font-size: .78rem; font-weight: 900; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; }
 .team-profile-tabs button span { display: grid; min-width: 22px; height: 22px; padding: 0 .35rem; place-items: center; border-radius: 999px; color: inherit; background: rgba(16,38,61,.09); font-size: .65rem; }
@@ -1289,7 +1313,7 @@ th { color: #69747c; font-size: .68rem; letter-spacing: .08em; text-transform: u
 .team-state button { padding: .65rem 1rem; border: 0; border-radius: 999px; color: white; background: #10263d; font-weight: 800; }
 @media (max-width: 900px) { .team-hero { grid-template-columns: 100px 1fr; } .team-logo { width: 90px; height: 90px; } .team-logo img { width: 68px; height: 68px; } .season-picker { grid-column: 1 / -1; } .team-summary { grid-template-columns: 1fr 1fr; } .team-schedule-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .performance-grid { grid-template-columns: 1fr 1fr; } .signals-grid, .drilldown-grid { grid-template-columns: 1fr; } .roster-panel > header { align-items: flex-start; flex-direction: column; } }
 @media (max-width: 900px) { .scouting-layout { grid-template-columns: 1fr; } }
-@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
+@media (max-width: 560px) { .team-hero { grid-template-columns: 1fr; padding: 1.25rem; } .team-summary { grid-template-columns: 1fr; } .team-summary__record { align-items: flex-start; flex-direction: column; } .team-summary__recent-records { width: 100%; text-align: left; } .team-profile-tabs button { flex: 1; min-width: 0; } .team-identity h1 { font-size: 3.4rem; } .ranking-card { padding: .85rem; } .ranking-row { grid-template-columns: 68px minmax(0, 1fr) 42px; gap: .45rem; } .ranking-bar { height: 38px; } .ranking-row__label { font-size: .75rem; } .ranking-card__heading span { width: 42px; } .performance-grid { grid-template-columns: 1fr; } .game-list li,.game-result-link { grid-template-columns: 68px 1fr auto; } .roster-view-controls { width: 100%; align-items: flex-start; flex-direction: column; } }
 @media (max-width: 560px) { .opponent-prep__overview,.starter-scouting > header { align-items: flex-start; flex-direction: column; } .opponent-prep__venue { max-width: none; text-align: left; } .opponent-recent dl { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .lineup-evaluation,.lineup-decision { grid-template-columns: 1fr; } .lineup-decision__wide { grid-column: auto; } .lineup-grid__header,.lineup-row { grid-template-columns: 36px minmax(0,1fr) 80px 32px; } }
 </style>

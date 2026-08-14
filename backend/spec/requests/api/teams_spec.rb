@@ -334,6 +334,11 @@ RSpec.describe "Api::Teams", type: :request do
       "runs_scored" => 5,
       "runs_allowed" => 2
     )
+    expect(json_body.dig("data", "record", "recent", "10")).to include(
+      "wins" => 1,
+      "losses" => 0,
+      "games_played" => 1
+    )
     serialized_membership = json_body.dig("data", "roster").find { |entry| entry.fetch("id") == membership.id }
     expect(serialized_membership).to include(
       "id" => membership.id,
