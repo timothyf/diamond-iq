@@ -2,6 +2,12 @@ class TeamProfileSnapshotQuery
   GAME_LIMIT = 5
   RECENT_GAME_WINDOWS = [ 7, 15, 30 ].freeze
   RECENT_RECORD_WINDOWS = [ 10, 30, 50 ].freeze
+  TEAM_PROFILE_GAME_COLUMNS = %i[
+    id schedule_id mlb_id official_date scheduled_at game_type status detailed_status
+    home_team_id away_team_id home_probable_pitcher_id away_probable_pitcher_id
+    venue_name game_number doubleheader home_score away_score source_name source_url
+    last_synced_at details_last_synced_at created_at updated_at
+  ].freeze
   MIN_PITCHING_OUTS_FOR_RATE = 9
   TEAM_LEADER_DEFINITIONS = {
     batting: [
@@ -20,11 +26,12 @@ class TeamProfileSnapshotQuery
     ]
   }.freeze
 
-  def initialize(team:, season: nil, on: Date.current, user: nil)
+  def initialize(team:, season: nil, on: Date.current, user: nil, includes: [ "all" ])
     @team = team
     @requested_season = season
     @on = on
     @user = user
+    @includes = Array(includes).map(&:to_s)
   end
 
   def result
@@ -44,14 +51,8 @@ class TeamProfileSnapshotQuery
       roster_summary: roster_summary(forty_man_roster, active_roster),
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
-      opponent_preparation: OpponentPreparationQuery.new(
-        team: team,
-        upcoming_games: upcoming_games,
-        season: season,
-        on: on
-      ).result,
-      opponent_reports: opponent_report_summaries,
-      lineup_scenarios: lineup_scenario_summaries,
+      **opponent_payload,
+      **lineup_payload,
       team_leaders: team_leaders,
       source_metadata: source_metadata,
       performance_dashboard: performance_dashboard
@@ -60,7 +61,31 @@ class TeamProfileSnapshotQuery
 
   private
 
-  attr_reader :team, :requested_season, :on, :user
+  attr_reader :team, :requested_season, :on, :user, :includes
+
+  def opponent_payload
+    return {} unless include_section?("opponent")
+
+    {
+      opponent_preparation: OpponentPreparationQuery.new(
+        team: team,
+        upcoming_games: upcoming_games,
+        season: season,
+        on: on
+      ).result,
+      opponent_reports: opponent_report_summaries
+    }
+  end
+
+  def lineup_payload
+    return {} unless include_section?("lineup")
+
+    { lineup_scenarios: lineup_scenario_summaries }
+  end
+
+  def include_section?(section)
+    includes.include?("all") || includes.include?(section)
+  end
 
   def opponent_report_summaries
     accessible_workflows(team.opponent_reports).includes(:owner, :opponent_team).where(season: season).recent_first.limit(5).map do |report|
@@ -127,7 +152,7 @@ class TeamProfileSnapshotQuery
     @season_games ||= team_games
       .joins(:schedule)
       .where(schedules: { season: season })
-      .includes(:schedule, :home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
+      .select(*TEAM_PROFILE_GAME_COLUMNS)
   end
 
   def completed_games
@@ -136,6 +161,7 @@ class TeamProfileSnapshotQuery
       .where("official_date <= ?", on)
       .where.not(home_score: nil, away_score: nil)
       .order(official_date: :desc, scheduled_at: :desc, mlb_id: :desc)
+      .preload(:home_team, :away_team)
       .to_a
   end
 
@@ -254,21 +280,23 @@ class TeamProfileSnapshotQuery
   end
 
   def recent_games
-    season_games
+    @recent_games ||= season_games
       .where(status: "final")
       .where("official_date <= ?", on)
       .where.not(home_score: nil, away_score: nil)
       .order(official_date: :desc, scheduled_at: :desc, mlb_id: :desc)
       .limit(GAME_LIMIT)
+      .preload(:schedule, :home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
       .to_a
   end
 
   def upcoming_games
-    season_games
+    @upcoming_games ||= season_games
       .where("official_date >= ?", on)
       .where(home_score: nil, away_score: nil)
       .order(:official_date, :scheduled_at, :mlb_id)
       .limit(GAME_LIMIT)
+      .preload(:schedule, :home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
       .to_a
   end
 

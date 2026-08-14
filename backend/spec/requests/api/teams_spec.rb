@@ -75,6 +75,15 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "lineup_scenarios").pluck("id")).to eq([ scenario.id ])
   end
 
+  it "defers opponent and lineup data for overview requests" do
+    get api_team_path(@tigers), params: { include: "overview" }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.fetch("data")).not_to have_key("opponent_preparation")
+    expect(json_body.fetch("data")).not_to have_key("opponent_reports")
+    expect(json_body.fetch("data")).not_to have_key("lineup_scenarios")
+  end
+
   it "returns a unified roster, record, and schedule profile" do
     player = create_player(team: @tigers, attributes: { mlb_id: 680_776, first_name: "Riley", last_name: "Greene" })
     create_player_profile(player: player, attributes: { headshot_id: "680776" })

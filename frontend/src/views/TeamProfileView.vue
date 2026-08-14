@@ -38,7 +38,7 @@ const savedAnalysisUrl = computed(() => {
   if (selectedRosterView.value !== 'active') query.set('roster', selectedRosterView.value)
   return `/teams/${encodeURIComponent(teamId.value)}${query.size ? `?${query}` : ''}`
 })
-const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason)
+const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason, selectedProfileTab)
 const savingReport = ref(false)
 const reportSaveError = ref('')
 const savingLineup = ref(false)

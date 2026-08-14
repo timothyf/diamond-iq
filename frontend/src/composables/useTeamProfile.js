@@ -146,7 +146,7 @@ function normalizeProfile(data) {
   }
 }
 
-export function useTeamProfile(teamIdRef, seasonRef) {
+export function useTeamProfile(teamIdRef, seasonRef, tabRef) {
   const team = ref(null)
   const loading = ref(false)
   const error = ref('')
@@ -164,7 +164,9 @@ export function useTeamProfile(teamIdRef, seasonRef) {
     loading.value = true
     error.value = ''
     const season = seasonRef?.value
-    const query = season ? `?season=${encodeURIComponent(season)}` : ''
+    const params = new URLSearchParams({ include: tabRef?.value || "overview" })
+    if (season) params.set("season", season)
+    const query = `?${params}`
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/teams/${encodeURIComponent(teamId)}${query}`, {
@@ -186,7 +188,7 @@ export function useTeamProfile(teamIdRef, seasonRef) {
     }
   }
 
-  watch([teamIdRef, ...(seasonRef ? [seasonRef] : [])], load, { immediate: true })
+  watch([teamIdRef, ...(seasonRef ? [seasonRef] : []), ...(tabRef ? [tabRef] : [])], load, { immediate: true })
 
   return {
     team: computed(() => team.value),

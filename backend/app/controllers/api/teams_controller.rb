@@ -22,7 +22,8 @@ module Api
 
     def show
       team = Team.find(params[:id])
-      snapshot = TeamProfileSnapshotQuery.new(team: team, season: params[:season], user: current_user).result
+      includes = params[:include].presence&.split(",") || [ "all" ]
+      snapshot = TeamProfileSnapshotQuery.new(team: team, season: params[:season], user: current_user, includes: includes).result
 
       render json: { data: serialize_team(team).merge(snapshot) }
     end

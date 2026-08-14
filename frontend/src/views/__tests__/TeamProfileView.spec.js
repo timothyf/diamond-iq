@@ -294,7 +294,7 @@ describe('TeamProfileView', () => {
         body: JSON.stringify({ season: 2026 }),
       }),
     )
-    expect(fetchMock).toHaveBeenCalledWith('/api/teams/1?season=2026', expect.any(Object))
+    expect(fetchMock).toHaveBeenCalledWith('/api/teams/1?include=overview&season=2026', expect.any(Object))
   })
 
   it('renders the overview and opens a separate roster tab on the active roster', async () => {
@@ -483,7 +483,7 @@ describe('TeamProfileView', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/teams/1?season=2025'),
+      expect.stringContaining('/api/teams/1?include=overview&season=2025'),
       expect.any(Object),
     )
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('2025 record')
