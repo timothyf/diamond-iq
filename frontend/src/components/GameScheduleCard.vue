@@ -1,4 +1,6 @@
 <script setup>
+import { teamLogoUrl } from "../config"
+
 defineProps({
   game: { type: Object, required: true },
 })
@@ -13,6 +15,10 @@ function gameState(game) {
   if (game.home_score !== null && game.home_score !== undefined && ['final', 'completed'].some((value) => status.includes(value))) return 'Final'
   if (['live', 'in progress', 'manager challenge'].some((value) => status.includes(value))) return game.detailed_status || 'Live'
   return formatTime(game.scheduled_at)
+}
+
+function teamLogo(team) {
+  return team?.logo_url || (team?.mlb_id ? teamLogoUrl(team.mlb_id) : null)
 }
 
 function score(game, side) {
@@ -34,12 +40,12 @@ function score(game, side) {
       <small>{{ game.venue_name || 'Venue TBD' }}</small>
     </header>
     <RouterLink :to="{ name: 'team-profile', params: { id: game.away_team.id } }" class="schedule-game-card__team">
-      <b>{{ game.away_team.abbreviation }}</b>
+      <img v-if="teamLogo(game.away_team)" class="schedule-game-card__team-logo" :src="teamLogo(game.away_team)" :alt="`${game.away_team.name} logo`" /><b v-else>{{ game.away_team.abbreviation }}</b>
       <strong>{{ game.away_team.name }}</strong>
       <em>{{ score(game, 'away') }}</em>
     </RouterLink>
     <RouterLink :to="{ name: 'team-profile', params: { id: game.home_team.id } }" class="schedule-game-card__team">
-      <b>{{ game.home_team.abbreviation }}</b>
+      <img v-if="teamLogo(game.home_team)" class="schedule-game-card__team-logo" :src="teamLogo(game.home_team)" :alt="`${game.home_team.name} logo`" /><b v-else>{{ game.home_team.abbreviation }}</b>
       <strong>{{ game.home_team.name }}</strong>
       <em>{{ score(game, 'home') }}</em>
     </RouterLink>
@@ -58,6 +64,7 @@ function score(game, side) {
 .schedule-game-card > header span { color: #a93627; font-size: .73rem; font-weight: 900; text-transform: uppercase; }
 .schedule-game-card > header small { overflow: hidden; color: #78838b; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-game-card__team { position: relative; z-index: 2; display: grid; grid-template-columns: 42px minmax(0,1fr) auto; gap: .65rem; align-items: center; padding-top: .75rem; color: #10263d; text-decoration: none; }
+.schedule-game-card__team-logo { display: block; width: 38px; height: 38px; object-fit: contain; }
 .schedule-game-card__team b { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: white; background: #183e5b; font-size: .7rem; }
 .schedule-game-card__team strong { overflow: hidden; font-size: .88rem; text-overflow: ellipsis; white-space: nowrap; }
 .schedule-game-card__team em { font-family: 'Avenir Next Condensed', sans-serif; font-size: 1.7rem; font-style: normal; font-weight: 900; }
