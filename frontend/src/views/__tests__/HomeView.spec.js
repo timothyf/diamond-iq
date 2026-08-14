@@ -16,8 +16,8 @@ const dashboardPayload = {
         venue_name: 'Comerica Park',
         away_score: null,
         home_score: null,
-        away_team: { id: 2, abbreviation: 'CLE', name: 'Cleveland Guardians' },
-        home_team: { id: 1, abbreviation: 'DET', name: 'Detroit Tigers' },
+        away_team: { id: 2, mlb_id: 114, abbreviation: 'CLE', name: 'Cleveland Guardians' },
+        home_team: { id: 1, mlb_id: 116, abbreviation: 'DET', name: 'Detroit Tigers' },
         away_probable_pitcher: { id: 20, full_name: 'Tanner Bibee' },
         home_probable_pitcher: { id: 21, full_name: 'Tarik Skubal' },
       },
@@ -71,6 +71,7 @@ describe('HomeView', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('presents the daily slate, league leaders, team pulse, and exploration links', async () => {
+    Object.values(dashboardPayload.data.team_pulse).flat().forEach((entry) => { entry.team.logo_url = "/DET.svg" })
     const wrapper = mount(HomeView, { global: { components: { RouterLink } } })
     await flushPromises()
 
@@ -79,6 +80,8 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Detroit Tigers')
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="game-summary-link"]').exists()).toBe(true)
+    expect(wrapper.findAll('.schedule-game-card__team-logo')).toHaveLength(2)
+    expect(wrapper.get('.schedule-game-card__team-logo').attributes('src')).toContain('team-logos/114.svg')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Aaron Judge')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.025')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.75')
@@ -87,6 +90,8 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('Last 30 games')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('19-11')
+    expect(wrapper.findAll('.pulse-team-logo')).toHaveLength(4)
+    expect(wrapper.get('.pulse-team-logo').attributes('src')).toBe('/DET.svg')
     expect(wrapper.text()).toContain('Stat Explorer')
   })
 

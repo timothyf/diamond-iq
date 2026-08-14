@@ -1,6 +1,7 @@
 class TeamProfileSnapshotQuery
   GAME_LIMIT = 5
   RECENT_GAME_WINDOWS = [ 7, 15, 30 ].freeze
+  RECENT_RECORD_WINDOWS = [ 10, 30, 50 ].freeze
   MIN_PITCHING_OUTS_FOR_RATE = 9
   TEAM_LEADER_DEFINITIONS = {
     batting: [
@@ -130,11 +131,22 @@ class TeamProfileSnapshotQuery
   end
 
   def completed_games
-    @completed_games ||= season_games.where(status: "final").where.not(home_score: nil, away_score: nil).to_a
+    @completed_games ||= season_games
+      .where(status: "final")
+      .where("official_date <= ?", on)
+      .where.not(home_score: nil, away_score: nil)
+      .order(official_date: :desc, scheduled_at: :desc, mlb_id: :desc)
+      .to_a
   end
 
   def record
-    totals = completed_games.each_with_object({ wins: 0, losses: 0, ties: 0, runs_scored: 0, runs_allowed: 0 }) do |game, sum|
+    record_for_games(completed_games).merge(
+      recent: RECENT_RECORD_WINDOWS.index_with { |window| record_for_games(completed_games.first(window)) }
+    )
+  end
+
+  def record_for_games(games)
+    totals = games.each_with_object({ wins: 0, losses: 0, ties: 0, runs_scored: 0, runs_allowed: 0 }) do |game, sum|
       team_score, opponent_score = scores_for(game)
       sum[:runs_scored] += team_score
       sum[:runs_allowed] += opponent_score
@@ -148,7 +160,7 @@ class TeamProfileSnapshotQuery
       end
     end
 
-    totals.merge(games_played: completed_games.length, winning_percentage: winning_percentage(totals))
+    totals.merge(games_played: games.length, winning_percentage: winning_percentage(totals))
   end
 
   def team_leaders
