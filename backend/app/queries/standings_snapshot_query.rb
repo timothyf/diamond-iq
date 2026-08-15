@@ -35,6 +35,21 @@ class StandingsSnapshotQuery
     }
   end
 
+  def division_rank_for(team)
+    division = DIVISIONS.find { |entry| entry.fetch(:team_mlb_ids).include?(team.mlb_id) }
+    return nil unless division
+
+    payload = division_payload(division)
+    row = payload.fetch(:teams).find { |entry| entry.dig(:team, :id) == team.id }
+    return nil unless row
+
+    {
+      rank: row.fetch(:rank),
+      total_teams: payload.fetch(:teams).length,
+      division: { key: payload.fetch(:key), name: payload.fetch(:name) }
+    }
+  end
+
   private
 
   attr_reader :requested_season

@@ -1473,6 +1473,8 @@ class PlayerProfileSnapshotQuery
       end
     end
 
+    close_superseded_open_windows(groups)
+
     groups.reverse.map do |group|
       serialized = serialize_membership(group[:latest_membership]).merge(
         starts_on: group[:starts_on],
@@ -1486,6 +1488,16 @@ class PlayerProfileSnapshotQuery
         injured: false,
         source_status_description: "Organization tenure"
       )
+    end
+  end
+
+  def close_superseded_open_windows(groups)
+    groups.each_cons(2) do |group, following_group|
+      next unless group[:ends_on].nil?
+      next if group[:latest_membership].team_id == following_group[:latest_membership].team_id
+
+      inferred_end = following_group[:starts_on] - 1.day
+      group[:ends_on] = inferred_end if inferred_end >= group[:starts_on]
     end
   end
 

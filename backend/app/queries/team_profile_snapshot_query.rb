@@ -42,6 +42,7 @@ class TeamProfileSnapshotQuery
       season: season,
       available_seasons: available_seasons,
       record: record,
+      division_rank: division_rank,
       roster: forty_man_roster,
       rosters: {
         forty_man: forty_man_roster,
@@ -187,6 +188,10 @@ class TeamProfileSnapshotQuery
     end
 
     totals.merge(games_played: games.length, winning_percentage: winning_percentage(totals))
+  end
+
+  def division_rank
+    StandingsSnapshotQuery.new(season: season).division_rank_for(team)
   end
 
   def team_leaders

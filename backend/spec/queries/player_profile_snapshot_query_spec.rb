@@ -112,6 +112,35 @@ RSpec.describe PlayerProfileSnapshotQuery do
     )
   end
 
+  it "closes a stale open transaction tenure when a later roster membership belongs to another team" do
+    former_team = create_team
+    current_team = create_team
+    player = create_player(team: current_team)
+    create_team_membership(
+      player: player,
+      team: former_team,
+      starts_on: Date.new(2026, 8, 3),
+      roster_status: "organization",
+      source_name: "MLB Stats API transactions"
+    )
+    create_team_membership(
+      player: player,
+      team: current_team,
+      starts_on: Date.new(2026, 8, 14),
+      roster_status: "active",
+      source_name: "MLB Stats API"
+    )
+
+    history = described_class.new(player: player, on: Date.new(2026, 8, 15)).result.fetch(:team_history)
+
+    expect(history.map { |tenure| [ tenure.dig(:team, :id), tenure[:starts_on], tenure[:ends_on], tenure[:current] ] }).to eq(
+      [
+        [ current_team.id, Date.new(2026, 8, 14), nil, true ],
+        [ former_team.id, Date.new(2026, 8, 3), Date.new(2026, 8, 13), false ]
+      ]
+    )
+  end
+
   it "does not let a stale roster snapshot extend a transaction-derived tenure" do
     former_team = create_team
     current_team = create_team

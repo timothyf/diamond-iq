@@ -7,7 +7,7 @@ import { adminRequestHeaders } from '../composables/apiAuth'
 import { formatTwoDecimalPitchingRate } from '../utils/baseballStatFormatting'
 import SavedAnalysisControls from '../components/SavedAnalysisControls.vue'
 import TeamLeadersCard from '../components/TeamLeadersCard.vue'
-import { teamLogoUrl } from '../config'
+import { frontendConfig, teamLogoUrl } from '../config'
 
 const props = defineProps({
   teamId: { type: [String, Number], required: true },
@@ -16,6 +16,18 @@ const props = defineProps({
 const route = inject(routeLocationKey, { query: {}, fullPath: `/teams/${props.teamId}` })
 const router = inject(routerKey, { replace: () => { }, push: () => { } })
 const teamId = computed(() => props.teamId)
+const MLB_TEAM_SLUGS = Object.freeze({
+  108: 'angels', 109: 'dbacks', 110: 'orioles', 111: 'redsox', 112: 'cubs',
+  113: 'reds', 114: 'guardians', 115: 'rockies', 116: 'tigers', 117: 'astros',
+  118: 'royals', 119: 'dodgers', 120: 'nationals', 121: 'mets', 133: 'athletics',
+  134: 'pirates', 135: 'padres', 136: 'mariners', 137: 'giants', 138: 'cardinals',
+  139: 'rays', 140: 'rangers', 141: 'bluejays', 142: 'twins', 143: 'phillies',
+  144: 'braves', 145: 'whitesox', 146: 'marlins', 147: 'yankees', 158: 'brewers',
+})
+const BASEBALL_REFERENCE_TEAM_CODES = Object.freeze({
+  118: 'KCR', 120: 'WSN', 133: 'ATH', 135: 'SDP', 137: 'SFG', 139: 'TBR', 145: 'CHW',
+})
+
 const profileTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
@@ -39,6 +51,27 @@ const savedAnalysisUrl = computed(() => {
   return `/teams/${encodeURIComponent(teamId.value)}${query.size ? `?${query}` : ''}`
 })
 const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason, selectedProfileTab)
+const externalTeamLinks = computed(() => {
+  if (!team.value?.mlbId) return []
+
+  const mlbSlug = MLB_TEAM_SLUGS[team.value.mlbId]
+  const fangraphsSlug = team.value.teamName
+    ?.normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/d-backs/g, "diamondbacks")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+  const baseballReferenceCode = BASEBALL_REFERENCE_TEAM_CODES[team.value.mlbId] || team.value.abbreviation
+  const season = team.value.season
+
+  return [
+    { key: "baseball-savant", label: "Baseball Savant", href: frontendConfig.externalUrls.baseballSavantTeamBaseUrl + "/" + team.value.mlbId },
+    { key: "mlb", label: "MLB.com", href: mlbSlug ? frontendConfig.externalUrls.mlbTeamBaseUrl + "/" + mlbSlug : null },
+    { key: "baseball-reference", label: "Baseball Reference", href: baseballReferenceCode && season ? frontendConfig.externalUrls.baseballReferenceTeamBaseUrl + "/" + baseballReferenceCode + "/" + season + ".shtml" : null },
+    { key: "fangraphs", label: "FanGraphs", href: fangraphsSlug ? frontendConfig.externalUrls.fangraphsTeamBaseUrl + "/" + fangraphsSlug : null },
+  ].filter((link) => link.href)
+})
 const savingReport = ref(false)
 const reportSaveError = ref('')
 const savingLineup = ref(false)
@@ -460,6 +493,11 @@ async function saveLineupScenario() {
           <p>Unified team profile · MLB {{ team.mlbId }}</p>
           <h1>{{ team.name }}</h1>
           <span>{{ team.abbreviation }} · {{ team.locationName }}</span>
+          <nav class="team-external-links" aria-label="External team profiles">
+            <a v-for="link in externalTeamLinks" :key="link.key" :href="link.href" target="_blank" rel="noopener noreferrer" data-test="external-team-link">
+              {{ link.label }} <span aria-hidden="true">↗</span>
+            </a>
+          </nav>
         </div>
         <label class="season-picker">
           <span class="season-picker__label">Profile season</span>
@@ -488,6 +526,10 @@ async function saveLineupScenario() {
         </article>
         <article><span>Run differential</span><strong>{{ (team.record.runs_scored || 0) - (team.record.runs_allowed ||
             0) }}</strong><small>{{ team.record.runs_scored || 0 }} RS · {{ team.record.runs_allowed || 0 }} RA</small>
+        </article>
+        <article data-test="division-rank">
+          <span>Division rank</span><strong>{{ team.divisionRank ? '#' + team.divisionRank.rank : '—' }}</strong>
+          <small>{{ team.divisionRank?.division?.name || 'Division unavailable' }}</small>
         </article>
        </section>
 
@@ -1207,6 +1249,12 @@ async function saveLineupScenario() {
   text-transform: uppercase;
 }
 
+.team-external-links { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .8rem; }
+.team-external-links a { display: inline-flex; align-items: center; gap: .3rem; padding: .42rem .68rem; border: 1px solid rgba(91,109,126,.16); border-radius: 999px; color: #526779; background: rgba(255,255,255,.7); font-size: .68rem; font-weight: 850; text-decoration: none; transition: transform .16s ease, background .16s ease, color .16s ease; }
+.team-external-links a:hover { color: #fffaf0; background: #526779; transform: translateY(-1px); }
+.team-external-links a:focus-visible { outline: 3px solid rgba(31,111,235,.32); outline-offset: 2px; }
+.team-external-links a span { color: inherit; font-size: inherit; }
+
 .team-identity h1 {
   margin: .2rem 0;
   font-family: 'Avenir Next Condensed', sans-serif;
@@ -1280,9 +1328,10 @@ async function saveLineupScenario() {
 
 .team-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8rem;
   margin: 1rem 0;
+  line-height: 1.2;
 }
 
 .team-summary article,
@@ -1294,6 +1343,7 @@ async function saveLineupScenario() {
 
 .team-summary article {
   padding: 1.2rem;
+  text-align: center;
 }
 
 .team-summary span,

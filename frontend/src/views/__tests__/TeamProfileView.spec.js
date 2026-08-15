@@ -21,6 +21,7 @@ const payload = {
     logo_url: 'https://www.mlbstatic.com/team-logos/116.svg',
     season: 2026,
     available_seasons: [2025, 2026],
+    division_rank: { rank: 1, total_teams: 5, division: { key: 'al_central', name: 'AL Central' } },
     record: {
       wins: 52, losses: 43, ties: 0, games_played: 95, runs_scored: 430, runs_allowed: 401,
       recent: {
@@ -305,8 +306,19 @@ describe('TeamProfileView', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Detroit Tigers')
+    expect(wrapper.text()).toContain("Detroit Tigers")
+    const externalLinks = wrapper.findAll(".team-external-links a")
+    expect(externalLinks).toHaveLength(4)
+    expect(externalLinks.map((link) => link.attributes("href"))).toEqual([
+      "https://baseballsavant.mlb.com/team/116",
+      "https://www.mlb.com/tigers",
+      "https://www.baseball-reference.com/teams/DET/2026.shtml",
+      "https://www.fangraphs.com/teams/tigers/stats",
+    ])
+    expect(externalLinks.every((link) => link.attributes("target") === "_blank" && link.attributes("rel") === "noopener noreferrer")).toBe(true)
     expect(wrapper.text()).toContain('52–43')
+    expect(wrapper.get('[data-test="division-rank"]').text()).toContain('#1')
+    expect(wrapper.get('[data-test="division-rank"]').text()).toContain('AL Central')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('Last 10')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('7–3')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('18–12')

@@ -22,11 +22,15 @@ export const frontendConfig = Object.freeze({
     mlbStaticBaseUrl: env.VITE_MLB_STATIC_BASE_URL || 'https://www.mlbstatic.com',
     mlbHeadshotBaseUrl: env.VITE_MLB_HEADSHOT_BASE_URL || 'https://img.mlbstatic.com',
     mlbPlayerBaseUrl: env.VITE_MLB_PLAYER_BASE_URL || 'https://www.mlb.com/player',
+    mlbTeamBaseUrl: env.VITE_MLB_TEAM_BASE_URL || 'https://www.mlb.com',
     fangraphsBaseUrl: env.VITE_FANGRAPHS_BASE_URL || 'https://www.fangraphs.com/players',
     fangraphsLegacyUrl: env.VITE_FANGRAPHS_LEGACY_URL || 'https://www.fangraphs.com/players.aspx',
     baseballReferenceBaseUrl: env.VITE_BASEBALL_REFERENCE_BASE_URL || 'https://www.baseball-reference.com/players',
     baseballReferenceSearchUrl: env.VITE_BASEBALL_REFERENCE_SEARCH_URL || 'https://www.baseball-reference.com/search/search.fcgi',
     baseballSavantPlayerBaseUrl: env.VITE_BASEBALL_SAVANT_PLAYER_BASE_URL || 'https://baseballsavant.mlb.com/savant-player',
+    baseballSavantTeamBaseUrl: env.VITE_BASEBALL_SAVANT_TEAM_BASE_URL || 'https://baseballsavant.mlb.com/team',
+    baseballReferenceTeamBaseUrl: env.VITE_BASEBALL_REFERENCE_TEAM_BASE_URL || 'https://www.baseball-reference.com/teams',
+    fangraphsTeamBaseUrl: env.VITE_FANGRAPHS_TEAM_BASE_URL || 'https://www.fangraphs.com/teams',
   }),
 })
 

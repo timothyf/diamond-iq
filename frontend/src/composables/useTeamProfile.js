@@ -56,6 +56,7 @@ function normalizeProfile(data) {
     season: data.season,
     availableSeasons: data.available_seasons || [],
     record: data.record || {},
+    divisionRank: data.division_rank || null,
     roster: (data.roster || []).map(normalizeMembership),
     rosters: {
       fortyMan: (data.rosters?.forty_man || data.roster || []).map(normalizeMembership),
