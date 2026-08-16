@@ -31,11 +31,14 @@ const BASEBALL_REFERENCE_TEAM_CODES = Object.freeze({
 const profileTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
+  { id: 'player-stats', label: 'Player Stats' },
+  { id: 'team-stats', label: 'Team Stats' },
   { id: 'opponent', label: 'Opponent Preparation' },
   { id: 'lineup', label: 'Lineup Planner' },
 ]
 const selectedSeason = ref(Number(route.query.season) || null)
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
+const requestedProfileSection = computed(() => ['opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
 const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
 const savedAnalysisState = computed(() => ({
   teamId: teamId.value,
@@ -50,7 +53,7 @@ const savedAnalysisUrl = computed(() => {
   if (selectedRosterView.value !== 'active') query.set('roster', selectedRosterView.value)
   return `/teams/${encodeURIComponent(teamId.value)}${query.size ? `?${query}` : ''}`
 })
-const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason, selectedProfileTab)
+const { team, loading, error, refresh } = useTeamProfile(teamId, selectedSeason, requestedProfileSection)
 const externalTeamLinks = computed(() => {
   if (!team.value?.mlbId) return []
 
@@ -546,6 +549,22 @@ async function saveLineupScenario() {
 
       <SavedAnalysisControls analysis-type="team_dashboard" :state="savedAnalysisState"
         :reproducible-url="savedAnalysisUrl" compact @apply="openSavedAnalysis" />
+
+      <section v-show="selectedProfileTab === 'player-stats'" id="team-profile-panel-player-stats"
+        class="team-panel team-profile-tab-panel team-coming-soon" role="tabpanel"
+        aria-labelledby="team-profile-tab-player-stats" data-test="team-profile-panel-player-stats">
+        <p>Player Stats</p>
+        <h2>Coming soon</h2>
+        <span>High-level player performance and roster production will appear here.</span>
+      </section>
+
+      <section v-show="selectedProfileTab === 'team-stats'" id="team-profile-panel-team-stats"
+        class="team-panel team-profile-tab-panel team-coming-soon" role="tabpanel"
+        aria-labelledby="team-profile-tab-team-stats" data-test="team-profile-panel-team-stats">
+        <p>Team Stats</p>
+        <h2>Coming soon</h2>
+        <span>High-level team performance and statistical trends will appear here.</span>
+      </section>
 
       <div v-show="selectedProfileTab === 'opponent'" id="team-profile-panel-opponent" class="team-profile-tab-panel"
         role="tabpanel" aria-labelledby="team-profile-tab-opponent" data-test="team-profile-panel-opponent">
@@ -1408,10 +1427,16 @@ async function saveLineupScenario() {
   white-space: nowrap;
 }
 
+.team-coming-soon { min-height: 260px; margin-bottom: 1rem; padding: 3rem 1.5rem; text-align: center; }
+.team-coming-soon p { margin: 0; color: #a93627; font-size: .68rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.team-coming-soon h2 { margin: .35rem 0 .5rem; font-family: 'Avenir Next Condensed', sans-serif; font-size: 2.8rem; text-transform: uppercase; }
+.team-coming-soon span { color: #697680; }
+
 .team-profile-tabs {
   display: flex;
   gap: .45rem;
   margin: 0 0 1rem;
+  overflow-x: auto;
   padding: .3rem;
   border: 1px solid #d9d7ce;
   border-radius: 16px;
@@ -2820,8 +2845,8 @@ th {
   }
 
   .team-profile-tabs button {
-    flex: 1;
-    min-width: 0;
+    flex: 0 0 auto;
+    min-width: 118px;
   }
 
   .team-identity h1 {

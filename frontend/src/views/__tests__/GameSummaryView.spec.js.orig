@@ -471,13 +471,6 @@ describe('GameSummaryView', () => {
     expect(fetch).toHaveBeenCalledWith('/api/games/80', expect.objectContaining({ headers: { Accept: 'application/json' } }))
     expect(wrapper.get('[data-test="game-scoreboard"]').text()).toContain('Cleveland Guardians')
     expect(wrapper.get('[data-test="game-scoreboard"]').text()).toContain('Detroit Tigers')
-    const teamLogos = wrapper.findAll('.scoreboard__team-logo')
-    expect(teamLogos).toHaveLength(2)
-    expect(teamLogos[0].attributes('src')).toContain('/team-logos/114.svg')
-    expect(teamLogos[0].attributes('alt')).toBe('Cleveland Guardians logo')
-    expect(teamLogos[1].attributes('src')).toContain('/team-logos/116.svg')
-    expect(teamLogos[1].attributes('alt')).toBe('Detroit Tigers logo')
-
     expect(wrapper.get('[data-test="line-score"]').text()).toContain('End 9th')
     expect(wrapper.get('[data-test="line-score"]').text()).toContain('CLE')
     expect(wrapper.get('[data-test="line-score"]').text()).toContain('DET')

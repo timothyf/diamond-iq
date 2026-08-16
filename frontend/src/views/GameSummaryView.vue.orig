@@ -91,10 +91,6 @@ function display(value) {
   return value === null || value === undefined || value === '' ? '—' : value
 }
 
-function teamLogo(team) {
-  return team?.logo_url || (team?.mlb_id ? teamLogoUrl(team.mlb_id) : null)
-}
-
 function rate(value, places = 3, omitLeadingZero = false) {
   if (value === null || value === undefined || value === '') return '—'
   const number = Number(value)
@@ -239,21 +235,11 @@ async function handleTabKey(event, index) {
         </header>
         <div class="scoreboard__matchup">
           <RouterLink :to="{ name: 'team-profile', params: { id: game.awayTeam.id } }" class="scoreboard__team">
-            <span>Away</span>
-            <div class="scoreboard__team-name">
-              <img v-if="teamLogo(game.awayTeam)" class="scoreboard__team-logo" :src="teamLogo(game.awayTeam)" :alt="game.awayTeam.name + ' logo'" />
-              <strong>{{ game.awayTeam.name }}</strong>
-            </div>
-            <small>{{ game.awayTeam.abbreviation }}</small>
+            <span>Away</span><strong>{{ game.awayTeam.name }}</strong><small>{{ game.awayTeam.abbreviation }}</small>
           </RouterLink>
           <div class="scoreboard__score"><strong>{{ display(game.awayScore) }}</strong><span>–</span><strong>{{ display(game.homeScore) }}</strong></div>
           <RouterLink :to="{ name: 'team-profile', params: { id: game.homeTeam.id } }" class="scoreboard__team scoreboard__team--home">
-            <span>Home</span>
-            <div class="scoreboard__team-name">
-              <img v-if="teamLogo(game.homeTeam)" class="scoreboard__team-logo" :src="teamLogo(game.homeTeam)" :alt="game.homeTeam.name + ' logo'" />
-              <strong>{{ game.homeTeam.name }}</strong>
-            </div>
-            <small>{{ game.homeTeam.abbreviation }}</small>
+            <span>Home</span><strong>{{ game.homeTeam.name }}</strong><small>{{ game.homeTeam.abbreviation }}</small>
           </RouterLink>
         </div>
       </section>
@@ -785,10 +771,7 @@ async function handleTabKey(event, index) {
 .scoreboard__team { display: grid; color: inherit; text-decoration: none; }
 .scoreboard__team--home { text-align: right; }
 .scoreboard__team span { color: #e8b276; font-size: .67rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-.scoreboard__team-name { display: flex; gap: clamp(.65rem,1.5vw,1.1rem); align-items: center; margin: .25rem 0; }
-.scoreboard__team--home .scoreboard__team-name { flex-direction: row-reverse; }
-.scoreboard__team-logo { width: clamp(46px,6vw,78px); height: clamp(46px,6vw,78px); flex: 0 0 auto; object-fit: contain; filter: drop-shadow(0 5px 8px rgba(0,0,0,.2)); }
-.scoreboard__team strong { font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(1.8rem,4vw,3.6rem); line-height: .95; text-transform: uppercase; }
+.scoreboard__team strong { margin: .25rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(1.8rem,4vw,3.6rem); line-height: .95; text-transform: uppercase; }
 .scoreboard__team small { color: #c6d2d9; font-weight: 800; }
 .scoreboard__score { display: flex; gap: clamp(.5rem,2vw,1.2rem); align-items: center; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.8rem,7vw,6rem); line-height: 1; }
 .scoreboard__score span { color: #7890a1; font-size: .5em; }
@@ -940,8 +923,6 @@ table a { color: #173652; font-weight: 900; text-decoration: none; }
   .game-summary-shell { width: calc(100% - 1.4rem); padding-top: 1rem; }
   .scoreboard > header,.game-panel__heading { align-items: flex-start; flex-direction: column; }
   .scoreboard__matchup { grid-template-columns: 1fr auto 1fr; gap: .6rem; padding: 1.3rem .9rem; }
-  .scoreboard__team-name { gap: .4rem; }
-  .scoreboard__team-logo { width: 34px; height: 34px; }
   .scoreboard__team strong { font-size: 1.35rem; }
   .scoreboard__score { font-size: 2.4rem; }
   .game-tabs { top: .25rem; }

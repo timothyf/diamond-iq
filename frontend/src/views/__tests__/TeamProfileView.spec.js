@@ -313,7 +313,7 @@ describe('TeamProfileView', () => {
       "https://baseballsavant.mlb.com/team/116",
       "https://www.mlb.com/tigers",
       "https://www.baseball-reference.com/teams/DET/2026.shtml",
-      "https://www.fangraphs.com/teams/tigers/stats",
+      "https://www.fangraphs.com/teams/tigers",
     ])
     expect(externalLinks.every((link) => link.attributes("target") === "_blank" && link.attributes("rel") === "noopener noreferrer")).toBe(true)
     expect(wrapper.text()).toContain('52–43')
@@ -464,6 +464,34 @@ describe('TeamProfileView', () => {
     expect(unavailable.get('.ranking-bar__fill').attributes('style')).toContain('width: 0%')
     expect(middle.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('50')
     expect(middle.get('.ranking-bar__fill').attributes('style')).toContain('width: 50%')
+  })
+
+  it("shows Player Stats and Team Stats as coming-soon tabs in the requested order", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: "1" },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    expect(wrapper.findAll("[role=tab]").map((tab) => tab.attributes("data-test"))).toEqual([
+      "team-profile-tab-overview",
+      "team-profile-tab-roster",
+      "team-profile-tab-player-stats",
+      "team-profile-tab-team-stats",
+      "team-profile-tab-opponent",
+      "team-profile-tab-lineup",
+    ])
+
+    const requestCount = fetch.mock.calls.length
+    await wrapper.get("[data-test=team-profile-tab-player-stats]").trigger("click")
+    expect(wrapper.get("[data-test=team-profile-panel-player-stats]").text()).toContain("Coming soon")
+    expect(wrapper.get("[data-test=team-profile-panel-player-stats]").attributes("style") || "").not.toContain("display: none")
+
+    await wrapper.get("[data-test=team-profile-tab-team-stats]").trigger("click")
+    expect(wrapper.get("[data-test=team-profile-panel-team-stats]").text()).toContain("Coming soon")
+    expect(wrapper.get("[data-test=team-profile-panel-team-stats]").attributes("style") || "").not.toContain("display: none")
+    expect(fetch).toHaveBeenCalledTimes(requestCount)
   })
 
   it('reloads the profile for the selected season', async () => {

@@ -4,7 +4,7 @@ import { computed } from 'vue'
 import GameScheduleCard from '../components/GameScheduleCard.vue'
 import { teamLogoUrl } from '../config'
 import { useHomeDashboard } from '../composables/useHomeDashboard'
-import nineLensLogo from '../assets/ninelens_logo_hero.png'
+import nineLensLogo from '../assets/ninelens_logo_v2.png'
 
 const { dashboard, loading, error, refresh } = useHomeDashboard()
 
@@ -63,7 +63,7 @@ function signed(value) {
         <div class="home-hero__baseball" aria-hidden="true"><span>Baseball Intelligence</span></div>
       </div>
       <div class="home-hero__copy">
-        <h1>Baseball intelligence,<br /> ready for first pitch.</h1>
+        <h1>Baseball intelligence,<br /> brought into focus.</h1>
         <p>
           Track today’s slate, scan the league’s top performers, and move directly into the player and team analysis
           behind the numbers.
@@ -250,9 +250,11 @@ function signed(value) {
 
 .home-hero__brand img {
   display: block;
-  width: min(100%, 570px);
-  max-height: 420px;
   object-fit: contain;
+  width: min(34vw, 500px);
+  filter:
+    drop-shadow(0 6px 8px rgba(0, 0, 0, 0.9))
+    drop-shadow(0 0 4px rgba(90, 180, 235, 0.65));
 }
 
 .home-hero__baseball {
@@ -299,11 +301,10 @@ function signed(value) {
   max-width: 850px;
   margin: 0 0 1.1rem;
   font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: clamp(3.2rem, 5.5vw, 6rem);
   font-size: 60px;
   line-height: .96;
   letter-spacing: -.025em;
-  text-transform: uppercase;
+  font-size: clamp(2.65rem, 14vw, 4rem);
 }
 
 .home-hero__copy>p {
@@ -715,11 +716,6 @@ function signed(value) {
     text-align: center;
   }
 
-  .home-hero__brand img {
-    width: min(78vw, 390px);
-    max-height: 275px;
-  }
-
   .home-hero__baseball {
     width: min(68vw, 335px);
   }
@@ -754,10 +750,6 @@ function signed(value) {
 
   .home-hero {
     padding: 1.25rem;
-  }
-
-  .home-hero h1 {
-    font-size: clamp(2.65rem, 14vw, 4rem);
   }
 
   .home-actions {

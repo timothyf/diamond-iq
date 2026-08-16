@@ -1,0 +1,8 @@
+@@ -90,3 +90,7 @@
+ function display(value) {
+   return value === null || value === undefined || value === '' ? '—' : value
+ }
++
++function teamLogo(team) {
++  return team?.logo_url || (team?.mlb_id ? teamLogoUrl(team.mlb_id) : null)
++}
