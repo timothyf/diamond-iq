@@ -75,13 +75,42 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "lineup_scenarios").pluck("id")).to eq([ scenario.id ])
   end
 
-  it "defers opponent and lineup data for overview requests" do
+  it "defers opponent, lineup, and schedule data for overview requests" do
     get api_team_path(@tigers), params: { include: "overview" }
 
     expect(response).to have_http_status(:ok)
     expect(json_body.fetch("data")).not_to have_key("opponent_preparation")
     expect(json_body.fetch("data")).not_to have_key("opponent_reports")
     expect(json_body.fetch("data")).not_to have_key("lineup_scenarios")
+    expect(json_body.fetch("data")).not_to have_key("schedule_games")
+  end
+
+  it "returns the selected season schedule for schedule requests" do
+    earlier_game = create_game(
+      schedule: @schedule,
+      home_team: @tigers,
+      away_team: @guardians,
+      official_date: Date.current - 2.days,
+      status: "final",
+      home_score: 5,
+      away_score: 2
+    )
+    later_game = create_game(
+      schedule: @schedule,
+      home_team: @guardians,
+      away_team: @tigers,
+      official_date: Date.current + 2.days,
+      status: "scheduled"
+    )
+
+    get api_team_path(@tigers), params: { include: "schedule" }
+
+    expect(response).to have_http_status(:ok)
+    games = json_body.dig("data", "schedule_games")
+    expect(games.pluck("id")).to eq([ earlier_game.id, later_game.id ])
+    expect(games.dig(0, "home_team", "mlb_id")).to eq(@tigers.mlb_id)
+    expect(games.dig(1, "away_team", "mlb_id")).to eq(@tigers.mlb_id)
+    expect(games.first).not_to have_key("schedule")
   end
 
   it "returns a unified roster, record, and schedule profile" do

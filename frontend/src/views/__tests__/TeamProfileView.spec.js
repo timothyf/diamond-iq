@@ -116,6 +116,26 @@ const payload = {
         away_probable_pitcher: { id: 55, full_name: 'Garrett Crochet' },
       },
     ],
+    schedule_games: [
+      {
+        id: 80, official_date: '2026-07-14', scheduled_at: '2026-07-14T23:10:00Z',
+        status: 'final', detailed_status: 'Final', home_score: 5, away_score: 2,
+        home_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', team_name: 'Tigers', abbreviation: 'DET' },
+        away_team: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', team_name: 'Guardians', abbreviation: 'CLE' },
+      },
+      {
+        id: 81, official_date: '2026-07-16', scheduled_at: '2026-07-16T23:10:00Z',
+        status: 'scheduled', detailed_status: 'Scheduled', home_score: null, away_score: null,
+        home_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', team_name: 'Tigers', abbreviation: 'DET' },
+        away_team: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', team_name: 'Guardians', abbreviation: 'CLE' },
+      },
+      {
+        id: 84, official_date: '2026-08-18', scheduled_at: '2026-08-18T23:10:00Z',
+        status: 'scheduled', detailed_status: 'Scheduled', home_score: null, away_score: null,
+        home_team: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', team_name: 'Guardians', abbreviation: 'CLE' },
+        away_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', team_name: 'Tigers', abbreviation: 'DET' },
+      },
+    ],
     opponent_preparation: {
       opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
       recent_performance: { games: 10, wins: 7, losses: 3, runs_per_game: 4.8, ops: 0.781, era: 3.42 },
@@ -244,29 +264,6 @@ const payload = {
       },
       strengths: ['Top-10 offense by OPS'],
       concerns: ['Offense has cooled over the last 30 games'],
-      drill_down: {
-        games: [
-          { id: 80, official_date: '2026-07-14', result: 'W', opponent: 'CLE', score: { team: 5, opponent: 2 } },
-        ],
-        players: {
-          hitters: [
-            { player: { id: 42, full_name: 'Riley Greene' }, ops: 0.842 },
-          ],
-          pitchers: [],
-        },
-        plate_appearances: {
-          team_total: 3812,
-          leaders: [
-            { player: { id: 42, full_name: 'Riley Greene' }, plate_appearances: 421 },
-          ],
-        },
-        pitches: {
-          team_total: 14280,
-          leaders: [
-            { player: { id: 51, full_name: 'Tarik Skubal' }, pitches: 1788 },
-          ],
-        },
-      },
     },
   },
 }
@@ -419,15 +416,6 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="offense-ranking-stolen-bases"]').text()).toContain('68')
     expect(wrapper.get('[data-test="offense-ranking-stolen-bases"]').text()).toContain('#11')
     expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Top-10 offense by OPS')
-    expect(wrapper.get('[data-test="team-performance-dashboard"]').text()).toContain('Total tracked pitches: 14280')
-    expect(wrapper.getComponent('[data-test="plate-appearance-player-42"]').props('to')).toEqual({
-      name: 'player-profile',
-      params: { id: 42 },
-    })
-    expect(wrapper.getComponent('[data-test="pitch-player-51"]').props('to')).toEqual({
-      name: 'player-profile',
-      params: { id: 51 },
-    })
     const leaders = wrapper.get('[data-test="team-leaders"]')
     expect(leaders.text()).toContain('Team leaders')
     expect(leaders.text()).toContain('Riley Greene')
@@ -466,6 +454,47 @@ describe('TeamProfileView', () => {
     expect(middle.get('.ranking-bar__fill').attributes('style')).toContain('width: 50%')
   })
 
+  it('loads and navigates the monthly team schedule', async () => {
+    const overviewPayload = structuredClone(payload)
+    delete overviewPayload.data.schedule_games
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url) => Promise.resolve({
+      ok: true,
+      json: async () => String(url).includes('include=schedule') ? payload : overviewPayload,
+    })))
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="team-profile-tab-schedule"]').trigger('click')
+    await flushPromises()
+
+    expect(fetch).toHaveBeenLastCalledWith(
+      '/api/teams/1?include=schedule&season=2026',
+      expect.any(Object),
+    )
+    expect(wrapper.get('[data-test="team-profile-panel-schedule"]').attributes('style') || '').not.toContain('display: none')
+    expect(wrapper.get('[data-test="schedule-month-label"]').text()).toBe('August 2026')
+    expect(wrapper.get('[data-test="team-schedule-calendar"]').text()).toContain('Sun')
+    expect(wrapper.get('[data-test="team-schedule-calendar"]').text()).toContain('Sat')
+    expect(wrapper.get('[data-test="schedule-game-84"]').text()).toContain('@')
+    expect(wrapper.get('[data-test="schedule-game-84"]').text()).toContain('Guardians')
+    expect(wrapper.get('[data-test="schedule-game-84"] img').attributes('src')).toContain('/team-logos/114.svg')
+
+    await wrapper.get('[data-test="schedule-previous-month"]').trigger('click')
+
+    expect(wrapper.get('[data-test="schedule-month-label"]').text()).toBe('July 2026')
+    expect(wrapper.get('[data-test="schedule-game-80"]').text()).toContain('W, 5–2')
+    expect(wrapper.get('[data-test="schedule-game-81"]').text()).toContain('Guardians')
+    expect(wrapper.getComponent('[data-test="schedule-game-80"]').props('to')).toEqual({
+      name: 'game-summary',
+      params: { id: 80 },
+    })
+    expect(wrapper.get('[data-test="schedule-previous-month"]').attributes()).toHaveProperty('disabled')
+    expect(wrapper.get('[data-test="schedule-next-month"]').attributes()).not.toHaveProperty('disabled')
+  })
+
   it("shows Player Stats and Team Stats as coming-soon tabs in the requested order", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(TeamProfileView, {
@@ -477,6 +506,7 @@ describe('TeamProfileView', () => {
     expect(wrapper.findAll("[role=tab]").map((tab) => tab.attributes("data-test"))).toEqual([
       "team-profile-tab-overview",
       "team-profile-tab-roster",
+      "team-profile-tab-schedule",
       "team-profile-tab-player-stats",
       "team-profile-tab-team-stats",
       "team-profile-tab-opponent",

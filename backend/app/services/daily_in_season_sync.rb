@@ -20,7 +20,7 @@ class DailyInSeasonSync
 
     synchronize("schedules", summary) { MlbScheduleSync.call(start_date: start_date, end_date: end_date, game_types: GAME_TYPES, sport_id: 1) }
     synchronize("game details", summary) { MlbGameDetailsBatchSync.call(start_date: start_date, end_date: end_date) }
-    synchronize("Statcast", summary) do
+    synchronize("Statcast", summary, continue_on_failure: true) do
       PitchDataBatchSync.call(
         start_date: start_date,
         end_date: end_date,
@@ -41,6 +41,12 @@ class DailyInSeasonSync
     #synchronize("MLB transaction histories", summary) { MlbPlayerTeamHistoriesSync.call }
     synchronize("contextual benchmarks", summary) do
       ContextualBenchmarkRefresh.call(start_date: start_date, end_date: end_date)
+    end
+
+    failed_stages = summary[:stages].reject { |stage| stage[:success] }
+    if failed_stages.any?
+      details = failed_stages.map { |stage| stage[:message] }.join("; ")
+      return failure("Completed remaining daily in-season refresh stages with failures: #{details}", summary)
     end
 
     success("Completed daily in-season refresh for #{start_date} through #{end_date}", summary)
@@ -67,7 +73,7 @@ class DailyInSeasonSync
     end
   end
 
-  def synchronize(name, summary)
+  def synchronize(name, summary, continue_on_failure: false)
     started_at = Process.clock_gettime(Process::CLOCK_MONOTONIC)
     puts "→ Starting #{name}..."
     $stdout.flush
@@ -80,7 +86,18 @@ class DailyInSeasonSync
     puts format("✓ Finished %<name>s in %<elapsed>.1fs: %<message>s", name: name, elapsed: elapsed, message: result[:message])
     $stdout.flush
   rescue StandardError => error
-    puts "✗ #{name} failed: #{error.message}"
+    elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started_at
+    failure_message = error.message.start_with?("#{name} failed:") ? error.message : "#{name} failed: #{error.message}"
+    summary[:stages] << { name: name, success: false, message: failure_message, data: {} }
+
+    puts format("✗ Failed %<name>s in %<elapsed>.1fs: %<message>s", name: name, elapsed: elapsed, message: failure_message)
+
+    if continue_on_failure
+      puts "⚠ Continuing with the remaining daily in-season sync stages..."
+      $stdout.flush
+      return
+    end
+
     $stdout.flush
     raise
   end

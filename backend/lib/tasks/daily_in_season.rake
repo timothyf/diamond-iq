@@ -10,9 +10,12 @@ namespace :daily_in_season do
     $stdout.flush
 
     result = DailyInSeasonSync.call(start_date: start_date, end_date: end_date, season: season)
-    abort result[:message] unless result[:success]
+    Array(result.dig(:data, :stages)).each do |stage|
+      marker = stage[:success] ? "✓" : "✗"
+      puts "#{marker} #{stage[:name]}: #{stage[:message]}"
+    end
 
-    result.dig(:data, :stages).each { |stage| puts "✓ #{stage[:name]}: #{stage[:message]}" }
+    abort result[:message] unless result[:success]
     puts result[:message]
   end
 end

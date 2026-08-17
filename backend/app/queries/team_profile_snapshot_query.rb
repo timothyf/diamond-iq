@@ -52,6 +52,7 @@ class TeamProfileSnapshotQuery
       roster_summary: roster_summary(forty_man_roster, active_roster),
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
+      **schedule_payload,
       **opponent_payload,
       **lineup_payload,
       team_leaders: team_leaders,
@@ -82,6 +83,14 @@ class TeamProfileSnapshotQuery
     return {} unless include_section?("lineup")
 
     { lineup_scenarios: lineup_scenario_summaries }
+  end
+
+  def schedule_payload
+    return {} unless include_section?("schedule")
+
+    {
+      schedule_games: schedule_games.map { |game| GameSerializer.call(game, include_schedule: false) }
+    }
   end
 
   def include_section?(section)
@@ -302,6 +311,13 @@ class TeamProfileSnapshotQuery
       .order(:official_date, :scheduled_at, :mlb_id)
       .limit(GAME_LIMIT)
       .preload(:schedule, :home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
+      .to_a
+  end
+
+  def schedule_games
+    @schedule_games ||= season_games
+      .order(:official_date, :scheduled_at, :mlb_id)
+      .preload(:home_team, :away_team, :home_probable_pitcher, :away_probable_pitcher)
       .to_a
   end
 

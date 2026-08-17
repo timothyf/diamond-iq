@@ -11,6 +11,8 @@ function normalizeGame(game) {
     status: game.status,
     detailedStatus: game.detailed_status,
     venueName: game.venue_name,
+    gameNumber: game.game_number,
+    doubleheader: game.doubleheader,
     homeScore: game.home_score,
     awayScore: game.away_score,
     homeTeam: game.home_team,
@@ -42,7 +44,6 @@ function normalizeMembership(membership) {
 }
 
 function normalizeProfile(data) {
-  const drillDown = data.performance_dashboard?.drill_down || {}
   const opponentPreparation = data.opponent_preparation || {}
   return {
     id: data.id,
@@ -66,6 +67,7 @@ function normalizeProfile(data) {
     rosterSummary: data.roster_summary || {},
     recentGames: (data.recent_games || []).map(normalizeGame),
     upcomingGames: (data.upcoming_games || []).map(normalizeGame),
+    scheduleGames: (data.schedule_games || []).map(normalizeGame),
     opponentPreparation: {
       opponent: opponentPreparation.opponent || null,
       recentPerformance: opponentPreparation.recent_performance || null,
@@ -128,21 +130,6 @@ function normalizeProfile(data) {
       },
       strengths: data.performance_dashboard?.strengths || [],
       concerns: data.performance_dashboard?.concerns || [],
-      drillDown: {
-        games: drillDown.games || [],
-        players: {
-          hitters: drillDown.players?.hitters || [],
-          pitchers: drillDown.players?.pitchers || [],
-        },
-        plateAppearances: {
-          teamTotal: drillDown.plate_appearances?.team_total || 0,
-          leaders: drillDown.plate_appearances?.leaders || [],
-        },
-        pitches: {
-          teamTotal: drillDown.pitches?.team_total || 0,
-          leaders: drillDown.pitches?.leaders || [],
-        },
-      },
     },
   }
 }

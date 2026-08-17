@@ -31,15 +31,18 @@ const BASEBALL_REFERENCE_TEAM_CODES = Object.freeze({
 const profileTabs = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
+  { id: 'schedule', label: 'Schedule' },
   { id: 'player-stats', label: 'Player Stats' },
   { id: 'team-stats', label: 'Team Stats' },
   { id: 'opponent', label: 'Opponent Preparation' },
   { id: 'lineup', label: 'Lineup Planner' },
 ]
+const SCHEDULE_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const selectedSeason = ref(Number(route.query.season) || null)
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
-const requestedProfileSection = computed(() => ['opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
+const requestedProfileSection = computed(() => ['schedule', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
 const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
+const selectedScheduleMonth = ref(null)
 const savedAnalysisState = computed(() => ({
   teamId: teamId.value,
   season: selectedSeason.value,
@@ -112,6 +115,7 @@ watch(teamId, () => {
   selectedSeason.value = null
   selectedProfileTab.value = 'overview'
   selectedRosterView.value = 'active'
+  selectedScheduleMonth.value = null
   reportSaveError.value = ''
   lineupError.value = ''
 })
@@ -188,6 +192,94 @@ const recentRecordEntries = computed(() => (
     return record?.games_played ? { window, label: formatRecord(record) } : null
   }).filter(Boolean)
 ))
+
+const scheduleMonthKeys = computed(() => (
+  [...new Set((team.value?.scheduleGames || []).map((game) => game.officialDate?.slice(0, 7)).filter(Boolean))].sort()
+))
+
+watch(
+  () => [team.value?.id, team.value?.season, scheduleMonthKeys.value.join(',')],
+  ([teamIdValue, season, monthKeys]) => {
+    if (!teamIdValue || !season || !monthKeys) {
+      selectedScheduleMonth.value = null
+      return
+    }
+
+    const availableMonths = monthKeys.split(',')
+    if (selectedScheduleMonth.value && availableMonths.includes(selectedScheduleMonth.value)) return
+
+    const now = new Date()
+    const currentMonth = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0')].join('-')
+    selectedScheduleMonth.value = availableMonths.includes(currentMonth) ? currentMonth : availableMonths[0]
+  },
+  { immediate: true },
+)
+
+const scheduleMonthLabel = computed(() => {
+  if (!selectedScheduleMonth.value) return ((team.value?.season || '') + ' schedule').trim()
+  const [year, month] = selectedScheduleMonth.value.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(year, month - 1, 1, 12))
+})
+
+const scheduleCalendarDays = computed(() => {
+  if (!selectedScheduleMonth.value) return []
+
+  const [year, month] = selectedScheduleMonth.value.split('-').map(Number)
+  const gamesByDate = new Map()
+  for (const game of team.value?.scheduleGames || []) {
+    if (!game.officialDate?.startsWith(selectedScheduleMonth.value + '-')) continue
+    if (!gamesByDate.has(game.officialDate)) gamesByDate.set(game.officialDate, [])
+    gamesByDate.get(game.officialDate).push(game)
+  }
+
+  const cells = Array.from({ length: new Date(year, month - 1, 1).getDay() }, () => null)
+  const daysInMonth = new Date(year, month, 0).getDate()
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const date = [selectedScheduleMonth.value, String(day).padStart(2, '0')].join('-')
+    cells.push({ date, day, games: gamesByDate.get(date) || [] })
+  }
+  while (cells.length % 7 !== 0) cells.push(null)
+  return cells
+})
+
+const canShowPreviousScheduleMonth = computed(() => (
+  Boolean(selectedScheduleMonth.value && scheduleMonthKeys.value.length && selectedScheduleMonth.value > scheduleMonthKeys.value[0])
+))
+const canShowNextScheduleMonth = computed(() => (
+  Boolean(selectedScheduleMonth.value && scheduleMonthKeys.value.length && selectedScheduleMonth.value < scheduleMonthKeys.value.at(-1))
+))
+
+function shiftScheduleMonth(offset) {
+  if (!selectedScheduleMonth.value) return
+  const [year, month] = selectedScheduleMonth.value.split('-').map(Number)
+  const target = new Date(year, month - 1 + offset, 1, 12)
+  selectedScheduleMonth.value = [target.getFullYear(), String(target.getMonth() + 1).padStart(2, '0')].join('-')
+}
+
+function scheduleGameLabel(game) {
+  if (teamScore(game) !== null && teamScore(game) !== undefined) {
+    return resultLabel(game) + ', ' + teamScore(game) + '–' + opponentScore(game)
+  }
+
+  const status = String(game.detailedStatus || game.status || '').toLowerCase()
+  if (['postponed', 'cancelled', 'canceled', 'suspended'].some((value) => status.includes(value))) {
+    return game.detailedStatus || titleize(game.status)
+  }
+  if (!game.scheduledAt) return game.detailedStatus || 'Time TBD'
+
+  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(game.scheduledAt))
+}
+
+function scheduleOpponentLogo(game) {
+  const gameOpponent = opponent(game)
+  return gameOpponent?.logo_url || (gameOpponent?.mlb_id ? teamLogoUrl(gameOpponent.mlb_id) : null)
+}
+
+function isToday(value) {
+  const now = new Date()
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-')
+  return value === today
+}
 
 const dashboard = computed(() => team.value?.performanceDashboard || {})
 const nextSeriesGames = computed(() => {
@@ -1040,63 +1132,6 @@ async function saveLineupScenario() {
               </ul>
             </article>
           </div>
-
-          <div class="drilldown-grid">
-            <article>
-              <h3>Drill-down: games</h3>
-              <ul>
-                <li v-for="game in dashboard.drillDown?.games || []" :key="game.id">
-                  <RouterLink :to="{ name: 'game-summary', params: { id: game.id } }">
-                    {{ formatDate(game.official_date, true) }} · {{ game.result }} · {{ game.score?.team }}-{{
-                      game.score?.opponent }} vs {{ game.opponent }}
-                  </RouterLink>
-                </li>
-              </ul>
-            </article>
-            <article>
-              <h3>Drill-down: players</h3>
-              <ul>
-                <li v-for="playerEntry in dashboard.drillDown?.players?.hitters || []"
-                  :key="`h-${playerEntry.player?.id}`">
-                  <RouterLink v-if="playerEntry.player?.id"
-                    :to="{ name: 'player-profile', params: { id: playerEntry.player.id } }">
-                    {{ playerEntry.player?.full_name }}
-                  </RouterLink>
-                  <template v-else>{{ playerEntry.player?.full_name || 'Unknown player' }}</template>
-                  · OPS {{ formatDecimal(playerEntry.ops) }}
-                </li>
-              </ul>
-            </article>
-            <article>
-              <h3>Drill-down: plate appearances</h3>
-              <p>Total tracked PA: {{ dashboard.drillDown?.plateAppearances?.teamTotal || 0 }}</p>
-              <ul>
-                <li v-for="entry in dashboard.drillDown?.plateAppearances?.leaders || []"
-                  :key="`pa-${entry.player?.id}`">
-                  <RouterLink v-if="entry.player?.id" :to="{ name: 'player-profile', params: { id: entry.player.id } }"
-                    :data-test="`plate-appearance-player-${entry.player.id}`">
-                    {{ entry.player.full_name }}
-                  </RouterLink>
-                  <template v-else>{{ entry.player?.full_name || 'Unknown player' }}</template>
-                  · {{ entry.plate_appearances }} PA
-                </li>
-              </ul>
-            </article>
-            <article>
-              <h3>Drill-down: pitches</h3>
-              <p>Total tracked pitches: {{ dashboard.drillDown?.pitches?.teamTotal || 0 }}</p>
-              <ul>
-                <li v-for="entry in dashboard.drillDown?.pitches?.leaders || []" :key="`pi-${entry.player?.id}`">
-                  <RouterLink v-if="entry.player?.id" :to="{ name: 'player-profile', params: { id: entry.player.id } }"
-                    :data-test="`pitch-player-${entry.player.id}`">
-                    {{ entry.player.full_name }}
-                  </RouterLink>
-                  <template v-else>{{ entry.player?.full_name || 'Unknown player' }}</template>
-                  · {{ entry.pitches }} pitches
-                </li>
-              </ul>
-            </article>
-          </div>
         </section>
 
         <div class="team-schedule-grid">
@@ -1205,6 +1240,56 @@ async function saveLineupScenario() {
           </table>
         </div>
         <p v-else class="team-empty">No players are stored for this team's {{ rosterViewLabel.toLowerCase() }}.</p>
+      </section>
+
+      <section v-show="selectedProfileTab === 'schedule'" id="team-profile-panel-schedule"
+        class="team-panel schedule-panel team-profile-tab-panel" role="tabpanel"
+        aria-labelledby="team-profile-tab-schedule" data-test="team-profile-panel-schedule">
+        <header class="schedule-calendar__header">
+          <div>
+            <p>Season schedule</p>
+            <h2 data-test="schedule-month-label">{{ scheduleMonthLabel }}</h2>
+          </div>
+          <nav class="schedule-month-nav" aria-label="Schedule month navigation">
+            <button type="button" :disabled="!canShowPreviousScheduleMonth" aria-label="Previous month"
+              data-test="schedule-previous-month" @click="shiftScheduleMonth(-1)">‹</button>
+            <button type="button" :disabled="!canShowNextScheduleMonth" aria-label="Next month"
+              data-test="schedule-next-month" @click="shiftScheduleMonth(1)">›</button>
+          </nav>
+        </header>
+
+        <div v-if="team.scheduleGames.length" class="schedule-calendar-scroll">
+          <div class="schedule-calendar" data-test="team-schedule-calendar">
+            <div class="schedule-calendar__weekdays" aria-hidden="true">
+              <span v-for="weekday in SCHEDULE_WEEKDAYS" :key="weekday">{{ weekday }}</span>
+            </div>
+            <div class="schedule-calendar__grid">
+              <div v-for="(day, index) in scheduleCalendarDays" :key="day?.date || 'empty-' + index"
+                class="schedule-day" :class="{ 'schedule-day--empty': !day, 'schedule-day--today': day && isToday(day.date) }">
+                <template v-if="day">
+                  <time :datetime="day.date">{{ day.day }}</time>
+                  <div class="schedule-day__games">
+                    <RouterLink v-for="game in day.games" :key="game.id"
+                      :to="{ name: 'game-summary', params: { id: game.id } }" class="schedule-game"
+                      :class="{ 'schedule-game--final': teamScore(game) !== null && teamScore(game) !== undefined }"
+                      :data-test="'schedule-game-' + game.id"
+                      :aria-label="formatDate(game.officialDate, true) + ', ' + (isHome(game) ? 'vs ' : 'at ') + opponent(game).name + ', ' + scheduleGameLabel(game)">
+                      <img v-if="scheduleOpponentLogo(game)" :src="scheduleOpponentLogo(game)"
+                        :alt="opponent(game).name + ' logo'" />
+                      <span class="schedule-game__opponent">
+                        <small>{{ isHome(game) ? 'vs' : '@' }}</small>
+                        <strong>{{ opponent(game).team_name || opponent(game).name }}</strong>
+                      </span>
+                      <b>{{ scheduleGameLabel(game) }}</b>
+                      <small v-if="game.gameNumber && game.doubleheader && game.doubleheader !== 'N'">Game {{ game.gameNumber }}</small>
+                    </RouterLink>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p v-else class="team-empty">No games are stored for the {{ team.season }} season.</p>
       </section>
 
       <footer class="team-freshness">
@@ -1496,6 +1581,204 @@ async function saveLineupScenario() {
 
 .team-panel {
   padding: 1.35rem;
+}
+
+.schedule-panel {
+  margin-bottom: 1rem;
+  overflow: hidden;
+  padding: 0;
+  background: rgba(255, 253, 247, .94);
+}
+
+.schedule-calendar__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem 1.35rem;
+  border-bottom: 1px solid #d9d7ce;
+}
+
+.schedule-calendar__header p {
+  margin: 0;
+  color: #a93627;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.schedule-calendar__header h2 {
+  margin: .15rem 0 0;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  text-transform: uppercase;
+}
+
+.schedule-month-nav {
+  display: flex;
+  gap: .45rem;
+}
+
+.schedule-month-nav button {
+  display: grid;
+  width: 44px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(16, 38, 61, .2);
+  border-radius: 10px;
+  color: #10263d;
+  background: #fffdf8;
+  font-size: 1.6rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.schedule-month-nav button:hover:not(:disabled) {
+  color: #fffaf0;
+  background: #10263d;
+}
+
+.schedule-month-nav button:disabled {
+  opacity: .32;
+  cursor: not-allowed;
+}
+
+.schedule-calendar-scroll {
+  overflow-x: auto;
+}
+
+.schedule-calendar {
+  min-width: 980px;
+}
+
+.schedule-calendar__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  color: #526572;
+  background: #f1eee7;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.schedule-calendar__weekdays span {
+  padding: .7rem .4rem;
+  border-right: 1px solid #d9d7ce;
+}
+
+.schedule-calendar__weekdays span:last-child {
+  border-right: 0;
+}
+
+.schedule-calendar__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid #d9d7ce;
+  border-left: 1px solid #d9d7ce;
+}
+
+.schedule-day {
+  min-height: 168px;
+  padding: .55rem;
+  border-right: 1px solid #d9d7ce;
+  border-bottom: 1px solid #d9d7ce;
+  background: rgba(255, 255, 255, .76);
+}
+
+.schedule-day--empty {
+  background: rgba(232, 235, 235, .42);
+}
+
+.schedule-day > time {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-bottom: .35rem;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: #485966;
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.schedule-day--today > time {
+  border-color: #a93627;
+  color: #fff;
+  background: #a93627;
+}
+
+.schedule-day__games {
+  display: grid;
+  gap: .4rem;
+}
+
+.schedule-game {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: .12rem .45rem;
+  align-items: center;
+  padding: .5rem;
+  border: 1px solid rgba(16, 38, 61, .1);
+  border-radius: 11px;
+  color: #10263d;
+  background: rgba(241, 245, 247, .86);
+  text-decoration: none;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+
+.schedule-game--final {
+  background: rgba(255, 250, 240, .94);
+}
+
+.schedule-game:hover {
+  border-color: rgba(169, 54, 39, .42);
+  box-shadow: 0 6px 16px rgba(16, 38, 61, .1);
+  transform: translateY(-1px);
+}
+
+.schedule-game > img {
+  grid-row: 1 / span 3;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.schedule-game__opponent {
+  display: flex;
+  gap: .3rem;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.schedule-game__opponent small {
+  color: #7b858c;
+  font-size: .64rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.schedule-game__opponent strong {
+  overflow: hidden;
+  font-size: .76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.schedule-game > b {
+  color: #5a6872;
+  font-size: .7rem;
+}
+
+.schedule-game > small {
+  grid-column: 2;
+  color: #8b5b43;
+  font-size: .6rem;
+  font-weight: 800;
 }
 
 .opponent-prep {
@@ -2454,8 +2737,7 @@ async function saveLineupScenario() {
 }
 
 .performance-grid article,
-.signals-grid article,
-.drilldown-grid article {
+.signals-grid article {
   padding: .75rem;
   border: 1px solid #e3dfd7;
   border-radius: 14px;
@@ -2480,31 +2762,21 @@ async function saveLineupScenario() {
   font-weight: 700;
 }
 
-.signals-grid,
-.drilldown-grid {
+.signals-grid {
   display: grid;
   gap: .75rem;
   margin-top: .85rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.signals-grid ul,
-.drilldown-grid ul {
+.signals-grid ul {
   margin: 0;
   padding-left: 1rem;
   color: #445767;
 }
 
-.signals-grid li,
-.drilldown-grid li {
+.signals-grid li {
   margin: .22rem 0;
-}
-
-.drilldown-grid a {
-  color: #173652;
-  font-weight: 750;
-  text-decoration-color: rgba(23, 54, 82, .3);
-  text-underline-offset: .15em;
 }
 
 .team-panel>header {
@@ -2807,8 +3079,7 @@ th {
     grid-template-columns: 1fr 1fr;
   }
 
-  .signals-grid,
-  .drilldown-grid {
+  .signals-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2847,6 +3118,15 @@ th {
   .team-profile-tabs button {
     flex: 0 0 auto;
     min-width: 118px;
+  }
+
+  .schedule-calendar__header {
+    align-items: flex-start;
+    padding: 1rem;
+  }
+
+  .schedule-calendar {
+    min-width: 840px;
   }
 
   .team-identity h1 {
