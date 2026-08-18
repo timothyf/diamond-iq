@@ -1,7 +1,8 @@
 <script setup>
+import { computed } from 'vue'
 import AddToWatchlistControl from '../../components/AddToWatchlistControl.vue'
 
-defineProps({
+const props = defineProps({
   player: { type: Object, required: true },
   initials: { type: String, required: true },
   headshotFailed: { type: Boolean, default: false },
@@ -13,6 +14,16 @@ defineProps({
 })
 
 const emit = defineEmits(['headshot-error', 'open-source'])
+
+const lastSeason = computed(() => {
+  if (props.player.profile?.active !== false) return null
+
+  const careerLastSeason = Number(props.player.careerOverview?.lastSeason)
+  if (Number.isInteger(careerLastSeason) && careerLastSeason > 0) return careerLastSeason
+
+  const year = String(props.player.profile?.lastPlayedDate || '').match(/^(\d{4})/)
+  return year ? Number(year[1]) : null
+})
 </script>
 
 <template>
@@ -85,7 +96,11 @@ const emit = defineEmits(['headshot-error', 'open-source'])
         <dt>MLB debut</dt>
         <dd>{{ formatDate(player.profile?.mlbDebutDate) }}</dd>
       </div>
-      <div class="profile-bio__empty" aria-hidden="true"></div>
+      <div v-if="lastSeason" data-test="player-last-season">
+        <dt>Last season</dt>
+        <dd>{{ lastSeason }}</dd>
+      </div>
+      <div v-else class="profile-bio__empty" aria-hidden="true"></div>
     </dl>
 
     <div class="profile-hero__footer">

@@ -16,6 +16,7 @@ function apiPayload() {
       display_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' },
       external_ids: { baseball_reference: 'greenri03', fangraphs: '25976' },
       profile: {
+        active: true,
         age: 25,
         birth_date: '2000-09-28',
         formatted_height: `6' 3"`,
@@ -514,6 +515,7 @@ describe('PlayerProfileView', () => {
     expect(wrapper.text()).toContain('Riley Greene')
     expect(wrapper.text()).toContain('Detroit Tigers')
     expect(wrapper.text()).toContain('Active')
+    expect(wrapper.find('[data-test="player-last-season"]').exists()).toBe(false)
     expect(wrapper.findComponent(AddToWatchlistControl).exists()).toBe(true)
     expect(wrapper.get('[data-test="compare-player-link"]').text()).toContain('Compare player')
     expect(wrapper.get('[data-test="external-profile-mlb"]').attributes()).toMatchObject({
@@ -588,6 +590,23 @@ describe('PlayerProfileView', () => {
     expect(fetch).toHaveBeenCalledWith('/api/players/42?range=7&pa_window=50&pitch_window=100&sections=core', {
       headers: { Accept: 'application/json' },
     })
+  })
+
+  it('shows the final MLB season in the bio for an inactive player', async () => {
+    const payload = apiPayload()
+    payload.data.profile.active = false
+    payload.data.profile.last_played_date = '2023-10-01'
+    payload.data.career_overview.last_season = null
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="player-last-season"]').text()).toContain('Last season')
+    expect(wrapper.get('[data-test="player-last-season"]').text()).toContain('2023')
   })
 
   it('renders favorable pitcher chase movement as a green improvement', async () => {

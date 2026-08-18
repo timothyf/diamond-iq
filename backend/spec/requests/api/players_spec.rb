@@ -68,6 +68,8 @@ RSpec.describe "Api::Players", type: :request do
         headshot_id: "408234",
         headshot_url_override: "https://example.test/miguel-cabrera.png",
         raw_data: {
+          "active" => false,
+          "lastPlayedDate" => "2023-10-01",
           "draftYear" => 1999,
           "drafts" => [ { "team" => { "id" => 135, "name" => "San Diego Padres" } } ],
           "awards" => [
@@ -90,6 +92,8 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile", "weight_pounds")).to eq(267)
     expect(json_body.dig("data", "profile", "bats")).to eq("R")
     expect(json_body.dig("data", "profile", "throws")).to eq("R")
+    expect(json_body.dig("data", "profile", "active")).to be(false)
+    expect(json_body.dig("data", "profile", "last_played_date")).to eq("2023-10-01")
     expect(json_body.dig("data", "profile", "mlb_debut_date")).to eq("2003-06-20")
     expect(json_body.dig("data", "profile", "draft_year")).to eq(1999)
     expect(json_body.dig("data", "profile", "draft_team")).to eq("id" => 135, "name" => "San Diego Padres")

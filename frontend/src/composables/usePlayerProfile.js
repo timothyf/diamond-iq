@@ -72,6 +72,8 @@ function normalizeProfile(data = {}) {
         birthDate: data.profile.birth_date,
         formattedHeight: data.profile.formatted_height,
         weightPounds: data.profile.weight_pounds,
+        active: data.profile.active,
+        lastPlayedDate: data.profile.last_played_date,
         draftYear: data.profile.draft_year,
         draftTeam: data.profile.draft_team,
         awards: (data.profile.awards || []).map((award) => ({

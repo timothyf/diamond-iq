@@ -76,6 +76,8 @@ module Api
         weight_pounds: profile.weight_pounds,
         bats: profile.bats,
         throws: profile.throws,
+        active: profile.raw_data.to_h["active"],
+        last_played_date: profile.raw_data.to_h["lastPlayedDate"],
         draft_year: Integer(profile.raw_data.to_h["draftYear"], exception: false),
         draft_team: serialized_draft_team(profile),
         awards: serialized_awards(profile),
