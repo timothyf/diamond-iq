@@ -164,7 +164,14 @@ function normalizeProfile(data = {}) {
       seasons: (defensiveStats.seasons || []).map((seasonRow) => ({
         season: seasonRow.season,
         games: seasonRow.games,
-        positions: seasonRow.positions || [],
+        positions: (seasonRow.positions || []).map((positionRow) => ({
+          position: positionRow.position,
+          games: positionRow.games,
+          innings: positionRow.innings,
+          fieldingPercentage: positionRow.fielding_percentage,
+          defensiveRunsSaved: positionRow.defensive_runs_saved,
+          outsAboveAverage: positionRow.outs_above_average,
+        })),
         fieldingPercentage: seasonRow.fielding_percentage,
         defensiveRunsSaved: seasonRow.defensive_runs_saved,
         outsAboveAverage: seasonRow.outs_above_average,

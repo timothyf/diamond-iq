@@ -824,6 +824,64 @@ describe('PlayerProfileView', () => {
     expect(panel.get('[data-test="advanced-stat-group-plate_discipline"]').text()).toContain('10.6%')
   })
 
+  it('shows defensive rows by position followed by a season total', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.defensive_stats = {
+        season: 2026,
+        seasons: [
+          {
+            season: 2026,
+            games: 79,
+            fielding_percentage: 0.9766,
+            defensive_runs_saved: -4,
+            outs_above_average: -9,
+            positions: [
+              {
+                position: '2B',
+                games: 56,
+                innings: '360.2',
+                fielding_percentage: 0.981928,
+                defensive_runs_saved: -3,
+                outs_above_average: -4,
+              },
+              {
+                position: '3B',
+                games: 24,
+                innings: '131.1',
+                fielding_percentage: 0.977778,
+                defensive_runs_saved: -1,
+                outs_above_average: -4,
+              },
+            ],
+          },
+        ],
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="player-profile-tab-defensive-stats"]').trigger('click')
+    await flushPromises()
+
+    const panel = wrapper.get('[data-test="defensive-stats-panel"]')
+    const rows = panel.findAll('tbody tr')
+    expect(rows).toHaveLength(3)
+    expect(rows[0].text()).toContain('2B')
+    expect(rows[0].text()).toContain('360.2')
+    expect(rows[0].text()).toContain('-3.00')
+    expect(rows[1].text()).toContain('3B')
+    expect(rows[2].classes()).toContain('advanced-table__season-total')
+    expect(rows[2].text()).toContain('Season total')
+    expect(rows[2].text()).toContain('79')
+    expect(rows[2].text()).toContain('-4.00')
+    expect(rows[2].text()).toContain('-9.00')
+  })
+
   it('shows pitcher rate and outcome statistics on the Advanced Stats tab', async () => {
     const payload = apiPayloadWith((response) => {
       response.data.positions = {

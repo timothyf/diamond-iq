@@ -288,6 +288,7 @@ class PlayerProfileSnapshotQuery
   def defensive_season_stats(season)
     stat_rows = all_season_rows.select { |row| row.season == season }
     games = advanced_count(stat_rows, %w[gamesPlayed G games], career: false)
+    stored_positions = stored_fielding_positions(season)
     game_fielding = game_fielding_summary(season)
     assignments = player.player_positions.to_a
       .select { |assignment| assignment.season.nil? || assignment.season == season }
@@ -305,18 +306,55 @@ class PlayerProfileSnapshotQuery
     {
       season: season,
       games: games || game_fielding[:positions].sum { |entry| entry[:games].to_i },
-      positions: (game_fielding[:positions].presence || assignments.map.with_index do |assignment, index|
+      positions: (stored_positions.presence || game_fielding[:positions].presence || assignments.map.with_index do |assignment, index|
         { position: assignment.position.abbreviation || assignment.position.name, games: index.zero? ? games : nil, innings: nil }
       end),
       fielding_percentage: numeric_advanced_value(fielding_percentage),
       defensive_runs_saved: numeric_advanced_value(
-        advanced_count(stat_rows, %w[defensiveRunsSaved DRS drs], career: false) || game_fielding[:defensive_runs_saved]
+        advanced_count(stat_rows, %w[defensiveRunsSaved DRS drs], career: false) || summed_position_metric(stored_positions, :defensive_runs_saved) || game_fielding[:defensive_runs_saved]
       ),
       outs_above_average: numeric_advanced_value(
-        advanced_count(stat_rows, %w[outsAboveAverage OAA oaa outs_above_average], career: false) || game_fielding[:outs_above_average]
+        advanced_count(stat_rows, %w[outsAboveAverage OAA oaa outs_above_average], career: false) || summed_position_metric(stored_positions, :outs_above_average) || game_fielding[:outs_above_average]
       )
     }
   end
+
+  def stored_fielding_positions(season)
+    player.player_season_fielding_stats
+      .where(season: season)
+      .to_a
+      .group_by(&:position)
+      .map do |position, rows|
+        putouts = rows.filter_map(&:putouts).sum
+        assists = rows.filter_map(&:assists).sum
+        fielding_errors = rows.filter_map(&:fielding_errors).sum
+        chances = putouts + assists + fielding_errors
+        innings_outs = rows.filter_map(&:innings).sum { |innings| innings_to_outs(innings) }
+
+        {
+          position: position,
+          games: rows.filter_map(&:games).sum,
+          innings: innings_outs.positive? ? format_innings(innings_outs) : nil,
+          fielding_percentage: numeric_advanced_value(
+            chances.positive? ? (putouts + assists).to_d / chances : rows.filter_map(&:fielding_percentage).first
+          ),
+          defensive_runs_saved: numeric_advanced_value(summed_fielding_value(rows, :defensive_runs_saved)),
+          outs_above_average: numeric_advanced_value(summed_fielding_value(rows, :outs_above_average))
+        }
+      end
+      .sort_by { |row| [ -row[:games].to_i, row[:position] ] }
+  end
+
+  def summed_fielding_value(rows, attribute)
+    values = rows.filter_map { |row| row.public_send(attribute) }
+    values.any? ? values.sum : nil
+  end
+
+  def summed_position_metric(rows, key)
+    values = rows.filter_map { |row| row[key] }
+    values.any? ? values.sum : nil
+  end
+
 
   def game_fielding_summary(season)
     lines = player.game_player_batting_lines

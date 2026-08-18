@@ -188,4 +188,37 @@ RSpec.describe PlayerStatsImporter, type: :service do
     )
     expect(season_rows.where(scope_type: "combined").pluck(:team_id)).to eq([nil])
   end
+  it "imports position-level fielding rows" do
+    fielding_rows = [
+      {
+        team_abbreviation: "DET", position: "2B", games: 56, innings: 360.2,
+        putouts: 64, assists: 99, fielding_errors: 3, fielding_percentage: 0.981928,
+        defensive_runs_saved: -3, outs_above_average: -4
+      },
+      {
+        team_abbreviation: "DET", position: "3B", games: 24, innings: 131.1,
+        putouts: 10, assists: 34, fielding_errors: 1, fielding_percentage: 0.977778,
+        defensive_runs_saved: -1, outs_above_average: -4
+      }
+    ]
+    csv_data = CSV.generate do |csv|
+      csv << %w[season stat_type playerId playerFirstName playerLastName teamAbbrev teamName teamShortName teamId gamesPlayed fieldingByPosition]
+      csv << [2026, "batter", 701678, "Hao-Yu", "Lee", "DET", "Detroit Tigers", "Tigers", 116, 80, fielding_rows.to_json]
+    end
+
+    result = described_class.call(csv_data: csv_data, source_name: "FanGraphs fielding leaderboard")
+
+    expect(result[:success]).to be(true)
+    expect(result.dig(:data, :fielding_imported_count)).to eq(2)
+    player = Player.find_by!(mlb_id: 701678)
+    rows = player.player_season_fielding_stats.order(games: :desc)
+    expect(rows.pluck(:position, :games)).to eq([["2B", 56], ["3B", 24]])
+    expect(rows.first).to have_attributes(
+      innings: BigDecimal("360.2"),
+      fielding_percentage: BigDecimal("0.981928"),
+      defensive_runs_saved: BigDecimal("-3"),
+      outs_above_average: BigDecimal("-4")
+    )
+  end
+
 end

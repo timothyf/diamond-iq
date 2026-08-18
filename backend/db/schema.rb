@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_17_220000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_17_224000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -730,6 +730,29 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_220000) do
     t.check_constraint "weight_pounds IS NULL OR weight_pounds > 0", name: "player_profiles_positive_weight"
   end
 
+  create_table "player_season_fielding_stats", force: :cascade do |t|
+    t.bigint "player_id", null: false
+    t.bigint "team_id"
+    t.integer "season", null: false
+    t.string "team_abbreviation", null: false
+    t.string "position", null: false
+    t.integer "games"
+    t.decimal "innings", precision: 7, scale: 1
+    t.integer "putouts"
+    t.integer "assists"
+    t.integer "fielding_errors"
+    t.decimal "fielding_percentage", precision: 7, scale: 6
+    t.decimal "defensive_runs_saved", precision: 7, scale: 2
+    t.decimal "outs_above_average", precision: 7, scale: 2
+    t.string "source_name", null: false
+    t.datetime "last_synced_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["player_id", "season", "team_abbreviation", "position"], name: "idx_player_season_fielding_stats_unique_scope", unique: true
+    t.index ["player_id"], name: "index_player_season_fielding_stats_on_player_id"
+    t.index ["team_id"], name: "index_player_season_fielding_stats_on_team_id"
+  end
+
   create_table "player_season_stats", force: :cascade do |t|
     t.bigint "player_id", null: false
     t.bigint "stat_type_id", null: false
@@ -1282,6 +1305,8 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_17_220000) do
   add_foreign_key "player_positions", "players"
   add_foreign_key "player_positions", "positions"
   add_foreign_key "player_profiles", "players"
+  add_foreign_key "player_season_fielding_stats", "players"
+  add_foreign_key "player_season_fielding_stats", "teams"
   add_foreign_key "player_season_stats", "players"
   add_foreign_key "player_season_stats", "stat_types"
   add_foreign_key "player_season_stats", "teams"

@@ -66,6 +66,7 @@ class PlayerStatsDownloader
     "BaseRunning",
     "Defense",
     "DRS",
+    "fieldingByPosition",
     "GB%",
     "FB%",
     "LD%",
@@ -354,14 +355,32 @@ class PlayerStatsDownloader
     response = http.request(request)
     raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
 
-    totals = Array(JSON.parse(response.body)["data"]).each_with_object({}) do |row, values|
+    rows_by_player = Array(JSON.parse(response.body)["data"]).each_with_object(Hash.new { |hash, key| hash[key] = [] }) do |row, values|
       player_id = Integer(row["xMLBAMID"], exception: false)
-      drs = Float(row["DRS"], exception: false)
-      next unless player_id && drs
+      position = (row["Position"].presence || row["Pos"]).to_s.strip
+      next if player_id.nil? || position.blank?
 
-      values[player_id] = values.fetch(player_id, 0.0) + drs
+      values[player_id] << {
+        team_abbreviation: row["TeamNameAbb"].to_s.strip.presence || "TOT",
+        position: position,
+        games: Integer(row["G"], exception: false),
+        innings: Float(row["Inn"], exception: false),
+        putouts: Integer(row["PO"], exception: false),
+        assists: Integer(row["A"], exception: false),
+        fielding_errors: Integer(row["E"], exception: false),
+        fielding_percentage: Float(row["FP"], exception: false),
+        defensive_runs_saved: Float(row["DRS"], exception: false),
+        outs_above_average: Float(row["OAA"], exception: false)
+      }
     end
-    totals.transform_values { |drs| { "DRS" => drs } }
+
+    rows_by_player.transform_values do |position_rows|
+      drs_values = position_rows.filter_map { |row| row[:defensive_runs_saved] }
+      {
+        "DRS" => drs_values.presence&.sum,
+        "fieldingByPosition" => position_rows.to_json
+      }.compact
+    end
   end
 
   def merge_statcast_values(rows, year)

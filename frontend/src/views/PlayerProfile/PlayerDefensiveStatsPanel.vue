@@ -9,6 +9,13 @@ function formatGames(value) {
   const number = Number(value)
   return Number.isFinite(number) ? Math.round(number).toString() : '—'
 }
+function formatInnings(value) {
+  if (value === null || value === undefined || value === '') return '—'
+
+  const number = Number(value)
+  return Number.isFinite(number) ? number.toFixed(1) : '—'
+}
+
 
 function formatFieldingPercentage(value) {
   if (value === null || value === undefined || value === '') return '—'
@@ -49,20 +56,39 @@ function formatRuns(value) {
           <thead>
             <tr>
               <th>Season</th>
+              <th>Position</th>
               <th>Games</th>
+              <th>Innings</th>
               <th>Fielding percentage</th>
               <th>Defensive Runs Saved</th>
               <th>Outs Above Average</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="season in defensiveStats.seasons" :key="season.season">
-              <th>{{ season.season }}</th>
-              <td>{{ formatGames(season.games) }}</td>
-              <td>{{ formatFieldingPercentage(season.fieldingPercentage) }}</td>
-              <td>{{ formatRuns(season.defensiveRunsSaved) }}</td>
-              <td>{{ formatRuns(season.outsAboveAverage) }}</td>
-            </tr>
+            <template v-for="season in defensiveStats.seasons" :key="season.season">
+              <tr
+                v-for="positionRow in season.positions"
+                :key="`${season.season}-${positionRow.position}`"
+                class="defensive-position-row"
+              >
+                <td>{{ season.season }}</td>
+                <th scope="row">{{ positionRow.position }}</th>
+                <td>{{ formatGames(positionRow.games) }}</td>
+                <td>{{ formatInnings(positionRow.innings) }}</td>
+                <td>{{ formatFieldingPercentage(positionRow.fieldingPercentage) }}</td>
+                <td>{{ formatRuns(positionRow.defensiveRunsSaved) }}</td>
+                <td>{{ formatRuns(positionRow.outsAboveAverage) }}</td>
+              </tr>
+              <tr class="advanced-table__season-total">
+                <th scope="row">{{ season.season }}</th>
+                <th scope="row">Season total</th>
+                <td>{{ formatGames(season.games) }}</td>
+                <td>—</td>
+                <td>{{ formatFieldingPercentage(season.fieldingPercentage) }}</td>
+                <td>{{ formatRuns(season.defensiveRunsSaved) }}</td>
+                <td>{{ formatRuns(season.outsAboveAverage) }}</td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>

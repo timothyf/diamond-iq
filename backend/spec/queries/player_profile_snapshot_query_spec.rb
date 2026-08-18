@@ -354,6 +354,19 @@ RSpec.describe PlayerProfileSnapshotQuery do
       source_name: "MLB Stats API",
       last_synced_at: Time.current
     )
+    PlayerSeasonFieldingStat.create!(
+      player: player, team: team, season: 2026, team_abbreviation: "DET", position: "2B",
+      games: 56, innings: 360.2, putouts: 64, assists: 99, fielding_errors: 3,
+      fielding_percentage: 0.981928, defensive_runs_saved: -3, outs_above_average: -4,
+      source_name: "FanGraphs fielding leaderboard", last_synced_at: Time.current
+    )
+    PlayerSeasonFieldingStat.create!(
+      player: player, team: team, season: 2026, team_abbreviation: "DET", position: "3B",
+      games: 24, innings: 131.1, putouts: 10, assists: 34, fielding_errors: 1,
+      fielding_percentage: 0.977778, defensive_runs_saved: -1, outs_above_average: -4,
+      source_name: "FanGraphs fielding leaderboard", last_synced_at: Time.current
+    )
+
 
     defensive = described_class.new(player: player).result.fetch(:defensive_stats).fetch(:seasons).sole
 
@@ -361,9 +374,22 @@ RSpec.describe PlayerProfileSnapshotQuery do
       season: 2026,
       games: 1,
       fielding_percentage: 0.981,
-      defensive_runs_saved: nil,
+      defensive_runs_saved: -4.0,
       outs_above_average: -9.0
     )
+
+    expect(defensive.fetch(:positions)).to eq([
+      {
+        position: "2B", games: 56, innings: "360.2",
+        fielding_percentage: (163.0 / 166),
+        defensive_runs_saved: -3.0, outs_above_average: -4.0
+      },
+      {
+        position: "3B", games: 24, innings: "131.1",
+        fielding_percentage: (44.0 / 45),
+        defensive_runs_saved: -1.0, outs_above_average: -4.0
+      }
+    ])
   end
 
   it "returns grouped advanced batting rates by season and for the career" do

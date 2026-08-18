@@ -185,9 +185,12 @@ RSpec.describe PlayerStatsDownloader, type: :service do
     allow(http).to receive(:read_timeout=)
     allow(http).to receive(:request).and_return(response)
 
-    expect(downloader.send(:fetch_fangraphs_fielding_values, 2026)).to eq(
-      701678 => { "DRS" => -4.0 },
-      682985 => { "DRS" => 4.0 }
+    values = downloader.send(:fetch_fangraphs_fielding_values, 2026)
+
+    expect(values.dig(701678, "DRS")).to eq(-4.0)
+    expect(values.dig(682985, "DRS")).to eq(4.0)
+    expect(JSON.parse(values.dig(701678, "fieldingByPosition"))).to include(
+      hash_including("position" => "2B", "defensive_runs_saved" => -3.0)
     )
   end
 

@@ -1,5 +1,6 @@
 require "bigdecimal"
 require "csv"
+require "json"
 
 class PlayerStatsImporter
   PLAYER_ID_FIELDS = %w[player_id playerid playerId id].freeze
@@ -15,6 +16,7 @@ class PlayerStatsImporter
 
   SEASON_FIELDS = %w[season year source_season sourceSeason].freeze
   STAT_GROUP_FIELDS = %w[stat_type statType].freeze
+  FIELDING_BY_POSITION_FIELDS = %w[fieldingByPosition fielding_by_position].freeze
 
   CATEGORY_MAP = {
     "batter" => "batting",
@@ -183,6 +185,7 @@ class PlayerStatsImporter
     category = normalize_category(fetch_value(normalized_row, key_map, STAT_GROUP_FIELDS))
     team_attributes = build_team_attributes(normalized_row, key_map)
     stat_entries = build_stat_entries(normalized_row, key_map, category)
+    fielding_position_rows = parse_fielding_position_rows(fetch_value(normalized_row, key_map, FIELDING_BY_POSITION_FIELDS))
 
     missing_identity_fields = []
     missing_identity_fields << "playerId" if player_mlb_id.nil?
@@ -216,7 +219,8 @@ class PlayerStatsImporter
       team_attributes: team_attributes,
       scope_type: scope_type_for(team_attributes),
       scope_key: scope_key_for(team_attributes),
-      stat_entries: stat_entries
+      stat_entries: stat_entries,
+      fielding_position_rows: fielding_position_rows
     }
   end
 
@@ -285,10 +289,33 @@ class PlayerStatsImporter
     @stat_types_for_category ||= StatType.all.group_by(&:category)
     @stat_types_for_category.fetch(category, [])
   end
+  def parse_fielding_position_rows(value)
+    return [] if value.blank?
+
+    Array(JSON.parse(value)).filter_map do |row|
+      position = row["position"].to_s.strip
+      next if position.blank?
+
+      {
+        team_abbreviation: row["team_abbreviation"].to_s.strip.upcase.presence || "TOT",
+        position: position,
+        games: parse_integer(row["games"]),
+        innings: parse_numeric_value(row["innings"]),
+        putouts: parse_integer(row["putouts"]),
+        assists: parse_integer(row["assists"]),
+        fielding_errors: parse_integer(row["fielding_errors"] || row["errors"]),
+        fielding_percentage: parse_numeric_value(row["fielding_percentage"]),
+        defensive_runs_saved: parse_numeric_value(row["defensive_runs_saved"]),
+        outs_above_average: parse_numeric_value(row["outs_above_average"])
+      }
+    end
+  end
+
 
   def persist_rows(import_rows)
     timestamp = Time.current
     season_stat_records = []
+    fielding_stat_records = []
     created_player_count = 0
     created_team_count = 0
     replaced_rows_count = 0
@@ -324,12 +351,33 @@ class PlayerStatsImporter
             updated_at: timestamp
           }
         end
+        if import_row[:fielding_position_rows].any?
+          PlayerSeasonFieldingStat.where(player: player, season: import_row[:season]).delete_all
+        end
+        import_row[:fielding_position_rows].each do |fielding_row|
+          fielding_team = if fielding_row[:team_abbreviation] == team.abbreviation
+            team
+          else
+            Team.find_by(abbreviation: fielding_row[:team_abbreviation])
+          end
+          fielding_stat_records << fielding_row.merge(
+            player_id: player.id,
+            team_id: fielding_team&.id,
+            season: import_row[:season],
+            source_name: resolved_source_name,
+            last_synced_at: timestamp,
+            created_at: timestamp,
+            updated_at: timestamp
+          )
+        end
       end
 
+      PlayerSeasonFieldingStat.upsert_all(fielding_stat_records, unique_by: :idx_player_season_fielding_stats_unique_scope) if fielding_stat_records.any?
       PlayerSeasonStat.upsert_all(season_stat_records, unique_by: UPSERT_SCOPE_INDEX) if season_stat_records.any?
     end
 
     {
+      fielding_imported_count: fielding_stat_records.length,
       imported_count: season_stat_records.length,
       created_player_count: created_player_count,
       created_team_count: created_team_count,
@@ -344,6 +392,7 @@ class PlayerStatsImporter
       stat_type_ids = stat_types_for_category(category).map(&:id)
       next 0 if stat_type_ids.empty?
 
+      PlayerSeasonFieldingStat.where(season: season).delete_all if category == "batting"
       PlayerSeasonStat.where(season: season, stat_type_id: stat_type_ids).delete_all
     end
   end

@@ -1,6 +1,7 @@
 class Team < ApplicationRecord
   has_many :need_profiles, dependent: :destroy
   has_many :players, dependent: :destroy
+  has_many :player_season_fielding_stats, dependent: :nullify
   has_many :team_memberships, dependent: :destroy
   has_many :membership_players, through: :team_memberships, source: :player
   has_many :outgoing_trade_participants, class_name: "TradeParticipant", foreign_key: :from_team_id, dependent: :nullify
