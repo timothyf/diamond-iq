@@ -366,6 +366,12 @@ RSpec.describe PlayerProfileSnapshotQuery do
       fielding_percentage: 0.977778, defensive_runs_saved: -1, outs_above_average: -4,
       source_name: "FanGraphs fielding leaderboard", last_synced_at: Time.current
     )
+    PlayerSeasonFieldingStat.create!(
+      player: player, team: team, season: 2026, team_abbreviation: "DET", position: "DH",
+      games: 10, innings: nil, putouts: nil, assists: nil, fielding_errors: nil,
+      fielding_percentage: nil, defensive_runs_saved: nil, outs_above_average: nil,
+      source_name: "legacy fallback", last_synced_at: Time.current
+    )
 
 
     defensive = described_class.new(player: player).result.fetch(:defensive_stats).fetch(:seasons).sole
@@ -436,7 +442,17 @@ RSpec.describe PlayerProfileSnapshotQuery do
       end
     end
 
-    advanced = described_class.new(player: player).result.fetch(:advanced_stats)
+    snapshot = described_class.new(player: player).result
+    advanced = snapshot.fetch(:advanced_stats)
+
+    expect(snapshot.dig(:season_overview, :comparison_stats)).to contain_exactly(
+      { key: "k_percentage", label: "K%", value: 0.25 },
+      { key: "bb_percentage", label: "BB%", value: 0.1 }
+    )
+    expect(snapshot.dig(:career_overview, :comparison_stats)).to contain_exactly(
+      { key: "k_percentage", label: "K%", value: (70.0 / 300) },
+      { key: "bb_percentage", label: "BB%", value: 0.1 }
+    )
 
     expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq(
       [ "Rate statistics", "Run creation", "Value", "Batted-ball profile", "Plate discipline" ]
@@ -477,6 +493,42 @@ RSpec.describe PlayerProfileSnapshotQuery do
       contact_percentage: ((0.75 * 400 + 0.8 * 800) / 1200),
       zone_contact_percentage: ((0.82 * 400 + 0.86 * 800) / 1200),
       swinging_strike_percentage: ((0.125 * 400 + 0.094 * 800) / 1200)
+    )
+  end
+
+  it "returns stored position-level defensive stats for pitchers" do
+    team = create_team(abbreviation: "DET")
+    player = create_player(team: team)
+    pitcher = create_position(mlb_code: "1", abbreviation: "P", name: "Pitcher", position_type: "pitcher")
+    create_player_position(player: player, position: pitcher, attributes: { is_primary: true })
+    games = create_stat_type(name: "G", label: "G", category: "pitching")
+    create_player_season_stat(
+      player: player,
+      stat_type: games,
+      attributes: { team: team, season: 2026, value: 19, scope_type: "team", scope_key: "DET" }
+    )
+    PlayerSeasonFieldingStat.create!(
+      player: player, season: 2026, team_abbreviation: "2 TMS", position: "P",
+      games: 19, innings: 113.2, putouts: 1, assists: 9, fielding_errors: 0,
+      fielding_percentage: 1.0, defensive_runs_saved: -1, outs_above_average: nil,
+      source_name: "FanGraphs fielding leaderboard", last_synced_at: Time.current
+    )
+
+    defensive = described_class.new(player: player).result.fetch(:defensive_stats).fetch(:seasons).sole
+
+    expect(defensive).to include(
+      season: 2026,
+      games: 19,
+      outs_above_average_applicable: false,
+      fielding_percentage: 1.0,
+      defensive_runs_saved: -1.0,
+      outs_above_average: nil
+    )
+    expect(defensive.fetch(:positions)).to contain_exactly(
+      {
+        position: "P", games: 19, innings: "113.2", fielding_percentage: 1.0,
+        defensive_runs_saved: -1.0, outs_above_average: nil
+      }
     )
   end
 

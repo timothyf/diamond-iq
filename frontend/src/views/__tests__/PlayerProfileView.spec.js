@@ -852,6 +852,14 @@ describe('PlayerProfileView', () => {
                 defensive_runs_saved: -1,
                 outs_above_average: -4,
               },
+              {
+                position: 'DH',
+                games: 10,
+                innings: null,
+                fielding_percentage: null,
+                defensive_runs_saved: null,
+                outs_above_average: null,
+              },
             ],
           },
         ],
@@ -875,6 +883,7 @@ describe('PlayerProfileView', () => {
     expect(rows[0].text()).toContain('360.2')
     expect(rows[0].text()).toContain('-3.00')
     expect(rows[1].text()).toContain('3B')
+    expect(panel.text()).not.toContain('DH')
     expect(rows[2].classes()).toContain('advanced-table__season-total')
     expect(rows[2].text()).toContain('Season total')
     expect(rows[2].text()).toContain('79')
@@ -882,6 +891,53 @@ describe('PlayerProfileView', () => {
     expect(rows[2].text()).toContain('-9.00')
   })
 
+  it('omits the season-total row and OAA column for a pitcher', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.defensive_stats = {
+        season: 2026,
+        seasons: [
+          {
+            season: 2026,
+            games: 19,
+            outs_above_average_applicable: false,
+            fielding_percentage: 1,
+            defensive_runs_saved: -1,
+            outs_above_average: null,
+            positions: [
+              {
+                position: 'P',
+                games: 19,
+                innings: '113.2',
+                fielding_percentage: 1,
+                defensive_runs_saved: -1,
+                outs_above_average: null,
+              },
+            ],
+          },
+        ],
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+
+    await wrapper.get('[data-test="player-profile-tab-defensive-stats"]').trigger('click')
+    await flushPromises()
+
+    const rows = wrapper.get('[data-test="defensive-stats-panel"]').findAll('tbody tr')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].text()).toContain('P')
+    expect(rows[0].text()).toContain('113.2')
+    expect(rows[0].text()).toContain('1.000')
+    expect(rows[0].text()).toContain('-1.00')
+    expect(rows[0].text()).not.toContain('Season total')
+    expect(wrapper.get('[data-test="defensive-stats-panel"]').text()).not.toContain('Outs Above Average')
+    expect(rows[0].findAll('td')).toHaveLength(5)
+  })
   it('shows pitcher rate and outcome statistics on the Advanced Stats tab', async () => {
     const payload = apiPayloadWith((response) => {
       response.data.positions = {

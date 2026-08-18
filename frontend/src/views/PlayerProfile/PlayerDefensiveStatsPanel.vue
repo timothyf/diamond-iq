@@ -30,6 +30,10 @@ function formatRuns(value) {
   const number = Number(value)
   return Number.isFinite(number) ? number.toFixed(2) : '—'
 }
+
+function formatOaa(value, applicable) {
+  return applicable === false ? 'N/A' : formatRuns(value)
+}
 </script>
 
 <template>
@@ -61,7 +65,9 @@ function formatRuns(value) {
               <th>Innings</th>
               <th>Fielding percentage</th>
               <th>Defensive Runs Saved</th>
-              <th>Outs Above Average</th>
+              <th
+                v-if="defensiveStats.seasons.some((season) => season.outsAboveAverageApplicable !== false)"
+              >Outs Above Average</th>
             </tr>
           </thead>
           <tbody>
@@ -77,16 +83,20 @@ function formatRuns(value) {
                 <td>{{ formatInnings(positionRow.innings) }}</td>
                 <td>{{ formatFieldingPercentage(positionRow.fieldingPercentage) }}</td>
                 <td>{{ formatRuns(positionRow.defensiveRunsSaved) }}</td>
-                <td>{{ formatRuns(positionRow.outsAboveAverage) }}</td>
+                <td
+                  v-if="defensiveStats.seasons.some((entry) => entry.outsAboveAverageApplicable !== false)"
+                >{{ formatOaa(positionRow.outsAboveAverage, season.outsAboveAverageApplicable) }}</td>
               </tr>
-              <tr class="advanced-table__season-total">
+              <tr v-if="season.positions.length !== 1" class="advanced-table__season-total">
                 <th scope="row">{{ season.season }}</th>
                 <th scope="row">Season total</th>
                 <td>{{ formatGames(season.games) }}</td>
                 <td>—</td>
                 <td>{{ formatFieldingPercentage(season.fieldingPercentage) }}</td>
                 <td>{{ formatRuns(season.defensiveRunsSaved) }}</td>
-                <td>{{ formatRuns(season.outsAboveAverage) }}</td>
+                <td
+                  v-if="defensiveStats.seasons.some((entry) => entry.outsAboveAverageApplicable !== false)"
+                >{{ formatOaa(season.outsAboveAverage, season.outsAboveAverageApplicable) }}</td>
               </tr>
             </template>
           </tbody>

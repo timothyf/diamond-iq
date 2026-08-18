@@ -30,7 +30,16 @@ function choose(player) {
     <div v-if="selectedPlayer" class="comparison-picker__selected">
       <img v-if="selectedPlayer.profile?.headshotUrl" :src="selectedPlayer.profile.headshotUrl" :alt="`${selectedPlayer.fullName} headshot`" />
       <span v-else>{{ selectedPlayer.firstName?.[0] }}{{ selectedPlayer.lastName?.[0] }}</span>
-      <div><strong>{{ selectedPlayer.fullName }}</strong><small>{{ selectedPlayer.displayTeam?.name || selectedPlayer.team?.name || 'Team unavailable' }}</small></div>
+      <div class="comparison-picker__identity">
+        <strong>{{ selectedPlayer.fullName }}</strong>
+        <small>{{ selectedPlayer.displayTeam?.name || selectedPlayer.team?.name || 'Team unavailable' }}</small>
+        <small class="comparison-picker__meta">
+          Age {{ selectedPlayer.profile?.age ?? '—' }}
+          · Position {{ selectedPlayer.positions?.primary?.abbreviation || selectedPlayer.positions?.primary?.name || '—' }}
+          · Bats {{ selectedPlayer.profile?.bats || '—' }}
+          · Throws {{ selectedPlayer.profile?.throws || '—' }}
+        </small>
+      </div>
     </div>
     <div v-else class="comparison-picker__search">
       <label>
@@ -61,6 +70,8 @@ function choose(player) {
 .comparison-picker__selected > img,.comparison-picker__selected > span { display: grid; flex: 0 0 auto; width: 64px; height: 64px; place-items: center; border-radius: 50%; background: #dce4e8; object-fit: cover; font-weight: 900; }
 .comparison-picker__selected strong,.comparison-picker__selected small { display: block; }
 .comparison-picker__selected strong { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.35rem; text-transform: uppercase; }
+.comparison-picker__identity { min-width: 0; }
+.comparison-picker__selected .comparison-picker__meta { color: #435b6b; font-weight: 700; line-height: 1.35; }
 .comparison-picker__selected small { margin-top: .15rem; color: #6a7882; }
 .comparison-picker__search { position: relative; }
 .comparison-picker__search input { width: 100%; padding: .72rem .8rem; border: 1px solid rgba(16,38,61,.18); border-radius: 11px; background: #fff; font: inherit; }

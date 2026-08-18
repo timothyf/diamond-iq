@@ -15,13 +15,23 @@ function profile(id, name, team, stats, careerStats = stats) {
       full_name: name,
       team: { id: team.id, name: team.name, abbreviation: team.abbreviation },
       display_team: { id: team.id, name: team.name, abbreviation: team.abbreviation },
-      profile: { age: id === 1 ? 25 : 27 },
+      profile: { age: id === 1 ? 25 : 27, bats: id === 1 ? 'L' : 'R', throws: 'R' },
       positions: { primary: { abbreviation: id === 1 ? 'CF' : 'RF', name: 'Outfielder' }, secondary: [], assignments: [] },
-      season_overview: { season: 2026, category: 'batting', preferred_category: 'batting', stats },
+      season_overview: {
+        season: 2026, category: 'batting', preferred_category: 'batting', stats,
+        comparison_stats: [
+          { key: 'k_percentage', label: 'K%', value: id === 1 ? 0.22 : 0.29 },
+          { key: 'bb_percentage', label: 'BB%', value: id === 1 ? 0.09 : 0.14 },
+        ],
+      },
       career_overview: {
         category: 'batting', preferred_category: 'batting', first_season: 2022,
         last_season: 2026, season_count: id === 1 ? 5 : 7, columns: [],
         seasons: [], stats: careerStats,
+        comparison_stats: [
+          { key: 'k_percentage', label: 'K%', value: id === 1 ? 0.24 : 0.28 },
+          { key: 'bb_percentage', label: 'BB%', value: id === 1 ? 0.1 : 0.15 },
+        ],
       },
       current_membership: null,
       team_history: [],
@@ -68,6 +78,16 @@ describe('PlayerComparisonView', () => {
     expect(fetch).toHaveBeenCalledWith('/api/players/2', expect.any(Object))
     expect(wrapper.get('[data-test="comparison-identities"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="comparison-identities"]').text()).toContain('Aaron Judge')
+    const playerAHeader = wrapper.get('[data-test="comparison-picker-player a"]')
+    expect(playerAHeader.text()).toContain('Age 25')
+    expect(playerAHeader.text()).toContain('Position CF')
+    expect(playerAHeader.text()).toContain('Bats L')
+    expect(playerAHeader.text()).toContain('Throws R')
+    const playerBHeader = wrapper.get('[data-test="comparison-picker-player b"]')
+    expect(playerBHeader.text()).toContain('Age 27')
+    expect(playerBHeader.text()).toContain('Position RF')
+    expect(playerBHeader.text()).toContain('Bats R')
+    expect(playerBHeader.text()).toContain('Throws R')
     const season = wrapper.get('[data-test="season-comparison"]')
     expect(season.text()).toContain('24')
     expect(season.text()).not.toContain('24.0')
@@ -83,8 +103,18 @@ describe('PlayerComparisonView', () => {
     const caughtStealing = wrapper.get('[data-test="season-stat-caughtStealing"]')
     expect(caughtStealing.findAll('td')[0].classes()).toContain('is-lesser')
     expect(caughtStealing.findAll('td')[1].classes()).toContain('is-better')
+    const strikeoutPercentage = wrapper.get('[data-test="season-stat-k_percentage"]')
+    expect(strikeoutPercentage.text()).toContain('22.0%')
+    expect(strikeoutPercentage.text()).toContain('29.0%')
+    expect(strikeoutPercentage.findAll('td')[0].classes()).toContain('is-better')
+    const walkPercentage = wrapper.get('[data-test="season-stat-bb_percentage"]')
+    expect(walkPercentage.text()).toContain('9.0%')
+    expect(walkPercentage.text()).toContain('14.0%')
+    expect(walkPercentage.findAll('td')[1].classes()).toContain('is-better')
     const career = wrapper.get('[data-test="career-comparison"]')
     expect(career.text()).toContain('82')
     expect(career.text()).toContain('353')
+    expect(career.text()).toContain('24.0%')
+    expect(career.text()).toContain('15.0%')
   })
 })

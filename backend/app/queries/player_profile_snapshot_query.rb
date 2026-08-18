@@ -4,6 +4,10 @@ class PlayerProfileSnapshotQuery
   SEASON_CATEGORIES = %w[batting pitching].freeze
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
+  COMPARISON_RATE_METRICS = [
+    { key: :k_percentage, label: "K%" },
+    { key: :bb_percentage, label: "BB%" }
+  ].freeze
   ADVANCED_BATTING_GROUPS = [
     {
       key: "rate_statistics",
@@ -119,6 +123,7 @@ class PlayerProfileSnapshotQuery
   ].freeze
   TRANSACTION_HISTORY_SOURCE_NAME = "MLB Stats API transactions"
   DEFERRED_SECTIONS = %w[advanced_stats defensive_stats splits similar_players analytics].freeze
+  NON_DEFENSIVE_POSITIONS = %w[DH].freeze
 
   def initialize(player:, on: Date.current, analysis_range: nil, similarity_options: {})
     @player = player
@@ -209,7 +214,8 @@ class PlayerProfileSnapshotQuery
       season: latest_season,
       category: category,
       preferred_category: preferred_category,
-      stats: category.present? ? serialized_season_stats(category) : []
+      stats: category.present? ? serialized_season_stats(category) : [],
+      comparison_stats: category.present? ? serialized_comparison_stats(category, season_rows, career: false) : []
     }
   end
 
@@ -232,7 +238,8 @@ class PlayerProfileSnapshotQuery
       season_count: seasons.length,
       columns: career_columns(category),
       seasons: serialized_career_seasons(category),
-      stats: serialized_career_stats(category)
+      stats: serialized_career_stats(category),
+      comparison_stats: serialized_comparison_stats(category, rows, career: true)
     }
   end
 
@@ -291,6 +298,7 @@ class PlayerProfileSnapshotQuery
     stored_positions = stored_fielding_positions(season)
     game_fielding = game_fielding_summary(season)
     assignments = player.player_positions.to_a
+      .reject { |assignment| non_defensive_position?(assignment.position.abbreviation) }
       .select { |assignment| assignment.season.nil? || assignment.season == season }
       .sort_by { |assignment| [assignment.is_primary? ? 0 : 1, assignment.position.sort_order] }
       .uniq { |assignment| assignment.position_id }
@@ -301,11 +309,14 @@ class PlayerProfileSnapshotQuery
       %w[gamesPlayed G games],
       career: false
     )
-    fielding_percentage = stored_fielding_percentage.to_f.positive? ? stored_fielding_percentage : game_fielding[:fielding_percentage]
+    fielding_percentage = stored_fielding_percentage
+    fielding_percentage = stored_position_fielding_percentage(season) if fielding_percentage.nil?
+    fielding_percentage ||= game_fielding[:fielding_percentage]
 
     {
       season: season,
       games: games || game_fielding[:positions].sum { |entry| entry[:games].to_i },
+      outs_above_average_applicable: player.primary_position&.position_type != "pitcher",
       positions: (stored_positions.presence || game_fielding[:positions].presence || assignments.map.with_index do |assignment, index|
         { position: assignment.position.abbreviation || assignment.position.name, games: index.zero? ? games : nil, innings: nil }
       end),
@@ -320,9 +331,7 @@ class PlayerProfileSnapshotQuery
   end
 
   def stored_fielding_positions(season)
-    player.player_season_fielding_stats
-      .where(season: season)
-      .to_a
+    stored_fielding_rows(season)
       .group_by(&:position)
       .map do |position, rows|
         putouts = rows.filter_map(&:putouts).sum
@@ -354,6 +363,29 @@ class PlayerProfileSnapshotQuery
     values = rows.filter_map { |row| row[key] }
     values.any? ? values.sum : nil
   end
+  def stored_position_fielding_percentage(season)
+    rows = stored_fielding_rows(season)
+    putouts = rows.filter_map(&:putouts).sum
+    assists = rows.filter_map(&:assists).sum
+    fielding_errors = rows.filter_map(&:fielding_errors).sum
+    chances = putouts + assists + fielding_errors
+    return (putouts + assists).to_d / chances if chances.positive?
+
+    rows.filter_map(&:fielding_percentage).first
+  end
+
+  def stored_fielding_rows(season)
+    @stored_fielding_rows ||= {}
+    @stored_fielding_rows[season] ||= player.player_season_fielding_stats
+      .where(season: season)
+      .to_a
+      .reject { |row| non_defensive_position?(row.position) }
+  end
+
+  def non_defensive_position?(position)
+    NON_DEFENSIVE_POSITIONS.include?(position.to_s.strip.upcase)
+  end
+
 
 
   def game_fielding_summary(season)
@@ -363,6 +395,7 @@ class PlayerProfileSnapshotQuery
       .where(games: { official_date: Date.new(season, 1, 1)..Date.new(season, 12, 31) })
       .to_a
     grouped = lines.group_by { |line| line.position.presence || "—" }
+    grouped.reject! { |position, _lines| non_defensive_position?(position) }
     position_rows = grouped.map do |position, position_lines|
       fielding = position_lines.filter_map { |line| line.raw_data.to_h.dig("stats", "fielding") }
       innings = fielding.sum { |stats| Float(stats["innings"], exception: false) || 0.0 }
@@ -835,6 +868,21 @@ class PlayerProfileSnapshotQuery
         key: definition.fetch(:key),
         label: definition.fetch(:label),
         value: format_career_value(category, definition.fetch(:key), value)
+      }
+    end
+  end
+
+  def serialized_comparison_stats(category, rows, career:)
+    values = advanced_values(category, rows, career: career)
+
+    COMPARISON_RATE_METRICS.filter_map do |metric|
+      value = values[metric.fetch(:key)]
+      next if value.nil?
+
+      {
+        key: metric.fetch(:key).to_s,
+        label: metric.fetch(:label),
+        value: value
       }
     end
   end

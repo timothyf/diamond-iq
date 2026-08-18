@@ -83,6 +83,16 @@ RSpec.describe PlayerStatsDownloader, type: :service do
         "Clutch" => -1.0, "RAR" => 59.1, "pLI" => 0.95, "SD" => 2, "MD" => 1
       }
     )
+    pitcher_fielding = [
+      {
+        team_abbreviation: "2 TMS", position: "P", games: 19, innings: 113.2,
+        putouts: 1, assists: 9, fielding_errors: 0, fielding_percentage: 1.0,
+        defensive_runs_saved: -1.0, outs_above_average: nil
+      }
+    ]
+    allow(downloader).to receive(:fetch_fangraphs_fielding_values).and_return(
+      669373 => { "DRS" => -1.0, "fieldingByPosition" => pitcher_fielding.to_json }
+    )
     allow(downloader).to receive(:fetch_statcast_values).and_return(
       669373 => { "wOBAAllowed" => 0.246, "xwOBAAllowed" => 0.266 }
     )
@@ -115,6 +125,9 @@ RSpec.describe PlayerStatsDownloader, type: :service do
       "RA9-Wins" => "7.1", "WPA" => "4.0", "WPA/LI" => "5.2", "RE24" => "43.6",
       "Clutch" => "-1.0", "RAR" => "59.1", "RAA" => "19.3", "PitchingRuns" => "51.4",
       "pLI" => "0.95", "SD" => "2", "MD" => "1"
+    )
+    expect(JSON.parse(row.fetch("fieldingByPosition"))).to contain_exactly(
+      hash_including("position" => "P", "games" => 19, "fielding_percentage" => 1.0)
     )
   end
 

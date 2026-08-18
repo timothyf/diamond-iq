@@ -228,7 +228,7 @@ class PlayerStatsDownloader
     end
 
     merge_fangraphs_values(rows, year)
-    merge_fangraphs_fielding_values(rows, year) if category == "batting"
+    merge_fangraphs_fielding_values(rows, year)
     merge_mlb_fielding_values(rows, year) if category == "batting"
     merge_statcast_fielding_values(rows, year) if category == "batting"
     if category == "pitching"

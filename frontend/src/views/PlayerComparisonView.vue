@@ -37,13 +37,14 @@ const sameCategory = computed(() =>
 const seasonRows = computed(() => alignedRows('season'))
 const careerRows = computed(() => alignedRows('career'))
 const LOWER_IS_BETTER = {
-  batting: new Set(['strikeouts', 'caughtstealing']),
-  pitching: new Set(['l', 'era', 'hits', 'runs', 'er', 'homeruns', 'hitbypitch', 'baseonballs', 'whip', 'avg']),
+  batting: new Set(['strikeouts', 'caughtstealing', 'k_percentage']),
+  pitching: new Set(['l', 'era', 'hits', 'runs', 'er', 'homeruns', 'hitbypitch', 'baseonballs', 'whip', 'avg', 'bb_percentage']),
 }
 const DECIMAL_STAT_KEYS = new Set([
   'avg', 'obp', 'slg', 'ops', 'era', 'whip', 'inningspitched', 'ip',
   'k/9', 'bb/9', 'k/bb', 'hr/9', 'h/9', 'war',
 ])
+const PERCENTAGE_STAT_KEYS = new Set(['k_percentage', 'bb_percentage'])
 
 watch([leftId, rightId], () => {
   const query = {}
@@ -62,8 +63,10 @@ watch(
 
 function alignedRows(scope) {
   if (!ready.value) return []
-  const leftStats = scope === 'season' ? leftPlayer.value.seasonOverview.stats : leftPlayer.value.careerOverview.stats
-  const rightStats = scope === 'season' ? rightPlayer.value.seasonOverview.stats : rightPlayer.value.careerOverview.stats
+  const leftOverview = scope === 'season' ? leftPlayer.value.seasonOverview : leftPlayer.value.careerOverview
+  const rightOverview = scope === 'season' ? rightPlayer.value.seasonOverview : rightPlayer.value.careerOverview
+  const leftStats = [...leftOverview.stats, ...leftOverview.comparisonStats]
+  const rightStats = [...rightOverview.stats, ...rightOverview.comparisonStats]
   const definitions = new Map()
   for (const stat of [...leftStats, ...rightStats]) {
     if (!definitions.has(stat.key)) definitions.set(stat.key, stat.label)
@@ -92,6 +95,10 @@ function statValue(key, value) {
 
   const number = Number(value)
   const normalizedKey = String(key).trim().toLowerCase()
+  if (PERCENTAGE_STAT_KEYS.has(normalizedKey)) {
+    return Number.isFinite(number) ? `${(number * 100).toFixed(1)}%` : '—'
+  }
+
   if (!DECIMAL_STAT_KEYS.has(normalizedKey) && Number.isInteger(number)) {
     return number.toLocaleString('en-US')
   }

@@ -120,6 +120,7 @@ function normalizeProfile(data = {}) {
       category: season.category,
       preferredCategory: season.preferred_category,
       stats: season.stats || [],
+      comparisonStats: season.comparison_stats || [],
     },
     careerOverview: {
       category: career.category,
@@ -142,6 +143,7 @@ function normalizeProfile(data = {}) {
         totalStatValues: Object.fromEntries((seasonRow.total_stats || seasonRow.stats || []).map((stat) => [stat.key, stat.value])),
       })),
       stats: career.stats || [],
+      comparisonStats: career.comparison_stats || [],
       statValues: Object.fromEntries((career.stats || []).map((stat) => [stat.key, stat.value])),
     },
     advancedStats: {
@@ -162,16 +164,19 @@ function normalizeProfile(data = {}) {
     defensiveStats: {
       season: defensiveStats.season,
       seasons: (defensiveStats.seasons || []).map((seasonRow) => ({
+        outsAboveAverageApplicable: seasonRow.outs_above_average_applicable !== false,
         season: seasonRow.season,
         games: seasonRow.games,
-        positions: (seasonRow.positions || []).map((positionRow) => ({
-          position: positionRow.position,
-          games: positionRow.games,
-          innings: positionRow.innings,
-          fieldingPercentage: positionRow.fielding_percentage,
-          defensiveRunsSaved: positionRow.defensive_runs_saved,
-          outsAboveAverage: positionRow.outs_above_average,
-        })),
+        positions: (seasonRow.positions || [])
+          .filter((positionRow) => positionRow.position?.trim().toUpperCase() !== 'DH')
+          .map((positionRow) => ({
+            position: positionRow.position,
+            games: positionRow.games,
+            innings: positionRow.innings,
+            fieldingPercentage: positionRow.fielding_percentage,
+            defensiveRunsSaved: positionRow.defensive_runs_saved,
+            outsAboveAverage: positionRow.outs_above_average,
+          })),
         fieldingPercentage: seasonRow.fielding_percentage,
         defensiveRunsSaved: seasonRow.defensive_runs_saved,
         outsAboveAverage: seasonRow.outs_above_average,
