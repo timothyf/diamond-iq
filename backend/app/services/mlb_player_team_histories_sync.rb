@@ -1,3 +1,5 @@
+require "set"
+
 class MlbPlayerTeamHistoriesSync
   def self.call(limit: nil, mlb_ids: nil)
     new(limit: limit, mlb_ids: mlb_ids).call
@@ -7,6 +9,7 @@ class MlbPlayerTeamHistoriesSync
     @limit = positive_integer(limit)
     @mlb_ids = Array(mlb_ids).flat_map { |value| value.to_s.split(",") }
       .filter_map { |value| Integer(value, exception: false) }.uniq.presence
+    @synchronized_trade_ids = Set.new
   end
 
   def call
@@ -15,6 +18,8 @@ class MlbPlayerTeamHistoriesSync
       synchronized_player_count: 0,
       transaction_count: 0,
       tenure_count: 0,
+      trade_count: 0,
+      trade_participant_count: 0,
       failed_player_count: 0,
       failures: []
     }
@@ -25,6 +30,8 @@ class MlbPlayerTeamHistoriesSync
         summary[:synchronized_player_count] += 1
         summary[:transaction_count] += result.dig(:data, :transaction_count).to_i
         summary[:tenure_count] += result.dig(:data, :tenure_count).to_i
+        summary[:trade_count] += result.dig(:data, :trade_count).to_i
+        summary[:trade_participant_count] += result.dig(:data, :trade_participant_count).to_i
       else
         summary[:failed_player_count] += 1
         summary[:failures] << { mlb_id: player.mlb_id, name: player.full_name, message: result[:message] }
@@ -56,12 +63,27 @@ class MlbPlayerTeamHistoriesSync
     return download unless download[:success]
 
     data = download.fetch(:data)
-    MlbPlayerTeamHistoryImporter.call(
+    history = MlbPlayerTeamHistoryImporter.call(
       player: player,
       payload: data.fetch(:payload),
       source_url: data.fetch(:source_url),
       fetched_at: data.fetch(:fetched_at)
     )
+    return history unless history[:success]
+
+    trade_ids = Array(data.dig(:payload, "transactions")).filter_map do |transaction|
+      Integer(transaction["id"], exception: false) if transaction["typeCode"].to_s.upcase == "TR"
+    end.uniq
+    unsynchronized_trade_ids = trade_ids.reject { |trade_id| @synchronized_trade_ids.include?(trade_id) }
+    trades = MlbTradesSync.call(mlb_transaction_ids: unsynchronized_trade_ids)
+    return trades unless trades[:success]
+
+    @synchronized_trade_ids.merge(unsynchronized_trade_ids)
+    history[:data] = history.fetch(:data).merge(
+      trade_count: trades.dig(:data, :synchronized_trade_count).to_i,
+      trade_participant_count: trades.dig(:data, :participant_count).to_i
+    )
+    history
   end
 
   def positive_integer(value)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_08_11_213000) do
+ActiveRecord::Schema[7.1].define(version: 2026_08_17_180000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "btree_gist"
   enable_extension "plpgsql"
@@ -1121,6 +1121,42 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_11_213000) do
     t.index ["mlb_id"], name: "index_teams_on_mlb_id", unique: true
   end
 
+  create_table "trade_participants", force: :cascade do |t|
+    t.bigint "trade_id", null: false
+    t.bigint "player_id"
+    t.bigint "player_mlb_id", null: false
+    t.string "player_name", null: false
+    t.bigint "from_team_id"
+    t.bigint "to_team_id"
+    t.integer "from_team_mlb_id"
+    t.string "from_team_name"
+    t.integer "to_team_mlb_id"
+    t.string "to_team_name"
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["from_team_id"], name: "index_trade_participants_on_from_team_id"
+    t.index ["player_id"], name: "index_trade_participants_on_player_id"
+    t.index ["player_mlb_id"], name: "index_trade_participants_on_player_mlb_id"
+    t.index ["to_team_id"], name: "index_trade_participants_on_to_team_id"
+    t.index ["trade_id", "player_mlb_id"], name: "index_trade_participants_on_trade_id_and_player_mlb_id", unique: true
+    t.index ["trade_id"], name: "index_trade_participants_on_trade_id"
+  end
+
+  create_table "trades", force: :cascade do |t|
+    t.bigint "mlb_transaction_id", null: false
+    t.date "occurred_on", null: false
+    t.text "description", null: false
+    t.string "source_name", null: false
+    t.string "source_url"
+    t.datetime "last_synced_at", null: false
+    t.jsonb "raw_data", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["mlb_transaction_id"], name: "index_trades_on_mlb_transaction_id", unique: true
+    t.index ["occurred_on"], name: "index_trades_on_occurred_on"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", null: false
     t.string "name", null: false
@@ -1268,6 +1304,10 @@ ActiveRecord::Schema[7.1].define(version: 2026_08_11_213000) do
   add_foreign_key "team_daily_metrics", "teams"
   add_foreign_key "team_memberships", "players"
   add_foreign_key "team_memberships", "teams"
+  add_foreign_key "trade_participants", "players"
+  add_foreign_key "trade_participants", "teams", column: "from_team_id"
+  add_foreign_key "trade_participants", "teams", column: "to_team_id"
+  add_foreign_key "trade_participants", "trades"
   add_foreign_key "watchlist_entries", "players"
   add_foreign_key "watchlist_entries", "users", column: "candidate_owner_id"
   add_foreign_key "watchlist_entries", "watchlists"

@@ -136,6 +136,7 @@ class PlayerProfileSnapshotQuery
       external_ids: external_ids,
       current_membership: serialize_membership(current_membership),
       team_history: organization_tenures,
+      trades: trade_history,
       analysis: { range: analysis_range.to_h },
       source_metadata: source_metadata
     }
@@ -1516,7 +1517,53 @@ class PlayerProfileSnapshotQuery
 
   def transaction_history_membership?(membership)
     membership.source_name == TRANSACTION_HISTORY_SOURCE_NAME
+
   end
+  def trade_history
+    Trade
+      .joins(:trade_participants)
+      .where(trade_participants: { player_id: player.id })
+      .includes(trade_participants: [ :player, :from_team, :to_team ])
+      .order(occurred_on: :desc, id: :desc)
+      .map { |trade| serialize_trade(trade) }
+  end
+
+  def serialize_trade(trade)
+    {
+      id: trade.id,
+      mlb_transaction_id: trade.mlb_transaction_id,
+      occurred_on: trade.occurred_on,
+      description: trade.description,
+      participants: trade.trade_participants.sort_by(&:player_name).map { |participant| serialize_trade_participant(participant) }
+    }
+  end
+
+  def serialize_trade_participant(participant)
+    {
+      player: {
+        id: participant.player_id,
+        mlb_id: participant.player_mlb_id,
+        full_name: participant.player&.full_name || participant.player_name
+      },
+      from_team: serialize_trade_team(
+        participant.from_team,
+        mlb_id: participant.from_team_mlb_id,
+        name: participant.from_team_name
+      ),
+      to_team: serialize_trade_team(
+        participant.to_team,
+        mlb_id: participant.to_team_mlb_id,
+        name: participant.to_team_name
+      )
+    }
+  end
+
+  def serialize_trade_team(team, mlb_id:, name:)
+    return serialize_team(team) if team.present?
+    return if mlb_id.nil? && name.blank?
+    { id: nil, mlb_id: mlb_id, name: name }
+  end
+
 
   def current_membership
     @current_membership ||= memberships

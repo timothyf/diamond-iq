@@ -47,6 +47,26 @@ describe('usePlayerProfile', () => {
             starts_on: '2026-03-26',
           },
           team_history: [],
+          trades: [
+            {
+              id: 7,
+              mlb_transaction_id: 642337,
+              occurred_on: '2022-08-02',
+              description: 'Two-team trade',
+              participants: [
+                {
+                  player: { id: 9, mlb_id: 665742, full_name: 'Juan Soto' },
+                  from_team: { id: 2, mlb_id: 120, name: 'Washington Nationals' },
+                  to_team: { id: 3, mlb_id: 135, name: 'San Diego Padres' },
+                },
+                {
+                  player: { id: 10, mlb_id: 695578, full_name: 'James Wood' },
+                  from_team: { id: 3, mlb_id: 135, name: 'San Diego Padres' },
+                  to_team: { id: 2, mlb_id: 120, name: 'Washington Nationals' },
+                },
+              ],
+            },
+          ],
           recent_pitch_indicators: {
             sample_size: 100,
             primary_role: 'batter',
@@ -100,6 +120,15 @@ describe('usePlayerProfile', () => {
       seasonOverview: { season: 2026, category: 'batting' },
       careerOverview: { category: 'batting', firstSeason: 2022, lastSeason: 2026, seasonCount: 5 },
       pitchIndicators: { primaryRole: 'batter' },
+      trades: [
+        {
+          mlbTransactionId: 642337,
+          sides: [
+            { team: { name: 'San Diego Padres' }, players: [{ fullName: 'Juan Soto' }] },
+            { team: { name: 'Washington Nationals' }, players: [{ fullName: 'James Wood' }] },
+          ],
+        },
+      ],
       contextualBenchmarks: {
         available: true,
         sourceStartDate: '2026-03-26',

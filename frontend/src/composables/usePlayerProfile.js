@@ -36,6 +36,35 @@ function normalizeMembership(membership) {
   }
 }
 
+function normalizeTrade(trade) {
+  const participants = (trade.participants || []).map((participant) => ({
+    player: {
+      id: participant.player?.id,
+      mlbId: participant.player?.mlb_id,
+      fullName: participant.player?.full_name,
+    },
+    fromTeam: normalizeTeam(participant.from_team),
+    toTeam: normalizeTeam(participant.to_team),
+  }))
+  const sidesByTeam = new Map()
+
+  participants.forEach((participant) => {
+    const key = participant.toTeam?.mlbId || participant.toTeam?.name || 'unknown'
+    const side = sidesByTeam.get(key) || { team: participant.toTeam, players: [] }
+    side.players.push(participant.player)
+    sidesByTeam.set(key, side)
+  })
+
+  return {
+    id: trade.id,
+    mlbTransactionId: trade.mlb_transaction_id,
+    occurredOn: trade.occurred_on,
+    description: trade.description,
+    participants,
+    sides: Array.from(sidesByTeam.values()),
+  }
+}
+
 function normalizeProfile(data = {}) {
   const profile = data.profile
     ? {
@@ -205,6 +234,7 @@ function normalizeProfile(data = {}) {
     },
     currentMembership: normalizeMembership(data.current_membership),
     teamHistory: (data.team_history || []).map(normalizeMembership),
+    trades: (data.trades || []).map(normalizeTrade),
     pitchIndicators: {
       sampleSize: indicators.sample_size || 100,
       primaryRole: indicators.primary_role || 'batter',

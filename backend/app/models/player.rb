@@ -2,6 +2,8 @@ class Player < ApplicationRecord
   belongs_to :team
   has_one :profile, class_name: "PlayerProfile", dependent: :destroy, inverse_of: :player
   has_many :player_season_stats, dependent: :destroy
+  has_many :trade_participants, dependent: :nullify
+  has_many :trades, through: :trade_participants
   has_many :team_memberships, dependent: :destroy
   has_many :membership_teams, through: :team_memberships, source: :team
   has_many :player_positions, dependent: :destroy

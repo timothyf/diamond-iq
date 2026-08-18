@@ -14,7 +14,7 @@ class AdminTaskRunner
     },
     "mlb_player_team_histories_sync" => {
       name: "MLB player organization history sync",
-      description: "Download official MLB transactions and rebuild dated major-league organization tenures."
+      description: "Download official MLB transactions, rebuild dated organization tenures, and store complete trade packages."
     },
     "mlb_roster_sync" => {
       name: "MLB 40-man roster sync",

@@ -45,6 +45,40 @@ const {
         <dd v-else>None recorded</dd>
       </div>
     </dl>
+    <section v-if="player.trades.length" class="trade-history" data-test="trade-history">
+      <div class="trade-history__heading">
+        <h3>Trades</h3>
+        <span>{{ player.trades.length }} {{ player.trades.length === 1 ? 'trade' : 'trades' }}</span>
+      </div>
+
+      <article v-for="trade in player.trades" :key="trade.id" class="trade-history__card">
+        <header>
+          <strong>{{ formatDate(trade.occurredOn) }}</strong>
+          <span>Trade</span>
+        </header>
+        <p>{{ trade.description }}</p>
+        <ul>
+          <li v-for="side in trade.sides" :key="side.team?.mlbId || side.team?.name">
+            <strong>
+              To
+              <RouterLink v-if="side.team?.id" :to="{ name: 'team-profile', params: { id: side.team.id } }">
+                {{ side.team.name }}
+              </RouterLink>
+              <template v-else>{{ side.team?.name || 'Unknown team' }}</template>
+            </strong>
+            <span>
+              <template v-for="(tradePlayer, index) in side.players" :key="tradePlayer.mlbId">
+                <template v-if="index"> · </template>
+                <RouterLink v-if="tradePlayer.id" :to="{ name: 'player-profile', params: { id: tradePlayer.id } }">
+                  {{ tradePlayer.fullName }}
+                </RouterLink>
+                <template v-else>{{ tradePlayer.fullName }}</template>
+              </template>
+            </span>
+          </li>
+        </ul>
+      </article>
+    </section>
 
     <ol v-if="player.teamHistory.length" class="team-timeline">
       <li v-for="membership in player.teamHistory" :key="membership.id">

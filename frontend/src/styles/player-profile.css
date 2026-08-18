@@ -1639,6 +1639,99 @@
   font-size: 0.72rem;
   font-weight: 800;
 }
+.trade-history {
+  margin: 0 0 1.4rem;
+  padding-bottom: 1.4rem;
+  border-bottom: 1px solid rgba(16, 38, 61, 0.1);
+}
+
+.trade-history__heading,
+.trade-history__card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.trade-history__heading {
+  margin-bottom: 0.7rem;
+}
+
+.trade-history__heading h3 {
+  margin: 0;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+
+.trade-history__heading span,
+.trade-history__card header span {
+  color: #71808c;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.trade-history__card {
+  padding: 1rem;
+  border: 1px solid rgba(16, 38, 61, 0.1);
+  border-radius: 14px;
+  background: rgba(16, 38, 61, 0.035);
+}
+
+.trade-history__card + .trade-history__card {
+  margin-top: 0.75rem;
+}
+
+.trade-history__card header strong {
+  color: #8f2d24;
+  font-size: 0.85rem;
+}
+
+.trade-history__card p {
+  margin: 0.65rem 0;
+  color: #526477;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.trade-history__card ul {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trade-history__card li {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 1fr);
+  gap: 0.65rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid rgba(16, 38, 61, 0.08);
+  color: #526477;
+  font-size: 0.8rem;
+}
+
+.trade-history__card a {
+  color: #10263d;
+  font-weight: 800;
+  text-decoration-color: #b79569;
+  text-underline-offset: 0.18em;
+}
+
+.trade-history__card a:hover {
+  color: #8f2d24;
+}
+
+@media (max-width: 560px) {
+  .trade-history__card li {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}
+
 
 .team-timeline li {
   position: relative;
