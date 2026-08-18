@@ -14,6 +14,9 @@ RSpec.describe PlayerStatsDownloader, type: :service do
         "Z-Contact%" => 0.85, "SwStr%" => 0.11
       }
     )
+    allow(downloader).to receive(:fetch_fangraphs_fielding_values).and_return(
+      408234 => { "DRS" => -4.0 }
+    )
     allow(downloader).to receive(:fetch_json).and_return(
       {
         "stats" => [
@@ -52,6 +55,7 @@ RSpec.describe PlayerStatsDownloader, type: :service do
       "BaseRunning" => "1.4",
       "Defense" => "-2.3",
       "GB%" => "0.39",
+      "DRS" => "-4.0",
       "Oppo%" => "0.25",
       "Swing%" => "0.49",
       "O-Swing%" => "0.27",
@@ -160,8 +164,36 @@ RSpec.describe PlayerStatsDownloader, type: :service do
     )
   end
 
+  it "sums FanGraphs DRS across a player's fielding positions" do
+    downloader = described_class.new(category: "batting", start_year: 2026, end_year: 2026)
+    response = instance_double(
+      Net::HTTPSuccess,
+      body: {
+        "data" => [
+          { "xMLBAMID" => 701678, "Pos" => "SS", "DRS" => 0 },
+          { "xMLBAMID" => 701678, "Pos" => "3B", "DRS" => -1 },
+          { "xMLBAMID" => 701678, "Pos" => "2B", "DRS" => -3 },
+          { "xMLBAMID" => 682985, "Pos" => "CF", "DRS" => 4 }
+        ]
+      }.to_json
+    )
+    http = instance_double(Net::HTTP)
+    allow(response).to receive(:is_a?).with(Net::HTTPSuccess).and_return(true)
+    allow(Net::HTTP).to receive(:new).and_return(http)
+    allow(http).to receive(:use_ssl=)
+    allow(http).to receive(:open_timeout=)
+    allow(http).to receive(:read_timeout=)
+    allow(http).to receive(:request).and_return(response)
+
+    expect(downloader.send(:fetch_fangraphs_fielding_values, 2026)).to eq(
+      701678 => { "DRS" => -4.0 },
+      682985 => { "DRS" => 4.0 }
+    )
+  end
+
   it "parses Baseball Savant OAA values using the yearly fielder leaderboard" do
     downloader = described_class.new(category: "batting", start_year: 2025, end_year: 2025)
+
     csv_body = <<~CSV
       player_name,playerId,outs_above_average
       Riley Greene,682985,3

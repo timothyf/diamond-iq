@@ -65,6 +65,7 @@ class PlayerStatsDownloader
     "Offense",
     "BaseRunning",
     "Defense",
+    "DRS",
     "GB%",
     "FB%",
     "LD%",
@@ -226,6 +227,7 @@ class PlayerStatsDownloader
     end
 
     merge_fangraphs_values(rows, year)
+    merge_fangraphs_fielding_values(rows, year) if category == "batting"
     merge_mlb_fielding_values(rows, year) if category == "batting"
     merge_statcast_fielding_values(rows, year) if category == "batting"
     if category == "pitching"
@@ -311,6 +313,55 @@ class PlayerStatsDownloader
       end
       values[mlb_id] = player_values if player_values.any?
     end
+  end
+
+  def merge_fangraphs_fielding_values(rows, year)
+    fielding_values = fetch_fangraphs_fielding_values(year)
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless fielding_values.key?(player_id)
+
+      row.merge!(fielding_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download FanGraphs DRS values for #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def fetch_fangraphs_fielding_values(year)
+    uri = URI(service_config.fetch(:fangraphs_url))
+    uri.query = {
+      pos: "all",
+      stats: "fld",
+      lg: "all",
+      qual: 0,
+      season: year,
+      season1: year,
+      month: 0,
+      ind: 0,
+      pageitems: 20_000,
+      pagenum: 1
+    }.to_query
+
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    http.open_timeout = service_config.fetch(:timeout_seconds).to_i
+    http.read_timeout = service_config.fetch(:timeout_seconds).to_i
+    request = Net::HTTP::Get.new(uri.request_uri)
+    request["User-Agent"] = service_config.fetch(:user_agent)
+    request["Accept"] = "application/json,text/plain,*/*"
+
+    response = http.request(request)
+    raise "HTTP #{response.code}: #{response.message}" unless response.is_a?(Net::HTTPSuccess)
+
+    totals = Array(JSON.parse(response.body)["data"]).each_with_object({}) do |row, values|
+      player_id = Integer(row["xMLBAMID"], exception: false)
+      drs = Float(row["DRS"], exception: false)
+      next unless player_id && drs
+
+      values[player_id] = values.fetch(player_id, 0.0) + drs
+    end
+    totals.transform_values { |drs| { "DRS" => drs } }
   end
 
   def merge_statcast_values(rows, year)

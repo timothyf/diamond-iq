@@ -313,6 +313,59 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(seasons.fetch(2026).fetch(:stats)).to include(hash_including(key: "inningsPitched", value: "5.1"))
   end
 
+  it "preserves imported defensive metrics when game lines replace mismatched batting totals" do
+    team = create_team(abbreviation: "DET")
+    opponent = create_team(abbreviation: "CLE")
+    player = create_player(team: team)
+    definitions = {
+      games: create_stat_type(name: "gamesPlayed", label: "G", category: "batting"),
+      fielding_percentage: create_stat_type(name: "fieldingPercentage", label: "FPCT", category: "batting"),
+      defense: create_stat_type(name: "Defense", label: "Def", category: "batting"),
+      oaa: create_stat_type(name: "OAA", label: "OAA", category: "batting")
+    }
+    {
+      games: 2,
+      fielding_percentage: 0.981,
+      defense: -6.4,
+      oaa: -9
+    }.each do |key, value|
+      create_player_season_stat(
+        player: player,
+        stat_type: definitions.fetch(key),
+        attributes: { team: team, season: 2026, value: value, scope_type: "team", scope_key: "DET" }
+      )
+    end
+    game = create_game(
+      home_team: team,
+      away_team: opponent,
+      official_date: Date.new(2026, 8, 17),
+      status: "final"
+    )
+    GamePlayerBattingLine.create!(
+      game: game,
+      player: player,
+      team: team,
+      opponent_team: opponent,
+      home: true,
+      starter: true,
+      plate_appearances: 4,
+      at_bats: 4,
+      hits: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+
+    defensive = described_class.new(player: player).result.fetch(:defensive_stats).fetch(:seasons).sole
+
+    expect(defensive).to include(
+      season: 2026,
+      games: 1,
+      fielding_percentage: 0.981,
+      defensive_runs_saved: nil,
+      outs_above_average: -9.0
+    )
+  end
+
   it "returns grouped advanced batting rates by season and for the career" do
     player = create_player
     definitions = {

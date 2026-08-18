@@ -310,7 +310,7 @@ class PlayerProfileSnapshotQuery
       end),
       fielding_percentage: numeric_advanced_value(fielding_percentage),
       defensive_runs_saved: numeric_advanced_value(
-        advanced_count(stat_rows, %w[defensiveRunsSaved DRS drs], career: false) || advanced_count(stat_rows, %w[Defense], career: false) || game_fielding[:defensive_runs_saved]
+        advanced_count(stat_rows, %w[defensiveRunsSaved DRS drs], career: false) || game_fielding[:defensive_runs_saved]
       ),
       outs_above_average: numeric_advanced_value(
         advanced_count(stat_rows, %w[outsAboveAverage OAA oaa outs_above_average], career: false) || game_fielding[:outs_above_average]
@@ -1215,8 +1215,12 @@ class PlayerProfileSnapshotQuery
     end.to_h
 
     replacements_by_key = replacements
+    replaced_stat_names_by_key = replacements_by_key.transform_values do |rows|
+      rows.map { |row| row.stat_type.name }
+    end
     stored_rows.reject do |row|
-      replacements_by_key.key?([ row.stat_type.category, row.season, row.team_id ])
+      key = [ row.stat_type.category, row.season, row.team_id ]
+      Array(replaced_stat_names_by_key[key]).include?(row.stat_type.name)
     end + replacements_by_key.values.flatten
   end
 
