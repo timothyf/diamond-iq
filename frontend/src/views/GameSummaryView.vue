@@ -241,8 +241,10 @@ async function handleTabKey(event, index) {
           <RouterLink :to="{ name: 'team-profile', params: { id: game.awayTeam.id } }" class="scoreboard__team">
             <span>Away</span>
             <div class="scoreboard__team-name">
-              <img v-if="teamLogo(game.awayTeam)" class="scoreboard__team-logo" :src="teamLogo(game.awayTeam)"
-                :alt="game.awayTeam.name + ' logo'" />
+              <div v-if="teamLogo(game.awayTeam)" class="scoreboard__team-logo-badge">
+                <img class="scoreboard__team-logo" :src="teamLogo(game.awayTeam)"
+                  :alt="game.awayTeam.name + ' logo'" />
+              </div>
               <strong>{{ game.awayTeam.name }}</strong>
             </div>
             <small>{{ game.awayTeam.abbreviation }}</small>
@@ -253,8 +255,10 @@ async function handleTabKey(event, index) {
             class="scoreboard__team scoreboard__team--home">
             <span>Home</span>
             <div class="scoreboard__team-name">
-              <img v-if="teamLogo(game.homeTeam)" class="scoreboard__team-logo" :src="teamLogo(game.homeTeam)"
-                :alt="game.homeTeam.name + ' logo'" />
+              <div v-if="teamLogo(game.homeTeam)" class="scoreboard__team-logo-badge">
+                <img class="scoreboard__team-logo" :src="teamLogo(game.homeTeam)"
+                  :alt="game.homeTeam.name + ' logo'" />
+              </div>
               <strong>{{ game.homeTeam.name }}</strong>
             </div>
             <small>{{ game.homeTeam.abbreviation }}</small>
@@ -1175,12 +1179,23 @@ async function handleTabKey(event, index) {
   flex-direction: row-reverse;
 }
 
-.scoreboard__team-logo {
-  width: clamp(46px, 6vw, 78px);
-  height: clamp(46px, 6vw, 78px);
+.scoreboard__team-logo-badge {
+  display: grid;
+  width: 85px;
   flex: 0 0 auto;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: clamp(11px, 1.5vw, 18px);
+  background: #fffaf0;
+  box-shadow: 0 7px 16px rgba(0, 0, 0, .24), inset 0 0 0 1px rgba(16, 38, 61, .08);
+}
+
+.scoreboard__team-logo {
+  width: 70px;
   object-fit: contain;
-  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, .2));
+  filter: drop-shadow(0 1px 1px rgba(16, 38, 61, .2));
 }
 
 .scoreboard__team strong {
@@ -2176,9 +2191,14 @@ table a {
     gap: .4rem;
   }
 
+  .scoreboard__team-logo-badge {
+    width: 60px;
+    padding: 5px;
+    border-radius: 10px;
+  }
+
   .scoreboard__team-logo {
-    width: 34px;
-    height: 34px;
+    width: 45px;
   }
 
   .scoreboard__team strong {
