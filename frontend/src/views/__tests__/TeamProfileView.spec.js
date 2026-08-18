@@ -21,7 +21,7 @@ const payload = {
     logo_url: 'https://www.mlbstatic.com/team-logos/116.svg',
     season: 2026,
     available_seasons: [2025, 2026],
-    division_rank: { rank: 1, total_teams: 5, division: { key: 'al_central', name: 'AL Central' } },
+    division_rank: { rank: 1, total_teams: 5, games_ahead: 3.5, division: { key: 'al_central', name: 'AL Central' } },
     record: {
       wins: 52, losses: 43, ties: 0, games_played: 95, runs_scored: 430, runs_allowed: 401,
       recent: {
@@ -316,6 +316,7 @@ describe('TeamProfileView', () => {
     expect(wrapper.text()).toContain('52–43')
     expect(wrapper.get('[data-test="division-rank"]').text()).toContain('#1')
     expect(wrapper.get('[data-test="division-rank"]').text()).toContain('AL Central')
+    expect(wrapper.get('[data-test="division-rank"]').text()).toContain('3.5 games ahead')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('Last 10')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('7–3')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('18–12')
@@ -427,6 +428,19 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="team-leader-whip"]').text()).toContain('0.99')
     expect(wrapper.get('[data-test="team-leader-WAR"][data-category="batting"]').text()).toContain('4.2')
     expect(wrapper.get('[data-test="team-leader-WAR"][data-category="pitching"]').text()).toContain('5.6')
+  })
+
+  it('shows games behind for a team outside first place', async () => {
+    const trailingPayload = structuredClone(payload)
+    trailingPayload.data.division_rank = {
+      rank: 3, total_teams: 5, games_behind: 4.5, division: { key: 'al_central', name: 'AL Central' },
+    }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => trailingPayload }))
+
+    const wrapper = mount(TeamProfileView, { props: { teamId: '1' }, global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="division-rank"]').text()).toContain('4.5 games behind')
   })
 
   it('sizes ranking bars from empty to full using the 30-team comparison', async () => {

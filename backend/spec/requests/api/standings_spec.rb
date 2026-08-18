@@ -54,6 +54,10 @@ RSpec.describe "Api::Standings", type: :request do
       "run_differential" => 3
     )
     expect(central.dig("teams", 1)).to include("games_back" => 1.0)
+    division_ranks = StandingsSnapshotQuery.new(season: 2026)
+    expect(division_ranks.division_rank_for(tigers)).to include(rank: 1, games_ahead: 1.0)
+    expect(division_ranks.division_rank_for(guardians)).to include(rank: 2, games_behind: 1.0)
+
     expect(central.dig("teams", 0, "playoff_odds", "playoffs")).to eq(100.0)
     wild_card = json_body.dig("data", "leagues", 0, "wild_card")
     expect(wild_card.fetch("cutoff_positions")).to eq(3)

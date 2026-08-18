@@ -375,6 +375,7 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "division_rank")).to include(
       "rank" => 1,
       "total_teams" => 2,
+      "games_ahead" => 1.0,
       "division" => { "key" => "al_central", "name" => "AL Central" }
     )
     expect(json_body.dig("data", "record", "recent", "10")).to include(

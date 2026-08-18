@@ -40,14 +40,21 @@ class StandingsSnapshotQuery
     return nil unless division
 
     payload = division_payload(division)
-    row = payload.fetch(:teams).find { |entry| entry.dig(:team, :id) == team.id }
+    teams = payload.fetch(:teams)
+    row = teams.find { |entry| entry.dig(:team, :id) == team.id }
     return nil unless row
+
+    gap = if row.fetch(:rank) == 1
+      { games_ahead: teams.second&.fetch(:games_back) || 0.0 }
+    else
+      { games_behind: row.fetch(:games_back) }
+    end
 
     {
       rank: row.fetch(:rank),
-      total_teams: payload.fetch(:teams).length,
+      total_teams: teams.length,
       division: { key: payload.fetch(:key), name: payload.fetch(:name) }
-    }
+    }.merge(gap)
   end
 
   private

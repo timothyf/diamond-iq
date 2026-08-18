@@ -186,6 +186,18 @@ function formatRecord(record) {
   return [record.wins, record.losses, ...(record.ties ? [record.ties] : [])].join('–')
 }
 
+const divisionGapLabel = computed(() => {
+  const standing = team.value?.divisionRank
+  if (!standing) return ''
+
+  const direction = standing.rank === 1 ? 'ahead' : 'behind'
+  const value = Number(standing.rank === 1 ? standing.games_ahead : standing.games_behind)
+  if (!Number.isFinite(value)) return ''
+
+  const formatted = Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)
+  return `${formatted} ${Math.abs(value) === 1 ? 'game' : 'games'} ${direction}`
+})
+
 const recentRecordEntries = computed(() => (
   [10, 30, 50].map((window) => {
     const record = team.value?.record?.recent?.[window]
@@ -624,7 +636,10 @@ async function saveLineupScenario() {
         </article>
         <article data-test="division-rank">
           <span>Division rank</span><strong>{{ team.divisionRank ? '#' + team.divisionRank.rank : '—' }}</strong>
-          <small>{{ team.divisionRank?.division?.name || 'Division unavailable' }}</small>
+          <small>
+            {{ team.divisionRank?.division?.name || 'Division unavailable' }}
+            <br/><template v-if="divisionGapLabel"> · {{ divisionGapLabel }}</template>
+          </small>
         </article>
        </section>
 
@@ -1458,10 +1473,11 @@ async function saveLineupScenario() {
 
 .team-summary span {
   color: #69747c;
-  font-size: .7rem;
+  font-size: .9rem;
   font-weight: 800;
   letter-spacing: .1em;
   text-transform: uppercase;
+  margin-bottom: 12px;
 }
 
 .team-summary strong {
@@ -1478,6 +1494,8 @@ async function saveLineupScenario() {
 
 .team-summary small {
   color: #788188;
+  color: #111;
+  font-size: 14px;
 }
 
 .team-summary__record {
