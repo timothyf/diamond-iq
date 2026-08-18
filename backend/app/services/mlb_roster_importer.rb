@@ -131,7 +131,7 @@ class MlbRosterImporter
 
     profile_result = MlbPlayerProfileUpserter.call(
       player: player,
-      person: person,
+      person: person_with_preserved_profile_history(player, person),
       fetched_at: fetched_at,
       position_payload: entry["position"] || person["primaryPosition"],
       seasons: [ nil, season ]
@@ -142,6 +142,11 @@ class MlbRosterImporter
     sync_membership!(player, team, entry, position, summary)
     summary[:membership_count] += 1
     player
+  end
+
+  def person_with_preserved_profile_history(player, person)
+    preserved_history = player.profile&.raw_data.to_h.slice("awards", "drafts", "draftYear") || {}
+    preserved_history.merge(person)
   end
 
   def sync_membership!(player, team, entry, position, summary)

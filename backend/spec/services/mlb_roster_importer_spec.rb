@@ -97,6 +97,30 @@ RSpec.describe MlbRosterImporter do
     expect(second_result.dig(:data, :updated_membership_count)).to eq(1)
   end
 
+  it "preserves awards and draft history when the roster payload omits them" do
+    player = create_player(team: team, attributes: { mlb_id: 680_776, first_name: "Riley", last_name: "Greene" })
+    profile = player.create_profile!(
+      source_name: "MLB Stats API",
+      last_synced_at: fetched_at - 1.day,
+      raw_data: {
+        "id" => 680_776,
+        "draftYear" => 2019,
+        "drafts" => [ { "team" => { "id" => 116, "name" => "Detroit Tigers" } } ],
+        "awards" => [ { "name" => "AL All-Star", "season" => "2026" } ]
+      }
+    )
+
+    result = import(payload: { "roster" => [ roster_entry ] })
+
+    expect(result[:success]).to be(true)
+    expect(profile.reload.raw_data).to include(
+      "draftYear" => 2019,
+      "drafts" => [ { "team" => { "id" => 116, "name" => "Detroit Tigers" } } ],
+      "awards" => [ { "name" => "AL All-Star", "season" => "2026" } ]
+    )
+    expect(profile.raw_data).to include("weight" => 200)
+  end
+
   it "closes the previous status window when a player's status changes" do
     import(payload: { "roster" => [ roster_entry ] })
 
