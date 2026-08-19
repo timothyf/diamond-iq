@@ -386,10 +386,10 @@ class PlayerStatsImporter
   end
 
   def replace_existing_season_rows(import_rows)
-    scopes = import_rows.map { |row| [  row[:season], row[:category]  ] }.uniq
+    scopes = import_rows.group_by { |row| [ row[:season], row[:category] ] }
 
-    scopes.sum do |season, category|
-      stat_type_ids = stat_types_for_category(category).map(&:id)
+    scopes.sum do |(season, category), rows|
+      stat_type_ids = rows.flat_map { |row| row[:stat_entries].map { |entry| entry[:stat_type].id } }.uniq
       next 0 if stat_type_ids.empty?
 
       PlayerSeasonFieldingStat.where(season: season).delete_all if category == "batting"

@@ -25,6 +25,7 @@ default: &default
         pitching: <%= ENV.fetch("MLB_PITCHING_STATS_REFERER", "https://www.mlb.com/stats/pitching/") %>
     baseball_reference:
       war_url: <%= ENV.fetch("BASEBALL_REFERENCE_WAR_URL", "https://www.baseball-reference.com/data/war_daily_pitch.txt") %>
+      batting_war_url: <%= ENV.fetch("BASEBALL_REFERENCE_BATTING_WAR_URL", "https://www.baseball-reference.com/data/war_daily_bat.txt") %>
     fangraphs:
       leaders_url: <%= ENV.fetch("FANGRAPHS_LEADERS_URL", "https://www.fangraphs.com/api/leaders/major-league/data") %>
     mlb_assets:

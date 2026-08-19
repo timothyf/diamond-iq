@@ -76,7 +76,7 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(fetch).toHaveBeenCalledWith('/api/home', expect.objectContaining({ headers: { Accept: 'application/json' } }))
-    expect(wrapper.text()).toContain('Baseball intelligence, ready for first pitch')
+    expect(wrapper.text()).toContain('Baseball intelligence, brought into focus')
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Detroit Tigers')
     expect(wrapper.get('[data-test="today-games"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="game-summary-link"]').exists()).toBe(true)

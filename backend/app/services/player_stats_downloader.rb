@@ -84,6 +84,7 @@ class PlayerStatsDownloader
     "K/BB",
     "BABIP",
     "LOB%",
+    "ERA+",
     "ERA-",
     "FIP-",
     "FIP",
@@ -177,6 +178,7 @@ class PlayerStatsDownloader
       user_agent: NineLensConfig.fetch(:external_services, :mlb_player_stats, :user_agent),
       fangraphs_url: NineLensConfig.fetch(:external_services, :fangraphs, :leaders_url),
       baseball_reference_url: NineLensConfig.fetch(:external_services, :baseball_reference, :war_url),
+      baseball_reference_batting_url: NineLensConfig.fetch(:external_services, :baseball_reference, :batting_war_url),
       baseballsavant_leaderboard_url: NineLensConfig.fetch(:external_services, :baseball_savant, :leaderboard_url),
       baseballsavant_user_agent: NineLensConfig.fetch(:external_services, :baseball_savant, :player_stats_user_agent),
       referers: NineLensConfig.fetch(:external_services, :mlb_player_stats, :referers)
@@ -228,6 +230,10 @@ class PlayerStatsDownloader
     end
 
     merge_fangraphs_values(rows, year)
+    if category == "batting"
+      merge_baseball_reference_batting_values(rows, year)
+      merge_statcast_batting_values(rows, year)
+    end
     merge_fangraphs_fielding_values(rows, year)
     merge_mlb_fielding_values(rows, year) if category == "batting"
     merge_statcast_fielding_values(rows, year) if category == "batting"
@@ -235,6 +241,7 @@ class PlayerStatsDownloader
       merge_baseball_reference_values(rows, year)
       merge_statcast_values(rows, year)
     end
+    merge_mlb_derived_values(rows)
     rows
   end
 
@@ -391,10 +398,23 @@ class PlayerStatsDownloader
       player_id = row["mlb_id"].to_i
       next unless statcast_values.key?(player_id)
 
-      row.merge!(statcast_values.fetch(player_id))
+      merge_missing_values(row, statcast_values.fetch(player_id))
     end
   rescue StandardError => e
     Rails.logger.warn("Unable to download Statcast values for pitching #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def merge_statcast_batting_values(rows, year)
+    statcast_values = fetch_statcast_batting_values(year)
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless statcast_values.key?(player_id)
+
+      merge_missing_values(row, statcast_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download Statcast batting fallback values for #{year}: #{e.class}: #{e.message}")
     rows
   end
 
@@ -427,6 +447,7 @@ class PlayerStatsDownloader
   def fetch_mlb_fielding_values(year)
     offset = 0
     totals_by_player = Hash.new { |hash, player_id| hash[player_id] = { chances: 0, errors: 0 } }
+    positions_by_player = Hash.new { |hash, player_id| hash[player_id] = [] }
 
     loop do
       query = {
@@ -453,6 +474,18 @@ class PlayerStatsDownloader
 
         totals_by_player[player_id][:chances] += chances
         totals_by_player[player_id][:errors] += errors || 0
+        positions_by_player[player_id] << {
+          team_abbreviation: row["teamAbbrev"].to_s.strip.presence || "TOT",
+          position: row["positionAbbrev"].to_s.strip,
+          games: Integer(row["games"] || row["gamesPlayed"], exception: false),
+          innings: Float(row["innings"], exception: false),
+          putouts: Integer(row["putOuts"], exception: false),
+          assists: Integer(row["assists"], exception: false),
+          fielding_errors: errors,
+          fielding_percentage: Float(row["fielding"], exception: false),
+          defensive_runs_saved: nil,
+          outs_above_average: nil
+        }
       end
       break if batch.length < page_size
 
@@ -463,7 +496,8 @@ class PlayerStatsDownloader
       next unless totals[:chances].positive?
 
       values[player_id] = {
-        "fieldingPercentage" => (totals[:chances] - totals[:errors]).to_f / totals[:chances]
+        "fieldingPercentage" => (totals[:chances] - totals[:errors]).to_f / totals[:chances],
+        "fieldingByPosition" => positions_by_player.fetch(player_id).to_json
       }
     end
   end
@@ -509,13 +543,65 @@ class PlayerStatsDownloader
     end
   end
 
+  def merge_baseball_reference_batting_values(rows, year)
+    year_values = fetch_baseball_reference_batting_values.fetch(year, {})
+    rows.each do |row|
+      player_id = row["mlb_id"].to_i
+      next unless year_values.key?(player_id)
+
+      merge_missing_values(row, year_values.fetch(player_id))
+    end
+  rescue StandardError => e
+    Rails.logger.warn("Unable to download Baseball-Reference WAR values for batting #{year}: #{e.class}: #{e.message}")
+    rows
+  end
+
+  def fetch_baseball_reference_batting_values
+    @fetch_baseball_reference_batting_values ||= begin
+      uri = URI(service_config.fetch(:baseball_reference_batting_url))
+      response = request_csv(uri)
+      values = Hash.new { |hash, year| hash[year] = {} }
+
+      CSV.parse(utf8_csv_body(response.body), headers: true).each do |row|
+        year = Integer(row["year_ID"], exception: false)
+        player_id = Integer(row["mlb_ID"], exception: false)
+        next unless year && player_id && year.between?(start_year, end_year)
+
+        player_values = values[year][player_id] ||= {
+          "_ops_plus_total" => 0.0,
+          "_ops_plus_pa" => 0.0
+        }
+        add_value(player_values, "WAR", row["WAR"])
+        add_value(player_values, "Offense", row["runs_above_avg_off"])
+        add_value(player_values, "BaseRunning", row["runs_br"])
+        add_value(player_values, "Defense", row["runs_above_avg_def"])
+
+        plate_appearances = Float(row["PA"], exception: false)
+        ops_plus = Float(row["OPS_plus"], exception: false)
+        if plate_appearances&.positive? && ops_plus
+          player_values["_ops_plus_total"] += ops_plus * plate_appearances
+          player_values["_ops_plus_pa"] += plate_appearances
+        end
+      end
+      values.each_value do |players|
+        players.each_value do |stats|
+          stats["OPS+"] = stats.delete("_ops_plus_total") / stats["_ops_plus_pa"] if stats["_ops_plus_pa"].positive?
+          stats.delete("_ops_plus_pa")
+        end
+      end
+      values
+    end
+  end
+
   def merge_baseball_reference_values(rows, year)
     year_values = fetch_baseball_reference_values.fetch(year, {})
     rows.each do |row|
       player_id = row["mlb_id"].to_i
       next unless year_values.key?(player_id)
 
-      row.merge!(year_values.fetch(player_id))
+      year_values.fetch(player_id).each do |key, value|
+        row[key] = value unless key == "WAR" && row[key].present?
+      end
     end
   rescue StandardError => e
     Rails.logger.warn("Unable to download Baseball-Reference values for pitching #{year}: #{e.class}: #{e.message}")
@@ -534,7 +620,13 @@ class PlayerStatsDownloader
         player_id = Integer(row["mlb_ID"], exception: false)
         next unless year && player_id && year.between?(start_year, end_year)
 
-        values[year][player_id] = { "RAA" => Float(row["runs_above_avg"], exception: false) }.compact
+        player_values = values[year][player_id] ||= {}
+        raa = Float(row["runs_above_avg"], exception: false)
+        war = Float(row["WAR"], exception: false)
+        era_plus = Float(row["ERA_plus"], exception: false)
+        player_values["RAA"] = player_values.fetch("RAA", 0.0) + raa if raa
+        player_values["WAR"] = player_values.fetch("WAR", 0.0) + war if war
+        player_values["ERA+"] = era_plus if era_plus
       end
       values
     end
@@ -546,7 +638,7 @@ class PlayerStatsDownloader
       year: year,
       type: "pitcher",
       min: 1,
-      selections: "player_id,player_name,woba,xwoba",
+      selections: "player_id,player_name,k_percent,bb_percent,babip,xera,woba,xwoba",
       csv: "true"
     }.to_query
 
@@ -557,8 +649,50 @@ class PlayerStatsDownloader
       next unless player_id
 
       values[player_id] = {
+        "K%" => percentage_fraction(row["k_percent"]),
+        "BB%" => percentage_fraction(row["bb_percent"]),
+        "BABIP" => Float(row["babip"], exception: false),
+        "xERA" => Float(row["xera"], exception: false),
         "wOBAAllowed" => Float(row["woba"], exception: false),
         "xwOBAAllowed" => Float(row["xwoba"], exception: false)
+      }.compact
+    end
+  end
+
+  def fetch_statcast_batting_values(year)
+    uri = URI("#{service_config.fetch(:baseballsavant_leaderboard_url)}/custom")
+    uri.query = {
+      year: year,
+      type: "batter",
+      min: 1,
+      selections: %w[
+        player_id player_name woba groundballs_percent flyballs_percent linedrives_percent
+        pull_percent straightaway_percent opposite_percent swing_percent oz_swing_percent
+        iz_contact_percent whiff_percent batted_ball
+      ].join(","),
+      csv: "true"
+    }.to_query
+
+    response = request_csv(uri)
+    CSV.parse(utf8_csv_body(response.body), headers: true).each_with_object({}) do |row, values|
+      player_id = Integer(row["player_id"], exception: false)
+      next unless player_id
+
+      whiff_rate = percentage_fraction(row["whiff_percent"])
+      values[player_id] = {
+        "wOBA" => Float(row["woba"], exception: false),
+        "GB%" => percentage_fraction(row["groundballs_percent"]),
+        "FB%" => percentage_fraction(row["flyballs_percent"]),
+        "LD%" => percentage_fraction(row["linedrives_percent"]),
+        "Pull%" => percentage_fraction(row["pull_percent"]),
+        "Cent%" => percentage_fraction(row["straightaway_percent"]),
+        "Oppo%" => percentage_fraction(row["opposite_percent"]),
+        "Swing%" => percentage_fraction(row["swing_percent"]),
+        "O-Swing%" => percentage_fraction(row["oz_swing_percent"]),
+        "Contact%" => whiff_rate.nil? ? nil : 1.0 - whiff_rate,
+        "Z-Contact%" => percentage_fraction(row["iz_contact_percent"]),
+        "SwStr%" => derived_swinging_strike_rate(row),
+        "ballsInPlay" => Integer(row["batted_ball"], exception: false)
       }.compact
     end
   end
@@ -601,6 +735,93 @@ class PlayerStatsDownloader
 
   def utf8_csv_body(body)
     body.dup.force_encoding(Encoding::UTF_8).delete_prefix("\uFEFF")
+  end
+
+  def merge_mlb_derived_values(rows)
+    rows.each do |row|
+      values = category == "pitching" ? derived_pitching_values(row) : derived_batting_values(row)
+      merge_missing_values(row, values)
+    end
+  end
+
+  def derived_pitching_values(row)
+    batters_faced = numeric_value(row["battersFaced"])
+    strikeouts = numeric_value(row["strikeOuts"])
+    walks = numeric_value(row["baseOnBalls"])
+    hits = numeric_value(row["hits"])
+    home_runs = numeric_value(row["homeRuns"])
+    hit_by_pitch = numeric_value(row["hitByPitch"] || row["hitBatsmen"])
+    runs = numeric_value(row["runs"])
+    k_rate = numeric_value(row["strikeoutsPerPlateAppearance"]) || safe_ratio(strikeouts, batters_faced)
+    bb_rate = numeric_value(row["walksPerPlateAppearance"]) || safe_ratio(walks, batters_faced)
+    effective_k_rate = numeric_value(row["K%"] || row["k_percentage"]) || k_rate
+    effective_bb_rate = numeric_value(row["BB%"] || row["bb_percentage"]) || bb_rate
+
+    {
+      "K%" => k_rate,
+      "BB%" => bb_rate,
+      "K-BB%" => effective_k_rate && effective_bb_rate ? (effective_k_rate - effective_bb_rate).round(6) : nil,
+      "K/BB" => numeric_value(row["strikeoutWalkRatio"]) || safe_ratio(strikeouts, walks),
+      "BABIP" => numeric_value(row["babip"]),
+      "LOB%" => derived_lob_rate(hits, walks, hit_by_pitch, runs, home_runs)
+    }.compact
+  end
+
+  def derived_batting_values(row)
+    pitches = numeric_value(row["numberOfPitches"])
+    swings = numeric_value(row["totalSwings"])
+    misses = numeric_value(row["swingAndMisses"])
+    balls_in_play = numeric_value(row["ballsInPlay"])
+    ground_balls = numeric_value(row["groundHits"]).to_f + numeric_value(row["groundOuts"]).to_f
+    fly_balls = numeric_value(row["flyHits"]).to_f + numeric_value(row["flyOuts"]).to_f
+    line_drives = numeric_value(row["lineHits"]).to_f + numeric_value(row["lineOuts"]).to_f
+
+    {
+      "GB%" => safe_ratio(ground_balls, balls_in_play),
+      "FB%" => safe_ratio(fly_balls, balls_in_play),
+      "LD%" => safe_ratio(line_drives, balls_in_play),
+      "Swing%" => safe_ratio(swings, pitches),
+      "Contact%" => swings&.positive? && misses ? 1.0 - (misses / swings) : nil,
+      "SwStr%" => safe_ratio(misses, pitches),
+      "ballsInPlay" => balls_in_play
+    }.compact
+  end
+
+  def derived_lob_rate(hits, walks, hit_by_pitch, runs, home_runs)
+    return if [ hits, walks, hit_by_pitch, runs, home_runs ].any?(&:nil?)
+
+    denominator = hits + walks + hit_by_pitch - (1.4 * home_runs)
+    safe_ratio(hits + walks + hit_by_pitch - runs, denominator)
+  end
+
+  def derived_swinging_strike_rate(row)
+    swing_rate = percentage_fraction(row["swing_percent"])
+    whiff_rate = percentage_fraction(row["whiff_percent"])
+    swing_rate * whiff_rate if swing_rate && whiff_rate
+  end
+
+  def percentage_fraction(value)
+    number = numeric_value(value)
+    number && (number / 100.0).round(6)
+  end
+
+  def numeric_value(value)
+    Float(value, exception: false)
+  end
+
+  def safe_ratio(numerator, denominator)
+    return if numerator.nil? || denominator.nil? || denominator.zero?
+
+    numerator.to_f / denominator
+  end
+
+  def merge_missing_values(row, values)
+    values.each { |key, value| row[key] = value if row[key].blank? && value.present? }
+  end
+
+  def add_value(values, key, raw_value)
+    value = numeric_value(raw_value)
+    values[key] = values.fetch(key, 0.0) + value if value
   end
 
   def calculated_ops_plus(row)

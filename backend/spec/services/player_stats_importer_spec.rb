@@ -125,6 +125,7 @@ RSpec.describe PlayerStatsImporter, type: :service do
 
   it "replaces existing rows for imported season/category when replace_season is enabled" do
     create_stat_type(name: "W", label: "W", category: "pitching")
+    war_type = create_stat_type(name: "WAR", label: "WAR", category: "batting")
 
     team = Team.create!(
       mlb_id: 142,
@@ -143,6 +144,7 @@ RSpec.describe PlayerStatsImporter, type: :service do
 
     PlayerSeasonStat.create!(player: old_player, stat_type: old_batting_type, season: 2026, value: BigDecimal("30"))
     PlayerSeasonStat.create!(player: old_player, stat_type: old_pitching_type, season: 2026, value: BigDecimal("8"))
+    PlayerSeasonStat.create!(player: old_player, stat_type: war_type, season: 2026, value: BigDecimal("4.2"))
 
     csv_data = <<~CSV
       source_season,season,stat_type,playerId,playerFirstName,playerLastName,teamAbbrev,teamName,teamShortName,teamId,gamesPlayed,homeRuns,avg,ops
@@ -161,6 +163,7 @@ RSpec.describe PlayerStatsImporter, type: :service do
 
     expect(PlayerSeasonStat.where(player: old_player, stat_type: old_batting_type, season: 2026)).to be_empty
     expect(PlayerSeasonStat.where(player: old_player, stat_type: old_pitching_type, season: 2026).count).to eq(1)
+    expect(PlayerSeasonStat.find_by!(player: old_player, stat_type: war_type, season: 2026).value).to eq(BigDecimal("4.2"))
   end
 
   it "keeps separate rows for team splits and a TOT row in the same season" do
