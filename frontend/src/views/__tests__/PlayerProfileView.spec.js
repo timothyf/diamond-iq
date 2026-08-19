@@ -800,6 +800,64 @@ describe('PlayerProfileView', () => {
     expect(rows[2].attributes('style')).toContain('--percentile-foreground: #f9fafb')
   })
 
+  it('renders batter and pitcher split dimensions as grouped table rows', async () => {
+    const payload = apiPayloadWith((response) => {
+      response.data.positions.primary.position_type = 'two_way'
+      response.data.batter_splits = {
+        available: true,
+        dimensions: [
+          {
+            key: 'pitcher_hand',
+            label: 'Vs. pitcher handedness',
+            options: [
+              { value: 'L', label: 'Left-handed', metrics: { plate_appearances: 10, batting_average: 0.300 } },
+              { value: 'R', label: 'Right-handed', metrics: { plate_appearances: 12, batting_average: 0.250 } },
+            ],
+          },
+          {
+            key: 'home_away',
+            label: 'Home / away',
+            options: [
+              { value: 'home', label: 'Home', metrics: { plate_appearances: 20, batting_average: 0.275 } },
+              { value: 'away', label: 'Away', metrics: { plate_appearances: 15, batting_average: 0.250 } },
+            ],
+          },
+        ],
+      }
+      response.data.pitcher_splits = {
+        available: true,
+        dimensions: [
+          {
+            key: 'batter_hand',
+            label: 'Vs. batter handedness',
+            options: [
+              { value: 'L', label: 'Left-handed', metrics: { batters_faced: 18, earned_run_average: 2.50 } },
+              { value: 'R', label: 'Right-handed', metrics: { batters_faced: 22, earned_run_average: 3.10 } },
+            ],
+          },
+        ],
+      }
+    })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
+
+    const wrapper = mount(PlayerProfileView, {
+      props: { playerId: '42' },
+      global: { stubs: { RouterLink: true } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-test="player-profile-tab-splits"]').trigger('click')
+    await flushPromises()
+
+    const panel = wrapper.get('[data-test="batter-splits"]')
+    expect(panel.findAll('.split-tabs')).toHaveLength(0)
+    expect(panel.findAll('.split-category-row')).toHaveLength(3)
+    expect(panel.text()).toContain('Vs. pitcher handedness')
+    expect(panel.text()).toContain('Home / away')
+    expect(panel.text()).toContain('Vs. batter handedness')
+    expect(panel.text()).toContain('Left-handed')
+    expect(panel.findAll('.split-role')).toHaveLength(2)
+  })
+
   it('shows grouped rate and run-creation tables on the Advanced Stats tab', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => apiPayload() }))
 

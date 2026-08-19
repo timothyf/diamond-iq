@@ -136,6 +136,35 @@ const payload = {
         away_team: { id: 1, mlb_id: 116, name: 'Detroit Tigers', team_name: 'Tigers', abbreviation: 'DET' },
       },
     ],
+    player_stats: {
+      season: 2026,
+      batting: {
+        columns: [
+          { key: 'gamesPlayed', label: 'G' },
+          { key: 'homeRuns', label: 'HR' },
+          { key: 'avg', label: 'AVG' },
+        ],
+        players: [
+          {
+            player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null },
+            stats: { gamesPlayed: '95', homeRuns: '24', avg: '.287' },
+          },
+        ],
+      },
+      pitching: {
+        columns: [
+          { key: 'W', label: 'W' },
+          { key: 'ERA', label: 'ERA' },
+          { key: 'strikeOuts', label: 'SO' },
+        ],
+        players: [
+          {
+            player: { id: 51, full_name: 'Tarik Skubal', first_name: 'Tarik', last_name: 'Skubal', headshot_url: null },
+            stats: { W: '11', ERA: '2.01', strikeOuts: '162' },
+          },
+        ],
+      },
+    },
     opponent_preparation: {
       opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
       recent_performance: { games: 10, wins: 7, losses: 3, runs_per_game: 4.8, ops: 0.781, era: 3.42 },
@@ -509,7 +538,7 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="schedule-next-month"]').attributes()).not.toHaveProperty('disabled')
   })
 
-  it("shows Player Stats and Team Stats as coming-soon tabs in the requested order", async () => {
+  it("shows Player Stats and Team Stats tabs in the requested order", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => payload }))
     const wrapper = mount(TeamProfileView, {
       props: { teamId: "1" },
@@ -529,13 +558,18 @@ describe('TeamProfileView', () => {
 
     const requestCount = fetch.mock.calls.length
     await wrapper.get("[data-test=team-profile-tab-player-stats]").trigger("click")
-    expect(wrapper.get("[data-test=team-profile-panel-player-stats]").text()).toContain("Coming soon")
-    expect(wrapper.get("[data-test=team-profile-panel-player-stats]").attributes("style") || "").not.toContain("display: none")
+    const playerStatsPanel = wrapper.get("[data-test=team-profile-panel-player-stats]")
+    expect(playerStatsPanel.text()).toContain("2026 player stats")
+    expect(playerStatsPanel.get("[data-test=team-player-stats-batting]").text()).toContain("Riley Greene")
+    expect(playerStatsPanel.get("[data-test=team-player-stats-batting]").text()).toContain(".287")
+    expect(playerStatsPanel.get("[data-test=team-player-stats-pitching]").text()).toContain("Tarik Skubal")
+    expect(playerStatsPanel.get("[data-test=team-player-stats-pitching]").text()).toContain("2.01")
+    expect(playerStatsPanel.attributes("style") || "").not.toContain("display: none")
 
     await wrapper.get("[data-test=team-profile-tab-team-stats]").trigger("click")
     expect(wrapper.get("[data-test=team-profile-panel-team-stats]").text()).toContain("Coming soon")
     expect(wrapper.get("[data-test=team-profile-panel-team-stats]").attributes("style") || "").not.toContain("display: none")
-    expect(fetch).toHaveBeenCalledTimes(requestCount)
+    expect(fetch).toHaveBeenCalledTimes(requestCount + 2)
   })
 
   it('reloads the profile for the selected season', async () => {

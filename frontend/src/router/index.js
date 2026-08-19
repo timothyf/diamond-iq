@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-import PlayerSeasonStatsDashboard from '../components/PlayerSeasonStatsDashboard.vue'
+import StatExplorer from '../components/StatExplorer.vue'
 import AdminView from '../views/AdminView.vue'
 import AccessDeniedView from '../views/AccessDeniedView.vue'
 import GameSummaryView from '../views/GameSummaryView.vue'
@@ -39,7 +39,7 @@ const router = createRouter({
     {
       path: '/explore',
       name: 'stat-explorer',
-      component: PlayerSeasonStatsDashboard,
+      component: StatExplorer,
     },
     {
       path: '/stat-board',

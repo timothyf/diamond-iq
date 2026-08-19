@@ -53,6 +53,7 @@ class TeamProfileSnapshotQuery
       recent_games: recent_games.map { |game| GameSerializer.call(game) },
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
       **schedule_payload,
+      **player_stats_payload,
       **opponent_payload,
       **lineup_payload,
       team_leaders: team_leaders,
@@ -90,6 +91,49 @@ class TeamProfileSnapshotQuery
 
     {
       schedule_games: schedule_games.map { |game| GameSerializer.call(game, include_schedule: false) }
+    }
+  end
+
+  def player_stats_payload
+    return {} unless include_section?("player-stats")
+
+    {
+      player_stats: {
+        season: season,
+        batting: player_stats_category("batting"),
+        pitching: player_stats_category("pitching")
+      }
+    }
+  end
+
+  def player_stats_category(category)
+    definitions = PlayerSeasonStatsLeaderboardQuery::COLUMN_DEFINITIONS_BY_CATEGORY.fetch(category)
+    rows = PlayerSeasonStat
+      .joins(:stat_type)
+      .where(team: team, season: season, scope_type: "team", stat_types: { category: category })
+      .includes(player: :profile)
+      .to_a
+
+    {
+      columns: definitions.map { |definition| { key: definition.fetch(:key), label: definition.fetch(:label) } },
+      players: rows.group_by(&:player).sort_by { |player, _| [ player.last_name.to_s, player.first_name.to_s ] }.map do |player, player_rows|
+        {
+          player: {
+            id: player.id,
+            mlb_id: player.mlb_id,
+            full_name: player.full_name,
+            first_name: player.first_name,
+            last_name: player.last_name,
+            headshot_url: player.profile&.headshot_url
+          },
+          stats: definitions.each_with_object({}) do |definition, stats|
+            stat = definition.fetch(:aliases).filter_map do |alias_name|
+              player_rows.find { |row| row.stat_type.name == alias_name }
+            end.first
+            stats[definition.fetch(:key)] = stat&.value&.to_s
+          end
+        }
+      end
     }
   end
 

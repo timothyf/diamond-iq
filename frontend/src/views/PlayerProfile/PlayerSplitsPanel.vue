@@ -2,9 +2,8 @@
 import { inject } from 'vue'
 
 const {
-  player, sectionLoading, showBattingIndicators, batterSplitDimension, batterSplitMetrics,
-  batterSplitValue, selectedBatterSplit, showPitchingIndicators, pitcherSplitDimension,
-  pitcherSplitMetrics, pitcherSplitValue, selectedPitcherSplit, formatDate,
+  player, sectionLoading, showBattingIndicators, batterSplitMetrics,
+  batterSplitValue, showPitchingIndicators, pitcherSplitMetrics, pitcherSplitValue, formatDate,
 } = inject('player-profile-context')
 </script>
 
@@ -28,22 +27,7 @@ const {
     <p v-if="sectionLoading('splits').value" class="profile-empty">Loading split statistics…</p>
     <div v-else-if="showBattingIndicators && player.batterSplits.available" class="split-role">
       <h3>As batter</h3>
-      <div class="split-tabs" role="tablist" aria-label="Batter split dimensions">
-        <button
-          v-for="dimension in player.batterSplits.dimensions"
-          :key="dimension.key"
-          type="button"
-          role="tab"
-          :aria-selected="batterSplitDimension?.key === dimension.key"
-          :class="{ 'is-active': batterSplitDimension?.key === dimension.key }"
-          :data-test="`batter-split-tab-${dimension.key}`"
-          @click="selectedBatterSplit = dimension.key"
-        >
-          {{ dimension.label }}
-        </button>
-      </div>
-
-      <div v-if="batterSplitDimension?.options?.length" class="split-table-wrap">
+      <div class="split-table-wrap">
         <table class="split-table">
           <thead>
             <tr>
@@ -52,12 +36,17 @@ const {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="option in batterSplitDimension.options" :key="option.value">
-              <th>{{ option.label }}</th>
-              <td v-for="metric in batterSplitMetrics" :key="metric[0]">
-                {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
-              </td>
-            </tr>
+            <template v-for="dimension in player.batterSplits.dimensions" :key="dimension.key">
+              <tr v-if="dimension.options?.length" class="split-category-row">
+                <th :colspan="batterSplitMetrics.length + 1">{{ dimension.label }}</th>
+              </tr>
+              <tr v-for="option in dimension.options" :key="`${dimension.key}-${option.value}`">
+                <th>{{ option.label }}</th>
+                <td v-for="metric in batterSplitMetrics" :key="metric[0]">
+                  {{ batterSplitValue(option.metrics[metric[0]], metric[2]) }}
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -65,22 +54,7 @@ const {
 
     <div v-if="!sectionLoading('splits').value && showPitchingIndicators && player.pitcherSplits.available" class="split-role">
       <h3>As pitcher</h3>
-      <div class="split-tabs" role="tablist" aria-label="Pitcher split dimensions">
-        <button
-          v-for="dimension in player.pitcherSplits.dimensions"
-          :key="dimension.key"
-          type="button"
-          role="tab"
-          :aria-selected="pitcherSplitDimension?.key === dimension.key"
-          :class="{ 'is-active': pitcherSplitDimension?.key === dimension.key }"
-          :data-test="`pitcher-split-tab-${dimension.key}`"
-          @click="selectedPitcherSplit = dimension.key"
-        >
-          {{ dimension.label }}
-        </button>
-      </div>
-
-      <div v-if="pitcherSplitDimension?.options?.length" class="split-table-wrap">
+      <div class="split-table-wrap">
         <table class="split-table">
           <thead>
             <tr>
@@ -89,12 +63,17 @@ const {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="option in pitcherSplitDimension.options" :key="option.value">
-              <th>{{ option.label }}</th>
-              <td v-for="metric in pitcherSplitMetrics" :key="metric[0]">
-                {{ pitcherSplitValue(option.metrics[metric[0]], metric[2]) }}
-              </td>
-            </tr>
+            <template v-for="dimension in player.pitcherSplits.dimensions" :key="dimension.key">
+              <tr v-if="dimension.options?.length" class="split-category-row">
+                <th :colspan="pitcherSplitMetrics.length + 1">{{ dimension.label }}</th>
+              </tr>
+              <tr v-for="option in dimension.options" :key="`${dimension.key}-${option.value}`">
+                <th>{{ option.label }}</th>
+                <td v-for="metric in pitcherSplitMetrics" :key="metric[0]">
+                  {{ pitcherSplitValue(option.metrics[metric[0]], metric[2]) }}
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -105,4 +84,3 @@ const {
     </p>
   </section>
 </template>
-

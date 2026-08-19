@@ -581,7 +581,7 @@ class PlayerProfileSnapshotQuery
     runs_per_nine = divide(runs && innings ? runs * 9 : nil, innings)
     earned_runs_per_nine = divide(earned_runs && innings ? earned_runs * 9 : nil, innings)
 
-    {
+    values = {
       k_percentage: numeric_advanced_value(k_percentage),
       bb_percentage: numeric_advanced_value(bb_percentage),
       k_minus_bb_percentage: numeric_advanced_value(
@@ -626,6 +626,185 @@ class PlayerProfileSnapshotQuery
       shutdowns: numeric_advanced_value(advanced_count(rows, %w[SD shutdowns], career: career)),
       meltdowns: numeric_advanced_value(advanced_count(rows, %w[MD meltdowns], career: career))
     }
+
+    statcast_fallback = pitcher_statcast_value_fallback(rows, career: career)
+    statcast_fallback.each { |key, value| values[key] = value if values[key].nil? && value.present? }
+    calculated_fallback = calculated_pitching_run_prevention_values(values, rows, career: career)
+    calculated_fallback.each { |key, value| values[key] = value if values[key].nil? && value.present? }
+    values
+  end
+
+  def calculated_pitching_run_prevention_values(values, rows, career:)
+    era_minus = values[:era_minus]
+    era_plus = values[:era_plus]
+    fallback = {}
+    fallback[:era_minus] = (10_000.0 / era_plus.to_f).round(1) if era_minus.nil? && era_plus.to_f.positive?
+
+    fip_values = rows.group_by(&:season).filter_map do |season, season_rows|
+      totals = pitching_formula_totals(season_rows)
+      next if totals.nil?
+
+      constant = league_fip_constant(season)
+      next if constant.nil?
+
+      fip = ((13 * totals[:home_runs]) + (3 * (totals[:walks] + totals[:hit_batters])) - (2 * totals[:strikeouts])) / totals[:innings] + constant
+      league_fip = league_pitching_rate(season, :fip)
+      [ fip, league_fip ? (fip / league_fip * 100) : nil, totals[:innings] ]
+    end
+    if fip_values.any?
+      if career
+        innings = fip_values.sum { |_fip, _fip_minus, weight| weight }
+        fallback[:fip] = (fip_values.sum { |fip, _fip_minus, weight| fip * weight } / innings).to_f.round(2) if innings.positive?
+        fallback[:fip_minus] = (fip_values.filter_map { |_fip, fip_minus, weight| fip_minus && [ fip_minus, weight ] }.sum { |value, weight| value * weight } / innings).to_f.round(1) if innings.positive?
+      else
+        fallback[:fip] = fip_values.first[0].to_f.round(2)
+        fallback[:fip_minus] = fip_values.first[1]&.to_f&.round(1)
+      end
+    end
+
+    fallback
+  end
+
+  def pitching_formula_totals(rows)
+    innings = rows.filter_map do |row|
+      value = row.stat_type.name.in?(%w[inningsPitched IP]) ? row.value : nil
+      innings_to_outs(value) if value
+    end.sum
+    return if innings.zero?
+
+    values = {
+      innings: innings_as_decimal(innings),
+      home_runs: season_additive_value(rows, %w[homeRuns HR]),
+      walks: season_additive_value(rows, %w[baseOnBalls BB]),
+      hit_batters: season_additive_value(rows, %w[hitByPitch hitBatsmen HBP]) || 0,
+      strikeouts: season_additive_value(rows, %w[strikeOuts SO])
+    }
+    return if [ values[:home_runs], values[:walks], values[:strikeouts] ].any?(&:nil?)
+
+    values
+  end
+
+  def league_fip_constant(season)
+    league_era = league_pitching_rate(season, :era)
+    league_fip = league_fip_raw_rate(season)
+    return if league_era.nil? || league_fip.nil?
+
+    league_era - league_fip
+  end
+
+  def league_pitching_rate(season, metric)
+    @league_pitching_rates ||= {}
+    @league_pitching_rates[[ season, metric ]] ||= begin
+      totals = league_pitching_totals(season)
+      innings = totals[:innings]
+      if innings.nil? || innings.zero?
+        nil
+      elsif metric == :era
+        totals[:earned_runs].to_f * 9 / innings
+      elsif metric == :fip
+        league_fip_raw_rate(season).to_f + league_fip_constant(season).to_f
+      else
+        nil
+      end
+    end
+  end
+
+  def league_fip_raw_rate(season)
+    totals = league_pitching_totals(season)
+    innings = totals[:innings]
+    return if innings.nil? || innings.zero?
+
+    ((13 * totals[:home_runs]) + (3 * (totals[:walks] + totals[:hit_batters])) - (2 * totals[:strikeouts])) / innings
+  end
+
+  def league_pitching_totals(season)
+    @league_pitching_totals ||= {}
+    @league_pitching_totals[season] ||= begin
+      games = GamePlayerPitchingLine.joins(:game).where(games: { official_date: Date.new(season, 1, 1)..Date.new(season, 12, 31) })
+      lines = games.to_a
+      if lines.any?
+        outs = lines.sum { |line| line.outs_recorded.to_i }
+        {
+          innings: outs.positive? ? innings_as_decimal(outs) : nil,
+          earned_runs: lines.sum { |line| line.earned_runs.to_i },
+          home_runs: lines.sum { |line| line.home_runs.to_i },
+          walks: lines.sum { |line| line.walks.to_i },
+          hit_batters: lines.sum { |line| line.raw_data.to_h.dig("stats", "pitching", "hitByPitch").to_f },
+          strikeouts: lines.sum { |line| line.strikeouts.to_i }
+        }
+      else
+        league_pitching_totals_from_player_stats(season)
+      end
+    end
+  end
+
+  def league_pitching_totals_from_player_stats(season)
+    names = %w[inningsPitched IP earnedRuns ER homeRuns HR baseOnBalls BB hitByPitch hitBatsmen HBP strikeOuts SO]
+    stat_rows = PlayerSeasonStat.joins(:stat_type)
+      .where(season: season, scope_type: "team", stat_types: { category: "pitching", name: names })
+      .pluck("stat_types.name", :value)
+    totals = Hash.new(0.0)
+    stat_rows.each { |name, value| totals[name] += value.to_f }
+    pick_total = lambda do |aliases|
+      name = aliases.find { |alias_name| totals.key?(alias_name) }
+      name ? totals[name] : 0.0
+    end
+    innings = stat_rows.filter_map { |name, value| innings_to_outs(value) if name.in?(%w[inningsPitched IP]) }.sum
+    {
+      innings: innings.zero? ? nil : innings_as_decimal(innings),
+      earned_runs: pick_total.call(%w[earnedRuns ER]),
+      home_runs: pick_total.call(%w[homeRuns HR]),
+      walks: pick_total.call(%w[baseOnBalls BB]),
+      hit_batters: pick_total.call(%w[hitByPitch hitBatsmen HBP]),
+      strikeouts: pick_total.call(%w[strikeOuts SO])
+    }
+  end
+
+  def pitcher_statcast_value_fallback(rows, career:)
+    pitches = pitcher_statcast_rows(rows, career: career)
+    return {} if pitches.empty?
+
+    lines = GamePlayerPitchingLine.where(player: player, game_id: pitches.filter_map(&:game_id).uniq).to_a.index_by(&:game_id)
+    wpa_rows = pitches.filter_map do |pitch|
+      line = lines[pitch.game_id]
+      delta = pitch.delta_home_win_exp&.to_f
+      next if line.nil? || delta.nil?
+
+      [ pitch, line.home? ? delta : -delta ]
+    end
+    game_wpa = wpa_rows.group_by { |pitch, _delta| pitch.game_id }
+      .transform_values { |game_rows| game_rows.sum { |_pitch, delta| delta } }
+
+    {
+      wpa: rounded_statcast_value(wpa_rows.sum { |_pitch, delta| delta }),
+      re24: rounded_statcast_value(pitches.filter_map { |pitch| pitch.delta_pitcher_run_exp&.to_f }.sum),
+      shutdowns: game_wpa.count { |game_id, value| !lines[game_id].starter? && value >= 0.06 },
+      meltdowns: game_wpa.count { |game_id, value| !lines[game_id].starter? && value <= -0.06 }
+    }
+  end
+
+  def pitcher_statcast_rows(rows, career:)
+    seasons = rows.filter_map(&:season).uniq.sort
+    return [] if seasons.empty? || player.mlb_id.blank?
+
+    team_ids = rows.filter_map(&:team_id).uniq
+    cache_key = [ seasons, team_ids, career ]
+    @pitcher_statcast_rows_cache ||= {}
+    @pitcher_statcast_rows_cache[cache_key] ||= begin
+      date_range = Date.new(seasons.first, 1, 1)..Date.new(seasons.last, 12, 31)
+      pitches = PitchDatum.where(pitcher: player.mlb_id, game_date: date_range).to_a
+      if team_ids.length != 1
+        pitches
+      else
+        line_by_game_id = GamePlayerPitchingLine.where(player: player, game_id: pitches.filter_map(&:game_id).uniq)
+          .pluck(:game_id, :team_id).to_h
+        pitches.select { |pitch| line_by_game_id[pitch.game_id] == team_ids.first }
+      end
+    end
+  end
+
+  def rounded_statcast_value(value)
+    value.to_f.round(3)
   end
 
   def advanced_pitching_innings(rows)
@@ -1754,8 +1933,8 @@ class PlayerProfileSnapshotQuery
     ]
 
     {
-      available: rows.any?,
-      dimensions: dimensions.map do |split_type, label, options|
+      available: rows.any? || rolling_batter_rows.any?,
+      dimensions: dimensions.filter_map do |split_type, label, options|
         grouped = rows.select { |row| row.split_type == split_type }.group_by(&:split_value)
         {
           key: split_type,
@@ -1767,7 +1946,7 @@ class PlayerProfileSnapshotQuery
             { value: value, label: option_label, metrics: aggregate_batter_split_rows(split_rows) }
           end
         }
-      end
+      end + rolling_game_split_dimensions(rolling_batter_rows, pitching: false)
     }
   end
 
@@ -1784,8 +1963,8 @@ class PlayerProfileSnapshotQuery
     ]
 
     {
-      available: rows.any?,
-      dimensions: dimensions.map do |split_type, label, options|
+      available: rows.any? || rolling_pitcher_rows.any?,
+      dimensions: dimensions.filter_map do |split_type, label, options|
         grouped = rows.select { |row| row.split_type == split_type }.group_by(&:split_value)
         {
           key: split_type,
@@ -1797,7 +1976,7 @@ class PlayerProfileSnapshotQuery
             { value: value, label: option_label, metrics: aggregate_pitcher_split_rows(split_rows) }
           end
         }
-      end
+      end + rolling_game_split_dimensions(rolling_pitcher_rows, pitching: true)
     }
   end
 
@@ -1841,6 +2020,114 @@ class PlayerProfileSnapshotQuery
       average_spin_rate: weighted_average(rows, :average_spin_rate, :spin_sample_size),
       delta_run_expectancy_per_100: weighted_average(rows, :delta_run_expectancy_per_100, :pitch_count)
     )
+  end
+
+  def rolling_game_split_dimensions(rows, pitching:)
+    game_ids = rows.sort_by { |row| [ row.game_date || Date.new(1900, 1, 1), row.game_pk ] }
+      .reverse
+      .map(&:game_pk)
+      .uniq
+
+    [ 7, 15, 30 ].map do |game_count|
+      selected_game_ids = game_ids.first(game_count)
+      metrics = if selected_game_ids.any?
+        selected_rows = rows.select { |row| selected_game_ids.include?(row.game_pk) }
+        pitching ? aggregate_raw_pitcher_split_rows(selected_rows) : aggregate_raw_batter_split_rows(selected_rows)
+      end
+
+      {
+        key: "last_#{game_count}_games",
+        label: "Last #{game_count} games",
+        options: metrics ? [{ value: "all", label: "Last #{game_count} games", metrics: metrics }] : []
+      }
+    end
+  end
+
+  def aggregate_raw_batter_split_rows(rows)
+    swings = rows.count { |row| DailyAnalyticsCalculator.swing?(row) }
+    whiffs = rows.count { |row| DailyAnalyticsCalculator.whiff?(row) }
+    batted_balls = rows.select { |row| DailyAnalyticsCalculator.batted_ball?(row) }
+    chase_opportunities = rows.count { |row| chase_opportunity_for?(row) }
+    chases = rows.count { |row| chase_opportunity_for?(row) && DailyAnalyticsCalculator.swing?(row) }
+
+    {
+      pitches_seen: rows.length,
+      plate_appearances: raw_plate_appearance_count(rows),
+      swings: swings,
+      whiffs: whiffs,
+      batted_balls: batted_balls.length,
+      hits: raw_terminal_event_count(rows, HIT_EVENTS),
+      home_runs: raw_terminal_event_count(rows, [ "home_run" ]),
+      walks: raw_terminal_event_count(rows, %w[walk intent_walk intentional_walk]),
+      strikeouts: raw_terminal_event_count(rows, %w[strikeout strikeout_double_play]),
+      swing_percentage: ratio_as_percentage(swings, rows.length),
+      whiff_percentage: ratio_as_percentage(whiffs, swings),
+      chase_percentage: ratio_as_percentage(chases, chase_opportunities),
+      hard_hit_percentage: ratio_as_percentage(batted_balls.count { |row| row.launch_speed.to_f >= 95 }, batted_balls.length),
+      average_exit_velocity: average_raw(batted_balls, :launch_speed),
+      estimated_woba: average_raw(rows, :estimated_woba_using_speedangle)
+    }
+  end
+
+  def aggregate_raw_pitcher_split_rows(rows)
+    swings = rows.count { |row| DailyAnalyticsCalculator.swing?(row) }
+    whiffs = rows.count { |row| DailyAnalyticsCalculator.whiff?(row) }
+    chase_opportunities = rows.count { |row| chase_opportunity_for?(row) }
+    chases = rows.count { |row| chase_opportunity_for?(row) && DailyAnalyticsCalculator.swing?(row) }
+
+    {
+      pitch_count: rows.length,
+      batters_faced: raw_plate_appearance_count(rows),
+      zone_percentage: ratio_as_percentage(rows.count { |row| row.zone.to_i.between?(1, 9) }, rows.length),
+      swings: swings,
+      whiffs: whiffs,
+      strikeouts: raw_terminal_event_count(rows, %w[strikeout strikeout_double_play]),
+      walks: raw_terminal_event_count(rows, %w[walk intent_walk intentional_walk]),
+      whiff_percentage: ratio_as_percentage(whiffs, swings),
+      chase_percentage: ratio_as_percentage(chases, chase_opportunities),
+      average_velocity: average_raw(rows, :release_speed),
+      maximum_velocity: numeric_values_for(rows, :release_speed).max,
+      average_spin_rate: average_raw(rows, :release_spin_rate),
+      delta_run_expectancy_per_100: average_raw(rows, :delta_run_exp)&.then { |value| (value * 100).round(1) }
+    }
+  end
+
+  def rolling_batter_rows
+    @rolling_batter_rows ||= rolling_rows_for(:batter)
+  end
+
+  def rolling_pitcher_rows
+    @rolling_pitcher_rows ||= rolling_rows_for(:pitcher)
+  end
+
+  def rolling_rows_for(player_field)
+    return [] if player.mlb_id.blank?
+
+    PitchDatum.where(player_field => player.mlb_id, game_date: analysis_range.start_date..analysis_range.end_date)
+      .order(game_date: :desc, game_pk: :desc, at_bat_number: :desc, pitch_number: :desc)
+      .to_a
+  end
+
+  def raw_plate_appearance_count(rows)
+    rows.map { |row| [ row.game_pk, row.at_bat_number ] }.uniq.length
+  end
+
+  def raw_terminal_event_count(rows, event_names)
+    rows.select { |row| event_names.include?(row.events.to_s.downcase) }
+      .map { |row| [ row.game_pk, row.at_bat_number ] }.uniq.length
+  end
+
+  def chase_opportunity_for?(row)
+    row.zone.present? && !row.zone.to_i.between?(1, 9)
+  end
+
+  def numeric_values_for(rows, field)
+    rows.filter_map { |row| row.public_send(field)&.to_f }
+  end
+
+  def average_raw(rows, field)
+    values = numeric_values_for(rows, field)
+    values.any? ? (values.sum / values.length).round(1) : nil
   end
 
   def batted_balls_for(row)

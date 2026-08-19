@@ -1,6 +1,72 @@
 require "rails_helper"
 
 RSpec.describe PlayerProfileSnapshotQuery do
+  it "calculates missing ERA-, FIP, and FIP- from pitching totals" do
+    team = create_team
+    player = create_player(team: team, attributes: { mlb_id: 765_432 })
+    innings = create_stat_type(name: "inningsPitched", label: "IP", category: "pitching")
+    earned_runs = create_stat_type(name: "earnedRuns", label: "ER", category: "pitching")
+    home_runs = create_stat_type(name: "homeRuns", label: "HR", category: "pitching")
+    walks = create_stat_type(name: "baseOnBalls", label: "BB", category: "pitching")
+    strikeouts = create_stat_type(name: "strikeOuts", label: "SO", category: "pitching")
+    era_plus = create_stat_type(name: "ERA+", label: "ERA+", category: "pitching")
+    [
+      [ innings, 100.0 ], [ earned_runs, 25.0 ], [ home_runs, 10.0 ], [ walks, 20.0 ],
+      [ strikeouts, 100.0 ], [ era_plus, 125.0 ]
+    ].each do |stat_type, value|
+      create_player_season_stat(player: player, stat_type: stat_type, attributes: { team: team, season: 2026, value: value })
+    end
+
+    values = described_class.new(player: player, on: Date.new(2026, 8, 19)).result
+      .dig(:advanced_stats, :seasons, 0, :values)
+
+    expect(values[:era_minus]).to eq(80.0)
+    expect(values[:fip]).to be_a(Float)
+    expect(values[:fip_minus]).to be_a(Float)
+  end
+
+  it "fills missing pitcher value metrics from Statcast pitch data" do
+    team = create_team(attributes: { abbreviation: "TST" })
+    opponent = create_team(attributes: { abbreviation: "OPP" })
+    player = create_player(team: team, attributes: { mlb_id: 654_321 })
+    game = create_game(home_team: team, away_team: opponent, official_date: Date.new(2026, 7, 10), status: "final")
+    GamePlayerPitchingLine.create!(
+      game: game, player: player, team: team, opponent_team: opponent, home: true, starter: false,
+      source_name: "spec", last_synced_at: Time.current
+    )
+    innings_type = create_stat_type(name: "inningsPitched", label: "IP", category: "pitching")
+    create_player_season_stat(player: player, stat_type: innings_type, attributes: { team: team, season: 2026, value: 1.0 })
+    PitchDatum.create!(
+      game_id: game.id, game_pk: game.mlb_id, game_date: game.official_date, pitcher: player.mlb_id,
+      at_bat_number: 1, pitch_number: 1, delta_home_win_exp: 0.08, delta_pitcher_run_exp: 0.25,
+      raw_data: { "pitchData" => {} }
+    )
+
+    values = described_class.new(player: player, on: game.official_date).result
+      .dig(:advanced_stats, :seasons, 0, :values)
+
+    expect(values).to include(wpa: 0.08, re24: 0.25, shutdowns: 1, meltdowns: 0)
+  end
+
+  it "includes last 7, 15, and 30 game splits for batters and pitchers" do
+    player = create_player(attributes: { mlb_id: 123_456 })
+    dates = (1..16).map { |offset| Date.new(2026, 7, 1) + offset }
+    dates.each_with_index do |date, index|
+      game_pk = 900_000 + index
+      PitchDatum.create!(
+        game_pk: game_pk, game_date: date, batter: player.mlb_id, pitcher: player.mlb_id,
+        at_bat_number: 1, pitch_number: 1, description: "called_strike", events: "", raw_data: { "pitchData" => {} }
+      )
+    end
+
+    payload = described_class.new(player: player, on: dates.last).result(sections: [ "splits"])
+
+    expect(payload.dig(:batter_splits, :dimensions).last(3).map { |dimension| dimension[:key] })
+      .to eq(%w[last_7_games last_15_games last_30_games])
+    expect(payload.dig(:pitcher_splits, :dimensions).last(3).map { |dimension| dimension[:key] })
+      .to eq(%w[last_7_games last_15_games last_30_games])
+  end
+
   it "displays the team a retired player spent the most seasons with" do
     longest_team = create_team(name: "Detroit Tigers")
     recent_team = create_team(name: "Miami Marlins")

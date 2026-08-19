@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { flushPromises } from '@vue/test-utils'
 import { beforeEach, vi } from 'vitest'
 
-import PlayerSeasonStatsDashboard from '../PlayerSeasonStatsDashboard.vue'
+import StatExplorer from '../StatExplorer.vue'
 import { usePitchData } from '../../composables/usePitchData'
 
 const refreshSpy = vi.fn()
@@ -110,7 +110,7 @@ vi.mock('../../composables/usePitchData', () => ({
   })),
 }))
 
-describe('PlayerSeasonStatsDashboard', () => {
+describe('StatExplorer', () => {
   beforeEach(() => {
     window.history.replaceState({}, '', '/')
     refreshSpy.mockClear()
@@ -119,7 +119,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('renders the table controls and summary metrics', () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
 
     expect(wrapper.text()).toContain('Stat Explorer')
     expect(wrapper.text()).toContain('Batting Leaderboard')
@@ -128,7 +128,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('enables pitch-data loading only while Pitch Data mode is selected', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const pitchDataEnabled = usePitchData.mock.calls[0][1]
 
     expect(pitchDataEnabled.value).toBe(false)
@@ -149,7 +149,7 @@ describe('PlayerSeasonStatsDashboard', () => {
       '/?category=pitching&player=Al+Kaline&team=2&season_start=2025&season_end=2026&per_page=30&sort=season',
     )
 
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const playerInput = wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]')
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
@@ -162,7 +162,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('writes selected leaderboard filters to the URL query string', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
 
     await wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]').setValue('Al Kaline')
     await wrapper.find('[data-test="team-filter"]').setValue('2')
@@ -182,7 +182,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('writes selected pitch data filters to the URL query string', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     await categorySelect.setValue('pitchData')
@@ -203,7 +203,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('updates the leaderboard title when the category changes', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     expect(wrapper.text()).toContain('Batting Leaderboard')
@@ -219,7 +219,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('shows pitch-only filters in pitch data mode and hides them in leaderboard modes', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     expect(wrapper.find('[data-test="pitch-game-date-start-filter"]').exists()).toBe(false)
@@ -285,7 +285,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('clears the pitcher field on focus after a pitcher is chosen', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     await categorySelect.setValue('pitchData')
@@ -310,7 +310,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('updates and resets the filter summary', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
 
     const playerInput = wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]')
     const teamSelect = wrapper.find('select[data-test="team-filter"]')
@@ -336,7 +336,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('preserves pitch data category when resetting pitch filters', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     await categorySelect.setValue('pitchData')
@@ -354,7 +354,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('shows player suggestions and applies a selected suggestion', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const playerInput = wrapper.find('input[placeholder="Ohtani, Cabrera, Trout..."]')
 
     await playerInput.setValue('Mig')
@@ -372,7 +372,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('renders season options from available data years', () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const seasonStartSelect = wrapper.find('select[data-test="season-start-filter"]')
     const seasonEndSelect = wrapper.find('select[data-test="season-end-filter"]')
 
@@ -387,7 +387,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('renders team options from available teams', () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const teamSelect = wrapper.find('select[data-test="team-filter"]')
 
     expect(teamSelect.text()).toContain('All teams')
@@ -396,7 +396,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('calls refresh when the refresh button is clicked', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
 
     const refreshButton = wrapper.findAll('button.ghost-button').find((button) => button.text().includes('Refresh Data'))
     await refreshButton.trigger('click')
@@ -405,7 +405,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('keeps data import and download actions off the stat board', () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
 
     expect(wrapper.find('[data-test="mlb-download-panel"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="open-import-panel"]').exists()).toBe(false)
@@ -414,7 +414,7 @@ describe('PlayerSeasonStatsDashboard', () => {
   })
 
   it('renders the pitch data table when pitch data category is selected', async () => {
-    const wrapper = mount(PlayerSeasonStatsDashboard)
+    const wrapper = mount(StatExplorer)
     const categorySelect = wrapper.findAll('select').find((select) => select.text().includes('Pitch Data'))
 
     await categorySelect.setValue('pitchData')

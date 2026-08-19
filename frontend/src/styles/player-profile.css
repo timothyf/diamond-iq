@@ -1881,13 +1881,6 @@
   background: rgba(16, 38, 61, 0.04);
 }
 
-.split-tabs {
-  display: flex;
-  gap: 0.55rem;
-  flex-wrap: wrap;
-  margin-bottom: 1rem;
-}
-
 .split-role + .split-role {
   margin-top: 1.5rem;
 }
@@ -1898,21 +1891,6 @@
   font-family: 'Avenir Next Condensed', sans-serif;
   font-size: 1.35rem;
   text-transform: uppercase;
-}
-
-.split-tabs button {
-  border: 1px solid rgba(16, 38, 61, 0.16);
-  border-radius: 999px;
-  padding: 0.55rem 0.8rem;
-  color: #405568;
-  background: white;
-  cursor: pointer;
-}
-
-.split-tabs button.is-active {
-  border-color: #b0000a;
-  color: white;
-  background: #b0000a;
 }
 
 .split-grid {
@@ -2001,6 +1979,17 @@
 .split-table tbody th {
   color: #10263d;
   font-weight: 900;
+}
+
+.split-table tbody .split-category-row th {
+  padding-top: 0.95rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 3px solid #10263d;
+  color: #697784;
+  background: #fffdf7;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 @keyframes spin {

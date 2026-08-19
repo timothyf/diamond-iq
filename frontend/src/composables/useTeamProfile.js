@@ -68,6 +68,17 @@ function normalizeProfile(data) {
     recentGames: (data.recent_games || []).map(normalizeGame),
     upcomingGames: (data.upcoming_games || []).map(normalizeGame),
     scheduleGames: (data.schedule_games || []).map(normalizeGame),
+    playerStats: {
+      season: data.player_stats?.season || data.season,
+      batting: {
+        columns: data.player_stats?.batting?.columns || [],
+        players: data.player_stats?.batting?.players || [],
+      },
+      pitching: {
+        columns: data.player_stats?.pitching?.columns || [],
+        players: data.player_stats?.pitching?.players || [],
+      },
+    },
     opponentPreparation: {
       opponent: opponentPreparation.opponent || null,
       recentPerformance: opponentPreparation.recent_performance || null,

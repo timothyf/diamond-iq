@@ -40,7 +40,7 @@ const profileTabs = [
 const SCHEDULE_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const selectedSeason = ref(Number(route.query.season) || null)
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
-const requestedProfileSection = computed(() => ['schedule', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
+const requestedProfileSection = computed(() => ['schedule', 'player-stats', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
 const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
 const selectedScheduleMonth = ref(null)
 const savedAnalysisState = computed(() => ({
@@ -658,11 +658,73 @@ async function saveLineupScenario() {
         :reproducible-url="savedAnalysisUrl" compact @apply="openSavedAnalysis" />
 
       <section v-show="selectedProfileTab === 'player-stats'" id="team-profile-panel-player-stats"
-        class="team-panel team-profile-tab-panel team-coming-soon" role="tabpanel"
+        class="team-panel team-profile-tab-panel player-stats-panel" role="tabpanel"
         aria-labelledby="team-profile-tab-player-stats" data-test="team-profile-panel-player-stats">
-        <p>Player Stats</p>
-        <h2>Coming soon</h2>
-        <span>High-level player performance and roster production will appear here.</span>
+        <header>
+          <div>
+            <p>Basic player statistics</p>
+            <h2>{{ team.playerStats.season }} player stats</h2>
+          </div>
+          <span>Team totals · {{ team.playerStats.batting.players.length + team.playerStats.pitching.players.length }} players</span>
+        </header>
+
+        <div v-if="team.playerStats.batting.players.length" class="player-stats-category" data-test="team-player-stats-batting">
+          <h3>Batters</h3>
+          <div class="player-stats-table-wrap">
+            <table class="player-stats-table">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th v-for="column in team.playerStats.batting.columns" :key="column.key" scope="col">{{ column.label }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in team.playerStats.batting.players" :key="entry.player.id">
+                  <th scope="row">
+                    <RouterLink class="player-stats-player" :to="{ name: 'player-profile', params: { id: entry.player.id } }">
+                      <span class="player-stats-headshot">
+                        <img v-if="entry.player.headshot_url" :src="entry.player.headshot_url" :alt="`${entry.player.full_name} headshot`" />
+                        <b v-else>{{ entry.player.first_name?.[0] }}{{ entry.player.last_name?.[0] }}</b>
+                      </span>
+                      {{ entry.player.full_name }}
+                    </RouterLink>
+                  </th>
+                  <td v-for="column in team.playerStats.batting.columns" :key="column.key">{{ entry.stats[column.key] ?? '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p v-else class="team-empty">No batting stats are stored for {{ team.playerStats.season }}.</p>
+
+        <div v-if="team.playerStats.pitching.players.length" class="player-stats-category" data-test="team-player-stats-pitching">
+          <h3>Pitchers</h3>
+          <div class="player-stats-table-wrap">
+            <table class="player-stats-table">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th v-for="column in team.playerStats.pitching.columns" :key="column.key" scope="col">{{ column.label }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="entry in team.playerStats.pitching.players" :key="entry.player.id">
+                  <th scope="row">
+                    <RouterLink class="player-stats-player" :to="{ name: 'player-profile', params: { id: entry.player.id } }">
+                      <span class="player-stats-headshot">
+                        <img v-if="entry.player.headshot_url" :src="entry.player.headshot_url" :alt="`${entry.player.full_name} headshot`" />
+                        <b v-else>{{ entry.player.first_name?.[0] }}{{ entry.player.last_name?.[0] }}</b>
+                      </span>
+                      {{ entry.player.full_name }}
+                    </RouterLink>
+                  </th>
+                  <td v-for="column in team.playerStats.pitching.columns" :key="column.key">{{ entry.stats[column.key] ?? '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <p v-else class="team-empty">No pitching stats are stored for {{ team.playerStats.season }}.</p>
       </section>
 
       <section v-show="selectedProfileTab === 'team-stats'" id="team-profile-panel-team-stats"
@@ -1528,6 +1590,80 @@ async function saveLineupScenario() {
   font-size: 1.05rem;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.player-stats-panel {
+  margin-bottom: 1rem;
+}
+
+.player-stats-category + .player-stats-category {
+  margin-top: 2rem;
+}
+
+.player-stats-category h3 {
+  margin: 1.25rem 0 .75rem;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.player-stats-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #d9d7ce;
+  border-radius: 16px;
+}
+
+.player-stats-table {
+  min-width: 1180px;
+  font-variant-numeric: tabular-nums;
+}
+
+.player-stats-table th,
+.player-stats-table td {
+  white-space: nowrap;
+}
+
+.player-stats-table thead th:not(:first-child),
+.player-stats-table tbody td {
+  text-align: right;
+}
+
+.player-stats-table tbody tr:nth-child(even) th,
+.player-stats-table tbody tr:nth-child(even) td {
+  background: #faf5ea;
+}
+
+.player-stats-player {
+  display: inline-flex;
+  align-items: center;
+  gap: .65rem;
+  color: #10263d;
+  text-decoration: none;
+}
+
+.player-stats-player:hover {
+  color: #a93627;
+}
+
+.player-stats-headshot {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #fff;
+  background: #10263d;
+  font-size: .65rem;
+}
+
+.player-stats-headshot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 16%;
 }
 
 .team-coming-soon { min-height: 260px; margin-bottom: 1rem; padding: 3rem 1.5rem; text-align: center; }

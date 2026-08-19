@@ -410,6 +410,16 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "team_leaders", "pitching", 0)).to include("value" => "5.6", "abbreviation" => "WAR")
     expect(json_body.dig("data", "team_leaders", "pitching", 1)).to include("value" => "2.25", "abbreviation" => "ERA")
     expect(json_body.dig("data", "team_leaders", "pitching", 2)).to include("value" => "0.99", "abbreviation" => "WHIP")
+    expect(json_body.dig("data", "player_stats", "season")).to eq(Date.current.year)
+    expect(json_body.dig("data", "player_stats", "batting", "columns").map { |column| column.fetch("key") }).to include("gamesPlayed", "homeRuns", "avg")
+    expect(json_body.dig("data", "player_stats", "batting", "players", 0)).to include(
+      "player" => include("full_name" => "Riley Greene"),
+      "stats" => include("avg" => "0.287", "homeRuns" => "14.0")
+    )
+    expect(json_body.dig("data", "player_stats", "pitching", "players", 0)).to include(
+      "player" => include("full_name" => "Riley Greene"),
+      "stats" => include("ERA" => "2.25", "strikeOuts" => "130.0")
+    )
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(0.8728)
