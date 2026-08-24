@@ -2,6 +2,30 @@ require "rails_helper"
 require "csv"
 
 RSpec.describe PlayerStatsDownloader, type: :service do
+  it "does not require the batting WAR setting for pitching imports" do
+    downloader = described_class.new(category: "pitching", start_year: 2026, end_year: 2026)
+
+    allow(NineLensConfig).to receive(:fetch).and_call_original
+    allow(NineLensConfig).to receive(:fetch).with(
+      :external_services, :baseball_reference, :batting_war_url
+    ).and_raise(KeyError, "key not found: :batting_war_url")
+
+    expect { downloader.send(:service_config) }.not_to raise_error
+  end
+
+  it "uses the default batting WAR URL when an older config is loaded" do
+    downloader = described_class.new(category: "batting", start_year: 2026, end_year: 2026)
+
+    allow(NineLensConfig).to receive(:fetch).and_call_original
+    allow(NineLensConfig).to receive(:fetch).with(
+      :external_services, :baseball_reference
+    ).and_return({ war_url: "https://example.test/pitching-war.csv" })
+
+    expect(downloader.send(:service_config).fetch(:baseball_reference_batting_url)).to eq(
+      PlayerStatsDownloader::DEFAULT_BASEBALL_REFERENCE_BATTING_WAR_URL
+    )
+  end
+
   it "downloads MLB batting rows and returns import-ready csv data" do
     downloader = described_class.new(category: "batting", start_year: 2026, end_year: 2026)
     allow(downloader).to receive(:fetch_fangraphs_values).and_return(

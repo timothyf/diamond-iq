@@ -3,6 +3,8 @@ require "json"
 require "net/http"
 
 class PlayerStatsDownloader
+  DEFAULT_BASEBALL_REFERENCE_BATTING_WAR_URL = "https://www.baseball-reference.com/data/war_daily_bat.txt".freeze
+
   CATEGORY_CONFIG = {
     "batting" => {
       group: "hitting",
@@ -178,11 +180,20 @@ class PlayerStatsDownloader
       user_agent: NineLensConfig.fetch(:external_services, :mlb_player_stats, :user_agent),
       fangraphs_url: NineLensConfig.fetch(:external_services, :fangraphs, :leaders_url),
       baseball_reference_url: NineLensConfig.fetch(:external_services, :baseball_reference, :war_url),
-      baseball_reference_batting_url: NineLensConfig.fetch(:external_services, :baseball_reference, :batting_war_url),
+      baseball_reference_batting_url: batting_baseball_reference_url,
       baseballsavant_leaderboard_url: NineLensConfig.fetch(:external_services, :baseball_savant, :leaderboard_url),
       baseballsavant_user_agent: NineLensConfig.fetch(:external_services, :baseball_savant, :player_stats_user_agent),
       referers: NineLensConfig.fetch(:external_services, :mlb_player_stats, :referers)
     }
+  end
+
+  def batting_baseball_reference_url
+    return unless category == "batting"
+
+    NineLensConfig.fetch(:external_services, :baseball_reference).fetch(
+      :batting_war_url,
+      DEFAULT_BASEBALL_REFERENCE_BATTING_WAR_URL
+    )
   end
 
   def page_size

@@ -43,6 +43,7 @@ const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.
 const requestedProfileSection = computed(() => ['schedule', 'player-stats', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
 const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
 const selectedScheduleMonth = ref(null)
+const playerStatsSort = reactive({ batting: 'player', pitching: 'player' })
 const savedAnalysisState = computed(() => ({
   teamId: teamId.value,
   season: selectedSeason.value,
@@ -180,6 +181,71 @@ const rosterViewLabel = computed(() => ({
 const recordLabel = computed(() => {
   return formatRecord(team.value?.record)
 })
+
+const PLAYER_STATS_INTEGER_KEYS = Object.freeze({
+  batting: new Set(['gamesPlayed', 'atBats', 'runs', 'hits', 'doubles', 'triples', 'homeRuns', 'rbi', 'baseOnBalls', 'strikeOuts', 'stolenBases', 'caughtStealing']),
+  pitching: new Set(['W', 'L', 'G', 'GS', 'CG', 'ShO', 'SV', 'SVO', 'hits', 'runs', 'ER', 'homeRuns', 'hitByPitch', 'baseOnBalls', 'strikeOuts']),
+})
+const PLAYER_STATS_FIXED_DECIMALS = Object.freeze({
+  avg: 3,
+  obp: 3,
+  slg: 3,
+  ops: 3,
+  ERA: 2,
+  whip: 2,
+  WAR: 1,
+})
+const PLAYER_STATS_LEADING_ZERO_KEYS = new Set(['avg', 'obp', 'slg', 'ops'])
+
+function sortedPlayerStats(category) {
+  const entries = team.value?.playerStats?.[category]?.players || []
+  const sort = playerStatsSort[category]
+  const descending = sort.startsWith('-')
+  const key = descending ? sort.slice(1) : sort
+
+  return entries.slice().sort((left, right) => {
+    let comparison
+    if (key === 'player') {
+      comparison = (left.player.full_name || '').localeCompare(right.player.full_name || '')
+    } else {
+      const leftValue = Number(left.stats?.[key])
+      const rightValue = Number(right.stats?.[key])
+      const leftMissing = !Number.isFinite(leftValue)
+      const rightMissing = !Number.isFinite(rightValue)
+      if (leftMissing || rightMissing) {
+        if (leftMissing && rightMissing) return 0
+        return leftMissing ? 1 : -1
+      }
+      comparison = leftValue - rightValue
+    }
+
+    return descending ? -comparison : comparison
+  })
+}
+
+function togglePlayerStatsSort(category, key) {
+  const current = playerStatsSort[category]
+  playerStatsSort[category] = current === key ? `-${key}` : current === `-${key}` ? key : `-${key}`
+}
+
+function playerStatsSortIndicator(category, key) {
+  const sort = playerStatsSort[category]
+  if (sort === key) return '↑'
+  if (sort === `-${key}`) return '↓'
+  return ''
+}
+
+function formatPlayerStatValue(category, key, value) {
+  if (value === null || value === undefined || value === '') return '—'
+
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return value
+  if (PLAYER_STATS_INTEGER_KEYS[category].has(key)) return String(Math.trunc(numericValue))
+
+  const decimals = PLAYER_STATS_FIXED_DECIMALS[key]
+  const formatted = decimals === undefined ? String(numericValue) : numericValue.toFixed(decimals)
+  return PLAYER_STATS_LEADING_ZERO_KEYS.has(key) ? formatted.replace(/^(-?)0\./, '$1.') : formatted
+}
 
 function formatRecord(record) {
   if (!record?.games_played) return 'No completed games'
@@ -674,12 +740,20 @@ async function saveLineupScenario() {
             <table class="player-stats-table">
               <thead>
                 <tr>
-                  <th scope="col">Player</th>
-                  <th v-for="column in team.playerStats.batting.columns" :key="column.key" scope="col">{{ column.label }}</th>
+                  <th scope="col">
+                    <button type="button" class="player-stats-sort-button" :aria-sort="playerStatsSortIndicator('batting', 'player') === '↑' ? 'ascending' : playerStatsSortIndicator('batting', 'player') === '↓' ? 'descending' : 'none'" @click="togglePlayerStatsSort('batting', 'player')">
+                      Player <span>{{ playerStatsSortIndicator('batting', 'player') }}</span>
+                    </button>
+                  </th>
+                  <th v-for="column in team.playerStats.batting.columns" :key="column.key" scope="col">
+                    <button type="button" class="player-stats-sort-button" :aria-sort="playerStatsSortIndicator('batting', column.key) === '↑' ? 'ascending' : playerStatsSortIndicator('batting', column.key) === '↓' ? 'descending' : 'none'" @click="togglePlayerStatsSort('batting', column.key)">
+                      {{ column.label }} <span>{{ playerStatsSortIndicator('batting', column.key) }}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="entry in team.playerStats.batting.players" :key="entry.player.id">
+                <tr v-for="entry in sortedPlayerStats('batting')" :key="entry.player.id">
                   <th scope="row">
                     <RouterLink class="player-stats-player" :to="{ name: 'player-profile', params: { id: entry.player.id } }">
                       <span class="player-stats-headshot">
@@ -689,7 +763,7 @@ async function saveLineupScenario() {
                       {{ entry.player.full_name }}
                     </RouterLink>
                   </th>
-                  <td v-for="column in team.playerStats.batting.columns" :key="column.key">{{ entry.stats[column.key] ?? '—' }}</td>
+                  <td v-for="column in team.playerStats.batting.columns" :key="column.key">{{ formatPlayerStatValue('batting', column.key, entry.stats[column.key]) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -703,12 +777,20 @@ async function saveLineupScenario() {
             <table class="player-stats-table">
               <thead>
                 <tr>
-                  <th scope="col">Player</th>
-                  <th v-for="column in team.playerStats.pitching.columns" :key="column.key" scope="col">{{ column.label }}</th>
+                  <th scope="col">
+                    <button type="button" class="player-stats-sort-button" :aria-sort="playerStatsSortIndicator('pitching', 'player') === '↑' ? 'ascending' : playerStatsSortIndicator('pitching', 'player') === '↓' ? 'descending' : 'none'" @click="togglePlayerStatsSort('pitching', 'player')">
+                      Player <span>{{ playerStatsSortIndicator('pitching', 'player') }}</span>
+                    </button>
+                  </th>
+                  <th v-for="column in team.playerStats.pitching.columns" :key="column.key" scope="col">
+                    <button type="button" class="player-stats-sort-button" :aria-sort="playerStatsSortIndicator('pitching', column.key) === '↑' ? 'ascending' : playerStatsSortIndicator('pitching', column.key) === '↓' ? 'descending' : 'none'" @click="togglePlayerStatsSort('pitching', column.key)">
+                      {{ column.label }} <span>{{ playerStatsSortIndicator('pitching', column.key) }}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="entry in team.playerStats.pitching.players" :key="entry.player.id">
+                <tr v-for="entry in sortedPlayerStats('pitching')" :key="entry.player.id">
                   <th scope="row">
                     <RouterLink class="player-stats-player" :to="{ name: 'player-profile', params: { id: entry.player.id } }">
                       <span class="player-stats-headshot">
@@ -718,7 +800,7 @@ async function saveLineupScenario() {
                       {{ entry.player.full_name }}
                     </RouterLink>
                   </th>
-                  <td v-for="column in team.playerStats.pitching.columns" :key="column.key">{{ entry.stats[column.key] ?? '—' }}</td>
+                  <td v-for="column in team.playerStats.pitching.columns" :key="column.key">{{ formatPlayerStatValue('pitching', column.key, entry.stats[column.key]) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1623,6 +1705,28 @@ async function saveLineupScenario() {
 .player-stats-table th,
 .player-stats-table td {
   white-space: nowrap;
+}
+
+.player-stats-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding: .25rem .35rem;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.player-stats-sort-button:hover,
+.player-stats-sort-button:focus-visible {
+  color: #a93627;
+}
+
+.player-stats-sort-button span {
+  min-width: .7rem;
 }
 
 .player-stats-table thead th:not(:first-child),

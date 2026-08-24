@@ -572,6 +572,40 @@ describe('TeamProfileView', () => {
     expect(fetch).toHaveBeenCalledTimes(requestCount + 2)
   })
 
+  it('sorts Team Profile player stats and formats count and rate values', async () => {
+    const statsPayload = structuredClone(payload)
+    statsPayload.data.player_stats.batting.players = [
+      {
+        player: { id: 42, full_name: 'Riley Greene', first_name: 'Riley', last_name: 'Greene', headshot_url: null },
+        stats: { gamesPlayed: '95.0', homeRuns: '24.0', avg: '0.287' },
+      },
+      {
+        player: { id: 43, full_name: 'Aaron Judge', first_name: 'Aaron', last_name: 'Judge', headshot_url: null },
+        stats: { gamesPlayed: '100.0', homeRuns: '8.0', avg: '0.310' },
+      },
+    ]
+    statsPayload.data.player_stats.pitching.columns.push({ key: 'whip', label: 'WHIP' })
+    statsPayload.data.player_stats.pitching.players[0].stats.whip = '0.99'
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => statsPayload }))
+    const wrapper = mount(TeamProfileView, {
+      props: { teamId: '1' },
+      global: { stubs: { RouterLink: RouterLinkStub } },
+    })
+    await flushPromises()
+    await wrapper.get('[data-test="team-profile-tab-player-stats"]').trigger('click')
+
+    const batting = wrapper.get('[data-test="team-player-stats-batting"]')
+    expect(batting.findAll('tbody tr')[0].text()).toContain('Aaron Judge')
+    expect(batting.text()).toContain('.310')
+    expect(batting.text()).not.toContain('95.0')
+    expect(wrapper.get('[data-test="team-player-stats-pitching"]').text()).toContain('0.99')
+
+    await batting.findAll('thead button').find((button) => button.text().includes('HR')).trigger('click')
+
+    expect(batting.findAll('tbody tr')[0].text()).toContain('Riley Greene')
+    expect(batting.findAll('thead button').find((button) => button.text().includes('HR')).text()).toContain('↓')
+  })
+
   it('reloads the profile for the selected season', async () => {
     const historicalPayload = structuredClone(payload)
     historicalPayload.data.season = 2025
