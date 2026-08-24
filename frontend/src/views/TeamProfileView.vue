@@ -40,10 +40,13 @@ const profileTabs = [
 const SCHEDULE_WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const selectedSeason = ref(Number(route.query.season) || null)
 const selectedProfileTab = ref(profileTabs.some((tab) => tab.id === route.query.tab) ? route.query.tab : 'overview')
-const requestedProfileSection = computed(() => ['schedule', 'player-stats', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
+const requestedProfileSection = computed(() => ['schedule', 'player-stats', 'team-stats', 'opponent', 'lineup'].includes(selectedProfileTab.value) ? selectedProfileTab.value : 'overview')
 const selectedRosterView = ref(['active', 'injured', 'fortyMan'].includes(route.query.roster) ? route.query.roster : 'active')
 const selectedScheduleMonth = ref(null)
 const playerStatsSort = reactive({ batting: 'player', pitching: 'player' })
+const teamStatsCategory = ref('batting')
+const teamStatsSort = ref('-ops')
+const playerStatsCategory = ref('batting')
 const savedAnalysisState = computed(() => ({
   teamId: teamId.value,
   season: selectedSeason.value,
@@ -245,6 +248,41 @@ function formatPlayerStatValue(category, key, value) {
   const decimals = PLAYER_STATS_FIXED_DECIMALS[key]
   const formatted = decimals === undefined ? String(numericValue) : numericValue.toFixed(decimals)
   return PLAYER_STATS_LEADING_ZERO_KEYS.has(key) ? formatted.replace(/^(-?)0\./, '$1.') : formatted
+}
+
+function sortedTeamStats() {
+  const category = teamStatsCategory.value
+  const entries = team.value?.teamStats?.[category]?.teams || []
+  const sort = teamStatsSort.value
+  const descending = sort.startsWith('-')
+  const key = descending ? sort.slice(1) : sort
+
+  return entries.slice().sort((left, right) => {
+    if (key === 'team') return descending
+      ? (right.team.name || '').localeCompare(left.team.name || '')
+      : (left.team.name || '').localeCompare(right.team.name || '')
+
+    const leftValue = Number(left.stats?.[key])
+    const rightValue = Number(right.stats?.[key])
+    const leftMissing = !Number.isFinite(leftValue)
+    const rightMissing = !Number.isFinite(rightValue)
+    if (leftMissing || rightMissing) {
+      if (leftMissing && rightMissing) return 0
+      return leftMissing ? 1 : -1
+    }
+    const comparison = leftValue - rightValue
+    return descending ? -comparison : comparison
+  })
+}
+
+function toggleTeamStatsSort(key) {
+  teamStatsSort.value = teamStatsSort.value === key ? `-${key}` : teamStatsSort.value === `-${key}` ? key : `-${key}`
+}
+
+function teamStatsSortIndicator(key) {
+  if (teamStatsSort.value === key) return '↑'
+  if (teamStatsSort.value === `-${key}`) return '↓'
+  return ''
 }
 
 function formatRecord(record) {
@@ -731,10 +769,13 @@ async function saveLineupScenario() {
             <p>Basic player statistics</p>
             <h2>{{ team.playerStats.season }} player stats</h2>
           </div>
-          <span>Team totals · {{ team.playerStats.batting.players.length + team.playerStats.pitching.players.length }} players</span>
+          <div class="team-stats-mode-toggle" role="tablist" aria-label="Player stats category">
+            <button type="button" :class="{ 'is-selected': playerStatsCategory === 'batting' }" @click="playerStatsCategory = 'batting'">Hitting</button>
+            <button type="button" :class="{ 'is-selected': playerStatsCategory === 'pitching' }" @click="playerStatsCategory = 'pitching'">Pitching</button>
+          </div>
         </header>
 
-        <div v-if="team.playerStats.batting.players.length" class="player-stats-category" data-test="team-player-stats-batting">
+        <div v-if="playerStatsCategory === 'batting' && team.playerStats.batting.players.length" class="player-stats-category" data-test="team-player-stats-batting">
           <h3>Batters</h3>
           <div class="player-stats-table-wrap">
             <table class="player-stats-table">
@@ -769,9 +810,9 @@ async function saveLineupScenario() {
             </table>
           </div>
         </div>
-        <p v-else class="team-empty">No batting stats are stored for {{ team.playerStats.season }}.</p>
+        <p v-else-if="playerStatsCategory === 'batting'" class="team-empty">No batting stats are stored for {{ team.playerStats.season }}.</p>
 
-        <div v-if="team.playerStats.pitching.players.length" class="player-stats-category" data-test="team-player-stats-pitching">
+        <div v-if="playerStatsCategory === 'pitching' && team.playerStats.pitching.players.length" class="player-stats-category" data-test="team-player-stats-pitching">
           <h3>Pitchers</h3>
           <div class="player-stats-table-wrap">
             <table class="player-stats-table">
@@ -806,15 +847,54 @@ async function saveLineupScenario() {
             </table>
           </div>
         </div>
-        <p v-else class="team-empty">No pitching stats are stored for {{ team.playerStats.season }}.</p>
+        <p v-else-if="playerStatsCategory === 'pitching'" class="team-empty">No pitching stats are stored for {{ team.playerStats.season }}.</p>
       </section>
 
       <section v-show="selectedProfileTab === 'team-stats'" id="team-profile-panel-team-stats"
-        class="team-panel team-profile-tab-panel team-coming-soon" role="tabpanel"
+        class="team-panel team-profile-tab-panel team-stats-panel" role="tabpanel"
         aria-labelledby="team-profile-tab-team-stats" data-test="team-profile-panel-team-stats">
-        <p>Team Stats</p>
-        <h2>Coming soon</h2>
-        <span>High-level team performance and statistical trends will appear here.</span>
+        <header class="team-stats-header">
+          <div>
+            <p>League-wide team statistics</p>
+            <h2>{{ team.teamStats.season }} team stats</h2>
+          </div>
+          <div class="team-stats-mode-toggle" role="tablist" aria-label="Team stats category">
+            <button type="button" :class="{ 'is-selected': teamStatsCategory === 'batting' }" @click="teamStatsCategory = 'batting'; teamStatsSort = '-ops'">Hitting</button>
+            <button type="button" :class="{ 'is-selected': teamStatsCategory === 'pitching' }" @click="teamStatsCategory = 'pitching'; teamStatsSort = '-strikeOuts'">Pitching</button>
+          </div>
+        </header>
+
+        <div class="player-stats-table-wrap team-stats-table-wrap" data-test="team-stats-table">
+          <table class="player-stats-table team-stats-table">
+            <thead>
+              <tr>
+                <th scope="col">
+                  <button type="button" class="player-stats-sort-button" @click="toggleTeamStatsSort('team')">
+                    Team <span>{{ teamStatsSortIndicator('team') }}</span>
+                  </button>
+                </th>
+                <th scope="col">League</th>
+                <th v-for="column in team.teamStats[teamStatsCategory].columns" :key="column.key" scope="col">
+                  <button type="button" class="player-stats-sort-button" @click="toggleTeamStatsSort(column.key)">
+                    {{ column.label }} <span>{{ teamStatsSortIndicator(column.key) }}</span>
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(entry, index) in sortedTeamStats()" :key="entry.team.id">
+                <th scope="row" :class="{ 'is-current-team': entry.team.id === team.id }"><span class="team-stats-rank">{{ index + 1 }}</span>{{ entry.team.name }}</th>
+                <td :class="{ 'is-current-team': entry.team.id === team.id }">{{ entry.team.league || '—' }}</td>
+                <td v-for="column in team.teamStats[teamStatsCategory].columns" :key="column.key" :class="{ 'is-current-team': entry.team.id === team.id }">
+                  {{ formatPlayerStatValue(teamStatsCategory, column.key, entry.stats[column.key]) }}
+                </td>
+              </tr>
+              <tr v-if="!sortedTeamStats().length">
+                <td :colspan="team.teamStats[teamStatsCategory].columns.length + 2">No team stats are stored for {{ team.teamStats.season }}.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <div v-show="selectedProfileTab === 'opponent'" id="team-profile-panel-opponent" class="team-profile-tab-panel"
@@ -1768,6 +1848,95 @@ async function saveLineupScenario() {
   height: 100%;
   object-fit: cover;
   object-position: center 16%;
+}
+
+.team-stats-panel {
+  margin-bottom: 1rem;
+}
+
+.team-stats-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.team-stats-header p {
+  margin: 0 0 .3rem;
+  color: #a93627;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.team-stats-header h2 {
+  margin: 0;
+  color: #10263d;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 2rem;
+}
+
+.team-stats-mode-toggle {
+  display: inline-flex;
+  gap: .2rem;
+  padding: .2rem;
+  border: 1px solid #d9d7ce;
+  border-radius: 10px;
+  background: #faf5ea;
+}
+
+.team-stats-mode-toggle button {
+  padding: .55rem .8rem;
+  border: 0;
+  border-radius: 8px;
+  color: #697680;
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.team-stats-mode-toggle button.is-selected {
+  color: #fff;
+  background: #10263d;
+}
+
+.team-stats-table-wrap {
+  max-height: 680px;
+  overflow: auto;
+}
+
+.team-stats-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f4f0e6;
+}
+
+.team-stats-table tbody th {
+  text-align: left;
+}
+
+.team-stats-table tbody th.is-current-team,
+.team-stats-table tbody td.is-current-team {
+  font-weight: 800;
+}
+
+.team-stats-table tbody td,
+.team-stats-table tbody th {
+  padding-top: .65rem;
+  padding-bottom: .65rem;
+}
+
+.team-stats-rank {
+  display: inline-block;
+  width: 2rem;
+  color: #697680;
+  font-size: .78rem;
+  text-align: right;
+  margin-right: .65rem;
 }
 
 .team-coming-soon { min-height: 260px; margin-bottom: 1rem; padding: 3rem 1.5rem; text-align: center; }

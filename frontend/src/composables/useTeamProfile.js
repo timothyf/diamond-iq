@@ -79,6 +79,17 @@ function normalizeProfile(data) {
         players: data.player_stats?.pitching?.players || [],
       },
     },
+    teamStats: {
+      season: data.team_stats?.season || data.season,
+      batting: {
+        columns: data.team_stats?.batting?.columns || [],
+        teams: data.team_stats?.batting?.teams || [],
+      },
+      pitching: {
+        columns: data.team_stats?.pitching?.columns || [],
+        teams: data.team_stats?.pitching?.teams || [],
+      },
+    },
     opponentPreparation: {
       opponent: opponentPreparation.opponent || null,
       recentPerformance: opponentPreparation.recent_performance || null,

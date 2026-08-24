@@ -25,6 +25,12 @@ class TeamProfileSnapshotQuery
       { key: "strikeOuts", label: "Strikeouts", abbreviation: "SO", aliases: %w[strikeOuts SO], direction: :desc }
     ]
   }.freeze
+  TEAM_LEAGUES = {
+    108 => "AL", 110 => "AL", 111 => "AL", 114 => "AL", 116 => "AL", 117 => "AL", 118 => "AL",
+    133 => "AL", 136 => "AL", 139 => "AL", 140 => "AL", 141 => "AL", 142 => "AL", 145 => "AL", 147 => "AL",
+    109 => "NL", 112 => "NL", 113 => "NL", 115 => "NL", 119 => "NL", 120 => "NL", 121 => "NL", 134 => "NL",
+    135 => "NL", 137 => "NL", 138 => "NL", 143 => "NL", 144 => "NL", 146 => "NL", 158 => "NL"
+  }.freeze
 
   def initialize(team:, season: nil, on: Date.current, user: nil, includes: [ "all" ])
     @team = team
@@ -54,6 +60,7 @@ class TeamProfileSnapshotQuery
       upcoming_games: upcoming_games.map { |game| GameSerializer.call(game) },
       **schedule_payload,
       **player_stats_payload,
+      **team_stats_payload,
       **opponent_payload,
       **lineup_payload,
       team_leaders: team_leaders,
@@ -131,6 +138,43 @@ class TeamProfileSnapshotQuery
               player_rows.find { |row| row.stat_type.name == alias_name }
             end.first
             stats[definition.fetch(:key)] = stat&.value&.to_s
+          end
+        }
+      end
+    }
+  end
+
+  def team_stats_payload
+    return {} unless include_section?("team-stats")
+
+    {
+      team_stats: {
+        season: season,
+        batting: team_stats_category("batting"),
+        pitching: team_stats_category("pitching")
+      }
+    }
+  end
+
+  def team_stats_category(category)
+    definitions = PlayerSeasonStatsLeaderboardQuery::COLUMN_DEFINITIONS_BY_CATEGORY.fetch(category).reject { |definition| definition.fetch(:key) == "WAR" }
+    official_stats_by_team = MlbTeamStatsDownloader.call(season: season, category: category)
+
+    {
+      columns: definitions.map { |definition| { key: definition.fetch(:key), label: definition.fetch(:label) } },
+      teams: Team.where(mlb_id: TEAM_LEAGUES.keys).order(:name).map do |current_team|
+        {
+          team: {
+            id: current_team.id,
+            mlb_id: current_team.mlb_id,
+            name: current_team.name,
+            team_name: current_team.team_name,
+            abbreviation: current_team.abbreviation,
+            league: TEAM_LEAGUES[current_team.mlb_id]
+          },
+          stats: definitions.each_with_object({}) do |definition, stats|
+            value = official_stats_by_team.dig(current_team.mlb_id, definition.fetch(:key))
+            stats[definition.fetch(:key)] = value.to_s if value.present?
           end
         }
       end

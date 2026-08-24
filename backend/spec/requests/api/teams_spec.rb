@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Api::Teams", type: :request do
   before do
+    allow(MlbTeamStatsDownloader).to receive(:call).and_return({})
     @tigers = create_team(
       mlb_id: 116,
       name: "Detroit Tigers",
@@ -420,6 +421,10 @@ RSpec.describe "Api::Teams", type: :request do
       "player" => include("full_name" => "Riley Greene"),
       "stats" => include("ERA" => "2.25", "strikeOuts" => "130.0")
     )
+    expect(json_body.dig("data", "team_stats", "season")).to eq(Date.current.year)
+    expect(json_body.dig("data", "team_stats", "batting", "columns").map { |column| column.fetch("key") }).to include("homeRuns", "ops")
+    expect(json_body.dig("data", "team_stats", "batting", "teams").map { |entry| entry.dig("team", "name") }).to include("Detroit Tigers")
+    expect(json_body.dig("data", "team_stats", "batting", "teams").find { |entry| entry.dig("team", "name") == "Detroit Tigers" }.dig("team", "league")).to eq("AL")
     expect(json_body.dig("data", "source_metadata", "roster_last_synced_at")).to be_present
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "rank")).to eq(1)
     expect(json_body.dig("data", "performance_dashboard", "rankings", "offense", "ops", "value")).to eq(0.8728)
@@ -444,6 +449,32 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", "performance_dashboard", "recent_form", "7", "sampled_games")).to be >= 1
     expect(json_body.dig("data", "performance_dashboard", "drill_down", "players", "hitters")).not_to be_empty
     expect(json_body.dig("data", "performance_dashboard", "platoon_splits", "offense", "vs_left", "sample_size")).to eq(8.0)
+  end
+
+  it "uses team games and historical team-scoped player stats for team stats" do
+    allow(MlbTeamStatsDownloader).to receive(:call).with(season: Date.current.year, category: "batting").and_return(
+      @tigers.mlb_id => { "gamesPlayed" => 2, "homeRuns" => "7.0" }
+    )
+    former_player = create_player(team: @guardians, attributes: { mlb_id: 700_001, first_name: "Former", last_name: "Tiger" })
+    games_played = create_stat_type(name: "gamesPlayed", label: "G", category: "batting")
+    home_runs = create_stat_type(name: "homeRuns", label: "HR", category: "batting")
+    create_player_season_stat(player: former_player, stat_type: games_played, attributes: {
+      team: @tigers, season: Date.current.year, scope_type: "team", scope_key: "DET", value: 12
+    })
+    create_player_season_stat(player: former_player, stat_type: home_runs, attributes: {
+      team: @tigers, season: Date.current.year, scope_type: "team", scope_key: "DET", value: 7
+    })
+    create_player_season_stat(player: former_player, stat_type: home_runs, attributes: {
+      team: nil, season: Date.current.year, scope_type: "combined", scope_key: "TOT", value: 99
+    })
+    create_game(schedule: @schedule, home_team: @tigers, away_team: @guardians, official_date: Date.current - 2.days, status: "final", home_score: 4, away_score: 2)
+    create_game(schedule: @schedule, home_team: @guardians, away_team: @tigers, official_date: Date.current - 1.day, status: "final", home_score: 3, away_score: 1)
+
+    get api_team_path(@tigers), params: { include: "team-stats" }
+
+    tigers = json_body.dig("data", "team_stats", "batting", "teams").find { |entry| entry.dig("team", "id") == @tigers.id }
+    expect(tigers.dig("stats", "gamesPlayed")).to eq("2")
+    expect(tigers.dig("stats", "homeRuns")).to eq("7.0")
   end
 
   it "selects a requested season" do

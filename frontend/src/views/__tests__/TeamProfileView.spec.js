@@ -165,6 +165,17 @@ const payload = {
         ],
       },
     },
+    team_stats: {
+      season: 2026,
+      batting: {
+        columns: [{ key: 'homeRuns', label: 'HR' }, { key: 'ops', label: 'OPS' }],
+        teams: [{ team: { id: 1, name: 'Detroit Tigers', league: 'AL' }, stats: { homeRuns: '150.0', ops: '0.750' } }],
+      },
+      pitching: {
+        columns: [{ key: 'ERA', label: 'ERA' }],
+        teams: [{ team: { id: 1, name: 'Detroit Tigers', league: 'AL' }, stats: { ERA: '3.50' } }],
+      },
+    },
     opponent_preparation: {
       opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
       recent_performance: { games: 10, wins: 7, losses: 3, runs_per_game: 4.8, ops: 0.781, era: 3.42 },
@@ -562,12 +573,17 @@ describe('TeamProfileView', () => {
     expect(playerStatsPanel.text()).toContain("2026 player stats")
     expect(playerStatsPanel.get("[data-test=team-player-stats-batting]").text()).toContain("Riley Greene")
     expect(playerStatsPanel.get("[data-test=team-player-stats-batting]").text()).toContain(".287")
+    expect(playerStatsPanel.find("[data-test=team-player-stats-pitching]").exists()).toBe(false)
+    await playerStatsPanel.findAll(".team-stats-mode-toggle button")[1].trigger("click")
     expect(playerStatsPanel.get("[data-test=team-player-stats-pitching]").text()).toContain("Tarik Skubal")
     expect(playerStatsPanel.get("[data-test=team-player-stats-pitching]").text()).toContain("2.01")
+    expect(playerStatsPanel.find("[data-test=team-player-stats-batting]").exists()).toBe(false)
     expect(playerStatsPanel.attributes("style") || "").not.toContain("display: none")
 
     await wrapper.get("[data-test=team-profile-tab-team-stats]").trigger("click")
-    expect(wrapper.get("[data-test=team-profile-panel-team-stats]").text()).toContain("Coming soon")
+    expect(wrapper.get("[data-test=team-profile-panel-team-stats]").text()).toContain("2026 team stats")
+    expect(wrapper.get("[data-test=team-stats-table]").text()).toContain("Detroit Tigers")
+    expect(wrapper.get("[data-test=team-stats-table] tbody th").classes()).toContain("is-current-team")
     expect(wrapper.get("[data-test=team-profile-panel-team-stats]").attributes("style") || "").not.toContain("display: none")
     expect(fetch).toHaveBeenCalledTimes(requestCount + 2)
   })
@@ -598,12 +614,17 @@ describe('TeamProfileView', () => {
     expect(batting.findAll('tbody tr')[0].text()).toContain('Aaron Judge')
     expect(batting.text()).toContain('.310')
     expect(batting.text()).not.toContain('95.0')
+
+    const playerStatsPanel = wrapper.get('[data-test="team-profile-panel-player-stats"]')
+    await playerStatsPanel.findAll('.team-stats-mode-toggle button')[1].trigger('click')
     expect(wrapper.get('[data-test="team-player-stats-pitching"]').text()).toContain('0.99')
+    await playerStatsPanel.findAll('.team-stats-mode-toggle button')[0].trigger('click')
+    const battingTable = wrapper.get('[data-test="team-player-stats-batting"]')
 
-    await batting.findAll('thead button').find((button) => button.text().includes('HR')).trigger('click')
+    await battingTable.findAll('thead button').find((button) => button.text().includes('HR')).trigger('click')
 
-    expect(batting.findAll('tbody tr')[0].text()).toContain('Riley Greene')
-    expect(batting.findAll('thead button').find((button) => button.text().includes('HR')).text()).toContain('↓')
+    expect(battingTable.findAll('tbody tr')[0].text()).toContain('Riley Greene')
+    expect(battingTable.findAll('thead button').find((button) => button.text().includes('HR')).text()).toContain('↓')
   })
 
   it('reloads the profile for the selected season', async () => {
