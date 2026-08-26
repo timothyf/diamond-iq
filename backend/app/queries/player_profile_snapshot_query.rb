@@ -21,26 +21,8 @@ class PlayerProfileSnapshotQuery
         { key: "k_percentage", label: "K%", unit: "percent" },
         { key: "bb_per_k", label: "BB/K", unit: "ratio" },
         { key: "iso", label: "ISO", unit: "rate" },
-        { key: "babip", label: "BABIP", unit: "rate" }
-      ]
-    },
-    {
-      key: "run_creation",
-      label: "Run creation",
-      columns: [
-        { key: "woba", label: "wOBA", unit: "rate" },
-        { key: "wrc_plus", label: "wRC+", unit: "index" },
-        { key: "ops_plus", label: "OPS+", unit: "index" }
-      ]
-    },
-    {
-      key: "value",
-      label: "Value",
-      columns: [
-        { key: "offensive_runs", label: "Offensive Runs", unit: "runs" },
-        { key: "baserunning_runs", label: "Baserunning Runs", unit: "runs" },
-        { key: "defensive_value", label: "Defensive Value", unit: "runs" },
-        { key: "war", label: "WAR", unit: "war" }
+        { key: "babip", label: "BABIP", unit: "rate" },
+        { key: "hr_per_fly_ball", label: "HR/FB%", unit: "percent" }
       ]
     },
     {
@@ -53,6 +35,19 @@ class PlayerProfileSnapshotQuery
         { key: "pull_percentage", label: "Pull%", unit: "percent" },
         { key: "center_percentage", label: "Center%", unit: "percent" },
         { key: "opposite_field_percentage", label: "Opposite-field%", unit: "percent" }
+      ]
+    },
+    {
+      key: "run_creation_value",
+      label: "Run Creation & Value",
+      columns: [
+        { key: "woba", label: "wOBA", unit: "rate" },
+        { key: "wrc_plus", label: "wRC+", unit: "index" },
+        { key: "ops_plus", label: "OPS+", unit: "index" },
+        { key: "offensive_runs", label: "Offensive Runs", unit: "runs" },
+        { key: "baserunning_runs", label: "Baserunning Runs", unit: "runs" },
+        { key: "defensive_value", label: "Defensive Value", unit: "runs" },
+        { key: "war", label: "WAR", unit: "war" }
       ]
     },
     {
@@ -546,6 +541,7 @@ class PlayerProfileSnapshotQuery
         divide(hits && home_runs ? hits - home_runs : nil, at_bats && strikeouts && home_runs && sacrifice_flies ? at_bats - strikeouts - home_runs + sacrifice_flies : nil) ||
           advanced_rate(rows, %w[BABIP babip BAbip], %w[atBats AB], career: career)
       ),
+      hr_per_fly_ball: numeric_advanced_value(advanced_home_run_per_fly_ball(rows, career: career)),
       woba: numeric_advanced_value(advanced_rate(rows, %w[wOBA woba], %w[plateAppearances PA], career: career)),
       wrc_plus: numeric_advanced_value(advanced_rate(rows, [ "wRC+", "wrc+", "wRCPlus", "wrcPlus" ], %w[plateAppearances PA], career: career)),
       ops_plus: numeric_advanced_value(advanced_rate(rows, [ "OPS+", "ops+", "OPSPlus", "opsPlus" ], %w[plateAppearances PA], career: career)),
@@ -824,6 +820,18 @@ class PlayerProfileSnapshotQuery
   def advanced_batted_ball_rate(rows, aliases, career:)
     value = advanced_rate(rows, aliases, %w[ballsInPlay BIP], career: career)
     value || advanced_rate(rows, aliases, %w[plateAppearances PA], career: career)
+  end
+
+  def advanced_home_run_per_fly_ball(rows, career:)
+    direct = advanced_rate(rows, %w[HR/FB hrPerFlyBall homeRunPerFlyBall], %w[ballsInPlay BIP], career: career)
+    return direct if direct
+
+    home_runs = advanced_count(rows, %w[homeRuns HR], career: career)
+    batted_balls = advanced_count(rows, %w[ballsInPlay BIP], career: career)
+    fly_ball_percentage = advanced_batted_ball_rate(rows, [ "FB%", "flyBallPercentage" ], career: career)
+    fly_balls = batted_balls && fly_ball_percentage ? batted_balls * fly_ball_percentage : nil
+
+    divide(home_runs, fly_balls)
   end
 
   def advanced_plate_discipline_rate(rows, aliases, career:)

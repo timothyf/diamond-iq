@@ -116,21 +116,16 @@ function apiPayload() {
               { key: 'bb_per_k', label: 'BB/K', unit: 'ratio' },
               { key: 'iso', label: 'ISO', unit: 'rate' },
               { key: 'babip', label: 'BABIP', unit: 'rate' },
+              { key: 'hr_per_fly_ball', label: 'HR/FB%', unit: 'percent' },
             ],
           },
           {
-            key: 'run_creation',
-            label: 'Run creation',
+            key: 'run_creation_value',
+            label: 'Run Creation & Value',
             columns: [
               { key: 'woba', label: 'wOBA', unit: 'rate' },
               { key: 'wrc_plus', label: 'wRC+', unit: 'index' },
               { key: 'ops_plus', label: 'OPS+', unit: 'index' },
-            ],
-          },
-          {
-            key: 'value',
-            label: 'Value',
-            columns: [
               { key: 'offensive_runs', label: 'Offensive Runs', unit: 'runs' },
               { key: 'baserunning_runs', label: 'Baserunning Runs', unit: 'runs' },
               { key: 'defensive_value', label: 'Defensive Value', unit: 'runs' },
@@ -165,16 +160,16 @@ function apiPayload() {
           {
             season: 2022,
             teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
-            values: { bb_percentage: 0.086, k_percentage: 0.287, bb_per_k: 0.3, iso: 0.141, babip: 0.354, woba: 0.326, wrc_plus: 98, ops_plus: 101, offensive_runs: -0.8, baserunning_runs: 0.4, defensive_value: 1.2, war: 1.0, ground_ball_percentage: 0.421, fly_ball_percentage: 0.355, line_drive_percentage: 0.224, pull_percentage: 0.401, center_percentage: 0.347, opposite_field_percentage: 0.252, swing_percentage: 0.521, chase_percentage: 0.298, contact_percentage: 0.741, zone_contact_percentage: 0.812, swinging_strike_percentage: 0.135 },
+            values: { bb_percentage: 0.086, k_percentage: 0.287, bb_per_k: 0.3, iso: 0.141, babip: 0.354, hr_per_fly_ball: 0.238, woba: 0.326, wrc_plus: 98, ops_plus: 101, offensive_runs: -0.8, baserunning_runs: 0.4, defensive_value: 1.2, war: 1.0, ground_ball_percentage: 0.421, fly_ball_percentage: 0.355, line_drive_percentage: 0.224, pull_percentage: 0.401, center_percentage: 0.347, opposite_field_percentage: 0.252, swing_percentage: 0.521, chase_percentage: 0.298, contact_percentage: 0.741, zone_contact_percentage: 0.812, swinging_strike_percentage: 0.135 },
           },
           {
             season: 2026,
             teams: [{ id: 1, mlb_id: 116, name: 'Detroit Tigers', abbreviation: 'DET' }],
-            values: { bb_percentage: 0.102, k_percentage: 0.241, bb_per_k: 0.42, iso: 0.218, babip: 0.331, woba: 0.368, wrc_plus: 132, ops_plus: 128, offensive_runs: 18.4, baserunning_runs: 1.7, defensive_value: -2.3, war: 4.6, ground_ball_percentage: 0.389, fly_ball_percentage: 0.401, line_drive_percentage: 0.21, pull_percentage: 0.428, center_percentage: 0.321, opposite_field_percentage: 0.251, swing_percentage: 0.487, chase_percentage: 0.263, contact_percentage: 0.782, zone_contact_percentage: 0.845, swinging_strike_percentage: 0.106 },
+            values: { bb_percentage: 0.102, k_percentage: 0.241, bb_per_k: 0.42, iso: 0.218, babip: 0.331, hr_per_fly_ball: 0.2778, woba: 0.368, wrc_plus: 132, ops_plus: 128, offensive_runs: 18.4, baserunning_runs: 1.7, defensive_value: -2.3, war: 4.6, ground_ball_percentage: 0.389, fly_ball_percentage: 0.401, line_drive_percentage: 0.21, pull_percentage: 0.428, center_percentage: 0.321, opposite_field_percentage: 0.251, swing_percentage: 0.487, chase_percentage: 0.263, contact_percentage: 0.782, zone_contact_percentage: 0.845, swinging_strike_percentage: 0.106 },
           },
         ],
         career: {
-          values: { bb_percentage: 0.094, k_percentage: 0.262, bb_per_k: 0.36, iso: 0.181, babip: 0.342, woba: 0.348, wrc_plus: 115, ops_plus: 114, offensive_runs: 17.6, baserunning_runs: 2.1, defensive_value: -1.1, war: 5.6, ground_ball_percentage: 0.4, fly_ball_percentage: 0.385, line_drive_percentage: 0.215, pull_percentage: 0.417, center_percentage: 0.331, opposite_field_percentage: 0.252, swing_percentage: 0.499, chase_percentage: 0.276, contact_percentage: 0.768, zone_contact_percentage: 0.833, swinging_strike_percentage: 0.116 },
+          values: { bb_percentage: 0.094, k_percentage: 0.262, bb_per_k: 0.36, iso: 0.181, babip: 0.342, hr_per_fly_ball: 0.2632, woba: 0.348, wrc_plus: 115, ops_plus: 114, offensive_runs: 17.6, baserunning_runs: 2.1, defensive_value: -1.1, war: 5.6, ground_ball_percentage: 0.4, fly_ball_percentage: 0.385, line_drive_percentage: 0.215, pull_percentage: 0.417, center_percentage: 0.331, opposite_field_percentage: 0.252, swing_percentage: 0.499, chase_percentage: 0.276, contact_percentage: 0.768, zone_contact_percentage: 0.833, swinging_strike_percentage: 0.116 },
         },
       },
       similar_players: {
@@ -885,11 +880,12 @@ describe('PlayerProfileView', () => {
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('BB%')
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('10.2%')
     expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('.331')
-    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('wRC+')
-    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('132')
-    expect(panel.get('[data-test="advanced-stat-group-run_creation"]').text()).toContain('Career')
-    expect(panel.get('[data-test="advanced-stat-group-value"]').text()).toContain('Offensive Runs')
-    expect(panel.get('[data-test="advanced-stat-group-value"]').text()).toContain('18.4')
+    expect(panel.get('[data-test="advanced-stat-group-rate_statistics"]').text()).toContain('HR/FB%')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation_value"]').text()).toContain('wRC+')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation_value"]').text()).toContain('132')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation_value"]').text()).toContain('Offensive Runs')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation_value"]').text()).toContain('18.4')
+    expect(panel.get('[data-test="advanced-stat-group-run_creation_value"]').text()).toContain('Career')
     expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('Opposite-field%')
     expect(panel.get('[data-test="advanced-stat-group-batted_ball_profile"]').text()).toContain('42.8%')
     const battingLongHeader = panel

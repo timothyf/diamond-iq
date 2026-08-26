@@ -542,13 +542,14 @@ RSpec.describe PlayerProfileSnapshotQuery do
     )
 
     expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq(
-      [ "Rate statistics", "Run creation", "Value", "Batted-ball profile", "Plate discipline" ]
+      [ "Rate statistics", "Batted-ball profile", "Run Creation & Value", "Plate discipline" ]
     )
     expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
       bb_percentage: 0.1,
       k_percentage: 0.25,
       bb_per_k: 0.4,
       iso: 0.235,
+      hr_per_fly_ball: (10.0 / (120 * 0.3)),
       woba: 0.35,
       wrc_plus: 115.0,
       ops_plus: 112.0,
@@ -566,6 +567,7 @@ RSpec.describe PlayerProfileSnapshotQuery do
       bb_percentage: 0.1,
       k_percentage: (70.0 / 300),
       bb_per_k: (30.0 / 70),
+      hr_per_fly_ball: (15.0 / (60 * 0.35 + 120 * 0.3)),
       woba: ((0.370 * 100 + 0.350 * 200) / 300),
       wrc_plus: 120.0,
       ops_plus: (349.0 / 3),
