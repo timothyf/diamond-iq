@@ -4,6 +4,10 @@ class PlayerProfileSnapshotQuery
   SEASON_CATEGORIES = %w[batting pitching].freeze
   BATTING_RATE_KEYS = %w[avg obp slg ops].freeze
   PITCHING_RATE_KEYS = %w[ERA whip avg].freeze
+  AUTHORITATIVE_RATE_STAT_NAMES = {
+    "batting" => %w[avg AVG obp OBP slg SLG ops OPS].freeze,
+    "pitching" => %w[ERA era whip WHIP avg AVG].freeze
+  }.freeze
   COMPARISON_RATE_METRICS = [
     { key: :k_percentage, label: "K%" },
     { key: :bb_percentage, label: "BB%" }
@@ -939,10 +943,10 @@ class PlayerProfileSnapshotQuery
   end
 
   def season_batting_average(rows)
-    divide(
+    season_weighted_rate(rows, %w[avg AVG], %w[atBats AB]) || divide(
       season_additive_value(rows, %w[hits H]),
       season_additive_value(rows, %w[atBats AB])
-    ) || season_weighted_rate(rows, %w[avg AVG], %w[atBats AB])
+    )
   end
 
   def season_batting_slugging(rows)
@@ -1470,12 +1474,16 @@ class PlayerProfileSnapshotQuery
         actual_game_count = lines.map(&:game_id).uniq.length
         next if imported_game_count.blank? || actual_game_count.zero? || imported_game_count == actual_game_count
 
-        [ [ category, season, team.id ], build_derived_stat_rows(
+        derived_rows = build_derived_stat_rows(
           category,
           season,
           team,
           category == "batting" ? batting_values_from_game_lines(lines) : pitching_values_from_game_lines(lines)
-        ) ]
+        ).reject do |row|
+          AUTHORITATIVE_RATE_STAT_NAMES.fetch(category).include?(row.stat_type.name)
+        end
+
+        [ [ category, season, team.id ], derived_rows ]
       end
     end.to_h
 

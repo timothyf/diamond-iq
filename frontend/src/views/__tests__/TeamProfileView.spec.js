@@ -176,6 +176,11 @@ const payload = {
         teams: [{ team: { id: 1, name: 'Detroit Tigers', league: 'AL' }, stats: { ERA: '3.50' } }],
       },
     },
+    team_stats_summary: {
+      season: 2026,
+      batting: { avg: { value: '.242', rank: 20 }, homeRuns: { value: 154, rank: 18 } },
+      pitching: { ERA: { value: '3.50', rank: 12 } },
+    },
     opponent_preparation: {
       opponent: { id: 2, mlb_id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE' },
       recent_performance: { games: 10, wins: 7, losses: 3, runs_per_game: 4.8, ops: 0.781, era: 3.42 },
@@ -357,6 +362,8 @@ describe('TeamProfileView', () => {
     expect(wrapper.get('[data-test="division-rank"]').text()).toContain('#1')
     expect(wrapper.get('[data-test="division-rank"]').text()).toContain('AL Central')
     expect(wrapper.get('[data-test="division-rank"]').text()).toContain('3.5 games ahead')
+    expect(wrapper.get('[data-test="team-stat-summary"]').text()).toContain('.242')
+    expect(wrapper.get('[data-test="team-stat-summary"]').text()).toContain('#20')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('Last 10')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('7–3')
     expect(wrapper.get('[aria-label="Season summary"]').text()).toContain('18–12')

@@ -9,6 +9,7 @@ class AdminDataHealthCheck
     checks = [
       final_games_missing_scores,
       final_games_missing_details,
+      past_games_with_player_lines_not_final,
       final_games_missing_pitch_data,
       synchronized_games_missing_batting_lines,
       synchronized_games_missing_pitching_lines,
@@ -42,7 +43,7 @@ class AdminDataHealthCheck
   private
 
   def completed_games
-    @completed_games ||= Game.where(status: "final").where("official_date <= ?", Date.current)
+    @completed_games ||= Game.where(status: "final").where("official_date <= ?", application_date)
   end
 
   def synchronized_games
@@ -72,6 +73,28 @@ class AdminDataHealthCheck
       description: "Final games need detailed synchronization before box scores and analytics are complete.",
       recommendation: "Run Synchronize game details for the affected dates."
     )
+  end
+
+  def past_games_with_player_lines_not_final
+    scope = Game
+      .where("official_date < ?", application_date)
+      .where.not(status: "final")
+      .joins(:game_player_batting_lines)
+      .distinct
+
+    game_check(
+      id: "past_games_with_player_lines_not_final",
+      category: "Games",
+      name: "Past games with player lines are final",
+      severity: "critical",
+      scope: scope,
+      description: "Past games with player statistics must be marked final so player and team totals include every completed game.",
+      recommendation: "Re-synchronize the affected game details and schedule status from MLB."
+    )
+  end
+
+  def application_date
+    @application_date ||= ApplicationCalendar.current_date
   end
 
   def final_games_missing_pitch_data

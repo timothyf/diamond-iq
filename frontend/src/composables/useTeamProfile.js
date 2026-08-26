@@ -90,6 +90,11 @@ function normalizeProfile(data) {
         teams: data.team_stats?.pitching?.teams || [],
       },
     },
+    teamStatsSummary: data.team_stats_summary || {
+      season: data.season,
+      batting: {},
+      pitching: {},
+    },
     opponentPreparation: {
       opponent: opponentPreparation.opponent || null,
       recentPerformance: opponentPreparation.recent_performance || null,

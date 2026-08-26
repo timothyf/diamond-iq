@@ -39,6 +39,28 @@ RSpec.describe "Api::Teams", type: :request do
     expect(json_body.dig("data", 0, "abbreviation")).to eq("DET")
   end
 
+  it "returns current team stat values and league ranks in the profile summary" do
+    allow(MlbTeamStatsDownloader).to receive(:call).with(season: Date.current.year, category: "batting").and_return(
+      116 => { "avg" => ".242", "homeRuns" => 154 },
+      114 => { "avg" => ".250", "homeRuns" => 100 }
+    )
+    allow(MlbTeamStatsDownloader).to receive(:call).with(season: Date.current.year, category: "pitching").and_return(
+      116 => { "ERA" => "3.50" },
+      114 => { "ERA" => "4.00" }
+    )
+
+    get api_team_path(@tigers), params: { include: "overview" }
+
+    expect(json_body.dig("data", "team_stats_summary")).to include(
+      "season" => Date.current.year,
+      "batting" => {
+        "avg" => { "value" => ".242", "rank" => 2 },
+        "homeRuns" => { "value" => 154, "rank" => 1 }
+      },
+      "pitching" => { "ERA" => { "value" => "3.50", "rank" => 1 } }
+    )
+  end
+
   it "only embeds workflow summaries visible to the signed-in owner or an administrator" do
     owner = create_user(role: "coach")
     other_user = create_user(role: "scout")

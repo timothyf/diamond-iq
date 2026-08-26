@@ -302,6 +302,15 @@ const divisionGapLabel = computed(() => {
   return `${formatted} ${Math.abs(value) === 1 ? 'game' : 'games'} ${direction}`
 })
 
+function formatTeamSummaryStat(key, value) {
+  if (value === null || value === undefined || value === '') return '—'
+  const number = Number(value)
+  if (!Number.isFinite(number)) return value
+  if (key === 'avg') return number.toFixed(3).replace(/^0\./, '.')
+  if (key === 'ERA') return number.toFixed(2)
+  return String(Math.trunc(number))
+}
+
 const recentRecordEntries = computed(() => (
   [10, 30, 50].map((window) => {
     const record = team.value?.record?.recent?.[window]
@@ -744,6 +753,23 @@ async function saveLineupScenario() {
             {{ team.divisionRank?.division?.name || 'Division unavailable' }}
             <br/><template v-if="divisionGapLabel"> · {{ divisionGapLabel }}</template>
           </small>
+        </article>
+        <article class="team-summary__leaders" data-test="team-stat-summary">
+          <span>Team stats</span>
+          <dl>
+            <div>
+              <dt>AVG</dt>
+              <dd>{{ formatTeamSummaryStat('avg', team.teamStatsSummary?.batting?.avg?.value) }} <small>#{{ team.teamStatsSummary?.batting?.avg?.rank || '—' }}</small></dd>
+            </div>
+            <div>
+              <dt>ERA</dt>
+              <dd>{{ formatTeamSummaryStat('ERA', team.teamStatsSummary?.pitching?.ERA?.value) }} <small>#{{ team.teamStatsSummary?.pitching?.ERA?.rank || '—' }}</small></dd>
+            </div>
+            <div>
+              <dt>HR</dt>
+              <dd>{{ formatTeamSummaryStat('HR', team.teamStatsSummary?.batting?.homeRuns?.value) }} <small>#{{ team.teamStatsSummary?.batting?.homeRuns?.rank || '—' }}</small></dd>
+            </div>
+          </dl>
         </article>
        </section>
 
@@ -1675,6 +1701,8 @@ async function saveLineupScenario() {
   gap: 8rem;
   margin: 1rem 0;
   line-height: 1.2;
+  padding-right: 50px;
+  padding-left: 50px;
 }
 
 .team-summary article,
@@ -1752,6 +1780,36 @@ async function saveLineupScenario() {
   font-size: 1.05rem;
   font-weight: 900;
   white-space: nowrap;
+}
+
+.team-summary__leaders dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .45rem;
+  margin: .75rem 0 0;
+}
+
+.team-summary__leaders dt {
+  color: #69747c;
+  font-size: .85rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.team-summary__leaders dd {
+  margin: .18rem 0 0;
+  font-family: 'Avenir Next Condensed', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.team-summary__leaders dd small {
+  display: block;
+  margin-top: .08rem;
+  color: #69747c;
+  font-family: inherit;
+  font-size: .85rem;
+  font-weight: 800;
 }
 
 .player-stats-panel {

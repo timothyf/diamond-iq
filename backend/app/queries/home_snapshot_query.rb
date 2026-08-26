@@ -1,17 +1,21 @@
 class HomeSnapshotQuery
-  LEADER_LIMIT = 3
+  LEADER_LIMIT = 5
   RECENT_TEAM_GAME_LIMIT = 10
   RECENT_TEAM_30_GAME_LIMIT = 30
   LEADER_DEFINITIONS = [
     { key: "ops", label: "OPS", category: "batting", aliases: %w[ops OPS], descending: true, qualifier: :at_bats },
-    { key: "WAR", label: "WAR", category: "batting", aliases: %w[WAR war], descending: true },
+    { key: "avg", label: "Batting average", category: "batting", aliases: %w[avg AVG], descending: true, qualifier: :at_bats },
+    { key: "battingWAR", label: "Batting WAR", category: "batting", aliases: %w[WAR war], descending: true },
     { key: "homeRuns", label: "Home runs", category: "batting", aliases: %w[homeRuns HR], descending: true },
+    { key: "rbi", label: "RBI", category: "batting", aliases: %w[rbi RBI], descending: true },
+    { key: "pitchingWAR", label: "Pitching WAR", category: "pitching", aliases: %w[WAR war], descending: true },
     { key: "ERA", label: "ERA", category: "pitching", aliases: %w[ERA era], descending: false, qualifier: :innings },
     { key: "strikeOuts", label: "Strikeouts", category: "pitching", aliases: %w[strikeOuts SO], descending: true }
   ].freeze
 
-  def initialize(on: nil)
+  def initialize(on: nil, league: nil)
     @on = parse_date(on) || ApplicationCalendar.current_date
+    @league = normalize_league(league)
   end
 
   def result
@@ -27,7 +31,12 @@ class HomeSnapshotQuery
 
   private
 
-  attr_reader :on
+  attr_reader :on, :league
+
+  def normalize_league(value)
+    value = value.to_s.downcase
+    value.in?(%w[american national]) ? value : nil
+  end
 
   def parse_date(value)
     Date.iso8601(value.to_s) if value.present?
@@ -78,6 +87,7 @@ class HomeSnapshotQuery
 
       value = stat_value(rows, definition.fetch(:aliases))
       next if value.nil?
+      next unless league_eligible?(first)
 
       {
         player: serialize_player(first.player),
@@ -96,6 +106,12 @@ class HomeSnapshotQuery
     end
 
     sort_rows(deduplicated, definition)
+  end
+
+  def league_eligible?(stat)
+    return true if league.nil?
+
+    MlbRosterBatchSync::TEAM_IDS_BY_LEAGUE.fetch(league).include?(stat.team&.mlb_id || stat.player.team&.mlb_id)
   end
 
   def leaderboard_groups

@@ -14,7 +14,7 @@ RSpec.describe "Api::Admin::DataHealth", type: :request do
       "checks"
     )
     expect(json_body.dig("data", "summary")).to include(
-      "check_count" => 12,
+      "check_count" => 13,
       "healthy_count" => be_a(Integer),
       "warning_count" => be_a(Integer),
       "critical_count" => be_a(Integer),

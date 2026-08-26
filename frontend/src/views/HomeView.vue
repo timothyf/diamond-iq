@@ -1,18 +1,23 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 import GameScheduleCard from '../components/GameScheduleCard.vue'
 import { teamLogoUrl } from '../config'
 import { useHomeDashboard } from '../composables/useHomeDashboard'
 import nineLensLogo from '../assets/ninelens_logo_v2.png'
 
-const { dashboard, loading, error, refresh } = useHomeDashboard()
+const selectedLeague = ref('all')
+const { dashboard, loading, error, refresh } = useHomeDashboard(selectedLeague)
 
 const briefingDate = computed(() => formatDate(dashboard.value.as_of, { weekday: 'long', month: 'long', day: 'numeric' }))
 const lastUpdatedAt = computed(() => {
   const values = Object.values(dashboard.value.freshness || {}).filter(Boolean)
   return values.sort().at(-1) || null
 })
+const leaderSections = computed(() => [
+  { key: 'batting', label: 'Batting', leaders: dashboard.value.leaders.filter((leader) => leader.category === 'batting') },
+  { key: 'pitching', label: 'Pitching', leaders: dashboard.value.leaders.filter((leader) => leader.category === 'pitching') },
+])
 
 function formatDate(value, options = { month: 'short', day: 'numeric' }) {
   if (!value) return 'Today'
@@ -28,9 +33,10 @@ function formatTimestamp(value) {
 function leaderValue(leader, value) {
   const number = Number(value)
   if (!Number.isFinite(number)) return '—'
+  if (leader.key === 'avg') return number.toFixed(3).replace(/^0\./, '.')
   if (leader.key === 'ops') return number.toFixed(3)
   if (leader.key === 'ERA') return number.toFixed(2)
-  if (leader.key === 'WAR') return number.toFixed(1)
+  if (['battingWAR', 'pitchingWAR'].includes(leader.key)) return number.toFixed(1)
   return Math.round(number).toLocaleString()
 }
 
@@ -113,24 +119,32 @@ function signed(value) {
             <p class="home-eyebrow">At the top</p>
             <h2>{{ dashboard.season }} league leaders</h2>
           </div>
+          <label class="leader-league-filter">League<select v-model="selectedLeague" :disabled="loading" data-test="leader-league-select">
+            <option value="all">All MLB</option>
+            <option value="american">American League</option>
+            <option value="national">National League</option>
+          </select></label>
           <RouterLink :to="{ name: 'stat-explorer' }">Open Stat Explorer →</RouterLink>
         </header>
-        <div class="leader-grid">
-          <article v-for="leader in dashboard.leaders" :key="leader.key" class="leader-card">
-            <header>
-              <h3>{{ leader.label }}</h3><small v-if="leader.qualifier">{{ leader.qualifier }}</small>
-            </header>
-            <ol v-if="leader.entries.length">
-              <li v-for="entry in leader.entries" :key="entry.player.id">
-                <span>{{ entry.rank }}</span>
-                <RouterLink :to="{ name: 'player-profile', params: { id: entry.player.id } }">
-                  <strong>{{ entry.player.full_name }}</strong><small>{{ entry.team.abbreviation }}</small>
-                </RouterLink>
-                <b>{{ leaderValue(leader, entry.value) }}</b>
-              </li>
-            </ol>
-            <p v-else>No qualified leaders available.</p>
-          </article>
+        <div v-for="section in leaderSections" :key="section.key" class="leader-section" :data-test="`leader-section-${section.key}`">
+          <header class="leader-section__heading"><h3>{{ section.label }}</h3></header>
+          <div class="leader-grid">
+            <article v-for="leader in section.leaders" :key="leader.key" class="leader-card">
+              <header>
+                <h3>{{ leader.label }}</h3><small v-if="leader.qualifier">{{ leader.qualifier }}</small>
+              </header>
+              <ol v-if="leader.entries.length">
+                <li v-for="entry in leader.entries" :key="entry.player.id">
+                  <span>{{ entry.rank }}</span>
+                  <RouterLink :to="{ name: 'player-profile', params: { id: entry.player.id } }">
+                    <strong>{{ entry.player.full_name }}</strong><small>{{ entry.team.abbreviation }}</small>
+                  </RouterLink>
+                  <b>{{ leaderValue(leader, entry.value) }}</b>
+                </li>
+              </ol>
+              <p v-else>No qualified leaders available.</p>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -454,6 +468,26 @@ function signed(value) {
   color: #a93627;
 }
 
+.leader-league-filter {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  color: #62707a;
+  font-size: .7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.leader-league-filter select {
+  padding: .45rem .6rem;
+  border: 1px solid rgba(16, 38, 61, .18);
+  border-radius: 8px;
+  color: #10263d;
+  background: #fffaf0;
+  font: inherit;
+  text-transform: none;
+}
+
 .game-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(275px, 1fr));
@@ -466,8 +500,33 @@ function signed(value) {
   gap: .8rem;
 }
 
+.leader-section + .leader-section {
+  margin-top: 1.4rem;
+}
+
+.leader-section__heading {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  margin-bottom: .65rem;
+}
+
+.leader-section__heading::after {
+  flex: 1;
+  height: 1px;
+  content: '';
+  background: rgba(16, 38, 61, .16);
+}
+
+.leader-section__heading h3 {
+  color: #a93627;
+  font-size: .75rem;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
 .leader-card {
-  padding: 1rem;
+  padding: .75rem .85rem;
   border-radius: 18px;
   background: #10263d;
   color: #fffaf0;
@@ -482,7 +541,7 @@ function signed(value) {
 
 .leader-card h3 {
   font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: 1.35rem;
+  font-size: 1.15rem;
   text-transform: uppercase;
 }
 
@@ -493,7 +552,7 @@ function signed(value) {
 }
 
 .leader-card ol {
-  margin: .75rem 0 0;
+  margin: .45rem 0 0;
   padding: 0;
   list-style: none;
 }
@@ -503,7 +562,7 @@ function signed(value) {
   grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: .55rem;
   align-items: center;
-  padding: .65rem 0;
+  padding: .42rem 0;
   border-top: 1px solid rgba(255, 255, 255, .11);
 }
 
@@ -513,6 +572,9 @@ function signed(value) {
 }
 
 .leader-card li a {
+  display: flex;
+  align-items: baseline;
+  gap: .35rem;
   min-width: 0;
   color: inherit;
   text-decoration: none;
@@ -520,26 +582,26 @@ function signed(value) {
 
 .leader-card li a strong,
 .leader-card li a small {
-  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .leader-card li a strong {
-  font-size: .83rem;
+  min-width: 0;
+  font-size: .76rem;
 }
 
 .leader-card li a small {
-  margin-top: .15rem;
+  flex: 0 0 auto;
   color: #9fb0bc;
-  font-size: .65rem;
+  font-size: .58rem;
 }
 
 .leader-card li>b {
   color: #e8b276;
   font-family: 'Avenir Next Condensed', sans-serif;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
 }
 
 .leader-card>p {

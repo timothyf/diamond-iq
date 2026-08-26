@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe AdminDataHealthCheck do
   it "reports contextual completeness, linkage, profile, position, and analytics problems" do
     game = create_game(
-      official_date: Date.current - 1.day,
+      official_date: ApplicationCalendar.current_date - 1.day,
       status: "final",
       home_score: nil,
       away_score: 3,
@@ -37,8 +37,70 @@ RSpec.describe AdminDataHealthCheck do
     expect(checks.dig("synchronized_dates_missing_analytics", :affected_count)).to eq(1)
   end
 
+  it "flags past non-final games that already have player lines" do
+    team = create_team
+    opponent = create_team
+    player = create_player(team: team)
+    game = create_game(
+      official_date: ApplicationCalendar.current_date - 1.day,
+      status: "preview",
+      home_team: opponent,
+      away_team: team
+    )
+    GamePlayerBattingLine.create!(
+      game: game,
+      player: player,
+      team: team,
+      opponent_team: opponent,
+      home: false,
+      starter: true,
+      plate_appearances: 4,
+      at_bats: 4,
+      hits: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+
+    check = described_class.call.fetch(:checks).find { |entry| entry.fetch(:id) == "past_games_with_player_lines_not_final" }
+
+    expect(check).to include(
+      status: "critical",
+      affected_count: 1,
+      examples: include("MLB game #{game.mlb_id} · #{game.official_date.iso8601}")
+    )
+  end
+
+  it "allows current-day non-final games with player lines" do
+    team = create_team
+    opponent = create_team
+    player = create_player(team: team)
+    game = create_game(
+      official_date: ApplicationCalendar.current_date,
+      status: "preview",
+      home_team: opponent,
+      away_team: team
+    )
+    GamePlayerBattingLine.create!(
+      game: game,
+      player: player,
+      team: team,
+      opponent_team: opponent,
+      home: false,
+      starter: true,
+      plate_appearances: 4,
+      at_bats: 4,
+      hits: 1,
+      source_name: "MLB Stats API",
+      last_synced_at: Time.current
+    )
+
+    check = described_class.call.fetch(:checks).find { |entry| entry.fetch(:id) == "past_games_with_player_lines_not_final" }
+
+    expect(check).to include(status: "healthy", affected_count: 0)
+  end
+
   it "does not require details or scores for future scheduled games" do
-    create_game(official_date: Date.current + 1.day, status: "scheduled")
+    create_game(official_date: ApplicationCalendar.current_date + 1.day, status: "scheduled")
 
     checks = described_class.call.fetch(:checks).index_by { |check| check.fetch(:id) }
 

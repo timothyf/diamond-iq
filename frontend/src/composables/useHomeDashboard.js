@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { API_BASE_URL } from '../config'
 
 const emptyDashboard = () => ({
@@ -15,7 +15,7 @@ const emptyDashboard = () => ({
   freshness: {},
 })
 
-export function useHomeDashboard() {
+export function useHomeDashboard(league = ref('all')) {
   const dashboard = ref(emptyDashboard())
   const loading = ref(true)
   const error = ref('')
@@ -25,7 +25,8 @@ export function useHomeDashboard() {
     error.value = ''
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/home`, { headers: { Accept: 'application/json' } })
+      const params = league.value !== 'all' ? `?league=${encodeURIComponent(league.value)}` : ''
+      const response = await fetch(`${API_BASE_URL}/api/home${params}`, { headers: { Accept: 'application/json' } })
       if (!response.ok) throw new Error(`Request failed with status ${response.status}`)
 
       const payload = await response.json()
@@ -45,6 +46,7 @@ export function useHomeDashboard() {
   }
 
   onMounted(load)
+  watch(league, load)
 
   return {
     dashboard: computed(() => dashboard.value),

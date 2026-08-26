@@ -31,11 +31,32 @@ const dashboardPayload = {
         entries: [{ rank: 1, value: '1.025', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
       },
       {
-        key: 'WAR',
-        label: 'WAR',
+        key: 'avg',
+        label: 'Batting average',
+        category: 'batting',
+        qualifier: 'Minimum 259 AB',
+        entries: [{ rank: 1, value: '0.333', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
+      },
+      {
+        key: 'battingWAR',
+        label: 'Batting WAR',
         category: 'batting',
         qualifier: '',
         entries: [{ rank: 1, value: '4.2', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
+      },
+      {
+        key: 'rbi',
+        label: 'RBI',
+        category: 'batting',
+        qualifier: '',
+        entries: [{ rank: 1, value: '12', player: { id: 30, full_name: 'Aaron Judge' }, team: { abbreviation: 'NYY' } }],
+      },
+      {
+        key: 'pitchingWAR',
+        label: 'Pitching WAR',
+        category: 'pitching',
+        qualifier: '',
+        entries: [{ rank: 1, value: '3.5', player: { id: 31, full_name: 'Tarik Skubal' }, team: { abbreviation: 'DET' } }],
       },
       {
         key: 'ERA',
@@ -85,7 +106,22 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Aaron Judge')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.025')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('1.75')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('.333')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('4.2')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('RBI')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('12')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Batting WAR')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Pitching WAR')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('3.5')
+    expect(wrapper.get('[data-test="leader-section-batting"] h3').text()).toBe('Batting')
+    expect(wrapper.get('[data-test="leader-section-pitching"] h3').text()).toBe('Pitching')
+    expect(wrapper.get('[data-test="leader-section-batting"]').text()).toContain('Batting WAR')
+    expect(wrapper.get('[data-test="leader-section-batting"]').text()).not.toContain('Pitching WAR')
+    expect(wrapper.get('[data-test="leader-section-pitching"]').text()).toContain('Pitching WAR')
+    expect(wrapper.get('[data-test="leader-section-pitching"]').text()).not.toContain('Batting WAR')
+    await wrapper.get('[data-test="leader-league-select"]').setValue('national')
+    await flushPromises()
+    expect(fetch).toHaveBeenLastCalledWith('/api/home?league=national', expect.objectContaining({ headers: { Accept: 'application/json' } }))
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('60-36')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('+105')
     expect(wrapper.get('[data-test="league-pulse"]').text()).toContain('Last 30 games')

@@ -337,6 +337,22 @@ RSpec.describe PlayerProfileSnapshotQuery do
     )
   end
 
+  it "uses the imported batting average when it differs from the H/AB calculation" do
+    player = create_player
+    at_bats = create_stat_type(name: "atBats", label: "AB", category: "batting")
+    hits = create_stat_type(name: "hits", label: "H", category: "batting")
+    average = create_stat_type(name: "avg", label: "AVG", category: "batting")
+
+    create_player_season_stat(player: player, stat_type: at_bats, attributes: { season: 2026, value: 494 })
+    create_player_season_stat(player: player, stat_type: hits, attributes: { season: 2026, value: 160 })
+    create_player_season_stat(player: player, stat_type: average, attributes: { season: 2026, value: 0.322 })
+
+    snapshot = described_class.new(player: player).result
+
+    expect(snapshot.dig(:season_overview, :stats)).to include(hash_including(key: "avg", value: "0.322"))
+    expect(snapshot.dig(:career_overview, :seasons, 0, :stats)).to include(hash_including(key: "avg", value: "0.322"))
+  end
+
   it "combines baseball innings and recalculates career pitching rates" do
     player = create_player
     pitcher = create_position(mlb_code: "1", abbreviation: "P", name: "Pitcher", position_type: "pitcher")
@@ -385,12 +401,14 @@ RSpec.describe PlayerProfileSnapshotQuery do
     player = create_player(team: team)
     definitions = {
       games: create_stat_type(name: "gamesPlayed", label: "G", category: "batting"),
+      average: create_stat_type(name: "avg", label: "AVG", category: "batting"),
       fielding_percentage: create_stat_type(name: "fieldingPercentage", label: "FPCT", category: "batting"),
       defense: create_stat_type(name: "Defense", label: "Def", category: "batting"),
       oaa: create_stat_type(name: "OAA", label: "OAA", category: "batting")
     }
     {
       games: 2,
+      average: 0.250,
       fielding_percentage: 0.981,
       defense: -6.4,
       oaa: -9
@@ -449,6 +467,9 @@ RSpec.describe PlayerProfileSnapshotQuery do
       defensive_runs_saved: -4.0,
       outs_above_average: -9.0
     )
+
+    expect(described_class.new(player: player).result.dig(:season_overview, :stats))
+      .to include(hash_including(key: "avg", value: "0.25"))
 
     expect(defensive.fetch(:positions)).to eq([
       {

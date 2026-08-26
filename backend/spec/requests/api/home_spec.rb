@@ -75,8 +75,11 @@ RSpec.describe "Api::Home", type: :request do
     stat_types = {
       at_bats: create_stat_type(name: "atBats", label: "AB", category: "batting"),
       ops: create_stat_type(name: "ops", label: "OPS", category: "batting"),
+      avg: create_stat_type(name: "avg", label: "AVG", category: "batting"),
       war: create_stat_type(name: "WAR", label: "WAR", category: "batting"),
+      pitching_war: create_stat_type(name: "WAR", label: "WAR", category: "pitching"),
       home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "batting"),
+      rbi: create_stat_type(name: "rbi", label: "RBI", category: "batting"),
       innings: create_stat_type(name: "inningsPitched", label: "IP", category: "pitching"),
       era: create_stat_type(name: "ERA", label: "ERA", category: "pitching"),
       strikeouts: create_stat_type(name: "strikeOuts", label: "SO", category: "pitching")
@@ -84,15 +87,18 @@ RSpec.describe "Api::Home", type: :request do
     {
       at_bats: 10,
       ops: 1.050,
+      avg: 0.333,
       war: 4.2,
-      home_runs: 3
+      home_runs: 3,
+      rbi: 12
     }.each do |key, value|
       create_player_season_stat(player: hitter, stat_type: stat_types.fetch(key), attributes: { team: tigers, season: 2026, value: value })
     end
     {
       innings: 5.0,
       era: 1.80,
-      strikeouts: 9
+      strikeouts: 9,
+      pitching_war: 3.5
     }.each do |key, value|
       create_player_season_stat(player: pitcher, stat_type: stat_types.fetch(key), attributes: { team: guardians, season: 2026, value: value })
     end
@@ -126,9 +132,11 @@ RSpec.describe "Api::Home", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "season")).to eq(2026)
     expect(json_body.dig("data", "games", 0, "id")).to eq(game.id)
-    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops WAR homeRuns ERA strikeOuts])
+    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops avg battingWAR homeRuns rbi pitchingWAR ERA strikeOuts])
     expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("Riley Greene")
-    expect(json_body.dig("data", "leaders", 3, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
+    expect(json_body.dig("data", "leaders", 4, "entries", 0, "player", "full_name")).to eq("Riley Greene")
+    expect(json_body.dig("data", "leaders", 4, "entries", 0, "value")).to eq("12.0")
+    expect(json_body.dig("data", "leaders", 5, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
     expect(json_body.dig("data", "team_pulse", "best_records", 0, "team", "abbreviation")).to eq("DET")
     expect(json_body.dig("data", "team_pulse", "run_differential", 0, "run_differential")).to eq(2)
     expect(json_body.dig("data", "team_pulse", "last_30_form", 0)).to include(
@@ -137,6 +145,24 @@ RSpec.describe "Api::Home", type: :request do
       "recent_30_losses" => 0
     )
     expect(json_body.dig("data", "freshness", "analytics")).to eq("2026-07-16T20:32:00.000Z")
+
+    national_team = create_team(mlb_id: 109, name: "Arizona Diamondbacks", abbreviation: "ARI")
+    national_hitter = create_player(team: national_team, attributes: { mlb_id: 700_001, first_name: "National", last_name: "Leader" })
+    create_player_season_stat(
+      player: national_hitter,
+      stat_type: stat_types.fetch(:ops),
+      attributes: { team: national_team, season: 2026, value: 1.2 }
+    )
+    create_player_season_stat(
+      player: national_hitter,
+      stat_type: stat_types.fetch(:at_bats),
+      attributes: { team: national_team, season: 2026, value: 10 }
+    )
+
+    get api_home_path, params: { date: "2026-07-16", league: "national" }
+
+    expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("National Leader")
+    expect(json_body.dig("data", "leaders", 0, "entries", 0, "team", "abbreviation")).to eq("ARI")
   end
 
   it "uses the last ten final games for recent form and ignores today's preview score" do

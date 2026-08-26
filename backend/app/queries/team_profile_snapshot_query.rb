@@ -61,6 +61,7 @@ class TeamProfileSnapshotQuery
       **schedule_payload,
       **player_stats_payload,
       **team_stats_payload,
+      team_stats_summary: team_stats_summary,
       **opponent_payload,
       **lineup_payload,
       team_leaders: team_leaders,
@@ -158,7 +159,7 @@ class TeamProfileSnapshotQuery
 
   def team_stats_category(category)
     definitions = PlayerSeasonStatsLeaderboardQuery::COLUMN_DEFINITIONS_BY_CATEGORY.fetch(category).reject { |definition| definition.fetch(:key) == "WAR" }
-    official_stats_by_team = MlbTeamStatsDownloader.call(season: season, category: category)
+    official_stats_by_team = official_team_stats(category)
 
     {
       columns: definitions.map { |definition| { key: definition.fetch(:key), label: definition.fetch(:label) } },
@@ -179,6 +180,43 @@ class TeamProfileSnapshotQuery
         }
       end
     }
+  end
+
+  def team_stats_summary
+    batting = official_team_stats("batting")
+    pitching = official_team_stats("pitching")
+
+    {
+      season: season,
+      batting: {
+        avg: ranked_team_stat(batting, "avg", :desc),
+        homeRuns: ranked_team_stat(batting, "homeRuns", :desc)
+      },
+      pitching: {
+        ERA: ranked_team_stat(pitching, "ERA", :asc)
+      }
+    }
+  end
+
+  def official_team_stats(category)
+    @official_team_stats ||= {}
+    @official_team_stats[category] ||= MlbTeamStatsDownloader.call(season: season, category: category)
+  end
+
+  def ranked_team_stat(stats_by_team, key, direction)
+    current_stats = stats_by_team[team.mlb_id]
+    value = current_stats&.[](key)
+    return { value: value, rank: nil } if value.blank?
+
+    current_value = value.to_f
+    better_count = stats_by_team.values.count do |stats|
+      candidate = stats[key]
+      next false if candidate.blank?
+
+      direction == :desc ? candidate.to_f > current_value : candidate.to_f < current_value
+    end
+
+    { value: value, rank: better_count + 1 }
   end
 
   def include_section?(section)
