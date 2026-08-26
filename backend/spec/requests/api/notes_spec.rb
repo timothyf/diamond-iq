@@ -104,6 +104,28 @@ RSpec.describe "Api::Notes", type: :request do
     expect(json_body.dig("data", "target_metadata", "right_player_id")).to be_present
   end
 
+  it "supports notes for three-player comparisons" do
+    second_player = create_player(team: team)
+    third_player = create_player(team: team)
+    comparison_key = "#{third_player.id}:#{player.id}:#{second_player.id}"
+
+    post api_notes_path,
+      params: { target_type: "comparison", target_id: comparison_key, body: "Compare all three profiles." },
+      headers: author_headers,
+      as: :json
+
+    expect(response).to have_http_status(:created)
+    expect(json_body.dig("data", "target_id")).to eq([ player.id, second_player.id, third_player.id ].sort.join(":"))
+    expect(json_body.dig("data", "target_metadata", "third_player_id")).to be_present
+    expect(json_body.dig("data", "target_metadata", "third_player_name")).to eq(third_player.full_name)
+
+    get api_notes_path,
+      params: { target_type: "comparison", target_id: comparison_key },
+      headers: author_headers
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", 0, "body")).to eq("Compare all three profiles.")
+  end
+
   it "archives notes while preserving their revision history" do
     post api_notes_path,
       params: { target_type: "player", target_id: player.id, body: "Temporary note" },
