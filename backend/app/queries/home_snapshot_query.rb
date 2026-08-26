@@ -9,6 +9,7 @@ class HomeSnapshotQuery
     { key: "homeRuns", label: "Home runs", category: "batting", aliases: %w[homeRuns HR], descending: true },
     { key: "rbi", label: "RBI", category: "batting", aliases: %w[rbi RBI], descending: true },
     { key: "pitchingWAR", label: "Pitching WAR", category: "pitching", aliases: %w[WAR war], descending: true },
+    { key: "wins", label: "Wins", category: "pitching", aliases: %w[wins W], descending: true },
     { key: "ERA", label: "ERA", category: "pitching", aliases: %w[ERA era], descending: false, qualifier: :innings },
     { key: "strikeOuts", label: "Strikeouts", category: "pitching", aliases: %w[strikeOuts SO], descending: true }
   ].freeze

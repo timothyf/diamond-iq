@@ -59,6 +59,13 @@ const dashboardPayload = {
         entries: [{ rank: 1, value: '3.5', player: { id: 31, full_name: 'Tarik Skubal' }, team: { abbreviation: 'DET' } }],
       },
       {
+        key: 'wins',
+        label: 'Wins',
+        category: 'pitching',
+        qualifier: '',
+        entries: [{ rank: 1, value: '12', player: { id: 31, full_name: 'Tarik Skubal' }, team: { abbreviation: 'DET' } }],
+      },
+      {
         key: 'ERA',
         label: 'ERA',
         category: 'pitching',
@@ -112,6 +119,7 @@ describe('HomeView', () => {
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('12')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Batting WAR')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Pitching WAR')
+    expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('Wins')
     expect(wrapper.get('[data-test="home-leaders"]').text()).toContain('3.5')
     expect(wrapper.get('[data-test="leader-section-batting"] h3').text()).toBe('Batting')
     expect(wrapper.get('[data-test="leader-section-pitching"] h3').text()).toBe('Pitching')

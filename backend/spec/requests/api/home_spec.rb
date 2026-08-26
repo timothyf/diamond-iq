@@ -81,6 +81,7 @@ RSpec.describe "Api::Home", type: :request do
       home_runs: create_stat_type(name: "homeRuns", label: "HR", category: "batting"),
       rbi: create_stat_type(name: "rbi", label: "RBI", category: "batting"),
       innings: create_stat_type(name: "inningsPitched", label: "IP", category: "pitching"),
+      wins: create_stat_type(name: "wins", label: "W", category: "pitching"),
       era: create_stat_type(name: "ERA", label: "ERA", category: "pitching"),
       strikeouts: create_stat_type(name: "strikeOuts", label: "SO", category: "pitching")
     }
@@ -96,6 +97,7 @@ RSpec.describe "Api::Home", type: :request do
     end
     {
       innings: 5.0,
+      wins: 1,
       era: 1.80,
       strikeouts: 9,
       pitching_war: 3.5
@@ -132,11 +134,12 @@ RSpec.describe "Api::Home", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "season")).to eq(2026)
     expect(json_body.dig("data", "games", 0, "id")).to eq(game.id)
-    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops avg battingWAR homeRuns rbi pitchingWAR ERA strikeOuts])
+    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops avg battingWAR homeRuns rbi pitchingWAR wins ERA strikeOuts])
     expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("Riley Greene")
     expect(json_body.dig("data", "leaders", 4, "entries", 0, "player", "full_name")).to eq("Riley Greene")
     expect(json_body.dig("data", "leaders", 4, "entries", 0, "value")).to eq("12.0")
     expect(json_body.dig("data", "leaders", 5, "entries", 0, "player", "full_name")).to eq("Tanner Bibee")
+    expect(json_body.dig("data", "leaders", 6, "entries", 0, "value")).to eq("1.0")
     expect(json_body.dig("data", "team_pulse", "best_records", 0, "team", "abbreviation")).to eq("DET")
     expect(json_body.dig("data", "team_pulse", "run_differential", 0, "run_differential")).to eq(2)
     expect(json_body.dig("data", "team_pulse", "last_30_form", 0)).to include(
