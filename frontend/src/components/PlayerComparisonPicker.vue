@@ -8,6 +8,7 @@ const props = defineProps({
   label: { type: String, required: true },
   selectedPlayer: { type: Object, default: null },
   excludedPlayerId: { type: [String, Number], default: null },
+  excludedPlayerIds: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['select', 'clear'])
 
@@ -15,7 +16,12 @@ const query = ref('')
 const searchQuery = computed(() => ({ name: query.value, perPage: frontendConfig.comparisonPlayerLimit }))
 const { suggestions, loading, error } = usePlayerSuggestions(searchQuery)
 const availableSuggestions = computed(() =>
-  suggestions.value.filter((player) => String(player.id) !== String(props.excludedPlayerId)),
+  suggestions.value.filter((player) => {
+    const excludedIds = [props.excludedPlayerId, ...props.excludedPlayerIds]
+      .filter((id) => id !== null && id !== undefined && id !== '')
+      .map(String)
+    return !excludedIds.includes(String(player.id))
+  }),
 )
 
 function choose(player) {

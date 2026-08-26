@@ -117,4 +117,30 @@ describe('PlayerComparisonView', () => {
     expect(career.text()).toContain('24.0%')
     expect(career.text()).toContain('15.0%')
   })
+
+  it('adds an optional third player to the comparison', async () => {
+    const responses = {
+      '/api/players/1': profile(1, 'Riley Greene', { id: 10, name: 'Detroit Tigers', abbreviation: 'DET' }, [{ key: 'homeRuns', label: 'HR', value: '24' }]),
+      '/api/players/2': profile(2, 'Aaron Judge', { id: 11, name: 'New York Yankees', abbreviation: 'NYY' }, [{ key: 'homeRuns', label: 'HR', value: '38' }]),
+      '/api/players/3': profile(3, 'Tarik Skubal', { id: 12, name: 'Detroit Tigers', abbreviation: 'DET' }, [{ key: 'homeRuns', label: 'HR', value: '2' }]),
+    }
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({ ok: true, json: async () => responses[url] })))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/compare', name: 'player-comparison', component: PlayerComparisonView },
+        { path: '/players/:id', name: 'player-profile', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/compare?left=1&right=2&third=3')
+    await router.isReady()
+
+    const wrapper = mount(PlayerComparisonView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="comparison-identities"]').text()).toContain('Tarik Skubal')
+    expect(wrapper.get('[data-test="comparison-picker-player c"]').text()).toContain('Tarik Skubal')
+    expect(wrapper.get('[data-test="season-comparison"] thead').findAll('th')).toHaveLength(4)
+    expect(wrapper.get('[data-test="season-stat-homeRuns"]').findAll('td')).toHaveLength(3)
+  })
 })

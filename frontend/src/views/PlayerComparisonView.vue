@@ -12,27 +12,34 @@ const route = useRoute()
 const router = useRouter()
 const leftId = ref(route.query.left ? String(route.query.left) : '')
 const rightId = ref(route.query.right ? String(route.query.right) : '')
-const savedAnalysisState = computed(() => ({ leftPlayerId: leftId.value, rightPlayerId: rightId.value }))
+const thirdId = ref(route.query.third ? String(route.query.third) : '')
+const savedAnalysisState = computed(() => ({ leftPlayerId: leftId.value, rightPlayerId: rightId.value, thirdPlayerId: thirdId.value }))
 const savedAnalysisUrl = computed(() => {
   const query = new URLSearchParams()
   if (leftId.value) query.set('left', leftId.value)
   if (rightId.value) query.set('right', rightId.value)
+  if (thirdId.value) query.set('third', thirdId.value)
   return `/compare${query.size ? `?${query}` : ''}`
 })
 const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId, null, { includeCoreSection: false })
 const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId, null, { includeCoreSection: false })
+const { player: thirdPlayer, loading: thirdLoading, error: thirdError } = usePlayerProfile(thirdId, null, { includeCoreSection: false })
+
+const comparisonPlayers = computed(() => [leftPlayer.value, rightPlayer.value, thirdPlayer.value].filter(Boolean))
+const hasThirdPlayer = computed(() => Boolean(thirdId.value))
 
 const ready = computed(() => Boolean(
   leftPlayer.value &&
   rightPlayer.value &&
-  String(leftPlayer.value.id) !== String(rightPlayer.value.id)
+  String(leftPlayer.value.id) !== String(rightPlayer.value.id) &&
+  (!thirdId.value || (thirdPlayer.value && ![leftPlayer.value.id, rightPlayer.value.id].map(String).includes(String(thirdPlayer.value.id))))
 ))
 const comparisonNoteKey = computed(() => {
   if (!ready.value) return ''
-  return [Number(leftId.value), Number(rightId.value)].sort((a, b) => a - b).join(':')
+  return [leftId.value, rightId.value, thirdId.value].filter(Boolean).map(Number).sort((a, b) => a - b).join(':')
 })
 const sameCategory = computed(() =>
-  ready.value && leftPlayer.value.seasonOverview.category === rightPlayer.value.seasonOverview.category,
+  ready.value && comparisonPlayers.value.every((player) => player.seasonOverview.category === comparisonPlayers.value[0].seasonOverview.category),
 )
 const seasonRows = computed(() => alignedRows('season'))
 const careerRows = computed(() => alignedRows('career'))
@@ -46,44 +53,46 @@ const DECIMAL_STAT_KEYS = new Set([
 ])
 const PERCENTAGE_STAT_KEYS = new Set(['k_percentage', 'bb_percentage'])
 
-watch([leftId, rightId], () => {
+watch([leftId, rightId, thirdId], () => {
   const query = {}
   if (leftId.value) query.left = leftId.value
   if (rightId.value) query.right = rightId.value
+  if (thirdId.value) query.third = thirdId.value
   router.replace({ name: 'player-comparison', query })
 })
 
 watch(
-  () => [route.query.left, route.query.right],
-  ([left, right]) => {
+  () => [route.query.left, route.query.right, route.query.third],
+  ([left, right, third]) => {
     leftId.value = left ? String(left) : ''
     rightId.value = right ? String(right) : ''
+    thirdId.value = third ? String(third) : ''
   },
 )
 
 function alignedRows(scope) {
   if (!ready.value) return []
   const leftOverview = scope === 'season' ? leftPlayer.value.seasonOverview : leftPlayer.value.careerOverview
-  const rightOverview = scope === 'season' ? rightPlayer.value.seasonOverview : rightPlayer.value.careerOverview
-  const leftStats = [...leftOverview.stats, ...leftOverview.comparisonStats]
-  const rightStats = [...rightOverview.stats, ...rightOverview.comparisonStats]
+  const overviews = comparisonPlayers.value.map((player) => scope === 'season' ? player.seasonOverview : player.careerOverview)
+  const statsByPlayer = overviews.map((overview) => [...overview.stats, ...overview.comparisonStats])
   const definitions = new Map()
-  for (const stat of [...leftStats, ...rightStats]) {
+  for (const stat of statsByPlayer.flat()) {
     if (!definitions.has(stat.key)) definitions.set(stat.key, stat.label)
   }
-  const leftValues = Object.fromEntries(leftStats.map((stat) => [stat.key, stat.value]))
-  const rightValues = Object.fromEntries(rightStats.map((stat) => [stat.key, stat.value]))
-  return [...definitions].map(([key, label]) => ({ key, label, left: leftValues[key], right: rightValues[key] }))
+  const valuesByPlayer = statsByPlayer.map((stats) => Object.fromEntries(stats.map((stat) => [stat.key, stat.value])))
+  return [...definitions].map(([key, label]) => ({ key, label, values: valuesByPlayer.map((values) => values[key]), left: valuesByPlayer[0]?.[key], right: valuesByPlayer[1]?.[key] }))
 }
 
 function selectPlayer(side, player) {
   if (side === 'left') leftId.value = String(player.id)
-  else rightId.value = String(player.id)
+  else if (side === 'right') rightId.value = String(player.id)
+  else thirdId.value = String(player.id)
 }
 
 function clearPlayer(side) {
   if (side === 'left') leftId.value = ''
-  else rightId.value = ''
+  else if (side === 'right') rightId.value = ''
+  else thirdId.value = ''
 }
 
 function openSavedAnalysis(item) {
@@ -106,23 +115,21 @@ function statValue(key, value) {
   return formatBaseballStatValue(key, value)
 }
 
-function comparisonClass(row, side, scope) {
-  const left = Number(row.left)
-  const right = Number(row.right)
-  if (!Number.isFinite(left) || !Number.isFinite(right) || left === right) return ''
+function comparisonClass(row, playerIndex, scope) {
+  const value = Number(row.values[playerIndex])
+  const comparisonValues = row.values.map(Number).filter(Number.isFinite)
+  if (!Number.isFinite(value) || comparisonValues.length < 2 || comparisonValues.every((candidate) => candidate === value)) return ''
 
   const leftCategory = scope === 'season'
-    ? leftPlayer.value?.seasonOverview.category
-    : leftPlayer.value?.careerOverview.category
-  const rightCategory = scope === 'season'
-    ? rightPlayer.value?.seasonOverview.category
-    : rightPlayer.value?.careerOverview.category
-  if (!leftCategory || leftCategory !== rightCategory) return ''
+    ? comparisonPlayers.value[playerIndex]?.seasonOverview.category
+    : comparisonPlayers.value[playerIndex]?.careerOverview.category
+  const categories = comparisonPlayers.value.map((player) => scope === 'season' ? player.seasonOverview.category : player.careerOverview.category)
+  if (!leftCategory || categories.some((category) => category !== leftCategory)) return ''
 
   const lowerIsBetter = LOWER_IS_BETTER[leftCategory]?.has(String(row.key).toLowerCase()) === true
-  const leftIsBetter = lowerIsBetter ? left < right : left > right
-  const sideIsBetter = side === 'left' ? leftIsBetter : !leftIsBetter
-  return sideIsBetter ? 'is-better' : 'is-lesser'
+  const isBetter = comparisonValues.every((candidate) => lowerIsBetter ? value <= candidate : value >= candidate) && comparisonValues.some((candidate) => value !== candidate)
+  const isLesser = comparisonValues.every((candidate) => lowerIsBetter ? value >= candidate : value <= candidate) && comparisonValues.some((candidate) => value !== candidate)
+  return isBetter ? 'is-better' : isLesser ? 'is-lesser' : ''
 }
 </script>
 
@@ -131,7 +138,7 @@ function comparisonClass(row, side, scope) {
     <header class="comparison-hero">
       <p>Player intelligence</p>
       <h1>Side-by-side comparison</h1>
-      <span>Select two players to align current-season and career performance.</span>
+      <span>Select two or three players to align current-season and career performance.</span>
     </header>
 
     <SavedAnalysisControls
@@ -142,19 +149,24 @@ function comparisonClass(row, side, scope) {
       @apply="openSavedAnalysis"
     />
 
-    <section class="comparison-selectors" aria-label="Players to compare">
-      <PlayerComparisonPicker label="Player A" :selected-player="leftPlayer" :excluded-player-id="rightId" @select="selectPlayer('left', $event)" @clear="clearPlayer('left')" />
+    <section class="comparison-selectors" :class="{ 'comparison-selectors--three': hasThirdPlayer }" aria-label="Players to compare">
+      <PlayerComparisonPicker label="Player A" :selected-player="leftPlayer" :excluded-player-ids="[rightId, thirdId]" @select="selectPlayer('left', $event)" @clear="clearPlayer('left')" />
       <div class="comparison-versus" aria-hidden="true">VS</div>
-      <PlayerComparisonPicker label="Player B" :selected-player="rightPlayer" :excluded-player-id="leftId" @select="selectPlayer('right', $event)" @clear="clearPlayer('right')" />
+      <PlayerComparisonPicker label="Player B" :selected-player="rightPlayer" :excluded-player-ids="[leftId, thirdId]" @select="selectPlayer('right', $event)" @clear="clearPlayer('right')" />
+      <template v-if="hasThirdPlayer">
+        <div class="comparison-versus" aria-hidden="true">VS</div>
+        <PlayerComparisonPicker label="Player C" :selected-player="thirdPlayer" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
+      </template>
+      <PlayerComparisonPicker v-else label="Player C" :selected-player="null" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
     </section>
 
-    <div v-if="leftLoading || rightLoading" class="comparison-state">Loading player profiles…</div>
-    <div v-else-if="leftError && leftId || rightError && rightId" class="comparison-state comparison-state--error">{{ leftError || rightError }}</div>
-    <section v-else-if="!ready" class="comparison-state">Choose two different players to begin the comparison.</section>
+    <div v-if="leftLoading || rightLoading || thirdLoading" class="comparison-state">Loading player profiles…</div>
+    <div v-else-if="(leftError && leftId) || (rightError && rightId) || (thirdError && thirdId)" class="comparison-state comparison-state--error">{{ leftError || rightError || thirdError }}</div>
+    <section v-else-if="!ready" class="comparison-state">Choose at least two different players to begin the comparison.</section>
 
     <template v-else>
       <section class="comparison-identities" data-test="comparison-identities">
-        <article v-for="player in [leftPlayer, rightPlayer]" :key="player.id">
+        <article v-for="player in comparisonPlayers" :key="player.id">
           <RouterLink :to="{ name: 'player-profile', params: { id: player.id } }">{{ player.fullName }}</RouterLink>
           <span>{{ player.displayTeam?.name || player.team?.name || 'Team unavailable' }}</span>
           <small>{{ player.positions?.primary?.abbreviation || '—' }} · Age {{ player.profile?.age || '—' }}</small>
@@ -168,28 +180,30 @@ function comparisonClass(row, side, scope) {
       </p>
 
       <section class="comparison-table-panel" data-test="season-comparison">
-        <header><div><p>Current production</p><h2>Season comparison</h2></div><span>{{ leftPlayer.seasonOverview.season || '—' }} / {{ rightPlayer.seasonOverview.season || '—' }}</span></header>
+        <header><div><p>Current production</p><h2>Season comparison</h2></div><span>{{ comparisonPlayers.map((player) => player.seasonOverview.season || '—').join(' / ') }}</span></header>
         <table>
-          <thead><tr><th>{{ leftPlayer.fullName }}</th><th>Statistic</th><th>{{ rightPlayer.fullName }}</th></tr></thead>
+          <thead><tr><th>{{ leftPlayer.fullName }}</th><th>Statistic</th><th>{{ rightPlayer.fullName }}</th><th v-if="hasThirdPlayer">{{ thirdPlayer.fullName }}</th></tr></thead>
           <tbody>
             <tr v-for="row in seasonRows" :key="row.key" :data-test="`season-stat-${row.key}`">
-              <td :class="comparisonClass(row, 'left', 'season')">{{ statValue(row.key, row.left) }}</td>
+              <td :class="comparisonClass(row, 0, 'season')">{{ statValue(row.key, row.values[0]) }}</td>
               <th>{{ row.label }}</th>
-              <td :class="comparisonClass(row, 'right', 'season')">{{ statValue(row.key, row.right) }}</td>
+              <td :class="comparisonClass(row, 1, 'season')">{{ statValue(row.key, row.values[1]) }}</td>
+              <td v-if="hasThirdPlayer" :class="comparisonClass(row, 2, 'season')">{{ statValue(row.key, row.values[2]) }}</td>
             </tr>
           </tbody>
         </table>
       </section>
 
       <section class="comparison-table-panel" data-test="career-comparison">
-        <header><div><p>Career ledger</p><h2>Career comparison</h2></div><span>{{ leftPlayer.careerOverview.seasonCount }} / {{ rightPlayer.careerOverview.seasonCount }} seasons</span></header>
+        <header><div><p>Career ledger</p><h2>Career comparison</h2></div><span>{{ comparisonPlayers.map((player) => `${player.careerOverview.seasonCount} seasons`).join(' / ') }}</span></header>
         <table>
-          <thead><tr><th>{{ leftPlayer.fullName }}</th><th>Statistic</th><th>{{ rightPlayer.fullName }}</th></tr></thead>
+          <thead><tr><th>{{ leftPlayer.fullName }}</th><th>Statistic</th><th>{{ rightPlayer.fullName }}</th><th v-if="hasThirdPlayer">{{ thirdPlayer.fullName }}</th></tr></thead>
           <tbody>
             <tr v-for="row in careerRows" :key="row.key" :data-test="`career-stat-${row.key}`">
-              <td :class="comparisonClass(row, 'left', 'career')">{{ statValue(row.key, row.left) }}</td>
+              <td :class="comparisonClass(row, 0, 'career')">{{ statValue(row.key, row.values[0]) }}</td>
               <th>{{ row.label }}</th>
-              <td :class="comparisonClass(row, 'right', 'career')">{{ statValue(row.key, row.right) }}</td>
+              <td :class="comparisonClass(row, 1, 'career')">{{ statValue(row.key, row.values[1]) }}</td>
+              <td v-if="hasThirdPlayer" :class="comparisonClass(row, 2, 'career')">{{ statValue(row.key, row.values[2]) }}</td>
             </tr>
           </tbody>
         </table>
@@ -205,10 +219,12 @@ function comparisonClass(row, side, scope) {
 .comparison-hero h1 { margin: .25rem 0; font-family: 'Avenir Next Condensed',sans-serif; font-size: clamp(2.8rem,6vw,5rem); line-height: .95; text-transform: uppercase; }
 .comparison-hero span { color: #d4dde2; }
 .comparison-selectors { display: grid; grid-template-columns: minmax(0,1fr) 54px minmax(0,1fr); gap: .75rem; align-items: center; margin-top: 1rem; }
+.comparison-selectors--three { grid-template-columns: minmax(0,1fr) 42px minmax(0,1fr) 42px minmax(0,1fr); }
 .comparison-versus { display: grid; width: 48px; height: 48px; place-items: center; border-radius: 50%; color: #fff; background: #a93627; font-weight: 900; }
 .comparison-state { margin-top: 1rem; padding: 2rem; border: 1px dashed rgba(16,38,61,.2); border-radius: 18px; color: #687781; background: rgba(255,252,245,.75); text-align: center; }
 .comparison-state--error { color: #8f2d24; }
-.comparison-identities { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; margin-top: 1rem; }
+.comparison-identities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
+.comparison-identities:has(article:nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .comparison-identities article { padding: 1rem; border-radius: 16px; color: #fffaf0; background: #10263d; }
 .comparison-identities article:last-child { text-align: right; }
 .comparison-identities a,.comparison-identities span,.comparison-identities small { display: block; }
@@ -222,10 +238,11 @@ function comparisonClass(row, side, scope) {
 .comparison-table-panel header > span { color: #6d7a83; font-size: .72rem; font-weight: 800; }
 .comparison-table-panel table { width: 100%; border-collapse: collapse; }
 .comparison-table-panel th,.comparison-table-panel td { width: 33.333%; padding: .7rem; border-top: 1px solid rgba(16,38,61,.09); text-align: center; }
+.comparison-table-panel:has(th:nth-child(4)) th,.comparison-table-panel:has(th:nth-child(4)) td { width: 25%; }
 .comparison-table-panel thead th { color: #6d7a83; font-size: .7rem; text-transform: uppercase; }
 .comparison-table-panel tbody td { font-family: 'Avenir Next Condensed',sans-serif; font-size: 1.2rem; font-weight: 900; }
 .comparison-table-panel tbody td.is-better { color: #17613d; background: rgba(42,145,91,.12); }
 .comparison-table-panel tbody td.is-lesser { color: #982f27; background: rgba(181,61,48,.1); }
 .comparison-table-panel tbody th { color: #61717d; font-size: .72rem; text-transform: uppercase; }
-@media (max-width: 650px) { .comparison-selectors { grid-template-columns: 1fr; } .comparison-versus { margin: 0 auto; } .comparison-table-panel { overflow-x: auto; } .comparison-table-panel table { min-width: 560px; } }
+@media (max-width: 650px) { .comparison-selectors,.comparison-selectors--three { grid-template-columns: 1fr; } .comparison-versus { margin: 0 auto; } .comparison-table-panel { overflow-x: auto; } .comparison-table-panel table { min-width: 560px; } }
 </style>
