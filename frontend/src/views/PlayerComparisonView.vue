@@ -21,12 +21,13 @@ const savedAnalysisUrl = computed(() => {
   if (thirdId.value) query.set('third', thirdId.value)
   return `/compare${query.size ? `?${query}` : ''}`
 })
-const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId, null, { includeCoreSection: false })
-const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId, null, { includeCoreSection: false })
-const { player: thirdPlayer, loading: thirdLoading, error: thirdError } = usePlayerProfile(thirdId, null, { includeCoreSection: false })
+const { player: leftPlayer, loading: leftLoading, error: leftError } = usePlayerProfile(leftId, null, { includeCoreSection: true })
+const { player: rightPlayer, loading: rightLoading, error: rightError } = usePlayerProfile(rightId, null, { includeCoreSection: true })
+const { player: thirdPlayer, loading: thirdLoading, error: thirdError } = usePlayerProfile(thirdId, null, { includeCoreSection: true })
 
 const comparisonPlayers = computed(() => [leftPlayer.value, rightPlayer.value, thirdPlayer.value].filter(Boolean))
 const hasThirdPlayer = computed(() => Boolean(thirdId.value))
+const showSeasonComparison = computed(() => comparisonPlayers.value.every((player) => player.profile?.active !== false))
 
 const ready = computed(() => Boolean(
   leftPlayer.value &&
@@ -150,14 +151,14 @@ function comparisonClass(row, playerIndex, scope) {
     />
 
     <section class="comparison-selectors" :class="{ 'comparison-selectors--three': hasThirdPlayer }" aria-label="Players to compare">
-      <PlayerComparisonPicker label="Player A" :selected-player="leftPlayer" :excluded-player-ids="[rightId, thirdId]" @select="selectPlayer('left', $event)" @clear="clearPlayer('left')" />
+      <PlayerComparisonPicker label="Player A" :selected-player="leftPlayer" :selected-player-id="leftId" :profile-loading="leftLoading" :excluded-player-ids="[rightId, thirdId]" @select="selectPlayer('left', $event)" @clear="clearPlayer('left')" />
       <div class="comparison-versus" aria-hidden="true">VS</div>
-      <PlayerComparisonPicker label="Player B" :selected-player="rightPlayer" :excluded-player-ids="[leftId, thirdId]" @select="selectPlayer('right', $event)" @clear="clearPlayer('right')" />
+      <PlayerComparisonPicker label="Player B" :selected-player="rightPlayer" :selected-player-id="rightId" :profile-loading="rightLoading" :excluded-player-ids="[leftId, thirdId]" @select="selectPlayer('right', $event)" @clear="clearPlayer('right')" />
       <template v-if="hasThirdPlayer">
         <div class="comparison-versus" aria-hidden="true">VS</div>
-        <PlayerComparisonPicker label="Player C" :selected-player="thirdPlayer" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
+        <PlayerComparisonPicker label="Player C" :selected-player="thirdPlayer" :selected-player-id="thirdId" :profile-loading="thirdLoading" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
       </template>
-      <PlayerComparisonPicker v-else label="Player C" :selected-player="null" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
+      <PlayerComparisonPicker v-else label="Player C" :selected-player="null" :selected-player-id="thirdId" :profile-loading="thirdLoading" :excluded-player-ids="[leftId, rightId]" @select="selectPlayer('third', $event)" @clear="clearPlayer('third')" />
     </section>
 
     <div v-if="leftLoading || rightLoading || thirdLoading" class="comparison-state">Loading player profiles…</div>
@@ -179,7 +180,7 @@ function comparisonClass(row, playerIndex, scope) {
         These players have different primary roles; unmatched statistics are shown as unavailable.
       </p>
 
-      <section class="comparison-table-panel" data-test="season-comparison">
+      <section v-if="showSeasonComparison" class="comparison-table-panel" data-test="season-comparison">
         <header><div><p>Current production</p><h2>Season comparison</h2></div><span>{{ comparisonPlayers.map((player) => player.seasonOverview.season || '—').join(' / ') }}</span></header>
         <table>
           <thead><tr><th>{{ leftPlayer.fullName }}</th><th>Statistic</th><th>{{ rightPlayer.fullName }}</th><th v-if="hasThirdPlayer">{{ thirdPlayer.fullName }}</th></tr></thead>

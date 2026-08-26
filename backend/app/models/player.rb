@@ -56,4 +56,17 @@ class Player < ApplicationRecord
     update!(team: membership.team) if membership.present? && team_id != membership.team_id
     membership&.team
   end
+
+  def display_team
+    return current_team_membership&.team || team unless profile&.raw_data.to_h["active"] == false
+
+    team_id_with_most_seasons = player_season_stats
+      .where.not(team_id: nil)
+      .pluck(:team_id, :season)
+      .group_by(&:first)
+      .max_by { |team_id, rows| [ rows.map(&:last).uniq.length, rows.map(&:last).max || 0, team_id ] }
+      &.first
+
+    Team.find_by(id: team_id_with_most_seasons) || team
+  end
 end

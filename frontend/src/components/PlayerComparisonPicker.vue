@@ -7,14 +7,24 @@ import { frontendConfig } from '../config'
 const props = defineProps({
   label: { type: String, required: true },
   selectedPlayer: { type: Object, default: null },
+  selectedPlayerId: { type: [String, Number], default: null },
+  profileLoading: { type: Boolean, default: false },
   excludedPlayerId: { type: [String, Number], default: null },
   excludedPlayerIds: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['select', 'clear'])
 
 const query = ref('')
+const pendingPlayer = ref(null)
 const searchQuery = computed(() => ({ name: query.value, perPage: frontendConfig.comparisonPlayerLimit }))
 const { suggestions, loading, error } = usePlayerSuggestions(searchQuery)
+const displayedPlayer = computed(() => {
+  const selectedId = props.selectedPlayerId
+  if (pendingPlayer.value && (!selectedId || String(pendingPlayer.value.id) === String(selectedId))) return pendingPlayer.value
+  if (props.selectedPlayer && (!selectedId || String(props.selectedPlayer.id) === String(selectedId))) return props.selectedPlayer
+  return null
+})
+const hasSelectedPlayer = computed(() => Boolean(displayedPlayer.value || props.selectedPlayerId))
 const availableSuggestions = computed(() =>
   suggestions.value.filter((player) => {
     const excludedIds = [props.excludedPlayerId, ...props.excludedPlayerIds]
@@ -25,26 +35,42 @@ const availableSuggestions = computed(() =>
 )
 
 function choose(player) {
+  pendingPlayer.value = player
   emit('select', player)
   query.value = ''
+}
+
+function clearSelection() {
+  pendingPlayer.value = null
+  emit('clear')
 }
 </script>
 
 <template>
   <section class="comparison-picker" :data-test="`comparison-picker-${label.toLowerCase()}`">
-    <header><span>{{ label }}</span><button v-if="selectedPlayer" type="button" @click="emit('clear')">Change</button></header>
-    <div v-if="selectedPlayer" class="comparison-picker__selected">
-      <img v-if="selectedPlayer.profile?.headshotUrl" :src="selectedPlayer.profile.headshotUrl" :alt="`${selectedPlayer.fullName} headshot`" />
-      <span v-else>{{ selectedPlayer.firstName?.[0] }}{{ selectedPlayer.lastName?.[0] }}</span>
+    <header><span>{{ label }}</span><button v-if="hasSelectedPlayer" type="button" @click="clearSelection">Change</button></header>
+    <div v-if="hasSelectedPlayer" class="comparison-picker__selected">
+      <template v-if="displayedPlayer">
+        <img v-if="displayedPlayer.profile?.headshotUrl" :src="displayedPlayer.profile.headshotUrl" :alt="`${displayedPlayer.fullName} headshot`" />
+        <span v-else>{{ displayedPlayer.firstName?.[0] }}{{ displayedPlayer.lastName?.[0] }}</span>
+      </template>
+      <span v-else class="comparison-picker__loading-icon" aria-hidden="true">…</span>
       <div class="comparison-picker__identity">
-        <strong>{{ selectedPlayer.fullName }}</strong>
-        <small>{{ selectedPlayer.displayTeam?.name || selectedPlayer.team?.name || 'Team unavailable' }}</small>
-        <small class="comparison-picker__meta">
-          Age {{ selectedPlayer.profile?.age ?? '—' }}
-          · Position {{ selectedPlayer.positions?.primary?.abbreviation || selectedPlayer.positions?.primary?.name || '—' }}
-          · Bats {{ selectedPlayer.profile?.bats || '—' }}
-          · Throws {{ selectedPlayer.profile?.throws || '—' }}
-        </small>
+        <template v-if="displayedPlayer">
+          <strong>{{ displayedPlayer.fullName }}</strong>
+          <small>{{ displayedPlayer.displayTeam?.name || displayedPlayer.team?.name || 'Team unavailable' }}</small>
+          <small class="comparison-picker__meta">
+            Age {{ displayedPlayer.profile?.age ?? '—' }}
+            · Position {{ displayedPlayer.positions?.primary?.abbreviation || displayedPlayer.positions?.primary?.name || '—' }}
+            · Bats {{ displayedPlayer.profile?.bats || '—' }}
+            · Throws {{ displayedPlayer.profile?.throws || '—' }}
+          </small>
+        </template>
+        <template v-else>
+          <strong>Loading player…</strong>
+          <small>Loading player profile…</small>
+        </template>
+        <small v-if="profileLoading && displayedPlayer" class="comparison-picker__loading">Loading player profile…</small>
       </div>
     </div>
     <div v-else class="comparison-picker__search">
@@ -79,6 +105,8 @@ function choose(player) {
 .comparison-picker__identity { min-width: 0; }
 .comparison-picker__selected .comparison-picker__meta { color: #435b6b; font-weight: 700; line-height: 1.35; }
 .comparison-picker__selected small { margin-top: .15rem; color: #6a7882; }
+.comparison-picker__loading-icon { color: #a93627; font-size: 1.6rem; }
+.comparison-picker__loading { color: #a93627 !important; font-weight: 800; }
 .comparison-picker__search { position: relative; }
 .comparison-picker__search input { width: 100%; padding: .72rem .8rem; border: 1px solid rgba(16,38,61,.18); border-radius: 11px; background: #fff; font: inherit; }
 .comparison-picker__search p { margin: .5rem 0 0; color: #6a7882; font-size: .72rem; }

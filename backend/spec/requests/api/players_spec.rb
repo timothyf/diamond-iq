@@ -105,6 +105,22 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile", "headshot_url")).to eq("https://example.test/miguel-cabrera.png")
   end
 
+  it "returns a retired player's most-seasons team in player search results" do
+    @miguel.update!(team: @dodgers)
+    @miguel.create_profile!(source_name: "MLB Stats API", last_synced_at: Time.current, raw_data: { "active" => false })
+    stat_type = create_stat_type(name: "gamesPlayed", label: "G", category: "batting")
+    [ 2012, 2013, 2014 ].each do |season|
+      create_player_season_stat(player: @miguel, stat_type: stat_type, attributes: { team: @tigers, season: season, value: 100 })
+    end
+    create_player_season_stat(player: @miguel, stat_type: stat_type, attributes: { team: @dodgers, season: 2015, value: 100 })
+
+    get api_players_path, params: { filter: { name: "Miguel Cabrera" } }
+
+    expect(response).to have_http_status(:ok)
+    expect(json_body.dig("data", 0, "team", "name")).to eq("Los Angeles Dodgers")
+    expect(json_body.dig("data", 0, "display_team", "name")).to eq("Detroit Tigers")
+  end
+
   it "returns a null profile when profile data has not been synchronized" do
     get api_player_path(@miguel)
 

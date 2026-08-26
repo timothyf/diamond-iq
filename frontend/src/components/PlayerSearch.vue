@@ -98,8 +98,8 @@ async function search(value) {
         id: player.id,
         name: player.full_name,
         subtitle: `Player · MLB ${player.mlb_id}`,
-        meta: player.team?.abbreviation || '—',
-        metaLabel: player.team?.short_name || player.team?.team_name || player.team?.name || 'No current team',
+        meta: (player.display_team || player.team)?.abbreviation || '—',
+        metaLabel: (player.display_team || player.team)?.short_name || (player.display_team || player.team)?.team_name || (player.display_team || player.team)?.name || 'No current team',
       }))
     const seenTeams = new Set()
     const teams = (Array.isArray(teamPayload?.data) ? teamPayload.data : [])

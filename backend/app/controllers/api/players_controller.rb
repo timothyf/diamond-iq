@@ -55,6 +55,7 @@ module Api
         last_name: player.last_name,
         full_name: player.full_name,
         team: serialize_team(player.team),
+        display_team: serialize_team(player.display_team),
         created_at: player.created_at,
         updated_at: player.updated_at
       }

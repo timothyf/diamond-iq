@@ -26,7 +26,7 @@ function normalizePlayers(players = []) {
     firstName: player.first_name,
     lastName: player.last_name,
     fullName: [player.first_name, player.last_name].filter(Boolean).join(' '),
-    team: player.team || {},
+    team: player.display_team || player.team || {},
   }))
 }
 

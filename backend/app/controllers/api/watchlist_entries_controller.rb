@@ -124,7 +124,7 @@ module Api
           mlb_id: entry.player.mlb_id,
           full_name: entry.player.full_name,
           headshot_url: entry.player.profile&.headshot_url,
-          team: entry.player.team && { id: entry.player.team.id, name: entry.player.team.name, abbreviation: entry.player.team.abbreviation }
+          team: entry.player.display_team && { id: entry.player.display_team.id, name: entry.player.display_team.name, abbreviation: entry.player.display_team.abbreviation }
         }
       }
     end

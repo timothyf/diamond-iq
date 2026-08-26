@@ -59,7 +59,7 @@ describe('PlayerComparisonView', () => {
     }
     vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({
       ok: true,
-      json: async () => responses[url],
+      json: async () => responses[url.split('?')[0]],
     })))
     const router = createRouter({
       history: createMemoryHistory(),
@@ -74,8 +74,8 @@ describe('PlayerComparisonView', () => {
     const wrapper = mount(PlayerComparisonView, { global: { plugins: [router] } })
     await flushPromises()
 
-    expect(fetch).toHaveBeenCalledWith('/api/players/1', expect.any(Object))
-    expect(fetch).toHaveBeenCalledWith('/api/players/2', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/players/1?sections=core', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/players/2?sections=core', expect.any(Object))
     expect(wrapper.get('[data-test="comparison-identities"]').text()).toContain('Riley Greene')
     expect(wrapper.get('[data-test="comparison-identities"]').text()).toContain('Aaron Judge')
     const playerAHeader = wrapper.get('[data-test="comparison-picker-player a"]')
@@ -124,7 +124,7 @@ describe('PlayerComparisonView', () => {
       '/api/players/2': profile(2, 'Aaron Judge', { id: 11, name: 'New York Yankees', abbreviation: 'NYY' }, [{ key: 'homeRuns', label: 'HR', value: '38' }]),
       '/api/players/3': profile(3, 'Tarik Skubal', { id: 12, name: 'Detroit Tigers', abbreviation: 'DET' }, [{ key: 'homeRuns', label: 'HR', value: '2' }]),
     }
-    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({ ok: true, json: async () => responses[url] })))
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({ ok: true, json: async () => responses[url.split('?')[0]] })))
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [
@@ -142,5 +142,30 @@ describe('PlayerComparisonView', () => {
     expect(wrapper.get('[data-test="comparison-picker-player c"]').text()).toContain('Tarik Skubal')
     expect(wrapper.get('[data-test="season-comparison"] thead').findAll('th')).toHaveLength(4)
     expect(wrapper.get('[data-test="season-stat-homeRuns"]').findAll('td')).toHaveLength(3)
+  })
+
+  it('shows only career comparison when a selected player is retired', async () => {
+    const retiredPlayer = profile(1, 'Riley Greene', { id: 10, name: 'Detroit Tigers', abbreviation: 'DET' }, [{ key: 'homeRuns', label: 'HR', value: '24' }])
+    retiredPlayer.data.profile.active = false
+    const responses = {
+      '/api/players/1': retiredPlayer,
+      '/api/players/2': profile(2, 'Aaron Judge', { id: 11, name: 'New York Yankees', abbreviation: 'NYY' }, [{ key: 'homeRuns', label: 'HR', value: '38' }]),
+    }
+    vi.stubGlobal('fetch', vi.fn((url) => Promise.resolve({ ok: true, json: async () => responses[url.split('?')[0]] })))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/compare', name: 'player-comparison', component: PlayerComparisonView },
+        { path: '/players/:id', name: 'player-profile', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/compare?left=1&right=2')
+    await router.isReady()
+
+    const wrapper = mount(PlayerComparisonView, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="season-comparison"]').exists()).toBe(false)
+    expect(wrapper.get('[data-test="career-comparison"]').exists()).toBe(true)
   })
 })
