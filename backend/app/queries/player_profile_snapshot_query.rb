@@ -14,15 +14,14 @@ class PlayerProfileSnapshotQuery
   ].freeze
   ADVANCED_BATTING_GROUPS = [
     {
-      key: "rate_statistics",
-      label: "Rate statistics",
+      key: "plate_discipline",
+      label: "Plate discipline",
       columns: [
-        { key: "bb_percentage", label: "BB%", unit: "percent" },
-        { key: "k_percentage", label: "K%", unit: "percent" },
-        { key: "bb_per_k", label: "BB/K", unit: "ratio" },
-        { key: "iso", label: "ISO", unit: "rate" },
-        { key: "babip", label: "BABIP", unit: "rate" },
-        { key: "hr_per_fly_ball", label: "HR/FB%", unit: "percent" }
+        { key: "swing_percentage", label: "Swing%", unit: "percent" },
+        { key: "chase_percentage", label: "Chase%", unit: "percent" },
+        { key: "contact_percentage", label: "Contact%", unit: "percent" },
+        { key: "zone_contact_percentage", label: "Zone Contact%", unit: "percent" },
+        { key: "swinging_strike_percentage", label: "SwStr%", unit: "percent" }
       ]
     },
     {
@@ -38,6 +37,18 @@ class PlayerProfileSnapshotQuery
       ]
     },
     {
+      key: "rate_statistics",
+      label: "Rate statistics",
+      columns: [
+        { key: "bb_percentage", label: "BB%", unit: "percent" },
+        { key: "k_percentage", label: "K%", unit: "percent" },
+        { key: "bb_per_k", label: "BB/K", unit: "ratio" },
+        { key: "iso", label: "ISO", unit: "rate" },
+        { key: "babip", label: "BABIP", unit: "rate" },
+        { key: "hr_per_fly_ball", label: "HR/FB%", unit: "percent" }
+      ]
+    },
+    {
       key: "run_creation_value",
       label: "Run Creation & Value",
       columns: [
@@ -50,17 +61,6 @@ class PlayerProfileSnapshotQuery
         { key: "war", label: "WAR", unit: "war" }
       ]
     },
-    {
-      key: "plate_discipline",
-      label: "Plate discipline",
-      columns: [
-        { key: "swing_percentage", label: "Swing%", unit: "percent" },
-        { key: "chase_percentage", label: "Chase%", unit: "percent" },
-        { key: "contact_percentage", label: "Contact%", unit: "percent" },
-        { key: "zone_contact_percentage", label: "Zone Contact%", unit: "percent" },
-        { key: "swinging_strike_percentage", label: "SwStr%", unit: "percent" }
-      ]
-    }
   ].freeze
   ADVANCED_PITCHING_GROUPS = [
     {

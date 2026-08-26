@@ -542,7 +542,7 @@ RSpec.describe PlayerProfileSnapshotQuery do
     )
 
     expect(advanced.fetch(:groups).map { |group| group.fetch(:label) }).to eq(
-      [ "Rate statistics", "Batted-ball profile", "Run Creation & Value", "Plate discipline" ]
+      [ "Plate discipline", "Batted-ball profile", "Rate statistics", "Run Creation & Value" ]
     )
     expect(advanced.fetch(:seasons).last.fetch(:values)).to include(
       bb_percentage: 0.1,
