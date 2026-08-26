@@ -341,6 +341,10 @@
   color: #8f2d24;
 }
 
+.data-source {
+  float: right;
+}
+
 @keyframes player-search-spin {
   to {
     transform: rotate(360deg);

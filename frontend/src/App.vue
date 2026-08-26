@@ -83,5 +83,6 @@ onBeforeUnmount(() => document.removeEventListener('click', closeAccountMenu))
   </div>
   <footer class="app-footer">
     <a href="https://github.com/timothyf/ninelens" target="_blank" rel="noopener noreferrer">NineLens on GitHub</a>
+    <span class="data-source">Data provided by MLB</span>
   </footer>
 </template>
