@@ -1,3 +1,9 @@
+# NineLens configuration file
+# example usage:
+#   @service_config ||= NineLensConfig.fetch(:external_services, :mlb_stats_api)
+#   @service_config.fetch(:timeout_seconds)
+
+
 default: &default
   external_services:
     mlb_stats_api:
@@ -57,6 +63,10 @@ default: &default
       roster_seconds_per_team: <%= ENV.fetch("ROSTER_DEFAULT_SECONDS_PER_TEAM", 8.0) %>
       roster_low_range_factor: <%= ENV.fetch("ROSTER_LOW_RANGE_FACTOR", 0.75) %>
       roster_high_range_factor: <%= ENV.fetch("ROSTER_HIGH_RANGE_FACTOR", 1.5) %>
+    projections:
+      playoff_odds_simulations: <%= ENV.fetch("PLAYOFF_ODDS_SIMULATIONS", 10_000) %>
+      regression_runs: <%= ENV.fetch("REGRESSION_RUNS", 200.0) %>
+      home_field_advantage: <%= ENV.fetch("HOME_FIELD_ADVANTAGE", 0.035) %>
 
 development: *default
 test: *default

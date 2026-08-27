@@ -1,8 +1,8 @@
 class PlayoffOddsProjection
-  DEFAULT_SIMULATIONS = 10_000
-  HOME_FIELD_ADVANTAGE = 0.035
-  REGRESSION_RUNS = 200.0
-
+  DEFAULT_SIMULATIONS = NineLensConfig.fetch(:operations, :projections, :playoff_odds_simulations)
+  REGRESSION_RUNS = NineLensConfig.fetch(:operations, :projections, :regression_runs)
+  HOME_FIELD_ADVANTAGE = NineLensConfig.fetch(:operations, :projections, :home_field_advantage)
+  
   def initialize(divisions:, remaining_games:, simulations: DEFAULT_SIMULATIONS, seed: 0)
     @divisions = divisions
     @remaining_games = remaining_games

@@ -134,7 +134,7 @@ RSpec.describe "Api::Home", type: :request do
     expect(response).to have_http_status(:ok)
     expect(json_body.dig("data", "season")).to eq(2026)
     expect(json_body.dig("data", "games", 0, "id")).to eq(game.id)
-    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[ops avg battingWAR homeRuns rbi pitchingWAR wins ERA strikeOuts])
+    expect(json_body.dig("data", "leaders").map { |leader| leader.fetch("key") }).to eq(%w[battingWAR ops avg homeRuns rbi pitchingWAR wins ERA strikeOuts])
     expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("Riley Greene")
     expect(json_body.dig("data", "leaders", 4, "entries", 0, "player", "full_name")).to eq("Riley Greene")
     expect(json_body.dig("data", "leaders", 4, "entries", 0, "value")).to eq("12.0")
@@ -164,8 +164,13 @@ RSpec.describe "Api::Home", type: :request do
 
     get api_home_path, params: { date: "2026-07-16", league: "national" }
 
-    expect(json_body.dig("data", "leaders", 0, "entries", 0, "player", "full_name")).to eq("National Leader")
-    expect(json_body.dig("data", "leaders", 0, "entries", 0, "team", "abbreviation")).to eq("ARI")
+    ops_leader = json_body.dig("data", "leaders")
+      .find { |leader| leader.fetch("key") == "ops" }
+      .fetch("entries")
+      .first
+
+    expect(ops_leader.dig("player", "full_name")).to eq("National Leader")
+    expect(ops_leader.dig("team", "abbreviation")).to eq("ARI")
   end
 
   it "uses the last ten final games for recent form and ignores today's preview score" do

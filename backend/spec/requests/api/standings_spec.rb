@@ -40,7 +40,7 @@ RSpec.describe "Api::Standings", type: :request do
     expect(json_body.dig("data", "season")).to eq(2026)
     expect(json_body.dig("data", "as_of")).to eq("2026-07-12")
     expect(json_body.dig("data", "playoff_odds")).to include(
-      "simulations" => 5_000,
+      "simulations" => NineLensConfig.fetch(:operations, :projections, :playoff_odds_simulations),
       "remaining_games" => 1
     )
     central = json_body.dig("data", "leagues", 0, "divisions").find { |division| division.fetch("key") == "al_central" }
