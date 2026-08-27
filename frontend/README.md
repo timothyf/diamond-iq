@@ -1,46 +1,85 @@
-# frontend
+# NineLens Frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+The frontend is a Vue 3 single-page application for the NineLens baseball intelligence workspace. It uses Vue Router, Vite, and the Rails API in `../backend`.
 
-## Recommended IDE Setup
+## Requirements
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- Node.js 20.19+ or 22.12+
+- A running NineLens Rails API (normally `http://127.0.0.1:3000`)
 
-## Recommended Browser Setup
-
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Runtime configuration
-
-Frontend runtime defaults are centralized in `src/config.js`. Use Vite
-environment variables to override the API origin and admin API token, task polling interval,
-search debounce timings, pagination/search limits (including the top-nav player/team search), admin batch size, and
-external MLB/FanGraphs/Baseball Reference URLs. The development API proxy can
-be redirected with `VITE_DEV_API_TARGET`.
-
-## Project Setup
+## Local development
 
 ```sh
 npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
 npm run dev
 ```
 
-### Compile and Minify for Production
+Vite proxies `/api` to `http://127.0.0.1:3000` by default. Point the development proxy to another Rails API with:
 
 ```sh
-npm run build
+VITE_DEV_API_TARGET=http://127.0.0.1:3001 npm run dev
 ```
+
+When serving the app without the development proxy, set the API origin directly:
+
+```sh
+VITE_API_BASE_URL=https://api.example.com npm run dev
+```
+
+## Commands
+
+```sh
+npm run dev       # start Vite with hot reload
+npm run build     # produce a production build in dist/
+npm run preview   # serve the production build locally
+npm test          # run Vitest in watch mode
+npm run test:run  # run the full Vitest suite once
+```
+
+## Application areas
+
+- Home dashboard with daily schedule, league leaders, league filter, and team pulse
+- Schedule, standings, Stat Explorer, and pitch-data exploration
+- Player profiles, advanced statistics, trends, notes, and saved analyses
+- Two- or three-player comparison with season/career alignment; retired-player comparisons show career totals only
+- Team directory and Team Profiles, including all-MLB Hitting/Pitching Team Stats
+- Game summaries with box score, pitching, batted-ball, situational, and play-by-play views
+- Signed-in watchlists, opponent reports, lineup scenarios, and saved analyses
+- Administrator-only synchronization, imports, task monitoring, and data-health workflows
+
+## Routes
+
+- `/` — Home dashboard
+- `/schedule` — schedule browser
+- `/standings` — standings
+- `/explore` — Stat Explorer (`/stat-board` redirects here)
+- `/games/:id` — Game Summary
+- `/players/:id` — Player Profile
+- `/compare` — Player Comparison
+- `/saved/:id` — saved-analysis redirect
+- `/teams` and `/teams/:id` — team directory and Team Profile
+- `/watchlists` — authenticated watchlists
+- `/admin` — administrator workspace
+- `/login` — authentication
+
+## Runtime configuration
+
+`src/config.js` centralizes defaults. Vite environment variables can override:
+
+- `VITE_API_BASE_URL` and `VITE_DEV_API_TARGET`
+- `VITE_ADMIN_API_TOKEN`
+- polling, debounce, page-size, and search-limit settings
+- MLB, FanGraphs, Baseball Reference, and Baseball Savant URL bases used for outbound links and assets
+
+`VITE_ADMIN_API_TOKEN` must match the backend `ADMIN_API_TOKEN` when using admin imports or task controls with system-token authentication. Signed-in administrator sessions can also authorize those controls.
+
+## Project structure
+
+- `src/views/` — route-level screens
+- `src/components/` — reusable UI, tables, pickers, and Admin controls
+- `src/composables/` — API access, state, authentication, and workflow logic
+- `src/router/` — routes and access guards
+- `src/utils/` — display formatting and UI helpers
+- `src/**/__tests__/` — Vitest component, composable, utility, and view tests
+
+See the repository [README](../README.md) for the backend workflow, API overview, and full feature inventory.

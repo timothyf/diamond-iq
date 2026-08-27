@@ -8,7 +8,8 @@ NineLens is a local-first baseball intelligence application built with a Ruby on
 
 - A daily MLB briefing built from the application's stored data, using the local `America/Detroit` date.
 - Today's games with status, scores, venue, probable pitchers, and links to Game Summary and Team Profile pages.
-- Current-season batting and pitching leaders with direct links to Player Profiles and Stat Explorer.
+- Current-season batting leaders (OPS, AVG, Batting WAR, home runs, and RBI) and pitching leaders (Pitching WAR, wins, ERA, and strikeouts), each showing the top five qualified players.
+- An All MLB/American League/National League filter for the leader cards, with direct links to Player Profiles and Stat Explorer.
 - League pulse cards for the best records, run differential, and recent team form.
 - Dataset freshness metadata so users can see when the briefing was last updated.
 
@@ -31,12 +32,14 @@ NineLens is a local-first baseball intelligence application built with a Ruby on
 - Selectable rolling windows of 25, 50, or 100 plate appearances and 50, 100, or 250 pitches.
 - Trend charts for exit velocity, hard-hit rate, pitch velocity, pitch usage, whiff rate, and chase rate.
 - MLB, position, and pitcher-role averages; player percentiles; period-over-period changes; and sample sizes.
+- A comparison workspace for two or three players, with aligned season and career totals, profile-loading feedback, saved comparison links, and comparison notes. Retired-player comparisons show career totals only.
 
 ### Team Profiles
 
 - MLB team directory with logos and dedicated team pages.
 - Season selector, record, runs scored and allowed, run differential, recent results, and upcoming games.
 - A Team Performance Dashboard with rank-scaled offensive and pitching cards across all 30 teams.
+- A sortable all-MLB Team Stats tab with Hitting and Pitching views; the current team is highlighted. The profile summary includes team AVG, ERA, and HR with league ranks.
 - Recent-form windows, home/road performance, platoon splits, starter/bullpen results, one-run games, strengths, and concerns.
 - Drill-down links to relevant games and players plus tracked plate-appearance and pitch totals.
 - Current 40-man and active roster views with links to player profiles.
@@ -154,7 +157,6 @@ flowchart LR
 - `backend/` — Rails API, data models, synchronization/import services, queries, jobs, Rake tasks, migrations, and specs
 - `frontend/` — Vue routes, views, components, composables, styles, and tests
 - `docs/` — project requirements and expansion plans
-- `output/pdf/` — generated printable reports, including the current codebase overview
 
 ## Local Setup
 
@@ -202,10 +204,14 @@ VITE_API_BASE_URL=http://127.0.0.1:3000 npm run dev
 The main frontend routes are:
 
 - `/` — daily MLB Home dashboard
+- `/schedule` — season schedule browser
+- `/standings` — current MLB standings
 - `/explore` — Stat Explorer for season and Statcast leaderboards
 - `/stat-board` — legacy redirect to Stat Explorer
 - `/games/:id` — tabbed Game Summary and pitch-level analysis
 - `/players/:id` — unified Player Profile
+- `/compare` — two- or three-player season and career comparison
+- `/saved/:id` — redirect to an accessible saved analysis
 - `/teams` — MLB Team Directory
 - `/teams/:id` — analytical Team Profile
 - `/admin` — imports, synchronization, data health, analytics, and database information
@@ -362,11 +368,12 @@ VERSION=1.1.0 bin/rails 'daily_analytics:refresh[2026-04-01,2026-04-30]'
 
 ### Players and Teams
 
-- `GET /api/home` — current daily briefing, games, league leaders, team pulse, and freshness metadata
+- `GET /api/home` — current daily briefing, games, league leaders, team pulse, and freshness metadata; accepts `league=american|national` for league-specific leaders
 - `GET /api/players` — searchable, paginated player directory data
 - `GET /api/players/:id` — unified profile, career history, roster history, analysis, trends, and benchmarks
 - `GET /api/teams`
 - `GET /api/teams/:id` — team profile, performance dashboard, schedule, freshness, and active/40-man rosters
+- `GET /api/standings` — current MLB standings
 - `GET /api/positions`
 
 Player analysis parameters include `range=season|7|14|30|custom`, `start_date`, `end_date`, `pa_window`, and `pitch_window`.
@@ -478,7 +485,7 @@ cd frontend
 npm run build
 ```
 
-The request, service, query, model, composable, component, and view suites cover both normal workflows and important incomplete-data/error states. A printable repository and coverage snapshot is available at `output/pdf/ninelens-codebase-overview.pdf`.
+The request, service, query, model, composable, component, and view suites cover both normal workflows and important incomplete-data/error states.
 
 ## Data Model Notes
 
