@@ -1,4 +1,7 @@
 class PlayerBenchmarkSnapshotQuery
+  CURRENT_BATTING_RATE_METRICS = %w[batter_strikeout_percentage batter_walk_percentage].freeze
+  CURRENT_PITCHING_RATE_METRICS = %w[pitcher_strikeout_percentage pitcher_walk_percentage].freeze
+
   def initialize(player:, start_date: nil, end_date: nil, calculation_version: DailyAnalyticsRefresh::CALCULATION_VERSION)
     @player = player
     @start_date = start_date
@@ -7,7 +10,7 @@ class PlayerBenchmarkSnapshotQuery
   end
 
   def result
-    if latest_rows.empty?
+    if latest_rows.empty? || (start_date.present? && end_date.present? && stale_metric_set?)
       return ContextualBenchmarkRefresh.preview(
         player_id: player.id,
         start_date: start_date,
@@ -93,6 +96,19 @@ class PlayerBenchmarkSnapshotQuery
         pitcher_role_player_count: role&.peer_player_count
       }
     end.sort_by { |metric| [ metric[:metric_group], metric[:display_name], metric[:dimension_value].to_s ] }
+  end
+
+  def stale_metric_set?
+    metric_keys_by_group = latest_rows.each_with_object(Hash.new { |hash, key| hash[key] = Set.new }) do |row, groups|
+      groups[row.league_metric_benchmark.metric_group] << row.league_metric_benchmark.metric_key
+    end
+
+    missing_metrics?(metric_keys_by_group["batting"], CURRENT_BATTING_RATE_METRICS) ||
+      missing_metrics?(metric_keys_by_group["pitching"], CURRENT_PITCHING_RATE_METRICS)
+  end
+
+  def missing_metrics?(cached_metric_keys, required_metric_keys)
+    cached_metric_keys.any? && !required_metric_keys.all? { |metric_key| cached_metric_keys.include?(metric_key) }
   end
 
   def number(value)

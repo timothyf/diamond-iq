@@ -9,7 +9,7 @@ const payload = {
     season: 2026,
     available_seasons: [2025, 2026],
     as_of: '2026-07-19',
-    playoff_odds: { simulations: 5000, remaining_games: 930, model: 'Monte Carlo' },
+    playoff_odds: { simulations: 7000, remaining_games: 930, model: 'Monte Carlo' },
     leagues: [
       {
         key: 'american',
@@ -82,7 +82,7 @@ describe('StandingsView', () => {
     expect(wildCard.text()).toContain('Boston Red Sox')
     expect(wildCard.text()).toContain('2.5')
     expect(wildCard.text()).toContain('38.2%')
-    expect(wrapper.get('[data-test="playoff-odds-note"]').text()).toContain('5,000 simulations')
+    expect(wrapper.get('[data-test="playoff-odds-note"]').text()).toContain('7,000 simulations')
 
     await wrapper.get('[data-test="standings-league-national"]').trigger('click')
     await flushPromises()

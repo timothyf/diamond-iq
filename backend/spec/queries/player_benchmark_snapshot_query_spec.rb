@@ -59,6 +59,30 @@ RSpec.describe PlayerBenchmarkSnapshotQuery do
     )
   end
 
+  it "previews a requested range when cached metrics predate current rate benchmarks" do
+    league = create_benchmark(peer_group_type: "mlb", peer_group_key: "all", average_value: 0.720, player_count: 280)
+    create_percentile(league, {})
+    preview = {
+      available: true,
+      cached: false,
+      source_start_date: start_date,
+      source_end_date: end_date,
+      calculation_version: "1.0.0",
+      calculated_at: Time.current,
+      metrics: [ { metric_key: "batter_strikeout_percentage" } ]
+    }
+    allow(ContextualBenchmarkRefresh).to receive(:preview).with(
+      player_id: player.id,
+      start_date: start_date,
+      end_date: end_date,
+      calculation_version: "1.0.0"
+    ).and_return(preview)
+
+    result = described_class.new(player: player, start_date: start_date, end_date: end_date).result
+
+    expect(result).to eq(preview)
+  end
+
   def create_benchmark(attributes)
     LeagueMetricBenchmark.create!(
       {

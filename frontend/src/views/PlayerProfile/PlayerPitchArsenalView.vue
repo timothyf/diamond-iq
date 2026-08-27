@@ -1,5 +1,6 @@
 <script setup>
 import { computed, inject } from 'vue'
+import ContextualBenchmarksPanel from './ContextualBenchmarksPanel.vue'
 
 const {
   player, rangePresets, tabAnalysisOptions, updateTabAnalysisPeriod, PlayerAnalysisPeriodControls,
@@ -67,5 +68,12 @@ function formatValue(value, unit) {
       </table>
     </div>
     <p v-else class="empty-state">Pitch-level arsenal data is not available for this pitcher.</p>
+
+    <ContextualBenchmarksPanel
+      :metric-keys="['pitch_usage_percentage']"
+      title="Pitch usage benchmarks & percentiles"
+      data-test="pitch-usage-percentiles"
+      empty-message="Pitch-usage benchmark context will appear after daily analytics have been calculated for multiple pitchers."
+    />
   </section>
 </template>

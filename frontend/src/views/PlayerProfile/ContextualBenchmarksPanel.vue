@@ -2,22 +2,42 @@
 import { computed, inject } from 'vue'
 
 const {
-  player, titleize, contextualMetricLabel, contextualValue, peerAverage, peerLabel,
+  player, sectionLoading, titleize, contextualMetricLabel, contextualValue, peerAverage, peerLabel,
   percentileStyle, benchmarkPeriodLabel,
 } = inject('player-profile-context')
 
+const props = defineProps({
+  metricKeys: { type: Array, default: null },
+  title: { type: String, default: 'Benchmarks & percentiles' },
+  dataTest: { type: String, default: 'contextual-benchmarks' },
+  emptyMessage: { type: String, default: 'Benchmark context will appear after daily analytics have been calculated for multiple players.' },
+})
+
 const metricOrder = [
-  'average_exit_velocity',
-  'maximum_exit_velocity',
-  'barrel_percentage',
-  'hard_hit_percentage',
-  'average_bat_speed',
   'ops',
+  'batter_strikeout_percentage',
+  'batter_walk_percentage',
   'batter_whiff_percentage',
   'batter_chase_percentage',
+  'average_exit_velocity',
+  'hard_hit_percentage',
+  'barrel_percentage',
+  'maximum_exit_velocity',
+  'average_bat_speed',
+  'pitcher_strikeout_percentage',
+  'pitcher_walk_percentage',
+  'pitcher_whiff_percentage',
+  'pitcher_chase_percentage',
+  'pitcher_average_velocity',
+  'pitcher_average_spin_rate',
+  'pitch_usage_percentage',
 ]
 
-const benchmarkMetrics = computed(() => [...player.value.contextualBenchmarks.metrics]
+const benchmarkMetrics = computed(() => player.value.contextualBenchmarks.metrics
+  .filter((metric) => props.metricKeys
+    ? props.metricKeys.includes(metric.metricKey)
+    : metric.metricKey !== 'pitch_usage_percentage')
+  .slice()
   .sort((left, right) => {
     const leftIndex = metricOrder.indexOf(left.metricKey)
     const rightIndex = metricOrder.indexOf(right.metricKey)
@@ -26,16 +46,26 @@ const benchmarkMetrics = computed(() => [...player.value.contextualBenchmarks.me
 </script>
 
 <template>
-  <section class="profile-panel contextual-panel" data-test="contextual-benchmarks">
+  <section class="profile-panel contextual-panel" :data-test="dataTest">
     <header class="profile-section-heading">
       <div>
         <p class="eyebrow">League Context</p>
-        <h2>Benchmarks & percentiles</h2>
+        <h2>{{ title }}</h2>
       </div>
       <span>{{ benchmarkPeriodLabel }}</span>
     </header>
 
-    <div v-if="benchmarkMetrics.length" class="context-percentile-board">
+    <p
+      v-if="sectionLoading('analytics').value"
+      class="contextual-benchmarks-loading"
+      role="status"
+      aria-live="polite"
+      data-test="contextual-benchmarks-loading"
+    >
+      <span class="contextual-benchmarks-loading__spinner" aria-hidden="true"></span>
+      Loading benchmark context…
+    </p>
+    <div v-else-if="benchmarkMetrics.length" class="context-percentile-board">
       <div class="context-percentile-board__scale" aria-hidden="true">
         <span>Poor</span>
         <span>Average</span>
@@ -76,7 +106,7 @@ const benchmarkMetrics = computed(() => [...player.value.contextualBenchmarks.me
       </div>
     </div>
     <p v-else class="profile-empty">
-      Benchmark context will appear after daily analytics have been calculated for multiple players.
+      {{ emptyMessage }}
     </p>
   </section>
 </template>

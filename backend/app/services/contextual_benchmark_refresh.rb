@@ -2,6 +2,8 @@ class ContextualBenchmarkRefresh
   SOURCE_NAME = "NineLens contextual benchmarks"
   METRICS = {
     "ops" => { group: "batting", label: "OPS", direction: "higher_better", unit: "rate" },
+    "batter_strikeout_percentage" => { group: "batting", label: "K%", direction: "lower_better", unit: "percent" },
+    "batter_walk_percentage" => { group: "batting", label: "BB%", direction: "higher_better", unit: "percent" },
     "average_exit_velocity" => { group: "batting", label: "Average exit velocity", direction: "higher_better", unit: "mph" },
     "maximum_exit_velocity" => { group: "batting", label: "Max exit velocity", direction: "higher_better", unit: "mph" },
     "barrel_percentage" => { group: "batting", label: "Barrel rate", direction: "higher_better", unit: "percent" },
@@ -10,12 +12,14 @@ class ContextualBenchmarkRefresh
     "batter_whiff_percentage" => { group: "batting", label: "Whiff rate", direction: "lower_better", unit: "percent" },
     "batter_chase_percentage" => { group: "batting", label: "Chase rate", direction: "lower_better", unit: "percent" },
     "pitcher_average_velocity" => { group: "pitching", label: "Average velocity", direction: "higher_better", unit: "mph" },
+    "pitcher_strikeout_percentage" => { group: "pitching", label: "K%", direction: "higher_better", unit: "percent" },
+    "pitcher_walk_percentage" => { group: "pitching", label: "BB%", direction: "lower_better", unit: "percent" },
     "pitcher_average_spin_rate" => { group: "pitching", label: "Average spin rate", direction: "neutral", unit: "rpm" },
     "pitcher_whiff_percentage" => { group: "pitching", label: "Whiff rate", direction: "higher_better", unit: "percent" },
     "pitcher_chase_percentage" => { group: "pitching", label: "Chase rate", direction: "higher_better", unit: "percent" },
     "pitch_usage_percentage" => { group: "pitch_type", label: "Pitch usage", direction: "neutral", unit: "percent" }
   }.freeze
-  BATTING_TOTAL_KEYS = %w[plate_appearances at_bats hits doubles triples home_runs walks hit_by_pitch sacrifice_flies].freeze
+  BATTING_TOTAL_KEYS = %w[plate_appearances at_bats hits doubles triples home_runs walks strikeouts hit_by_pitch sacrifice_flies].freeze
   BATTER_QUALIFIER_PER_TEAM_GAME = 2.1
   PITCHER_QUALIFIER_PER_TEAM_GAME = 1.25
   SEASON_STAT_NAMES = {
@@ -26,6 +30,7 @@ class ContextualBenchmarkRefresh
     "triples" => "triples",
     "home_runs" => "homeRuns",
     "walks" => "baseOnBalls",
+    "strikeouts" => "strikeOuts",
     "hit_by_pitch" => "hitByPitch",
     "sacrifice_flies" => "sacFlies"
   }.freeze
@@ -147,6 +152,7 @@ class ContextualBenchmarkRefresh
 
   def observations(range_start, range_end)
     batting_observations(range_start, range_end) +
+      pitching_observations(range_start, range_end) +
       batter_statcast_observations(range_start, range_end) +
       pitcher_statcast_observations(range_start, range_end) +
       pitch_usage_observations(range_start, range_end)
@@ -201,20 +207,39 @@ class ContextualBenchmarkRefresh
 
   def batting_observations(range_start, range_end)
     official_totals = full_season_range?(range_start, range_end) ? season_batting_totals(end_date.year) : {}
-    daily_rows(PlayerBattingDaily, range_start, range_end).group_by(&:player_id).filter_map do |player_id, rows|
+    daily_rows(PlayerBattingDaily, range_start, range_end).group_by(&:player_id).flat_map do |player_id, rows|
       totals = official_totals[player_id] || sum_metrics(rows, BATTING_TOTAL_KEYS)
-      next if totals["plate_appearances"].zero? || totals["at_bats"].zero?
+      next [] if totals["plate_appearances"].zero?
 
-      value = ops(totals)
-      observation(
-        player_id: player_id,
-        metric_key: "ops",
-        value: value,
-        sample_size: totals["plate_appearances"],
-        numerator: value * totals["plate_appearances"],
-        denominator: totals["plate_appearances"],
-        components: totals
-      )
+      observations = [
+        rate_observation(player_id, "batter_strikeout_percentage", totals["strikeouts"], totals["plate_appearances"], scale: 100),
+        rate_observation(player_id, "batter_walk_percentage", totals["walks"], totals["plate_appearances"], scale: 100)
+      ]
+      if totals["at_bats"].positive?
+        value = ops(totals)
+        observations.unshift(observation(
+          player_id: player_id,
+          metric_key: "ops",
+          value: value,
+          sample_size: totals["plate_appearances"],
+          numerator: value * totals["plate_appearances"],
+          denominator: totals["plate_appearances"],
+          components: totals
+        ))
+      end
+      observations.compact
+    end
+  end
+
+  def pitching_observations(range_start, range_end)
+    daily_rows(PlayerPitchingDaily, range_start, range_end).group_by(&:player_id).flat_map do |player_id, rows|
+      batters_faced = sum_metric(rows, "batters_faced")
+      next [] if batters_faced.zero?
+
+      [
+        rate_observation(player_id, "pitcher_strikeout_percentage", sum_metric(rows, "strikeouts"), batters_faced, scale: 100),
+        rate_observation(player_id, "pitcher_walk_percentage", sum_metric(rows, "walks"), batters_faced, scale: 100)
+      ].compact
     end
   end
 

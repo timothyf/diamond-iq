@@ -1237,6 +1237,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+.contextual-benchmarks-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 1rem;
+  border-radius: 12px;
+  color: #526f7d;
+  background: rgba(16, 38, 61, 0.05);
+  font-weight: 700;
+}
+
+.contextual-benchmarks-loading__spinner {
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(26, 116, 128, 0.25);
+  border-top-color: #1a7480;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 .context-percentile-board__scale {
   display: grid;
   grid-template-columns: minmax(10rem, 1fr) minmax(14rem, 2.5fr) minmax(5.5rem, 0.65fr);

@@ -13,14 +13,14 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     create_player_position(player: batter_one, position: third_base, attributes: { is_primary: true })
     create_player_position(player: batter_two, position: third_base, attributes: { is_primary: true })
 
-    create_batting_daily(batter_one, date, plate_appearances: 5, at_bats: 4, hits: 2, doubles: 1, triples: 0, home_runs: 0, walks: 1)
-    create_batting_daily(batter_two, date, plate_appearances: 4, at_bats: 4, hits: 1, doubles: 0, triples: 0, home_runs: 0, walks: 0)
+    create_batting_daily(batter_one, date, plate_appearances: 5, at_bats: 4, hits: 2, doubles: 1, triples: 0, home_runs: 0, walks: 1, strikeouts: 1)
+    create_batting_daily(batter_two, date, plate_appearances: 4, at_bats: 4, hits: 1, doubles: 0, triples: 0, home_runs: 0, walks: 0, strikeouts: 2)
 
     create_batter_split(batter_one, date, average_exit_velocity: 100, maximum_exit_velocity: 110, barrel_count: 1, barrel_sample_size: 2, average_bat_speed: 76, bat_speed_sample_size: 4, batted_balls: 2, hard_hit_percentage: 100, swings: 4, whiffs: 1, chase_opportunities: 4, chases: 1)
     create_batter_split(batter_two, date, average_exit_velocity: 90, maximum_exit_velocity: 105, barrel_count: 0, barrel_sample_size: 2, average_bat_speed: 72, bat_speed_sample_size: 4, batted_balls: 2, hard_hit_percentage: 0, swings: 4, whiffs: 2, chase_opportunities: 4, chases: 2)
 
-    create_pitching_daily(starter, games: 1, games_started: 1)
-    create_pitching_daily(reliever, games: 1, games_started: 0)
+    create_pitching_daily(starter, games: 1, games_started: 1, batters_faced: 5, strikeouts: 2, walks: 1)
+    create_pitching_daily(reliever, games: 1, games_started: 0, batters_faced: 5, strikeouts: 1, walks: 2)
     create_pitcher_split(starter, average_velocity: 96, average_spin_rate: 2400, swings: 5, whiffs: 2, chase_opportunities: 4, chases: 2)
     create_pitcher_split(reliever, average_velocity: 94, average_spin_rate: 2200, swings: 5, whiffs: 1, chase_opportunities: 4, chases: 1)
     create_pitch_type(starter, "FF", 80)
@@ -58,9 +58,17 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
     chase = LeagueMetricBenchmark.find_by!(metric_key: "batter_chase_percentage", peer_group_type: "mlb")
     expect(chase.average_value.to_f).to eq(37.5)
     expect(PlayerMetricPercentile.find_by!(player: batter_one, league_metric_benchmark: chase).percentile.to_f).to eq(75.0)
+    batter_strikeout_rate = LeagueMetricBenchmark.find_by!(metric_key: "batter_strikeout_percentage", peer_group_type: "mlb")
+    batter_walk_rate = LeagueMetricBenchmark.find_by!(metric_key: "batter_walk_percentage", peer_group_type: "mlb")
+    expect(batter_strikeout_rate.average_value.to_f).to be_within(0.0001).of(33.333333)
+    expect(batter_walk_rate.average_value.to_f).to be_within(0.0001).of(11.111111)
 
     starter_velocity = LeagueMetricBenchmark.find_by!(metric_key: "pitcher_average_velocity", peer_group_type: "pitcher_role", peer_group_key: "starter")
     expect(starter_velocity.average_value.to_f).to eq(96.0)
+    pitcher_strikeout_rate = LeagueMetricBenchmark.find_by!(metric_key: "pitcher_strikeout_percentage", peer_group_type: "mlb")
+    pitcher_walk_rate = LeagueMetricBenchmark.find_by!(metric_key: "pitcher_walk_percentage", peer_group_type: "mlb")
+    expect(pitcher_strikeout_rate.average_value.to_f).to eq(30.0)
+    expect(pitcher_walk_rate.average_value.to_f).to eq(30.0)
     usage = LeagueMetricBenchmark.find_by!(metric_key: "pitch_usage_percentage", dimension_value: "FF", peer_group_type: "mlb")
     expect(usage.average_value.to_f).to eq(65.0)
     expect(usage.sample_size).to eq(200)
@@ -122,6 +130,7 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
       "triples" => 1,
       "homeRuns" => 5,
       "baseOnBalls" => 10,
+      "strikeOuts" => 20,
       "hitByPitch" => 2,
       "sacFlies" => 1
     }.each do |name, value|
@@ -135,8 +144,12 @@ RSpec.describe ContextualBenchmarkRefresh, type: :service do
 
     result = described_class.preview(player_id: batter_one.id, start_date: Date.new(date.year, 1, 1), end_date: date)
     ops = result.fetch(:metrics).find { |metric| metric[:metric_key] == "ops" }
+    strikeout_rate = result.fetch(:metrics).find { |metric| metric[:metric_key] == "batter_strikeout_percentage" }
+    walk_rate = result.fetch(:metrics).find { |metric| metric[:metric_key] == "batter_walk_percentage" }
 
     expect(ops).to include(raw_value: 0.941681, sample_size: 113)
+    expect(strikeout_rate).to include(raw_value: 17.699115, sample_size: 113)
+    expect(walk_rate).to include(raw_value: 8.849558, sample_size: 113)
   end
 
   def common_daily(player, metric_date)

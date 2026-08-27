@@ -1,7 +1,9 @@
 import { flushPromises, mount } from '@vue/test-utils'
+import { computed, ref } from 'vue'
 import { vi } from 'vitest'
 
 import PlayerProfileView from '../PlayerProfile/PlayerProfileView.vue'
+import ContextualBenchmarksPanel from '../PlayerProfile/ContextualBenchmarksPanel.vue'
 import AddToWatchlistControl from '../../components/AddToWatchlistControl.vue'
 
 function apiPayload() {
@@ -290,6 +292,32 @@ function apiPayload() {
             mlb_player_count: 280,
           },
           {
+            metric_key: 'batter_strikeout_percentage',
+            metric_group: 'batting',
+            display_name: 'K%',
+            unit: 'percent',
+            raw_value: 21.7,
+            mlb_average: 22.5,
+            position_average: 23.1,
+            position_key: 'CF',
+            percentile: 55,
+            sample_size: 480,
+            mlb_player_count: 280,
+          },
+          {
+            metric_key: 'batter_walk_percentage',
+            metric_group: 'batting',
+            display_name: 'BB%',
+            unit: 'percent',
+            raw_value: 9.8,
+            mlb_average: 8.4,
+            position_average: 8.1,
+            position_key: 'CF',
+            percentile: 66,
+            sample_size: 480,
+            mlb_player_count: 280,
+          },
+          {
             metric_key: 'average_exit_velocity',
             metric_group: 'batting',
             display_name: 'Average exit velocity',
@@ -423,6 +451,24 @@ function apiPayloadWith(mutator) {
 }
 
 describe('PlayerProfileView', () => {
+  it('shows a loading indicator while benchmark context is refreshing', () => {
+    const wrapper = mount(ContextualBenchmarksPanel, {
+      global: {
+        provide: {
+          'player-profile-context': {
+            player: ref({ contextualBenchmarks: { metrics: [] } }),
+            sectionLoading: () => computed(() => true),
+          },
+        },
+      },
+    })
+
+    const indicator = wrapper.get('[data-test="contextual-benchmarks-loading"]')
+    expect(indicator.text()).toContain('Loading benchmark context…')
+    expect(indicator.attributes('role')).toBe('status')
+    expect(indicator.find('.contextual-benchmarks-loading__spinner').exists()).toBe(true)
+  })
+
   it('opens data provenance from the profile header in a modal', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => apiPayload() }))
 
@@ -567,6 +613,14 @@ describe('PlayerProfileView', () => {
     expect(benchmarks.text()).toContain('Max exit velocity')
     expect(benchmarks.text()).toContain('Barrel rate')
     expect(benchmarks.text()).toContain('Bat speed')
+    expect(benchmarks.text()).toContain('K%')
+    expect(benchmarks.text()).toContain('BB%')
+    expect(benchmarks.text()).toContain('21.7%')
+    expect(benchmarks.text()).toContain('9.8%')
+    const benchmarkLabels = benchmarks.findAll('.context-percentile-row__metric > strong').map((element) => element.text())
+    expect(benchmarkLabels).toEqual([
+      'OPS', 'K%', 'BB%', 'Average exit velocity', 'Barrel rate', 'Max exit velocity', 'Bat speed',
+    ])
     expect(benchmarks.text()).toContain('0.842')
     expect(benchmarks.text()).toContain('0.720')
     expect(benchmarks.text()).toContain('CF')
@@ -686,6 +740,21 @@ describe('PlayerProfileView', () => {
           run_value: -1.24,
         }],
       }
+      response.data.contextual_benchmarks.metrics.push({
+        metric_key: 'pitch_usage_percentage',
+        metric_group: 'pitch_type',
+        display_name: 'Pitch usage',
+        unit: 'percent',
+        dimension_type: 'pitch_type',
+        dimension_value: 'FF',
+        raw_value: 54.2,
+        mlb_average: 48.5,
+        pitcher_role_average: 51.2,
+        pitcher_role_key: 'starter',
+        percentile: 68,
+        sample_size: 64,
+        mlb_player_count: 280,
+      })
       response.data.batted_ball_profile.pitcher_metrics = {
         available: true,
         batted_ball_count: 118,
@@ -738,6 +807,8 @@ describe('PlayerProfileView', () => {
     })
     await flushPromises()
 
+    expect(wrapper.get('[data-test="contextual-benchmarks"]').text()).not.toContain('Pitch usage')
+
     await wrapper.get('[data-test="player-page-tab-batted-ball-profile"]').trigger('click')
     const table = wrapper.get('[data-test="pitcher-batted-ball-table"]')
     expect(table.text()).toContain('GB%')
@@ -752,6 +823,7 @@ describe('PlayerProfileView', () => {
     expect(table.get('tbody').text()).toContain('2025')
 
     await wrapper.get('[data-test="player-page-tab-pitch-arsenal"]').trigger('click')
+    await flushPromises()
     const arsenal = wrapper.get('[data-test="player-page-panel-pitch-arsenal"]')
     expect(arsenal.text()).toContain('Pitch arsenal and effectiveness')
     expect(arsenal.text()).toContain('4-Seam Fastball')
@@ -759,6 +831,10 @@ describe('PlayerProfileView', () => {
     expect(arsenal.text()).toContain('Active spin')
     expect(arsenal.text()).toContain('54.2%')
     expect(arsenal.text()).toContain('-1.24')
+    const pitchUsagePercentiles = arsenal.get('[data-test="pitch-usage-percentiles"]')
+    expect(pitchUsagePercentiles.text()).toContain('Pitch usage benchmarks & percentiles')
+    expect(pitchUsagePercentiles.text()).toContain('Pitch usage · FF')
+    expect(pitchUsagePercentiles.text()).toContain('54.2%')
 
     await arsenal.get('[data-test="tab-analysis-period-controls"] button').trigger('click')
     await flushPromises()
