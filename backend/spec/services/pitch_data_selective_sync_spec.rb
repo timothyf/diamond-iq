@@ -31,11 +31,21 @@ RSpec.describe "selective Statcast pitch synchronization" do
       data: { rows: [ { "game_pk" => game.mlb_id.to_s, "at_bat_number" => "2", "pitch_number" => "1", "game_date" => "2026-07-02" } ] }
     )
 
+    progress_events = []
     result = PitchDataBatchSync.call(
-      start_date: "2026-07-02", end_date: "2026-07-02", game_types: "R", chunk_days: 1, replace_existing: true
+      start_date: "2026-07-02",
+      end_date: "2026-07-02",
+      game_types: "R",
+      chunk_days: 1,
+      replace_existing: true,
+      progress_callback: ->(**event) { progress_events << event }
     )
 
     expect(result).to include(success: true)
+    expect(progress_events).to include(
+      hash_including(event: :download_started, chunk_index: 1, chunk_count: 1, game_count: 1),
+      hash_including(event: :download_finished, row_count: 1)
+    )
     expect(PitchDatum.where(game_id: game.id).pluck(:at_bat_number, :pitch_number)).to eq([ [ 2, 1 ] ])
     expect(game.reload.pitch_data_complete_at).to be_present
     expect(game.pitch_data_row_count).to eq(1)

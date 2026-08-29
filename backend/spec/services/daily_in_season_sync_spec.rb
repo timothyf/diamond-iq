@@ -74,6 +74,33 @@ RSpec.describe DailyInSeasonSync do
     expect(ContextualBenchmarkRefresh).to have_received(:call)
   end
 
+  it "reports progress while each Statcast download chunk is running" do
+    allow(PitchDataBatchSync).to receive(:call) do |progress_callback:, **_options|
+      progress_callback.call(
+        event: :download_started,
+        chunk_start: date,
+        chunk_end: date,
+        chunk_index: 1,
+        chunk_count: 1,
+        game_count: 4
+      )
+      progress_callback.call(
+        event: :download_finished,
+        chunk_start: date,
+        chunk_end: date,
+        chunk_index: 1,
+        chunk_count: 1,
+        game_count: 4,
+        row_count: 612,
+        message: "Downloaded 612 pitch data rows from Baseball Savant"
+      )
+      success_result
+    end
+
+    expect { described_class.call(start_date: date, end_date: date) }
+      .to output(/\[Statcast 1\/1\] Downloading 2026-08-13 through 2026-08-13 \(4 games\).*Downloaded 612 pitch rows/m).to_stdout
+  end
+
   def success_result(data = {})
     { success: true, message: "ok", data: data }
   end

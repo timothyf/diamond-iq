@@ -25,7 +25,8 @@ class DailyInSeasonSync
         start_date: start_date,
         end_date: end_date,
         game_types: GAME_TYPES,
-        chunk_days: NineLensConfig.fetch(:operations, :pitch_data, :default_chunk_days)
+        chunk_days: NineLensConfig.fetch(:operations, :pitch_data, :default_chunk_days),
+        progress_callback: ->(**event) { report_statcast_download_progress(**event) }
       )
     end
     synchronize_season_stats(summary)
@@ -100,6 +101,21 @@ class DailyInSeasonSync
 
     $stdout.flush
     raise
+  end
+
+  def report_statcast_download_progress(event:, chunk_start:, chunk_end:, chunk_index:, chunk_count:, game_count:, row_count: nil, message: nil)
+    range = "#{chunk_start.iso8601} through #{chunk_end.iso8601}"
+    prefix = "  [Statcast #{chunk_index}/#{chunk_count}]"
+
+    case event
+    when :download_started
+      puts "#{prefix} Downloading #{range} (#{game_count} game#{'s' unless game_count == 1})..."
+    when :download_finished
+      puts "#{prefix} Downloaded #{row_count.to_i} pitch rows for #{range}."
+    when :download_failed
+      puts "#{prefix} Download failed for #{range}: #{message}"
+    end
+    $stdout.flush
   end
 
   def parse_date(value)

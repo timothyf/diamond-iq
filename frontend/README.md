@@ -34,7 +34,24 @@ npm run build     # produce a production build in dist/
 npm run preview   # serve the production build locally
 npm test          # run Vitest in watch mode
 npm run test:run  # run the full Vitest suite once
+npm run test:e2e  # run Playwright browser tests against the Rails test database
 ```
+
+## End-to-end browser tests
+
+Playwright starts a Rails server in the `test` environment on port 3001 and Vite on port 4173. Before each run it prepares the Rails test database and upserts two dedicated accounts:
+
+- `e2e.viewer@ninelens.test`
+- `e2e.admin@ninelens.test`
+
+The initial suite covers sign-in, the authenticated Watchlists route, and viewer versus administrator access to `/admin`. Install the Chromium browser once before the first run:
+
+```sh
+npx playwright install chromium
+npm run test:e2e
+```
+
+Set `E2E_BASE_URL` to run the tests against already-running servers; that mode does not start local servers.
 
 ## Application areas
 
