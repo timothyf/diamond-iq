@@ -80,6 +80,9 @@ module Api
         active: profile.raw_data.to_h["active"],
         last_played_date: profile.raw_data.to_h["lastPlayedDate"],
         draft_year: Integer(profile.raw_data.to_h["draftYear"], exception: false),
+        draft_round: serialized_draft_round(profile),
+        draft_round_pick_number: serialized_draft_value(profile, "roundPickNumber"),
+        draft_pick_number: serialized_draft_value(profile, "pickNumber"),
         draft_team: serialized_draft_team(profile),
         awards: serialized_awards(profile),
         all_star_selections: serialized_all_star_selections(profile),
@@ -104,11 +107,25 @@ module Api
     end
 
     def serialized_draft_team(profile)
-      draft = Array(profile.raw_data.to_h["drafts"]).find { |entry| entry.is_a?(Hash) && entry.dig("team", "id").present? }
+      draft = serialized_draft(profile)
       team = draft&.fetch("team")
       return if team.blank?
 
       { id: Integer(team["id"], exception: false), name: team["name"] }
+    end
+
+    def serialized_draft_value(profile, keys)
+      value = Array(keys).lazy.map { |key| serialized_draft(profile)&.[](key) }.find(&:present?)
+      Integer(value, exception: false)
+    end
+
+    def serialized_draft_round(profile)
+      value = Array(%w[round pickRound]).lazy.map { |key| serialized_draft(profile)&.[](key) }.find(&:present?)
+      Integer(value, exception: false) || value
+    end
+
+    def serialized_draft(profile)
+      Array(profile.raw_data.to_h["drafts"]).find { |entry| entry.is_a?(Hash) && entry.dig("team", "id").present? }
     end
 
     def serialized_all_star_selections(profile)

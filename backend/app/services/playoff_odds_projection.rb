@@ -1,12 +1,15 @@
 class PlayoffOddsProjection
-  DEFAULT_SIMULATIONS = NineLensConfig.fetch(:operations, :projections, :playoff_odds_simulations)
-  REGRESSION_RUNS = NineLensConfig.fetch(:operations, :projections, :regression_runs)
-  HOME_FIELD_ADVANTAGE = NineLensConfig.fetch(:operations, :projections, :home_field_advantage)
-  
-  def initialize(divisions:, remaining_games:, simulations: DEFAULT_SIMULATIONS, seed: 0)
+  DEFAULT_SIMULATIONS = 10_000
+  DEFAULT_REGRESSION_RUNS = 200.0
+  DEFAULT_HOME_FIELD_ADVANTAGE = 0.035
+
+  def initialize(divisions:, remaining_games:, simulations: nil, seed: 0)
+    settings = projection_settings
     @divisions = divisions
     @remaining_games = remaining_games
-    @simulations = simulations
+    @simulations = (simulations || settings.fetch(:playoff_odds_simulations, DEFAULT_SIMULATIONS)).to_i
+    @regression_runs = settings.fetch(:regression_runs, DEFAULT_REGRESSION_RUNS).to_f
+    @home_field_advantage = settings.fetch(:home_field_advantage, DEFAULT_HOME_FIELD_ADVANTAGE).to_f
     @random = Random.new(seed)
   end
 
@@ -31,7 +34,11 @@ class PlayoffOddsProjection
 
   private
 
-  attr_reader :divisions, :remaining_games, :simulations, :random
+  attr_reader :divisions, :remaining_games, :simulations, :regression_runs, :home_field_advantage, :random
+
+  def projection_settings
+    NineLensConfig.fetch(:operations).fetch(:projections, {})
+  end
 
   def team_ids
     @team_ids ||= divisions.flat_map { |division| division.fetch(:teams) }.map { |row| row.dig(:team, :id) }
@@ -49,8 +56,8 @@ class PlayoffOddsProjection
     @strength ||= {}
     @strength[team_id] ||= begin
       row = rows_by_team_id.fetch(team_id)
-      scored = row.fetch(:runs_scored) + REGRESSION_RUNS / 2.0
-      allowed = row.fetch(:runs_allowed) + REGRESSION_RUNS / 2.0
+      scored = row.fetch(:runs_scored) + regression_runs / 2.0
+      allowed = row.fetch(:runs_allowed) + regression_runs / 2.0
       scored**1.83 / (scored**1.83 + allowed**1.83)
     end
   end
@@ -61,7 +68,7 @@ class PlayoffOddsProjection
       away_id = game.away_team_id
       next unless records.key?(home_id) && records.key?(away_id)
 
-      home_probability = [ [ 0.5 + strength(home_id) - strength(away_id) + HOME_FIELD_ADVANTAGE, 0.1 ].max, 0.9 ] .min
+      home_probability = [ [ 0.5 + strength(home_id) - strength(away_id) + home_field_advantage, 0.1 ].max, 0.9 ] .min
       winner_id, loser_id = random.rand < home_probability ? [ home_id, away_id ] : [ away_id, home_id ]
       records[winner_id][0] += 1
       records[loser_id][1] += 1

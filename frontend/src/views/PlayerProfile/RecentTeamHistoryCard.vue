@@ -20,7 +20,7 @@ const {
       <div>
         <dt>Draft information</dt>
         <dd v-if="player.profile?.draftYear">
-          {{ player.profile.draftYear }} MLB Draft<template v-if="player.profile.draftTeam?.name"> · {{ player.profile.draftTeam.name }}</template>
+          {{ player.profile.draftYear }} MLB Draft<template v-if="player.profile.draftRound"> · Round {{ player.profile.draftRound }}</template><template v-if="player.profile.draftRoundPickNumber">, Pick {{ player.profile.draftRoundPickNumber }}<template v-if="player.profile.draftPickNumber"> ({{ player.profile.draftPickNumber }})</template></template><template v-else-if="player.profile.draftPickNumber">, Pick {{ player.profile.draftPickNumber }}</template><template v-if="player.profile.draftTeam?.name"> · {{ player.profile.draftTeam.name }}</template>
         </dd>
         <dd v-else>Not available</dd>
       </div>

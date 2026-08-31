@@ -13,6 +13,9 @@ describe('RecentTeamHistoryCard', () => {
     const player = {
       profile: {
         draftYear: 2021,
+        draftRound: 1,
+        draftRoundPickNumber: 3,
+        draftPickNumber: 220,
         draftTeam: { name: 'San Diego Padres' },
         awards: [],
         allStarSelections: [2026],
@@ -59,6 +62,7 @@ describe('RecentTeamHistoryCard', () => {
 
     expect(wrapper.get('[data-test="trade-history"]').text()).toContain('Washington Nationals traded Juan Soto')
     expect(wrapper.text()).toContain('To San Diego Padres')
+    expect(wrapper.text()).toContain('2021 MLB Draft · Round 1, Pick 3 (220) · San Diego Padres')
     expect(wrapper.text()).toContain('To Washington Nationals')
     expect(wrapper.text()).toContain('Juan Soto · Josh Bell')
     expect(wrapper.text()).toContain('James Wood · CJ Abrams')

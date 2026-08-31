@@ -71,7 +71,7 @@ RSpec.describe "Api::Players", type: :request do
           "active" => false,
           "lastPlayedDate" => "2023-10-01",
           "draftYear" => 1999,
-          "drafts" => [ { "team" => { "id" => 135, "name" => "San Diego Padres" } } ],
+          "drafts" => [ { "pickRound" => "CB-A", "roundPickNumber" => "3", "pickNumber" => "220", "team" => { "id" => 135, "name" => "San Diego Padres" } } ],
           "awards" => [
             { "id" => "ALMVP", "name" => "AL Most Valuable Player", "season" => "2012", "date" => "2012-11-15" },
             { "id" => "ALAS", "name" => "AL All-Star", "season" => "2012", "date" => "2012-07-10" },
@@ -96,6 +96,9 @@ RSpec.describe "Api::Players", type: :request do
     expect(json_body.dig("data", "profile", "last_played_date")).to eq("2023-10-01")
     expect(json_body.dig("data", "profile", "mlb_debut_date")).to eq("2003-06-20")
     expect(json_body.dig("data", "profile", "draft_year")).to eq(1999)
+    expect(json_body.dig("data", "profile", "draft_round")).to eq("CB-A")
+    expect(json_body.dig("data", "profile", "draft_round_pick_number")).to eq(3)
+    expect(json_body.dig("data", "profile", "draft_pick_number")).to eq(220)
     expect(json_body.dig("data", "profile", "draft_team")).to eq("id" => 135, "name" => "San Diego Padres")
     expect(json_body.dig("data", "profile", "awards")).to include(
       include("id" => "ALMVP", "name" => "AL Most Valuable Player", "season" => 2012),
