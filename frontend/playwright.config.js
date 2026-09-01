@@ -20,12 +20,13 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL,
+    testIdAttribute: 'data-test',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
   webServer: useManagedServers ? [
     {
-      command: 'bundle exec rails server -e test -p 3001',
+      command: 'bundle exec rails server -e test -p 3001 -P tmp/pids/playwright-test-server.pid',
       cwd: '../backend',
       url: 'http://127.0.0.1:3001/up',
       timeout: 120_000,

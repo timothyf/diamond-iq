@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe AdminDataHealthCheck do
+  before { allow(MlbTotalsReconciliation).to receive(:call).and_return([]) }
+
   it "reports contextual completeness, linkage, profile, position, and analytics problems" do
     game = create_game(
       official_date: ApplicationCalendar.current_date - 1.day,

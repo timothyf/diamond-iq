@@ -39,7 +39,7 @@ npm run test:e2e  # run Playwright browser tests against the Rails test database
 
 ## End-to-end browser tests
 
-Playwright starts a Rails server in the `test` environment on port 3001 and Vite on port 4173. Before each run it prepares the Rails test database and upserts two dedicated accounts:
+Playwright starts an isolated Rails server in the `test` environment on port 3001 and Vite on port 4173. It uses a dedicated PID file, so it can run while the normal development Rails server is running. Before each run it prepares the Rails test database and upserts two dedicated accounts:
 
 - `e2e.viewer@ninelens.test`
 - `e2e.admin@ninelens.test`

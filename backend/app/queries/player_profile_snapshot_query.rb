@@ -1257,8 +1257,42 @@ class PlayerProfileSnapshotQuery
     @all_season_rows ||= begin
       stored_rows = player.player_season_stats.includes(:stat_type, :team).to_a
       normalized_rows = normalize_mislabeled_team_totals(stored_rows)
+      normalized_rows = normalize_duplicate_team_scopes(normalized_rows)
       corrected_rows = correct_mismatched_team_rows(normalized_rows)
       corrected_rows + derived_game_stat_rows(corrected_rows)
+    end
+  end
+
+  # Historical MLB responses can contain the same team split more than once
+  # under different abbreviations while retaining the same team id. Treat
+  # those rows as one split; otherwise team_rows_for_season groups them by the
+  # Team record and season_additive_value sums the duplicate values.
+  def normalize_duplicate_team_scopes(stored_rows)
+    canonical_scopes = stored_rows
+      .select { |row| row.scope_type == "team" && row.team_id.present? }
+      .group_by { |row| [ row.stat_type.category, row.season, row.team_id ] }
+      .filter_map do |(_category, _season, _team_id), rows|
+        scopes = rows.group_by(&:scope_key)
+        next if scopes.one? || !duplicate_scope_values?(scopes)
+
+        canonical_scope = rows.first.team&.abbreviation.to_s.presence
+        canonical_scope ||= scopes.keys.compact.min_by { |scope| scope.to_s }
+        [ rows.first.stat_type.category, rows.first.season, rows.first.team_id, canonical_scope ]
+      end.to_h { |category, season, team_id, scope| [[ category, season, team_id ], scope] }
+
+    stored_rows.reject do |row|
+      canonical_scope = canonical_scopes[[ row.stat_type.category, row.season, row.team_id ]]
+      canonical_scope.present? && row.scope_key != canonical_scope
+    end
+  end
+
+  def duplicate_scope_values?(scopes)
+    scope_values = scopes.values.map do |scope_rows|
+      scope_rows.to_h { |row| [ row.stat_type.name, row.value ] }
+    end
+    shared_stat_names = scope_values.map(&:keys).reduce(&:&)
+    shared_stat_names.present? && shared_stat_names.all? do |stat_name|
+      scope_values.map { |values| values.fetch(stat_name) }.uniq.one?
     end
   end
 

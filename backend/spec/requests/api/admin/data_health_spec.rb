@@ -2,6 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Api::Admin::DataHealth", type: :request do
   around { |example| with_admin_api_token("test-admin-token", &example) }
+  before { allow(MlbTotalsReconciliation).to receive(:call).and_return([]) }
   it "returns the current data-health report" do
     get api_admin_data_health_path, headers: admin_headers
 

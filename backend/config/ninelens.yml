@@ -53,6 +53,17 @@ default: &default
     player_profiles:
       max_people_per_request: <%= ENV.fetch("PLAYER_PROFILES_MAX_PEOPLE_PER_REQUEST", 100) %>
       batch_size: <%= ENV.fetch("PLAYER_PROFILES_BATCH_SIZE", 50) %>
+    official_reconciliation:
+      team_mlb_ids: <%= ENV.fetch("OFFICIAL_RECONCILIATION_TEAM_MLB_IDS", "116,119,147").split(",").map(&:to_i) %>
+      player_selections:
+        - mlb_id: 682985
+          category: batting
+        - mlb_id: 592450
+          category: batting
+        - mlb_id: 660271
+          category: batting
+        - mlb_id: 669373
+          category: pitching
     estimates:
       game_details_seconds_per_game: <%= ENV.fetch("GAME_DETAILS_DEFAULT_SECONDS_PER_GAME", 50.0) %>
       game_details_low_range_factor: <%= ENV.fetch("GAME_DETAILS_LOW_RANGE_FACTOR", 0.8) %>

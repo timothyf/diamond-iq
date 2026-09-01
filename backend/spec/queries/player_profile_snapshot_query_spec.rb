@@ -353,6 +353,41 @@ RSpec.describe PlayerProfileSnapshotQuery do
     expect(snapshot.dig(:career_overview, :seasons, 0, :stats)).to include(hash_including(key: "avg", value: "0.322"))
   end
 
+  it "does not double team stats when identical scopes share a team id" do
+    team = create_team(abbreviation: "TEX")
+    player = create_player(team: team)
+    games = StatType.find_or_create_by!(name: "gamesPlayed") { |stat| stat.label = "G"; stat.category = "batting" }
+    at_bats = StatType.find_or_create_by!(name: "atBats") { |stat| stat.label = "AB"; stat.category = "batting" }
+    hits = StatType.find_or_create_by!(name: "hits") { |stat| stat.label = "H"; stat.category = "batting" }
+
+    [ [ "TEX", 120 ], [ "WAS", 120 ] ].each do |scope_key, value|
+      create_player_season_stat(
+        player: player,
+        stat_type: games,
+        attributes: { team: team, season: 2006, scope_key: scope_key, value: value }
+      )
+      create_player_season_stat(
+        player: player,
+        stat_type: at_bats,
+        attributes: { team: team, season: 2006, scope_key: scope_key, value: 423 }
+      )
+      create_player_season_stat(
+        player: player,
+        stat_type: hits,
+        attributes: { team: team, season: 2006, scope_key: scope_key, value: 121 }
+      )
+    end
+
+    season = described_class.new(player: player).result.dig(:career_overview, :seasons, 0)
+
+    expect(season.fetch(:team_rows).size).to eq(1)
+    expect(season.fetch(:stats)).to include(
+      hash_including(key: "gamesPlayed", value: "120"),
+      hash_including(key: "atBats", value: "423"),
+      hash_including(key: "hits", value: "121")
+    )
+  end
+
   it "combines baseball innings and recalculates career pitching rates" do
     player = create_player
     pitcher = create_position(mlb_code: "1", abbreviation: "P", name: "Pitcher", position_type: "pitcher")

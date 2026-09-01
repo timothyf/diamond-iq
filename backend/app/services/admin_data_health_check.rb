@@ -19,7 +19,8 @@ class AdminDataHealthCheck
       players_missing_profiles,
       players_missing_primary_positions,
       synchronized_dates_missing_analytics,
-      analytics_on_old_versions
+      analytics_on_old_versions,
+      *MlbTotalsReconciliation.call
     ]
 
     critical_count = checks.count { |check| check[:status] == "critical" }
